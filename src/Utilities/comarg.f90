@@ -3,7 +3,7 @@ module CommandArguments
   use ConstantsModule, only: LINELENGTH, LENBIGLINE, LENHUGELINE, &
                              VSUMMARY, VALL, VDEBUG, &
                              MVALIDATE
-  use VersionModule, only: VERSION, MFVNAM, IDEVELOPMODE, &
+  use VersionModule, only: VERSION, VERSIONNUMBER, MFVNAM, IDEVELOPMODE, &
                            FMTDISCLAIMER, FMTLICENSE
   use CompilerVersion
   use SimVariablesModule, only: istdout, isim_level, &
@@ -153,7 +153,7 @@ contains
       case ('-V', '--VERSION')
         lstop = .TRUE.
         write (line, '(2a,2(1x,a))') &
-          trim(adjustl(cexe)), ':', trim(adjustl(VERSION)), ctyp
+          trim(adjustl(cexe)), ':', trim(adjustl(VERSIONNUMBER)), ctyp
         call write_message(line, skipbefore=1, skipafter=1)
       case ('-DEV', '--DEVELOP')
         lstop = .TRUE.
