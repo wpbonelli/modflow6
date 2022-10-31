@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - develop
+      - test*
   pull_request:
     branches:
       - develop
+      - test*
 
 env:
   FC: gfortran

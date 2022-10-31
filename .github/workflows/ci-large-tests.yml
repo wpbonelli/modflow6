@@ -17,6 +17,7 @@
 name: Run and test modflow6-largetestmodels and modflow6-examples (z03)
 
 on:
+  push:
   schedule:
     - cron: '0 6 * * *' # run at 6 AM UTC every day
 
