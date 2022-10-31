@@ -157,6 +157,3 @@ if __name__ == "__main__":
     build_mf6_makefile()
     build_zbud6_makefile()
     build_mf5to6_makefile()
-    # test_build_mf6_wmake()
-    # test_build_zbud6_wmake()
-    # test_build_mf5to6_wmake()
