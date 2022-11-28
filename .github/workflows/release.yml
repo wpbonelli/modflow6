@@ -409,6 +409,7 @@ jobs:
       - name: Update version
         working-directory: distribution
         run: |
+          # update version files
           ref="${{ github.ref_name }}"
           ver="${ref%"rc"}"
           if [ "$ref" == "$ver" ]; then
@@ -417,37 +418,30 @@ jobs:
             python update_version.py -v "${ver#"v"}" 
           fi
           
+          # commit and push
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          
           git add -A
           git commit -m "ci(release): update version to $ver"
+          git push origin "$ref"
 
-      - name: Commit and push version number update
+      - name: Create pull request
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # do we need timestamp for anything?
+          # now=$(date +'%Y-%m-%dT%H-%M-%S')
+          # ref="${{ github.ref_name }}"
+          # ver="${ref%"rc"}"
+          # ver="${ver#"v"}"
           
-          now=$(date +'%Y-%m-%dT%H-%M-%S')
-          ref="${{ github.ref_name }}"
-          ver="${ref%"rc"}"
-          ver="${ver#"v"}"
+          # generate changelog
+          gem install github_changelog_generator
+          repo_name="${{ github.repository }}"
+          github_changelog_generator -u ${{ github.repository_owner }} -p ${repo_name%/*}
           
-          git push origin "$ref"
-          # gh pr create -B "master" -H "$ref" --title "Release $ver"
-
-      - name: Create release candidate PR
-        uses: google-github-actions/release-please-action@v3
-        with:
-          command: release-pr
-          version-file: version.txt
-          release-type: simple
-          token: ${{ secrets.GITHUB_TOKEN }}
-          skip-github-release: true
-          include-v-in-tag: false
-          default-branch: master
+          # create PR
+          gh pr create -B "master" -H "$ref" --title "Release $ver" --body-file CHANGELOG.md --draft
 
   release:
     name: Release
