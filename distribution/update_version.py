@@ -134,41 +134,38 @@ _preliminary_fmtdisclaimer = '''  character(len=*), parameter :: FMTDISCLAIMER =
     &'liable for any damages resulting from the authorized or unauthorized ',/, &
     &'use of the software.',/)"'''
 
+_approved_disclaimer = """Disclaimer
+----------
+
+This software has been approved for release by the U.S. Geological Survey
+(USGS). Although the software has been subjected to rigorous review, the USGS
+reserves the right to update the software as needed pursuant to further analysis
+and review. No warranty, expressed or implied, is made by the USGS or the U.S.
+Government as to the functionality of the software and related material nor
+shall the fact of release constitute any such warranty. Furthermore, the
+software is released on condition that neither the USGS nor the U.S. Government
+shall be held liable for any damages resulting from its authorized or
+unauthorized use.
+"""
+
+_preliminary_disclaimer = """Disclaimer
+----------
+
+This software is preliminary or provisional and is subject to revision. It is
+being provided to meet the need for timely best science. The software has not
+received final approval by the U.S. Geological Survey (USGS). No warranty,
+expressed or implied, is made by the USGS or the U.S. Government as to the
+functionality of the software and related material nor shall the fact of release
+constitute any such warranty. The software is provided on the condition that
+neither the USGS nor the U.S. Government shall be held liable for any damages
+resulting from the authorized or unauthorized use of the software.
+"""
+
 
 def get_disclaimer(release_type: ReleaseType, formatted: bool = False) -> str:
-    if formatted:
-        if release_type == ReleaseType.APPROVED:
-            return _approved_fmtdisclaimer
-        else:
-            return _preliminary_fmtdisclaimer
-    else:
-        if release_type == ReleaseType.APPROVED:
-            return """Disclaimer\
-            ----------
-
-            This software has been approved for release by the U.S. Geological Survey
-            (USGS). Although the software has been subjected to rigorous review, the USGS
-            reserves the right to update the software as needed pursuant to further analysis
-            and review. No warranty, expressed or implied, is made by the USGS or the U.S.
-            Government as to the functionality of the software and related material nor
-            shall the fact of release constitute any such warranty. Furthermore, the
-            software is released on condition that neither the USGS nor the U.S. Government
-            shall be held liable for any damages resulting from its authorized or
-            unauthorized use.
-            """
-        else:
-            return """Disclaimer\
-            ----------
-
-            This software is preliminary or provisional and is subject to revision. It is
-            being provided to meet the need for timely best science. The software has not
-            received final approval by the U.S. Geological Survey (USGS). No warranty,
-            expressed or implied, is made by the USGS or the U.S. Government as to the
-            functionality of the software and related material nor shall the fact of release
-            constitute any such warranty. The software is provided on the condition that
-            neither the USGS nor the U.S. Government shall be held liable for any damages
-            resulting from the authorized or unauthorized use of the software.
-            """
+    approved = _approved_fmtdisclaimer if formatted else _approved_disclaimer
+    preliminary = _preliminary_fmtdisclaimer if formatted else _preliminary_disclaimer
+    return approved if release_type == ReleaseType.APPROVED else preliminary
 
 
 def update_version_txt_and_py(

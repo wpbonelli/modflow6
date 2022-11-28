@@ -423,7 +423,7 @@ jobs:
           git add -A
           git commit -m "ci(release): update version to $ver"
 
-      - name: Create PR
+      - name: Commit and push version number update
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
@@ -435,8 +435,19 @@ jobs:
           ver="${ref%"rc"}"
           ver="${ver#"v"}"
           
-          git push -u origin "$ref"
-          gh pr create -B "master" -H "$ref" --title "Release $ver"
+          git push origin "$ref"
+          # gh pr create -B "master" -H "$ref" --title "Release $ver"
+
+      - name: Create release candidate PR
+        uses: google-github-actions/release-please-action@v3
+        with:
+          command: release-pr
+          version-file: version.txt
+          release-type: simple
+          token: ${{ secrets.GITHUB_TOKEN }}
+          skip-github-release: true
+          include-v-in-tag: false
+          default-branch: master
 
   release:
     name: Release
