@@ -436,9 +436,10 @@ jobs:
           # ver="${ver#"v"}"
           
           # generate changelog
-          gem install github_changelog_generator
+          sudo gem install github_changelog_generator
           repo_name="${{ github.repository }}"
           github_changelog_generator -u ${{ github.repository_owner }} -p ${repo_name%/*}
+          cat CHANGELOG.md
           
           # create PR
           gh pr create -B "master" -H "$ref" --title "Release $ver" --body-file CHANGELOG.md --draft
