@@ -188,3 +188,13 @@ To release a new version of MODFLOW 6:
 3. If the release candidate build passes inspection, rename the branch (or create another) without the trailing `rc`. This will trigger a build, in which the distribution archive is constructed with release mode binaries. If the build passes, a PR is created into the `MODFLOW-USGS/modflow6` repository's `master` branch. To finalize the release, merge the PR into `master`. This will trigger a final job to tag the revision to `master` with the updated version, post a draft release to the `MODFLOW-USGS/modflow6` repository, and rebase the `master` branch onto `develop`.
 
 **Note**: version tags posted to the MODFLOW 6 repository follow [semver](https://semver.org/) formatting (`major.minor.patch`) *without* an initial `v`.
+
+Release notes should use the following format:
+
+```
+This is the approved USGS MODFLOW <semver> release.
+
+<authors>, <release year>, MODFLOW 6 Modular Hydrologic Model version <semver>: U.S. Geological Survey Software Release, <release date>, <doi link>
+
+Visit the USGS "MODFLOW and Related Programs" site for information on MODFLOW 6 and related software: https://doi.org/10.5066/F76Q1VQV
+```
