@@ -10,17 +10,13 @@ This folder contains scripts to automate MODFLOW 6 distribution tasks.
 - [Testing](#testing)
 - [Release procedures](#release-procedures)
   - [Preparing a nightly release](#preparing-a-nightly-release)
-    - [Building the nightly distribution](#building-the-nightly-distribution)
-    - [Building MF6 I/O documentation](#building-mf6-io-documentation)
   - [Preparing an official release](#preparing-an-official-release)
-    - [Building makefiles](#building-makefiles)
     - [Updating version info](#updating-version-info)
+    - [Building makefiles](#building-makefiles)
     - [Building example models](#building-example-models)
-    - [Building documentation](#building-documentation)
-      - [Rebuilding TeX from DFN files](#rebuilding-tex-from-dfn-files)
-      - [Building PDFs from TeX files](#building-pdfs-from-tex-files)
     - [Benchmarking example models](#benchmarking-example-models)
-  - [Building the distribution](#building-the-distribution)
+    - [Building documentation](#building-documentation)
+    - [Building the distribution archive](#building-the-distribution-archive)
 - [Release automation](#release-automation)
   - [Nightly builds](#nightly-builds)
   - [Official releases](#official-releases)
@@ -165,7 +161,7 @@ Extensive documentation is bundled with official MODFLOW 6 releases. MODFLOW 6 d
 
 Manually building MODFLOW 6 documentation requires additional Python dependencies specified in `build_rtd_docs/requirements.rtd.txt`. Styles defined in the [`MODFLOW-USGS/usgslatex`](https://github.com/MODFLOW-USGS/usgslatex) are also required. (See that repository's `README` for installation instructions or this repo's [`../.github/workflows/docs.yml](../.github/workflows/docs.yml) CI workflow for an example.) A Docker image with documentation dependencies pre-installed is also available on Docker Hub: [`wbonelli/usgslatex`](https://hub.docker.com/r/wbonelli/usgslatex). This can be useful for building documentation on a system without a LaTeX installation.
 
-### Building the distribution archive
+#### Building the distribution archive
 
 After each step above is complete, the `build_dist.py` script can be used (without the `--development` flag) to bundle MODFLOW 6 official release artifacts for distribution. See [the `release.yml` workflow](../.github/workflows/release.yml) for a complete example of how to build a distribution archive.
 
