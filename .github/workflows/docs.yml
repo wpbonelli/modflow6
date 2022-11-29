@@ -10,7 +10,7 @@ on:
       - master
       - develop
 jobs:
-  rtd:
+  rtd_build:
     name: Build ReadTheDocs
     runs-on: ubuntu-22.04
     defaults:
