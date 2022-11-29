@@ -440,7 +440,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           ref="${{ github.ref_name }}"
-          ver="${ver#"v"}"
+          ver="${ref#"v"}"
           body='
           # MODFLOW 6 version '$ver' release
           
