@@ -448,11 +448,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          # do we need timestamp for anything?
-          # now=$(date +'%Y-%m-%dT%H-%M-%S')
-          # ref="${{ github.ref_name }}"
-          # ver="${ref%"rc"}"
-          # ver="${ver#"v"}"
+          ref="${{ github.ref_name }}"
+          ver="${ver#"v"}"
           
           # generate changelog
           sudo gem install github_changelog_generator
@@ -464,8 +461,17 @@ jobs:
             --since-tag ${{ steps.previous_tag.outputs.tag }}
           cat CHANGELOG.md
           
+          body='
+          # MODFLOW 6 version '$ver' release
+          
+          To approve this release, squash/rebase this pull request. This will trigger a final CI job to:
+          - tag the tip of the `master` branch with `'$ver'`
+          - rebase the `master` branch onto `develop`
+          - reset version files and `IDEVELOPMODE`
+          '
+          
           # create PR
-          gh pr create -B "master" -H "$ref" --title "Release $ver" --body-file CHANGELOG.md --draft
+          gh pr create -B "master" -H "$ref" --title "Release $ver" --draft --body "$body"
 
   release:
     name: Release
