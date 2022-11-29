@@ -397,10 +397,20 @@ if __name__ == "__main__":
         action="store_true",
         help="Indicate release is approved (defaults to false for preliminary/candidate distributions)",
     )
+    parser.add_argument(
+        "-g",
+        "--get",
+        required=False,
+        action="store_true",
+        help="Just get the current version number, don't update anything (defaults to false)",
+    )
     args = parser.parse_args()
 
-    update_version(
-        release_type=ReleaseType.APPROVED if args.approve else ReleaseType.CANDIDATE,
-        timestamp=datetime.now(),
-        version=Version.from_string(args.version) if args.version else _current_version,
-    )
+    if args.get:
+        print(Version.from_file(project_root_path / "version.txt"))
+    else:
+        update_version(
+            release_type=ReleaseType.APPROVED if args.approve else ReleaseType.CANDIDATE,
+            timestamp=datetime.now(),
+            version=Version.from_string(args.version) if args.version else _current_version,
+        )

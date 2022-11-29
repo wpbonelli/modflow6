@@ -417,25 +417,28 @@ jobs:
         run: |
           # update version files
           ref="${{ github.ref_name }}"
-          ver="${ref%"rc"}"
+          ver="${ref#"v"}"
           if [ "$ref" == "$ver" ]; then
-            python update_version.py -v "${ver#"v"}" --approve
+            python update_version.py -v "$ver" --approve
           else
-            python update_version.py -v "${ver#"v"}" 
+            python update_version.py -v "$ver" 
           fi
           
           # commit and push
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "ci(release): update version to $ver"
-          git push origin "$ref"
+          # git config user.name "github-actions[bot]"
+          # git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # git add -A
+          # git commit -m "ci(release): update version to $ver"
+          # git push origin "$ref"
+          
+          # tag revision (needed to auto-gen changelog)
+          git tag "$ver"
 
       # - name: Get latest tag
       #   id: latest_tag
       #   run: |
       #     latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
-      #     echo "tag=$latest_tag" >> $GITHUB_OUTPUT
+      #     echo "tag=$tag" >> $GITHUB_OUTPUT
 
       - name: Get latest tag
         uses: actions-ecosystem/action-get-latest-tag@v1
@@ -458,8 +461,7 @@ jobs:
             -u ${{ github.repository_owner }} \
             -p ${repo_name#*/} \
             -t ${{ github.token }} \
-            # --since-tag ${{ steps.latest_tag.outputs.tag }} \
-            --simple-list true
+            --since-tag ${{ steps.latest_tag.outputs.tag }}
           cat CHANGELOG.md
           
           # create PR
@@ -487,24 +489,37 @@ jobs:
           path: doc
 
       - name: Create release
-        uses: marvinpinto/action-automatic-releases@latest
-        with:
-          draft: true
-          prerelease: false
-          repo_token: ${{ github.token }}
-          files: |
-            zip/*.zip
-            doc/release.pdf
-
-      - name: Rebase branches
         run: |
+          echo "todo"
+          # attach docs and archive files as assets
+          # add front matter (from distribution/README.md)
+          # add changelog
+          # set as draft
+
+      # - name: Create release
+      #   uses: marvinpinto/action-automatic-releases@latest
+      #   with:
+      #     draft: true
+      #     prerelease: false
+      #     repo_token: ${{ github.token }}
+      #     files: |
+      #       zip/*.zip
+      #       doc/release.pdf
+
+      - name: Finalize
+        run: |
+          # tag master
+          git checkout master
+          tag=$(python distribution/update_version.py --get)
+          git tag "$tag"
+          git push origin --tags
+          
+          # rebase develop
           git checkout develop
           git rebase master
 
-      - name: Reset version files
-        working-directory: distribution
-        run: |
-          python update_version.py
+          # reset version files and develop mode
+          python distribution/update_version.py
           git add -A
           git commit -m "ci(release): reset version"
           git push origin develop
