@@ -412,6 +412,10 @@ jobs:
           cache-downloads: true
           cache-env: true
 
+      - name: Get previous tag
+        uses: actions-ecosystem/action-get-latest-tag@v1
+        id: previous_tag
+
       - name: Update version
         working-directory: distribution
         run: |
@@ -440,10 +444,6 @@ jobs:
       #     latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
       #     echo "tag=$tag" >> $GITHUB_OUTPUT
 
-      - name: Get latest tag
-        uses: actions-ecosystem/action-get-latest-tag@v1
-        id: latest_tag
-
       - name: Create pull request
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -461,7 +461,7 @@ jobs:
             -u ${{ github.repository_owner }} \
             -p ${repo_name#*/} \
             -t ${{ github.token }} \
-            --since-tag ${{ steps.latest_tag.outputs.tag }}
+            --since-tag ${{ steps.previous_tag.outputs.tag }}
           cat CHANGELOG.md
           
           # create PR
