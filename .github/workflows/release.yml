@@ -19,8 +19,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          # - os: windows-2022
-          #   ostag: win64
+          - os: windows-2022
+            ostag: win64
     defaults:
       run:
         shell: bash -l {0}
@@ -235,8 +235,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          # - os: windows-2022
-          #   ostag: win64
+          - os: windows-2022
+            ostag: win64
     defaults:
       run:
         shell: bash -l {0}
@@ -452,7 +452,7 @@ jobs:
           ver="${ver#"v"}"
           
           # generate changelog
-          sudo gem install github_changelog_generator
+          # sudo gem install github_changelog_generator
           repo_name="${{ github.repository }}"
           github_changelog_generator \
             -u ${{ github.repository_owner }} \
