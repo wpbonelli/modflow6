@@ -458,7 +458,7 @@ jobs:
             -u ${{ github.repository_owner }} \
             -p ${repo_name#*/} \
             -t ${{ github.token }} \
-            --since-tag ${{ steps.latest_tag.outputs.tag }} \
+            # --since-tag ${{ steps.latest_tag.outputs.tag }} \
             --simple-list true
           cat CHANGELOG.md
           
