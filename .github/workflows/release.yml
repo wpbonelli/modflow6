@@ -330,17 +330,21 @@ jobs:
           mkdir modflow6/distribution/.benchmarks
           python modflow6/distribution/build_dist.py -o "$VERSION" -e modflow6-examples
 
-      - name: Rename PDF docs
+      - name: Rename PDF docs, copy code.json, set zip name
         run: |
+          # rename PDF docs
           mv "$VERSION/doc/ReleaseNotes.pdf" "$VERSION/doc/release.pdf"
           mv "$VERSION/doc/converter_mf5to6.pdf" "$VERSION/doc/mf5to6.pdf"
           
+          # copy code.json
+          cp modflow6/code.json "$VERSION/code.json"
+          
+          # set zip name
           if [ "${{ runner.os }}" == "Windows" ]; then
             zip_name="${{ env.VERSION }}"
           else
             zip_name="${{ env.VERSION }}_${{ matrix.ostag }}"
           fi
-          
           echo "ZIP_NAME=$zip_name" >> $GITHUB_ENV
 
       - name: Set executable permissions
