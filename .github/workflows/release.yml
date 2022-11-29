@@ -431,11 +431,15 @@ jobs:
           git commit -m "ci(release): update version to $ver"
           git push origin "$ref"
 
+      # - name: Get latest tag
+      #   id: latest_tag
+      #   run: |
+      #     latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+      #     echo "tag=$latest_tag" >> $GITHUB_OUTPUT
+
       - name: Get latest tag
+        uses: actions-ecosystem/action-get-latest-tag@v1
         id: latest_tag
-        run: |
-          latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
-          echo "tag=$latest_tag" >> $GITHUB_OUTPUT
 
       - name: Create pull request
         env:
