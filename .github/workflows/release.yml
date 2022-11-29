@@ -19,8 +19,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          - os: windows-2022
-            ostag: win64
+          # - os: windows-2022
+          #   ostag: win64
     defaults:
       run:
         shell: bash -l {0}
@@ -235,8 +235,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          - os: windows-2022
-            ostag: win64
+          # - os: windows-2022
+          #   ostag: win64
     defaults:
       run:
         shell: bash -l {0}
@@ -406,7 +406,6 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Setup Micromamba
-        if: ${{ !(contains(github.ref_name, 'rc')) || steps.cache-bin.outputs.cache-hit != 'true' }}
         uses: mamba-org/provision-with-micromamba@main
         with:
           cache-downloads: true
@@ -429,20 +428,11 @@ jobs:
           fi
           
           # commit and push
-          # git config user.name "github-actions[bot]"
-          # git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # git add -A
-          # git commit -m "ci(release): update version to $ver"
-          # git push origin "$ref"
-          
-          # tag revision (needed to auto-gen changelog)
-          git tag "$ver"
-
-      # - name: Get latest tag
-      #   id: latest_tag
-      #   run: |
-      #     latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
-      #     echo "tag=$tag" >> $GITHUB_OUTPUT
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "ci(release): update version to $ver"
+          git push origin "$ref"
 
       - name: Create pull request
         env:
@@ -450,17 +440,6 @@ jobs:
         run: |
           ref="${{ github.ref_name }}"
           ver="${ver#"v"}"
-          
-          # generate changelog
-          # sudo gem install github_changelog_generator
-          repo_name="${{ github.repository }}"
-          github_changelog_generator \
-            -u ${{ github.repository_owner }} \
-            -p ${repo_name#*/} \
-            -t ${{ github.token }} \
-            --since-tag ${{ steps.previous_tag.outputs.tag }}
-          cat CHANGELOG.md
-          
           body='
           # MODFLOW 6 version '$ver' release
           
@@ -470,7 +449,6 @@ jobs:
           - reset version files and `IDEVELOPMODE`
           '
           
-          # create PR
           gh pr create -B "master" -H "$ref" --title "Release $ver" --draft --body "$body"
 
   release:
@@ -482,50 +460,45 @@ jobs:
       - name: Checkout modflow6
         uses: actions/checkout@v3
 
-      - name: Download zipfiles
-        uses: actions/download-artifact@v3
+      - name: Setup Micromamba
+        uses: mamba-org/provision-with-micromamba@main
         with:
-          name: zip*
-          path: zip
+          cache-downloads: true
+          cache-env: true
 
-      - name: Download docs PDF
-        uses: actions/download-artifact@v3
+      - name: Download artifacts
+        uses: dawidd6/action-download-artifact@v2
         with:
-          name: doc
-          path: doc
+          skip_unpack: true
 
-      - name: Create release
+      - name: Draft release
         run: |
-          echo "todo"
-          # attach docs and archive files as assets
-          # add front matter (from distribution/README.md)
-          # add changelog
-          # set as draft
-
-      # - name: Create release
-      #   uses: marvinpinto/action-automatic-releases@latest
-      #   with:
-      #     draft: true
-      #     prerelease: false
-      #     repo_token: ${{ github.token }}
-      #     files: |
-      #       zip/*.zip
-      #       doc/release.pdf
-
-      - name: Finalize
-        run: |
-          # tag master
-          git checkout master
-          tag=$(python distribution/update_version.py --get)
-          git tag "$tag"
-          git push origin --tags
+          ver=$(python distribution/update_version.py --get)
+          title="MODFLOW Version $ver"
+          notes='
+          This is the approved USGS MODFLOW '$ver' release.
           
-          # rebase develop
-          git checkout develop
-          git rebase master
+          *Insert citation here*
+          
+          Visit the USGS "MODFLOW and Related Programs" site for information on MODFLOW 6 and related software: https://doi.org/10.5066/F76Q1VQV
+          '
+          
+          gh pr create "$ver" mf*.zip release_notes.zip --title "$title" --notes "$notes" --draft --latest 
 
-          # reset version files and develop mode
-          python distribution/update_version.py
-          git add -A
-          git commit -m "ci(release): reset version"
-          git push origin develop
+      # - name: Tag and rebase
+      #   run: |
+      #     # tag master
+      #     git checkout master
+      #     tag=$(python distribution/update_version.py --get)
+      #     git tag "$tag"
+      #     git push origin --tags
+      #
+      #     # rebase develop
+      #     git checkout develop
+      #     git rebase master
+
+      #     # reset version files and develop mode
+      #     python distribution/update_version.py
+      #     git add -A
+      #     git commit -m "ci(release): reset version"
+      #     git push origin develop
