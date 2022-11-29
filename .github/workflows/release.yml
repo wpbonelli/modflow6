@@ -69,6 +69,9 @@ jobs:
           else
             python update_version.py -v "${ver#"v"}" 
           fi
+          
+          # check src/Utilities/version.f90 IDEVELOPMODE setting
+          cat src/Utilities/version.f90
 
       - name: Build binaries
         if: ${{ runner.os != 'Windows' && (!(contains(github.ref_name, 'rc')) || steps.cache-bin.outputs.cache-hit != 'true') }}
@@ -79,7 +82,6 @@ jobs:
           meson test --verbose --no-rebuild -C builddir
 
       - name: Build binaries (Windows)
-        # if: runner.os == 'Windows'
         if: ${{ runner.os == 'Windows' && (!(contains(github.ref_name, 'rc')) || steps.cache-bin.outputs.cache-hit != 'true') }}
         working-directory: modflow6
         shell: pwsh

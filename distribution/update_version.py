@@ -168,6 +168,10 @@ def get_disclaimer(release_type: ReleaseType, formatted: bool = False) -> str:
     return approved if release_type == ReleaseType.APPROVED else preliminary
 
 
+def log_update(path, release_type: ReleaseType, version: Version):
+    print(f"Updated {path} with version {version}" + (f" {release_type.value}" if release_type != ReleaseType.APPROVED else ""))
+
+
 def update_version_txt_and_py(
     release_type: ReleaseType, timestamp: datetime, version: Version
 ):
@@ -183,12 +187,11 @@ def update_version_txt_and_py(
         f.write(f"micro = {version.patch}\n")
         f.write("__version__ = '{:d}.{:d}.{:d}'.format(major, minor, micro)\n")
         f.close()
-
-    print(f"Updated {version_file_path} (version {version} {release_type.value})")
+    log_update(version_file_path, release_type, version)
 
     py_path = project_root_path / "doc" / version_file_path.name.replace(".txt", ".py")
     shutil.copyfile(version_file_path, py_path)
-    print(f"Updated {py_path} ({version} {release_type.value})")
+    log_update(py_path, release_type, version)
 
 
 def update_version_tex(
@@ -215,7 +218,7 @@ def update_version_tex(
         f.write(f"{line}\n")
         f.close()
 
-    print(f"Updated {path} (version {version} {release_type.value})")
+    log_update(path, release_type, version)
 
 
 def update_version_f90(
@@ -246,7 +249,7 @@ def update_version_f90(
                 skip = True
             f.write(f"{line}\n")
 
-    print(f"Updated {path} (version {version} {release_type.value})")
+    log_update(path, release_type, version)
 
 
 def update_readme_and_disclaimer(
@@ -267,12 +270,12 @@ def update_readme_and_disclaimer(
                 break
             else:
                 f.write(f"{line}\n")
-    print(f"Updated {readme_path} (version {version} {release_type.value})")
+    log_update(readme_path, release_type, version)
 
     disclaimer_path = project_root_path / "DISCLAIMER.md"
     with open(disclaimer_path, "w") as f:
         f.write(disclaimer)
-    print(f"Updated {disclaimer_path} (version {version} {release_type.value})")
+    log_update(disclaimer_path, release_type, version)
 
 
 def update_codejson(release_type: ReleaseType, timestamp: datetime, version: Version):
@@ -287,7 +290,7 @@ def update_codejson(release_type: ReleaseType, timestamp: datetime, version: Ver
         json.dump(data, f, indent=4)
         f.write("\n")
 
-    print(f"Updated {path} (version {version} {release_type.value})")
+    log_update(path, release_type, version)
 
 
 def update_version(
@@ -392,7 +395,7 @@ if __name__ == "__main__":
         "--approve",
         required=False,
         action="store_true",
-        help="Indicate release is approved (defaults to preliminary/candidate)",
+        help="Indicate release is approved (defaults to false for preliminary/candidate distributions)",
     )
     args = parser.parse_args()
 
