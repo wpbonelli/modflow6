@@ -71,7 +71,7 @@ jobs:
           fi
           
           # check src/Utilities/version.f90 IDEVELOPMODE setting
-          cat modflow6/src/Utilities/version.f90
+          cat ../src/Utilities/version.f90
 
       - name: Build binaries
         if: ${{ runner.os != 'Windows' && (!(contains(github.ref_name, 'rc')) || steps.cache-bin.outputs.cache-hit != 'true') }}
