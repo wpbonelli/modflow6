@@ -438,7 +438,7 @@ jobs:
           # generate changelog
           sudo gem install github_changelog_generator
           repo_name="${{ github.repository }}"
-          github_changelog_generator -u ${{ github.repository_owner }} -p ${repo_name%/*}
+          github_changelog_generator -u ${{ github.repository_owner }} -p ${repo_name#*/} -t ${{ github.token }}
           cat CHANGELOG.md
           
           # create PR
