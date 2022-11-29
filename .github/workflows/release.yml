@@ -427,6 +427,12 @@ jobs:
           git commit -m "ci(release): update version to $ver"
           git push origin "$ref"
 
+      - name: Get latest tag
+        id: latest_tag
+        run: |
+          latest_tag=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "tag=$latest_tag" >> $GITHUB_OUTPUT
+
       - name: Create pull request
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -440,7 +446,12 @@ jobs:
           # generate changelog
           sudo gem install github_changelog_generator
           repo_name="${{ github.repository }}"
-          github_changelog_generator -u ${{ github.repository_owner }} -p ${repo_name#*/} -t ${{ github.token }}
+          github_changelog_generator \
+            -u ${{ github.repository_owner }} \
+            -p ${repo_name#*/} \
+            -t ${{ github.token }} \
+            --since-tag ${{ steps.latest_tag.outputs.tag }} \
+            --simple-list true
           cat CHANGELOG.md
           
           # create PR
