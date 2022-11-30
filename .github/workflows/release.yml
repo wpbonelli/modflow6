@@ -471,10 +471,29 @@ jobs:
           cache-downloads: true
           cache-env: true
 
+      - name: Archive source code (zip)
+        uses: thedoctor0/zip-release@main
+        with:
+          type: 'zip'
+          filename: "Source code (zip)"
+          exclusions: '*.git/'
+
+      - name: Archive source code (tar)
+        uses: thedoctor0/zip-release@main
+        with:
+          type: 'tar'
+          filename: "Source code (tar.gz)"
+          exclusions: '*.git/'
+
       - name: Download artifacts
         uses: dawidd6/action-download-artifact@v2
         with:
           skip_unpack: true
+
+      - name: Unzip/rename release notes
+        run: |
+          unzip -q release_notes.zip
+          mv release_notes.pdf release.pdf
 
       - name: Draft release
         env:
@@ -490,7 +509,7 @@ jobs:
           Visit the USGS "MODFLOW and Related Programs" site for information on MODFLOW 6 and related software: https://doi.org/10.5066/F76Q1VQV
           '
           
-          gh release create "$ver" mf*.zip release_notes.zip --title "$title" --notes "$notes" --draft --latest 
+          gh release create "$ver" mf*.zip release.pdf Source* --title "$title" --notes "$notes" --draft --latest 
 
       # - name: Tag and rebase
       #   run: |
