@@ -20,8 +20,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          # - os: windows-2022
-          #   ostag: win64
+          - os: windows-2022
+            ostag: win64
     defaults:
       run:
         shell: bash -l {0}
@@ -236,8 +236,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          # - os: windows-2022
-          #   ostag: win64
+          - os: windows-2022
+            ostag: win64
     defaults:
       run:
         shell: bash -l {0}
@@ -377,10 +377,10 @@ jobs:
             ${{ env.DISTNAME }}/utils \
             ${{ env.DISTNAME }}/code.json \
             ${{ env.DISTNAME }}/meson.build \
+            -x '*.DS_Store' \
             -x '*libmf6.lib' \
             -x '*idmloader*' \
-            -x '*pymake* \
-            -x '*.DS_Store' \
+            -x '*pymake*' \
             -x '*obj_temp*' \
             -x '*mod_temp*'
 
