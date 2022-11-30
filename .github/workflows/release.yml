@@ -477,6 +477,8 @@ jobs:
           skip_unpack: true
 
       - name: Draft release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           ver=$(python distribution/update_version.py --get)
           title="MODFLOW Version $ver"
