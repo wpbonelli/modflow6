@@ -488,7 +488,7 @@ jobs:
           Visit the USGS "MODFLOW and Related Programs" site for information on MODFLOW 6 and related software: https://doi.org/10.5066/F76Q1VQV
           '
           
-          gh pr create "$ver" mf*.zip release_notes.zip --title "$title" --notes "$notes" --draft --latest 
+          gh release create "$ver" mf*.zip release_notes.zip --title "$title" --notes "$notes" --draft --latest 
 
       # - name: Tag and rebase
       #   run: |
