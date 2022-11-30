@@ -362,7 +362,38 @@ jobs:
       - name: Check distribution
         run: pytest -v -s modflow6/distribution/check_dist.py -P ${{ env.DISTNAME }}
 
+      # distribution must be zipped manually on Unix to preserve executable permissions
+      - name: Zip distribution
+        if: runner.os != 'Windows'
+        run: |
+          zip -r ${{ env.ZIP_NAME }}.zip \
+            ${{ env.DISTNAME }}/bin \
+            ${{ env.DISTNAME }}/src \
+            ${{ env.DISTNAME }}/srcbmi \
+            ${{ env.DISTNAME }}/doc \
+            ${{ env.DISTNAME }}/examples \
+            ${{ env.DISTNAME }}/make \
+            ${{ env.DISTNAME }}/msvs \
+            ${{ env.DISTNAME }}/utils \
+            ${{ env.DISTNAME }}/code.json \
+            ${{ env.DISTNAME }}/meson.build \
+            -x ${{ env.DISTNAME }}/utils/idmloader \
+            -x ${{ env.DISTNAME }}/bin/libmf6.lib \
+            -x ${{ env.DISTNAME }}/**/pymake \
+            -x ${{ env.DISTNAME }}/**/.DS_Store \
+            -x ${{ env.DISTNAME }}/**/.obj_temp \
+            -x ${{ env.DISTNAME }}/**/.mod_temp
+
       - name: Upload distribution
+        if: runner.os != 'Windows'
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: ${{ env.ZIP_NAME }}.zip
+
+      # executable permissions don't matter on Windows
+      - name: Upload distribution (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v3
         with:
           name: ${{ env.ZIP_NAME }}
@@ -470,6 +501,7 @@ jobs:
       - name: Setup Micromamba
         uses: mamba-org/provision-with-micromamba@main
         with:
+          environment-file: modflow6/environment.yml
           cache-downloads: true
           cache-env: true
 
@@ -503,7 +535,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          ver=$(python distribution/update_version.py --get)
+          ver=$(python modflow6/distribution/update_version.py --get)
           title="MODFLOW Version $ver"
           notes='
           This is the approved USGS MODFLOW '$ver' release.
@@ -516,6 +548,7 @@ jobs:
           gh release create "$ver" mf*.zip release.pdf Source* --target master --title "$title" --notes "$notes" --draft --latest 
 
       - name: Rebase develop and reset version files
+        working-directory: modflow6
         run: |
           # check tag was created 
           git fetch --tags origin
