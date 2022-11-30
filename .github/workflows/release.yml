@@ -530,7 +530,7 @@ jobs:
       - name: Unzip/rename release notes
         run: |
           unzip -q release_notes.zip
-          mv release_notes.pdf release.pdf
+          mv release_notes release.pdf
 
       - name: Draft release
         env:
