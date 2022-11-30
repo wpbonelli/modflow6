@@ -377,12 +377,12 @@ jobs:
             ${{ env.DISTNAME }}/utils \
             ${{ env.DISTNAME }}/code.json \
             ${{ env.DISTNAME }}/meson.build \
-            -x ${{ env.DISTNAME }}/utils/idmloader \
-            -x ${{ env.DISTNAME }}/bin/libmf6.lib \
-            -x ${{ env.DISTNAME }}/**/pymake \
-            -x ${{ env.DISTNAME }}/**/.DS_Store \
-            -x ${{ env.DISTNAME }}/**/.obj_temp \
-            -x ${{ env.DISTNAME }}/**/.mod_temp
+            -x '*libmf6.lib' \
+            -x '*idmloader*' \
+            -x '*pymake* \
+            -x '*.DS_Store' \
+            -x '*obj_temp*' \
+            -x '*mod_temp*'
 
       - name: Upload distribution
         if: runner.os != 'Windows'
@@ -505,21 +505,22 @@ jobs:
           cache-downloads: true
           cache-env: true
 
-      - name: Archive source code (zip)
-        uses: thedoctor0/zip-release@main
-        with:
-          path: modflow6
-          type: zip
-          filename: "Source code (zip)"
-          exclusions: '*.git/'
+      # TODO: figure out how to reproduce the default GitHub Actions asset naming: "Source code (zip/tar.gz)"
+      # - name: Archive source code (zip)
+      #   uses: thedoctor0/zip-release@main
+      #   with:
+      #     path: modflow6
+      #     type: zip
+      #     filename: "Source code (zip)"
+      #     exclusions: '*.git/'
 
-      - name: Archive source code (tar)
-        uses: thedoctor0/zip-release@main
-        with:
-          path: modflow6
-          type: tar
-          filename: "Source code (tar.gz)"
-          exclusions: '*.git/'
+      # - name: Archive source code (tar)
+      #   uses: thedoctor0/zip-release@main
+      #   with:
+      #     path: modflow6
+      #     type: tar
+      #     filename: "Source code (tar.gz)"
+      #     exclusions: '*.git/'
 
       - name: Download artifacts
         uses: dawidd6/action-download-artifact@v2
@@ -545,7 +546,7 @@ jobs:
           Visit the USGS "MODFLOW and Related Programs" site for information on MODFLOW 6 and related software: https://doi.org/10.5066/F76Q1VQV
           '
           
-          gh release create "$ver" mf*.zip release.pdf Source* --target master --title "$title" --notes "$notes" --draft --latest 
+          gh release create "$ver" mf*.zip release.pdf --target master --title "$title" --notes "$notes" --draft --latest 
 
       - name: Rebase develop and reset version files
         working-directory: modflow6
