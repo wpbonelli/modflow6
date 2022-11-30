@@ -152,23 +152,23 @@ jobs:
           $mamba_bin = "C:\Users\runneradmin\micromamba-root\envs\modflow6\Scripts"
           echo $mamba_bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Cache modflow6 examples
-        id: cache-examples
-        uses: actions/cache@v3
-        with:
-          path: modflow6-examples/examples
-          key: modflow6-examples-${{ hashFiles('modflow6-examples/scripts/**') }}
+      # - name: Cache modflow6 examples
+      #   id: cache-examples
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: modflow6-examples/examples
+      #     key: modflow6-examples-${{ hashFiles('modflow6-examples/scripts/**') }}
 
       - name: Install extra Python packages
-        if: steps.cache-examples.outputs.cache-hit != 'true'
+        # if: steps.cache-examples.outputs.cache-hit != 'true'
         working-directory: modflow6-examples/etc
         run: pip install -r requirements.pip.txt
 
       - name: Build example models
-        if: steps.cache-examples.outputs.cache-hit != 'true'
+        # if: steps.cache-examples.outputs.cache-hit != 'true'
         working-directory: modflow6-examples/etc
         run: |
-          python ci_build_files.py
+          pytest -v -n auto ci_build_files.py
           ls -lh ../examples/ 
 
       - name: Update version
@@ -271,24 +271,24 @@ jobs:
           $mamba_bin = "C:\Users\runneradmin\micromamba-root\envs\modflow6\Scripts"
           echo $mamba_bin | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Cache modflow6 examples
-        id: cache-examples
-        uses: actions/cache@v3
-        with:
-          path: modflow6-examples/examples
-          key: modflow6-examples-${{ hashFiles('modflow6-examples/scripts/**') }}
+      # - name: Cache modflow6 examples
+      #   id: cache-examples
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: modflow6-examples/examples
+      #     key: modflow6-examples-${{ hashFiles('modflow6-examples/scripts/**') }}
 
       - name: Install extra Python packages
-        if: steps.cache-examples.outputs.cache-hit != 'true'
+        # if: steps.cache-examples.outputs.cache-hit != 'true'
         working-directory: modflow6-examples/etc
         run: |
           pip install -r requirements.pip.txt
 
       - name: Build example models
-        if: steps.cache-examples.outputs.cache-hit != 'true'
+        # if: steps.cache-examples.outputs.cache-hit != 'true'
         working-directory: modflow6-examples/etc
         run: |
-          python ci_build_files.py
+          pytest -v -n auto ci_build_files.py
           ls -lh ../examples/ 
       
       - name: Update version
@@ -464,6 +464,8 @@ jobs:
     steps:
       - name: Checkout modflow6
         uses: actions/checkout@v3
+        with:
+          path: modflow6
 
       - name: Setup Micromamba
         uses: mamba-org/provision-with-micromamba@main
@@ -474,19 +476,18 @@ jobs:
       - name: Archive source code (zip)
         uses: thedoctor0/zip-release@main
         with:
-          type: 'zip'
+          path: modflow6
+          type: zip
           filename: "Source code (zip)"
           exclusions: '*.git/'
-
-      - name: Touch tar source code archive
-        run: touch "Source code (tar.gz)"
 
       - name: Archive source code (tar)
         uses: thedoctor0/zip-release@main
         with:
-          type: 'tar'
+          path: modflow6
+          type: tar
           filename: "Source code (tar.gz)"
-          exclusions: '*.git/ Source*'
+          exclusions: '*.git/'
 
       - name: Download artifacts
         uses: dawidd6/action-download-artifact@v2
@@ -516,12 +517,6 @@ jobs:
 
       - name: Rebase develop and reset version files
         run: |
-          # tag master
-          # git checkout master
-          # tag=$(python distribution/update_version.py --get)
-          # git tag "$tag"
-          # git push origin --tags
-          
           # check tag was created 
           git fetch --tags origin
           git tag
