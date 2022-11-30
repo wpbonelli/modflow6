@@ -19,8 +19,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          - os: windows-2022
-            ostag: win64
+          # - os: windows-2022
+          #   ostag: win64
     defaults:
       run:
         shell: bash -l {0}
@@ -140,11 +140,10 @@ jobs:
           cache-env: true
 
       - name: Setup Intel Fortran
-        # if: ${{ !(contains(github.ref_name, 'rc')) }}
         uses: w-bonelli/install-intelfortran-action@develop
 
       - name: Fix Micromamba path (Windows)
-        # if: ${{ runner.os == 'Windows' && (!(contains(github.ref_name, 'rc'))) }}
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           # https://github.com/modflowpy/install-intelfortran-action#conda-scripts
@@ -161,8 +160,7 @@ jobs:
       - name: Install extra Python packages
         if: steps.cache-examples.outputs.cache-hit != 'true'
         working-directory: modflow6-examples/etc
-        run: |
-          pip install -r requirements.pip.txt
+        run: pip install -r requirements.pip.txt
 
       - name: Build example models
         if: steps.cache-examples.outputs.cache-hit != 'true'
@@ -183,24 +181,24 @@ jobs:
             python update_version.py -v "${ver#"v"}" 
           fi
           
-          echo "VERSION=mf${ref#"v"}" >> $GITHUB_ENV
+          echo "DISTNAME=mf${ref#"v"}" >> $GITHUB_ENV
 
       - name: Create directory structure
         run: |
           # Create a skeleton of the distribution's folder structure to include in the docs
-          mkdir -p "$VERSION/doc"
-          mkdir "$VERSION/make"
-          mkdir "$VERSION/msvs"
-          mkdir "$VERSION/srcbmi"
-          cp modflow6/code.json "$VERSION/code.json"
-          cp modflow6/meson.build "$VERSION/meson.build"
-          cp -r modflow6-examples/examples "$VERSION"
-          cp -r modflow6/src "$VERSION"
-          cp -r modflow6/utils "$VERSION"
+          mkdir -p "$DISTNAME/doc"
+          mkdir "$DISTNAME/make"
+          mkdir "$DISTNAME/msvs"
+          mkdir "$DISTNAME/srcbmi"
+          cp modflow6/code.json "$DISTNAME/code.json"
+          cp modflow6/meson.build "$DISTNAME/meson.build"
+          cp -r modflow6-examples/examples "$DISTNAME"
+          cp -r modflow6/src "$DISTNAME"
+          cp -r modflow6/utils "$DISTNAME"
           
           # create LaTeX file describing the folder structure
           cd modflow6/doc/ReleaseNotes
-          python mk_folder_struct.py -dp "${{ github.workspace }}/$VERSION"
+          python mk_folder_struct.py -dp "${{ github.workspace }}/$DISTNAME"
 
       - name: Download artifacts
         uses: actions/download-artifact@v3
@@ -235,8 +233,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          - os: windows-2022
-            ostag: win64
+          # - os: windows-2022
+          #   ostag: win64
     defaults:
       run:
         shell: bash -l {0}
@@ -302,19 +300,19 @@ jobs:
             python update_version.py -v "${ver#"v"}" 
           fi
           
-          echo "VERSION=mf${ref#"v"}" >> $GITHUB_ENV
+          echo "DISTNAME=mf${ref#"v"}" >> $GITHUB_ENV
 
       - name: Download artifacts
         uses: actions/download-artifact@v3
         with:
-          path: ${{ env.VERSION }}
+          path: ${{ env.DISTNAME }}
 
       - name: Prune artifacts
         run: |
           # move binaries for current OS to top level bin
           # directory and remove executables for other OS
-          mv "$VERSION/bin-${{ runner.os }}" "$VERSION/bin"
-          rm -rf "$VERSION/bin-*"
+          mv "$DISTNAME/bin-${{ runner.os }}" "$DISTNAME/bin"
+          rm -rf "$DISTNAME/bin-*"
 
       - name: Build distribution
         env:
@@ -323,72 +321,72 @@ jobs:
           if [ "${{ runner.os }}" == "Windows" ]; then
             export PATH="/C/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Tools/MSVC/14.33.31629/bin/Hostx64/x64":$PATH
           else
-            chmod +x "$VERSION/bin/mf6"
-            chmod +x "$VERSION/bin/mf5to6"
-            chmod +x "$VERSION/bin/zbud6"
+            chmod +x "$DISTNAME/bin/mf6"
+            chmod +x "$DISTNAME/bin/mf5to6"
+            chmod +x "$DISTNAME/bin/zbud6"
           fi
           mkdir modflow6/distribution/.benchmarks
-          python modflow6/distribution/build_dist.py -o "$VERSION" -e modflow6-examples
+          python modflow6/distribution/build_dist.py -o "$DISTNAME" -e modflow6-examples
 
       - name: Rename PDF docs, copy code.json, set zip name
         run: |
           # rename PDF docs
-          mv "$VERSION/doc/ReleaseNotes.pdf" "$VERSION/doc/release.pdf"
-          mv "$VERSION/doc/converter_mf5to6.pdf" "$VERSION/doc/mf5to6.pdf"
+          mv "$DISTNAME/doc/ReleaseNotes.pdf" "$DISTNAME/doc/release.pdf"
+          mv "$DISTNAME/doc/converter_mf5to6.pdf" "$DISTNAME/doc/mf5to6.pdf"
           
           # copy code.json
-          cp modflow6/code.json "$VERSION/code.json"
+          cp modflow6/code.json "$DISTNAME/code.json"
           
           # set zip name
           if [ "${{ runner.os }}" == "Windows" ]; then
-            zip_name="${{ env.VERSION }}"
+            zip_name="${{ env.DISTNAME }}"
           else
-            zip_name="${{ env.VERSION }}_${{ matrix.ostag }}"
+            zip_name="${{ env.DISTNAME }}_${{ matrix.ostag }}"
           fi
           echo "ZIP_NAME=$zip_name" >> $GITHUB_ENV
 
       - name: Set executable permissions
         if: runner.os != 'Windows'
         run: |
-          chmod +x "$VERSION/bin/mf6"
-          chmod +x "$VERSION/bin/mf5to6"
-          chmod +x "$VERSION/bin/zbud6"
-          chmod +x "$VERSION/examples/runall.sh"
-          for f in "$VERSION/examples"/*/run.sh; do
+          chmod +x "$DISTNAME/bin/mf6"
+          chmod +x "$DISTNAME/bin/mf5to6"
+          chmod +x "$DISTNAME/bin/zbud6"
+          chmod +x "$DISTNAME/examples/runall.sh"
+          for f in "$DISTNAME/examples"/*/run.sh; do
             chmod +x "$f"
           done
 
       - name: Check distribution
-        run: pytest -v -s modflow6/distribution/check_dist.py -P ${{ env.VERSION }}
+        run: pytest -v -s modflow6/distribution/check_dist.py -P ${{ env.DISTNAME }}
 
       - name: Upload distribution
         uses: actions/upload-artifact@v3
         with:
           name: ${{ env.ZIP_NAME }}
           path: |
-            ${{ env.VERSION }}/bin
-            ${{ env.VERSION }}/src
-            ${{ env.VERSION }}/srcbmi
-            ${{ env.VERSION }}/doc
-            ${{ env.VERSION }}/examples
-            ${{ env.VERSION }}/make
-            ${{ env.VERSION }}/msvs
-            ${{ env.VERSION }}/utils
-            ${{ env.VERSION }}/code.json
-            ${{ env.VERSION }}/meson.build
-            !${{ env.VERSION }}/utils/idmloader
-            !${{ env.VERSION }}/bin/libmf6.lib
-            !${{ env.VERSION }}/**/pymake
-            !${{ env.VERSION }}/**/.DS_Store
-            !${{ env.VERSION }}/**/obj_temp
-            !${{ env.VERSION }}/**/mod_temp
+            ${{ env.DISTNAME }}/bin
+            ${{ env.DISTNAME }}/src
+            ${{ env.DISTNAME }}/srcbmi
+            ${{ env.DISTNAME }}/doc
+            ${{ env.DISTNAME }}/examples
+            ${{ env.DISTNAME }}/make
+            ${{ env.DISTNAME }}/msvs
+            ${{ env.DISTNAME }}/utils
+            ${{ env.DISTNAME }}/code.json
+            ${{ env.DISTNAME }}/meson.build
+            !${{ env.DISTNAME }}/utils/idmloader
+            !${{ env.DISTNAME }}/bin/libmf6.lib
+            !${{ env.DISTNAME }}/**/pymake
+            !${{ env.DISTNAME }}/**/.DS_Store
+            !${{ env.DISTNAME }}/**/obj_temp
+            !${{ env.DISTNAME }}/**/mod_temp
 
       - name: Upload release notes
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v3
         with:
           name: release_notes
-          path: ${{ env.VERSION }}/doc/release.pdf
+          path: ${{ env.DISTNAME }}/doc/release.pdf
 
   pr:
     name: Create pull request
@@ -444,10 +442,11 @@ jobs:
           body='
           # MODFLOW 6 version '$ver' release
           
-          To approve this release, squash/rebase this pull request. This will trigger a final CI job to:
+          To approve this release, merge (or squash/rebase) this pull request. This will trigger a final CI job to:
           - tag the tip of the `master` branch with `'$ver'`
           - rebase the `master` branch onto `develop`
           - reset version files and `IDEVELOPMODE`
+          - create a GitHub release
           '
           
           gh pr create -B "master" -H "$ref" --title "Release $ver" --draft --body "$body"
@@ -455,7 +454,6 @@ jobs:
   release:
     name: Release
     if: ${{ github.event_name == 'push' && github.ref_name == 'master' }}
-    needs: dist
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout modflow6
