@@ -10,6 +10,7 @@ env:
 jobs:
   build:
     name: Build binaries (${{ matrix.os }})
+    if: ${{ github.event_name != 'push' || github.ref_name != 'master' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -98,6 +99,7 @@ jobs:
 
   docs:
     name: Build docs
+    if: ${{ github.event_name != 'push' || github.ref_name != 'master' }}
     needs: build
     runs-on: ubuntu-22.04
     defaults:
@@ -223,6 +225,7 @@ jobs:
 
   dist:
     name: Build distribution (${{ matrix.os }})
+    if: ${{ github.event_name != 'push' || github.ref_name != 'master' }}
     needs: docs
     runs-on: ${{ matrix.os }}
     strategy:
@@ -442,7 +445,7 @@ jobs:
           body='
           # MODFLOW 6 version '$ver' release
           
-          To approve this release, merge (or squash/rebase) this pull request. This will trigger a final CI job to:
+          To approve this release, merge this pull request. This will trigger a final CI job to:
           - tag the tip of the `master` branch with `'$ver'`
           - rebase the `master` branch onto `develop`
           - reset version files and `IDEVELOPMODE`
@@ -455,6 +458,9 @@ jobs:
     name: Release
     if: ${{ github.event_name == 'push' && github.ref_name == 'master' }}
     runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash -l {0}
     steps:
       - name: Checkout modflow6
         uses: actions/checkout@v3
