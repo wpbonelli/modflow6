@@ -478,12 +478,15 @@ jobs:
           filename: "Source code (zip)"
           exclusions: '*.git/'
 
+      - name: Touch tar source code archive
+        run: touch "Source code (tar.gz)"
+
       - name: Archive source code (tar)
         uses: thedoctor0/zip-release@main
         with:
           type: 'tar'
           filename: "Source code (tar.gz)"
-          exclusions: '*.git/'
+          exclusions: '*.git/ Source*'
 
       - name: Download artifacts
         uses: dawidd6/action-download-artifact@v2
@@ -509,22 +512,26 @@ jobs:
           Visit the USGS "MODFLOW and Related Programs" site for information on MODFLOW 6 and related software: https://doi.org/10.5066/F76Q1VQV
           '
           
-          gh release create "$ver" mf*.zip release.pdf Source* --title "$title" --notes "$notes" --draft --latest 
+          gh release create "$ver" mf*.zip release.pdf Source* --target master --title "$title" --notes "$notes" --draft --latest 
 
-      # - name: Tag and rebase
-      #   run: |
-      #     # tag master
-      #     git checkout master
-      #     tag=$(python distribution/update_version.py --get)
-      #     git tag "$tag"
-      #     git push origin --tags
-      #
-      #     # rebase develop
-      #     git checkout develop
-      #     git rebase master
+      - name: Rebase develop and reset version files
+        run: |
+          # tag master
+          # git checkout master
+          # tag=$(python distribution/update_version.py --get)
+          # git tag "$tag"
+          # git push origin --tags
+          
+          # check tag was created 
+          git fetch --tags origin
+          git tag
+      
+          # rebase develop
+          git checkout develop
+          git rebase master
 
-      #     # reset version files and develop mode
-      #     python distribution/update_version.py
-      #     git add -A
-      #     git commit -m "ci(release): reset version"
-      #     git push origin develop
+          # reset version files and develop mode
+          python distribution/update_version.py
+          git add -A
+          git commit -m "ci(release): reset version"
+          git push origin develop
