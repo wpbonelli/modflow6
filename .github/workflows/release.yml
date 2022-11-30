@@ -20,8 +20,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          # - os: windows-2022
-          #   ostag: win64
+          - os: windows-2022
+            ostag: win64
     defaults:
       run:
         shell: bash -l {0}
@@ -236,8 +236,8 @@ jobs:
             ostag: linux
           - os: macos-12
             ostag: mac
-          # - os: windows-2022
-          #   ostag: win64
+          - os: windows-2022
+            ostag: win64
     defaults:
       run:
         shell: bash -l {0}
