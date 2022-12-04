@@ -1,4 +1,4 @@
-subroutine amux ( n, x, y, a, ja, ia )
+subroutine amux(n, x, y, a, ja, ia)
 
   !*****************************************************************************80
   !
@@ -21,7 +21,7 @@ subroutine amux ( n, x, y, a, ja, ia )
   !
   !    Input, integer ( kind = 4 ) N, the row dimension of the matrix.
   !
-  !    Input, real X(*), and array of length equal to the column dimension 
+  !    Input, real X(*), and array of length equal to the column dimension
   !    of A.
   !
   !    Input, real A(*), integer ( kind = 4 ) JA(*), IA(NROW+1), the matrix in CSR
@@ -29,36 +29,36 @@ subroutine amux ( n, x, y, a, ja, ia )
   !
   !    Output, real Y(N), the product A * X.
   !
-    implicit none
-  
-    integer ( kind = 4 ) n
-  
-    real ( kind = 8 ) a(*)
-    integer ( kind = 4 ) i
-    integer ( kind = 4 ) ia(*)
-    integer ( kind = 4 ) ja(*)
-    integer ( kind = 4 ) k
-    real ( kind = 8 ) t
-    real ( kind = 8 ) x(*)
-    real ( kind = 8 ) y(n)
-  
-    do i = 1, n
-  !
-  !  Compute the inner product of row I with vector X.
-  !
-      t = 0.0D+00
-      do k = ia(i), ia(i+1)-1
-        t = t + a(k) * x(ja(k))
-      end do
-  
-      y(i) = t
-  
-    end do
-  
-    return
-  end
+  implicit none
 
-subroutine dvperm ( n, x, perm )
+  integer(kind=4) n
+
+  real(kind=8) a(*)
+  integer(kind=4) i
+  integer(kind=4) ia(*)
+  integer(kind=4) ja(*)
+  integer(kind=4) k
+  real(kind=8) t
+  real(kind=8) x(*)
+  real(kind=8) y(n)
+
+  do i = 1, n
+    !
+    !  Compute the inner product of row I with vector X.
+    !
+    t = 0.0D+00
+    do k = ia(i), ia(i + 1) - 1
+      t = t + a(k) * x(ja(k))
+    end do
+
+    y(i) = t
+
+  end do
+
+  return
+end
+
+subroutine dvperm(n, x, perm)
 
   !*****************************************************************************80
   !
@@ -88,79 +88,79 @@ subroutine dvperm ( n, x, perm )
   !
   !    Input, integer ( kind = 4 ) PERM(N), the permutation.
   !
-    implicit none
-  
-    integer ( kind = 4 ) n
-  
-    integer ( kind = 4 ) ii
-    integer ( kind = 4 ) init
-    integer ( kind = 4 ) k
-    integer ( kind = 4 ) next
-    integer ( kind = 4 ) perm(n)
-    real ( kind = 8 ) tmp
-    real ( kind = 8 ) tmp1
-    real ( kind = 8 ) x(n)
-  
-    init = 1
-    tmp = x(init)
-    ii = perm(init)
-    perm(init)= -perm(init)
-    k = 0
+  implicit none
+
+  integer(kind=4) n
+
+  integer(kind=4) ii
+  integer(kind=4) init
+  integer(kind=4) k
+  integer(kind=4) next
+  integer(kind=4) perm(n)
+  real(kind=8) tmp
+  real(kind=8) tmp1
+  real(kind=8) x(n)
+
+  init = 1
+  tmp = x(init)
+  ii = perm(init)
+  perm(init) = -perm(init)
+  k = 0
   !
   !  The main loop.
   !
-   6  continue
-  
-     k = k + 1
+6 continue
+
+  k = k + 1
   !
   !  Save the chased element.
   !
-    tmp1 = x(ii)
-    x(ii) = tmp
-    next = perm(ii)
-  
-    if ( next < 0 ) then
-      go to 65
-    end if
+  tmp1 = x(ii)
+  x(ii) = tmp
+  next = perm(ii)
+
+  if (next < 0) then
+    go to 65
+  end if
   !
   !  Test for end.
   !
-    if ( n < k ) then
-      perm(1:n) = -perm(1:n)
-      return
-    end if
-  
-    tmp = tmp1
-    perm(ii) = -perm(ii)
-    ii = next
+  if (n < k) then
+    perm(1:n) = -perm(1:n)
+    return
+  end if
+
+  tmp = tmp1
+  perm(ii) = -perm(ii)
+  ii = next
   !
   !  End of the loop.
   !
-    go to 6
+  go to 6
   !
   !  Reinitialize cycle.
   !
-   65   continue
-  
-    init = init + 1
-  
-    if ( n < init ) then 
-      perm(1:n) = -perm(1:n)
-      return
-    end if
-  
-    if ( perm(init) < 0 ) then
-      go to 65
-    end if
-  
-    tmp = x(init)
-    ii = perm(init)
-    perm(init) = -perm(init)
-    go to 6
-  
+65 continue
+
+  init = init + 1
+
+  if (n < init) then
+    perm(1:n) = -perm(1:n)
+    return
+  end if
+
+  if (perm(init) < 0) then
+    go to 65
+  end if
+
+  tmp = x(init)
+  ii = perm(init)
+  perm(init) = -perm(init)
+  go to 6
+
 end subroutine dvperm
 
-subroutine cperm ( nrow, a, ja, ia, ao, jao, iao, perm, job )
+subroutine cperm(nrow, a, ja, ia, ao, jao, iao, perm, job)
 
   !*****************************************************************************80
   !
@@ -210,43 +210,43 @@ subroutine cperm ( nrow, a, ja, ia, ao, jao, iao, perm, job )
   !
   ! ao, jao, iao = input matrix in a, ja, ia format (array ao not needed)
   !
-    implicit none
-  
-    integer ( kind = 4 ) nrow
-  
-    real ( kind = 8 ) a(*)
-    real ( kind = 8 ) ao(*)
-    integer ( kind = 4 ) ia(nrow+1)
-    integer ( kind = 4 ) iao(nrow+1)
-    integer ( kind = 4 ) ja(*)
-    integer ( kind = 4 ) jao(*)
-    integer ( kind = 4 ) job
-    integer ( kind = 4 ) k
-    integer ( kind = 4 ) nnz
-    integer ( kind = 4 ) perm(*)
-  
-    nnz = ia(nrow+1)-1
-  
-    do k = 1, nnz
-      jao(k) = perm(ja(k))
-    end do
+  implicit none
+
+  integer(kind=4) nrow
+
+  real(kind=8) a(*)
+  real(kind=8) ao(*)
+  integer(kind=4) ia(nrow + 1)
+  integer(kind=4) iao(nrow + 1)
+  integer(kind=4) ja(*)
+  integer(kind=4) jao(*)
+  integer(kind=4) job
+  integer(kind=4) k
+  integer(kind=4) nnz
+  integer(kind=4) perm(*)
+
+  nnz = ia(nrow + 1) - 1
+
+  do k = 1, nnz
+    jao(k) = perm(ja(k))
+  end do
   !
   !  Done with the JA array.  Return if no need to touch values.
   !
-    if ( job /= 1 ) then
-      return
-    end if
+  if (job /= 1) then
+    return
+  end if
   !
   !  Else get new pointers, and copy values too.
   !
-    iao(1:nrow+1) = ia(1:nrow+1)
-  
-    ao(1:nnz) = a(1:nnz)
-  
-    return
+  iao(1:nrow + 1) = ia(1:nrow + 1)
+
+  ao(1:nnz) = a(1:nnz)
+
+  return
 end subroutine cperm
 
-subroutine rperm ( nrow, a, ja, ia, ao, jao, iao, perm, job )
+subroutine rperm(nrow, a, ja, ia, ao, jao, iao, perm, job)
 
   !*****************************************************************************80
   !
@@ -273,7 +273,7 @@ subroutine rperm ( nrow, a, ja, ia, ao, jao, iao, perm, job )
   !    Input, real A(*), integer ( kind = 4 ) JA(*), IA(NROW+1), the matrix in CSR
   !    Compressed Sparse Row format.
   !
-  ! perm       = integer ( kind = 4 ) array of length nrow containing the 
+  ! perm       = integer ( kind = 4 ) array of length nrow containing the
   !    permutation arrays
   !        for the rows: perm(i) is the destination of row i in the
   !         permuted matrix.
@@ -294,67 +294,67 @@ subroutine rperm ( nrow, a, ja, ia, ao, jao, iao, perm, job )
   ! note :
   !        if (job/=1)  then the arrays a and ao are not used.
   !
-    implicit none
-  
-    integer ( kind = 4 ) nrow
-  
-    real ( kind = 8 ) a(*)
-    real ( kind = 8 ) ao(*)
-    integer ( kind = 4 ) i
-    integer ( kind = 4 ) ia(nrow+1)
-    integer ( kind = 4 ) iao(nrow+1)
-    integer ( kind = 4 ) ii
-    integer ( kind = 4 ) j
-    integer ( kind = 4 ) ja(*)
-    integer ( kind = 4 ) jao(*)
-    integer ( kind = 4 ) job
-    integer ( kind = 4 ) k
-    integer ( kind = 4 ) ko
-    integer ( kind = 4 ) perm(nrow)
-    logical values
-  
-    values = ( job == 1 )
+  implicit none
+
+  integer(kind=4) nrow
+
+  real(kind=8) a(*)
+  real(kind=8) ao(*)
+  integer(kind=4) i
+  integer(kind=4) ia(nrow + 1)
+  integer(kind=4) iao(nrow + 1)
+  integer(kind=4) ii
+  integer(kind=4) j
+  integer(kind=4) ja(*)
+  integer(kind=4) jao(*)
+  integer(kind=4) job
+  integer(kind=4) k
+  integer(kind=4) ko
+  integer(kind=4) perm(nrow)
+  logical values
+
+  values = (job == 1)
   !
   !  Determine pointers for output matrix.
   !
-    do j = 1, nrow
-      i = perm(j)
-      iao(i+1) = ia(j+1) - ia(j)
-    end do
+  do j = 1, nrow
+    i = perm(j)
+    iao(i + 1) = ia(j + 1) - ia(j)
+  end do
   !
   !  Get pointers from lengths.
   !
-    iao(1) = 1
-    do j = 1, nrow
-      iao(j+1) = iao(j+1) + iao(j)
-    end do
+  iao(1) = 1
+  do j = 1, nrow
+    iao(j + 1) = iao(j + 1) + iao(j)
+  end do
   !
   !  Copying.
   !
-    do ii = 1, nrow
-  !
-  !  Old row = II is new row IPERM(II), and KO is the new pointer.
-  !
-      ko = iao(perm(ii))
+  do ii = 1, nrow
+    !
+    !  Old row = II is new row IPERM(II), and KO is the new pointer.
+    !
+    ko = iao(perm(ii))
 
-      do k = ia(ii), ia(ii+1)-1
-        jao(ko) = ja(k)
-        if ( values ) then
-          ao(ko) = a(k)
-        end if
-        ko = ko + 1
-      end do
-  
+    do k = ia(ii), ia(ii + 1) - 1
+      jao(ko) = ja(k)
+      if (values) then
+        ao(ko) = a(k)
+      end if
+      ko = ko + 1
     end do
-  
-    return
+
+  end do
+
+  return
 end subroutine rperm
 
-subroutine dperm ( nrow, a, ja, ia, ao, jao, iao, perm, qperm, job )
+subroutine dperm(nrow, a, ja, ia, ao, jao, iao, perm, qperm, job)
 
   !*****************************************************************************80
   !
-  !! DPERM permutes the rows and columns of a matrix stored in CSR format. 
+  !! DPERM permutes the rows and columns of a matrix stored in CSR format.
   !
   !  Discussion:
   !
@@ -395,8 +395,8 @@ subroutine dperm ( nrow, a, ja, ia, ao, jao, iao, perm, qperm, job )
   !    of column I in case the permutation is symmetric (JOB <= 2).
   !
   !    Input, integer ( kind = 4 ) QPERM(NROW), the permutation array for the columns.
-  !    This should be provided only if JOB=3 or JOB=4, that is, only in 
-  !    the case of a nonsymmetric permutation of rows and columns. 
+  !    This should be provided only if JOB=3 or JOB=4, that is, only in
+  !    the case of a nonsymmetric permutation of rows and columns.
   !    Otherwise QPERM is a dummy argument.
   !
   ! job      = integer ( kind = 4 ) indicating the work to be done:
@@ -410,39 +410,39 @@ subroutine dperm ( nrow, a, ja, ia, ao, jao, iao, perm, qperm, job )
   !    Output, real AO(*), JAO(*), IAO(NROW+1), the permuted matrix in CSR
   !    Compressed Sparse Row format.
   !
-    implicit none
-  
-    integer ( kind = 4 ) nrow
-  
-    real ( kind = 8 ) a(*)
-    real ( kind = 8 ) ao(*)
-    integer ( kind = 4 ) ia(nrow+1)
-    integer ( kind = 4 ) iao(nrow+1)
-    integer ( kind = 4 ) ja(*)
-    integer ( kind = 4 ) jao(*)
-    integer ( kind = 4 ) job
-    integer ( kind = 4 ) locjob
-    integer ( kind = 4 ) perm(nrow)
-    integer ( kind = 4 ) qperm(nrow)
+  implicit none
+
+  integer(kind=4) nrow
+
+  real(kind=8) a(*)
+  real(kind=8) ao(*)
+  integer(kind=4) ia(nrow + 1)
+  integer(kind=4) iao(nrow + 1)
+  integer(kind=4) ja(*)
+  integer(kind=4) jao(*)
+  integer(kind=4) job
+  integer(kind=4) locjob
+  integer(kind=4) perm(nrow)
+  integer(kind=4) qperm(nrow)
   !
   !  LOCJOB indicates whether or not real values must be copied.
   !
-    locjob = mod ( job, 2 )
+  locjob = mod(job, 2)
   !
   !  Permute the rows first.
   !
-    call rperm ( nrow, a, ja, ia, ao, jao, iao, perm, locjob )
+  call rperm(nrow, a, ja, ia, ao, jao, iao, perm, locjob)
   !
   !  Permute the columns.
   !
-    locjob = 0
-  
-    if ( job <= 2 ) then
-      call cperm ( nrow, ao, jao, iao, ao, jao, iao, perm, locjob )
-    else
-      call cperm ( nrow, ao, jao, iao, ao, jao, iao, qperm, locjob )
-    end if
-  
-    return
+  locjob = 0
+
+  if (job <= 2) then
+    call cperm(nrow, ao, jao, iao, ao, jao, iao, perm, locjob)
+  else
+    call cperm(nrow, ao, jao, iao, ao, jao, iao, qperm, locjob)
+  end if
+
+  return
 end subroutine dperm
 
