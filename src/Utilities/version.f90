@@ -56,7 +56,7 @@ module VersionModule
     &'      (https://github.com/jacobwilliams/daglib)',/&
     &)"
   ! -- disclaimer must be appropriate for version (release or release candidate)
-  character(len=*), parameter :: FMTDISCLAIMER = &
+  character(len=*), parameter :: FMTDISCLAIMER =                                &
     "(/,                                                                        &
     &'This software is preliminary or provisional and is subject to ',/,        &
     &'revision. It is being provided to meet the need for timely best ',/,      &
