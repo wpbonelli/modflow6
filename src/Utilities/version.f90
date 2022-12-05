@@ -15,8 +15,8 @@ module VersionModule
   public
   ! -- modflow 6 version
   integer(I4B), parameter :: IDEVELOPMODE = 1
-  character(len=*), parameter :: VERSIONNUMBER = '6.4.0'
-  character(len=*), parameter :: VERSIONTAG = ' Release Candidate 11/30/2022'
+  character(len=*), parameter :: VERSIONNUMBER = '6.4.1'
+  character(len=*), parameter :: VERSIONTAG = ' Release Candidate 12/05/2022'
   character(len=40), parameter :: VERSION = VERSIONNUMBER//VERSIONTAG
   character(len=10), parameter :: MFVNAM = ' 6'
   character(len=*), parameter :: MFTITLE = &
@@ -57,16 +57,16 @@ module VersionModule
     &)"
   ! -- disclaimer must be appropriate for version (release or release candidate)
   character(len=*), parameter :: FMTDISCLAIMER = &
-    "(/,&
-    &'This software is preliminary or provisional and is subject to ',/,&
-    &'revision. It is being provided to meet the need for timely best ',/,&
-    &'science. The software has not received final approval by the U.S. ',/,&
-    &'Geological Survey (USGS). No warranty, expressed or implied, is made ',/,&
-    &'by the USGS or the U.S. Government as to the functionality of the ',/,&
-    &'software and related material nor shall the fact of release ',/,&
-    &'constitute any such warranty. The software is provided on the ',/,&
+    "(/,                                                                        &
+    &'This software is preliminary or provisional and is subject to ',/,        &
+    &'revision. It is being provided to meet the need for timely best ',/,      &
+    &'science. The software has not received final approval by the U.S. ',/,    &
+    &'Geological Survey (USGS). No warranty, expressed or implied, is made ',/, &
+    &'by the USGS or the U.S. Government as to the functionality of the ',/,    &
+    &'software and related material nor shall the fact of release ',/,          &
+    &'constitute any such warranty. The software is provided on the ',/,        &
     &'condition that neither the USGS nor the U.S. Government shall be held ',/,&
-    &'liable for any damages resulting from the authorized or unauthorized ',/,&
+    &'liable for any damages resulting from the authorized or unauthorized ',/, &
     &'use of the software.',/)"
 
 contains
