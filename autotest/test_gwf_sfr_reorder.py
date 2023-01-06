@@ -16,7 +16,8 @@ from framework import testing_framework
 from simulation import Simulation
 
 sys.path.append("scripts")
-from cross_section_functions import get_depths
+# from cross_section_functions import get_depths
+from channel_utils import get_depths
 
 paktest = "sfr"
 

@@ -16,7 +16,8 @@ from framework import testing_framework
 from simulation import Simulation
 
 sys.path.append("scripts")
-from cross_section_functions import calculate_rectchan_mannings_discharge
+# from cross_section_functions import calculate_rectchan_mannings_discharge
+from channel_utils import get_discharge
 
 paktest = "sfr"
 
@@ -181,14 +182,14 @@ def build_model(idx, ws, base=False):
         package_data.append(rp)
 
     depth = simulated_depths[idx]
-    qleft = calculate_rectchan_mannings_discharge(
-        conversion_fact, roughness * 10.0, slope, 10.0, depth
+    qleft = get_discharge(
+        10.0, depth, conversion_fact, roughness * 10.0, slope,
     )
-    qchannel = calculate_rectchan_mannings_discharge(
-        conversion_fact, roughness, slope, 10.0, depth
+    qchannel = get_discharge(
+        10.0, depth, conversion_fact, roughness, slope,
     )
-    qright = calculate_rectchan_mannings_discharge(
-        conversion_fact, roughness * 10.0, slope, 10.0, depth
+    qright = get_discharge(
+        10.0, depth, conversion_fact, roughness * 10.0, slope,
     )
     qtotal = qleft + qchannel + qright
 
