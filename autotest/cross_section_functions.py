@@ -96,7 +96,7 @@ def get_wetted_area(x0, x1, h0, h1, depth):
             area = xlen * (depth - hmax)
         # -- add the area below zmax
         if hmax != hmin and depth > hmin:
-            area += 0.5 * (depth - hmin)
+            area += 0.5 * xlen * ((depth if depth < hmax else hmax) - hmin)
     return area
 
 
