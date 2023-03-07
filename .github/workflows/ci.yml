@@ -407,7 +407,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-22.04, macos-12 ] #, windows-2022 ]
+        os: [ ubuntu-22.04, macos-12, windows-2022 ]
     defaults:
       run:
         shell: bash -l {0}
@@ -497,7 +497,7 @@ jobs:
             mingw-w64-x86_64-toolchain patch python flex \
             pkg-config pkgfile tar unzip mingw-w64-x86_64-cmake \
             mingw-w64-x86_64-msmpi mingw-w64-x86_64-openblas mingw-w64-x86_64-jq
-          /usr/bin/python ./configure --with-mpiexec='/C/Program\ Files/Microsoft\ MPI/Bin/mpiexec' --with-shared-libraries=0
+          /usr/bin/python ./configure --download-fblaslapack --with-mpiexec='/C/Program\ Files/Microsoft\ MPI/Bin/mpiexec' --with-shared-libraries=0
           make all
 
       - name: Setup Micromamba
