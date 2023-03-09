@@ -443,15 +443,15 @@ jobs:
           mpi: msmpi
 
       - name: Setup GNU Fortran 9
-        if: runner.os != 'Windows'
+        # if: runner.os != 'Windows'
         uses: awvwgk/setup-fortran@main
         with:
           compiler: gcc
           version: 9
       
-      - name: Setup Intel Fortran
-        if: runner.os == 'Windows'
-        uses: modflowpy/install-intelfortran-action@v1
+      # - name: Setup Intel Fortran
+      #   if: runner.os == 'Windows'
+      #   uses: modflowpy/install-intelfortran-action@v1
 
       - name: Cache PETSc
         id: cache-petsc
@@ -472,21 +472,14 @@ jobs:
           tar -xzf petsc-3.18.4.tar.gz -C petsc --strip-components=1
 
       - name: Configure environment
-        if: runner.os == 'Linux'
+        if: runner.os != 'Windows'
         run: |
           petsc_dir="$GITHUB_WORKSPACE/petsc"
-          petsc_arch="linux-gnu"
-
-          echo "PETSC_DIR=$petsc_dir" >> $GITHUB_ENV
-          echo "PETSC_ARCH=$petsc_arch" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=$petsc_dir/$petsc_arch/lib/pkgconfig" >> $GITHUB_ENV
-          echo "$petsc_dir/petsc_arch/bin" >> $GITHUB_PATH
-
-      - name: Configure environment
-        if: runner.os == 'macOS'
-        run: |
-          petsc_dir="$GITHUB_WORKSPACE/petsc"
-          petsc_arch="arch-darwin-c-debug"
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            petsc_arch="linux-gnu" 
+          else
+            petsc_arch="arch-darwin-c-debug"
+          fi
 
           echo "PETSC_DIR=$petsc_dir" >> $GITHUB_ENV
           echo "PETSC_ARCH=$petsc_arch" >> $GITHUB_ENV
@@ -494,17 +487,10 @@ jobs:
           echo "$petsc_dir/$petsc_arch/bin" >> $GITHUB_PATH
 
       - name: Configure PETSc
-        if: runner.os == 'Linux'
+        if: runner.os != 'Windows'
         working-directory: petsc
         run: |
-          sudo ./configure --download-fblaslapack --download-openmpi
-          sudo make all
-
-      - name: Configure PETSc
-        if: runner.os == 'macOS'
-        working-directory: petsc
-        run: |
-          sudo ./configure --download-fblaslapack --download-openmpi
+          sudo ./configure PETSC_DIR=$PETSC_DIR PETSC_ARCH=$PETSC_ARCH --download-fblaslapack --download-openmpi
           sudo make all
 
       - name: Configure PETSc
