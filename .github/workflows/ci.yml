@@ -477,8 +477,10 @@ jobs:
           petsc_dir="$GITHUB_WORKSPACE/petsc"
           if [ "$RUNNER_OS" == "Linux" ]; then
             petsc_arch="linux-gnu" 
-          else
+          elif [ "$RUNNER_OS" == "macOS" ]; then
             petsc_arch="arch-darwin-c-debug"
+          # else
+          #   petsc_arch="arch-mswin-c-debug"
           fi
 
           echo "PETSC_DIR=$petsc_dir" >> $GITHUB_ENV
@@ -503,8 +505,9 @@ jobs:
             mingw-w64-x86_64-toolchain patch python flex \
             pkg-config pkgfile tar unzip mingw-w64-x86_64-cmake \
             mingw-w64-x86_64-msmpi mingw-w64-x86_64-openblas mingw-w64-x86_64-jq
-          /usr/bin/python ./configure --with-mpiexec='/C/Program\ Files/Microsoft\ MPI/Bin/mpiexec' --with-shared-libraries=0
-          make all
+          # /usr/bin/python ./configure PETSC_ARCH=$PETSC_ARCH --with-mpiexec='/C/Program\ Files/Microsoft\ MPI/Bin/mpiexec' --with-shared-libraries=0
+          /usr/bin/python config/examples/arch-ci-mswin-gnu.py
+          make PETSC_ARCH="arch-mswin-c-debug" all
 
       - name: Setup Micromamba
         uses: mamba-org/provision-with-micromamba@main
