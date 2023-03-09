@@ -5,6 +5,7 @@ on:
       - master
       - develop
       - ci-diagnose*
+      - parallel-ci
     paths-ignore:
       - '**.md'
       - 'doc/**'
@@ -72,6 +73,7 @@ jobs:
         run: meson test --verbose --no-rebuild -C builddir
 
   smoke_test:
+    if: github.repository == 'MODFLOW-USGS/modflow6'
     name: Smoke test (gfortran 12)
     runs-on: ubuntu-22.04
     defaults:
@@ -126,6 +128,7 @@ jobs:
           fi
 
   test_gfortran_latest:
+    if: github.repository == 'MODFLOW-USGS/modflow6'
     name: Test (gfortran 12)
     needs:
       - lint
@@ -202,6 +205,7 @@ jobs:
         run: pytest -v --durations 0
 
   test_gfortran_previous:
+    if: github.repository == 'MODFLOW-USGS/modflow6'
     name: Test gfortran (${{ matrix.GCC_V }}, ${{ matrix.os }})
     needs:
       - lint
@@ -273,6 +277,7 @@ jobs:
           fi
 
   test_ifort:
+    if: github.repository == 'MODFLOW-USGS/modflow6'
     name: Test (ifort)
     needs:
       - lint
@@ -399,10 +404,10 @@ jobs:
         
   parallel_test:
     name: Parallel testing
-    needs:
-      - lint
-      - build
-      - smoke_test
+    # needs:
+    #   - lint
+    #   - build
+    #   - smoke_test
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -438,10 +443,15 @@ jobs:
           mpi: msmpi
 
       - name: Setup GNU Fortran 9
+        if: runner.os != 'Windows'
         uses: awvwgk/setup-fortran@main
         with:
           compiler: gcc
           version: 9
+      
+      - name: Setup Intel Fortran
+        if: runner.os == 'Windows'
+        uses: modflowpy/install-intelfortran-action@v1
 
       - name: Cache PETSc
         id: cache-petsc
@@ -464,27 +474,37 @@ jobs:
       - name: Configure environment
         if: runner.os == 'Linux'
         run: |
-          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/petsc/linux-gnu/lib/pkgconfig" >> $GITHUB_ENV
-          echo "$GITHUB_WORKSPACE/petsc/linux-gnu/bin" >> $GITHUB_PATH
+          petsc_dir="$GITHUB_WORKSPACE/petsc"
+          petsc_arch="linux-gnu"
+
+          echo "PETSC_DIR=$petsc_dir" >> $GITHUB_ENV
+          echo "PETSC_ARCH=$petsc_arch" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$petsc_dir/$petsc_arch/lib/pkgconfig" >> $GITHUB_ENV
+          echo "$petsc_dir/petsc_arch/bin" >> $GITHUB_PATH
 
       - name: Configure environment
         if: runner.os == 'macOS'
         run: |
-          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/petsc/arch-darwin-c-debug/lib/pkgconfig" >> $GITHUB_ENV
-          echo "$GITHUB_WORKSPACE/petsc/arch-darwin-c-debug/bin" >> $GITHUB_PATH
+          petsc_dir="$GITHUB_WORKSPACE/petsc"
+          petsc_arch="arch-darwin-c-debug"
+
+          echo "PETSC_DIR=$petsc_dir" >> $GITHUB_ENV
+          echo "PETSC_ARCH=$petsc_arch" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$petsc_dir/$petsc_arch/lib/pkgconfig" >> $GITHUB_ENV
+          echo "$petsc_dir/$petsc_arch/bin" >> $GITHUB_PATH
 
       - name: Configure PETSc
         if: runner.os == 'Linux'
         working-directory: petsc
         run: |
-          sudo ./configure PETSC_ARCH=linux-gnu --download-fblaslapack --download-openmpi
+          sudo ./configure --download-fblaslapack --download-openmpi
           sudo make all
 
       - name: Configure PETSc
         if: runner.os == 'macOS'
         working-directory: petsc
         run: |
-          sudo ./configure PETSC_DIR="$GITHUB_WORKSPACE/petsc" PETSC_ARCH=arch-darwin-c-debug --download-fblaslapack --download-openmpi
+          sudo ./configure --download-fblaslapack --download-openmpi
           sudo make all
 
       - name: Configure PETSc
