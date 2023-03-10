@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 configure_options = [
-  '--with-mpiexec=\'/C/Program\ Files/Microsoft\ MPI/Bin/mpiexec\'',
+  '--with-mpiexec=/C/Program Files/Microsoft MPI/Bin/mpiexec',
   '--with-shared-libraries=0',
   # '--with-batch=1',
   '--with-debugging=0',

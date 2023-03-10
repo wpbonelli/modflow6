@@ -506,6 +506,7 @@ jobs:
             pkg-config pkgfile tar unzip mingw-w64-x86_64-cmake \
             mingw-w64-x86_64-msmpi mingw-w64-x86_64-openblas mingw-w64-x86_64-jq
           # /usr/bin/python ./configure PETSC_ARCH=$PETSC_ARCH --with-mpiexec='/C/Program\ Files/Microsoft\ MPI/Bin/mpiexec' --with-shared-libraries=0
+          ls /C/Program\ Files/Microsoft\ MPI/Bin/mpiexec
           /usr/bin/python ../modflow6/.github/common/arch-ci-mswin-gnu.py
           make PETSC_ARCH="arch-mswin-c-debug" all
 
