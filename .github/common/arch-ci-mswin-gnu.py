@@ -3,7 +3,7 @@
 configure_options = [
   '--with-mpiexec=\'/C/Program\ Files/Microsoft\ MPI/Bin/mpiexec\'',
   '--with-shared-libraries=0',
-  '--with-batch=1',
+  # '--with-batch=1',
   '--with-debugging=0',
   # not using -g so that the binaries are smaller
   'COPTFLAGS=-O',
