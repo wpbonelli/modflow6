@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
+from os import environ
+
 configure_options = [
+  f"FC={environ['FC']}",
+  f"CC={environ['CC']}",
   '--with-mpiexec=/C/Program Files/Microsoft MPI/Bin/mpiexec',
   '--with-shared-libraries=0',
   # '--with-batch=1',
