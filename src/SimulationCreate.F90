@@ -3,7 +3,6 @@ module SimulationCreateModule
   use KindModule, only: DP, I4B, LGP, write_kindinfo
   use ConstantsModule, only: LINELENGTH, LENMODELNAME, LENBIGLINE, &
                              DZERO, LENEXCHANGENAME, LENMEMPATH, LENPACKAGETYPE
-
   use CharacterStringModule, only: CharacterStringType
   use SimVariablesModule, only: iout, simulation_mode, proc_id, &
                                 nr_procs, model_names, model_ranks, &
@@ -218,9 +217,12 @@ contains
     use SimVariablesModule, only: idm_context
     use GwfModule, only: gwf_cr
     use GwtModule, only: gwt_cr
+    use PrtModule, only: prt_cr
     use NumericalModelModule, only: NumericalModelType, GetNumericalModelFromList
+    use ExplicitModelModule, only: ExplicitModelType, GetExplicitModelFromList
     use VirtualGwfModelModule, only: add_virtual_gwf_model
     use VirtualGwtModelModule, only: add_virtual_gwt_model
+    ! use VirtualPrtModelModule, only: add_virtual_prt_model
     use ConstantsModule, only: LENMODELNAME
     ! -- dummy
     ! -- locals
@@ -297,6 +299,10 @@ contains
           model_loc_idx(n) = im
         end if
         call add_virtual_gwt_model(n, model_names(n), num_model)
+      case ('PRT6')
+        im = im + 1
+        model_loc_idx(n) = im
+        call prt_cr(fname, n, model_names(n))
       case default
         write (errmsg, '(a,a)') &
           'Unknown simulation model type: ', trim(model_type)
@@ -327,9 +333,11 @@ contains
     use SimVariablesModule, only: idm_context
     use GwfGwfExchangeModule, only: gwfexchange_create
     use GwfGwtExchangeModule, only: gwfgwt_cr
+    use GwfPrtExchangeModule, only: gwfprt_cr
     use GwtGwtExchangeModule, only: gwtexchange_create
     use VirtualGwfExchangeModule, only: add_virtual_gwf_exchange
     use VirtualGwtExchangeModule, only: add_virtual_gwt_exchange
+    ! use VirtualPrtExchangeModule, only: add_virtual_prt_exchange
     ! -- dummy
     ! -- locals
     character(len=LENMEMPATH) :: input_mempath
@@ -414,6 +422,8 @@ contains
         if (both_local) then
           call gwfgwt_cr(fname, exg_id, m1_id, m2_id)
         end if
+      case ('GWF6-PRT6')
+        call gwfprt_cr(fname, exg_id, m1_id, m2_id)
       case ('GWT6-GWT6')
         write (exg_name, '(a,i0)') 'GWT-GWT_', exg_id
         if (.not. both_remote) then

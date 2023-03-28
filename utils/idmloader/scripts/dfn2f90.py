@@ -862,12 +862,28 @@ if __name__ == "__main__":
             Path("../../../src/Model/GroundWaterTransport", "gwt1dsp1idm.f90"),
         ],
         [
+            Path("../../../doc/mf6io/mf6ivar/dfn", "prt-dis.dfn"),
+            Path("../../../src/Model/ParticleTracking", "prt1dis1idm.f90"),
+        ],
+        # [
+        #     Path("../../../doc/mf6io/mf6ivar/dfn", "prt-disu.dfn"),
+        #     Path("../../../src/Model/ParticleTracking", "prt1disu1idm.f90"),
+        # ],
+        [
+            Path("../../../doc/mf6io/mf6ivar/dfn", "prt-disv.dfn"),
+            Path("../../../src/Model/ParticleTracking", "prt1disv1idm.f90"),
+        ],
+        [
             Path("../../../doc/mf6io/mf6ivar/dfn", "gwf-nam.dfn"),
             Path("../../../src/Model/GroundWaterFlow", "gwf3idm.f90"),
         ],
         [
             Path("../../../doc/mf6io/mf6ivar/dfn", "gwt-nam.dfn"),
             Path("../../../src/Model/GroundWaterTransport", "gwt1idm.f90"),
+        ],
+        [
+            Path("../../../doc/mf6io/mf6ivar/dfn", "prt-nam.dfn"),
+            Path("../../../src/Model/ParticleTracking", "prt1idm.f90"),
         ],
         [
             Path("../../../doc/mf6io/mf6ivar/dfn", "sim-nam.dfn"),

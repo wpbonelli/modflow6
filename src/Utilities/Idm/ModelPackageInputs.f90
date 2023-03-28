@@ -16,7 +16,7 @@ module ModelPackageInputsModule
 
   implicit none
   private
-  public :: NIUNIT_GWF, NIUNIT_GWT
+  public :: NIUNIT_GWF, NIUNIT_GWT, NIUNIT_PRT
   public :: ModelPackageInputsType
 
   ! -- GWF base package types, ordered for memload
@@ -51,10 +51,27 @@ module ModelPackageInputsModule
   data GWT_MULTIPKG/'CNC6 ', 'SRC6 ', 'LKT6 ', 'IST6 ', '     ', & !  5
                    &'SFT6 ', 'MWT6 ', 'UZT6 ', 'API6 ', '     ', & ! 10
                    &40*'     '/ ! 50
+  
+  ! -- PRT base package types, ordered for memload
+  integer(I4B), parameter :: PRT_NBASEPKG = 50
+  character(len=LENPACKAGETYPE), dimension(PRT_NBASEPKG) :: PRT_BASEPKG
+  data PRT_BASEPKG/'DIS6 ', 'DISV6', 'DISU6', 'IC6  ', 'MST6 ', & !  5
+                  &'ADV6 ', 'DSP6 ', 'SSM6 ', 'MIP6 ', 'CNC6 ', & ! 10
+                  &'OC6  ', 'OBS6 ', 'FMI6 ', '     ', 'IST6 ', & ! 15
+                  &'LKT6 ', 'SFT6 ', 'MWT6 ', 'UZT6 ', 'MVT6 ', & ! 20
+                  &'API6 ', '     ', '     ', '     ', '     ', & ! 25
+                  25*'     '/ ! 50
+  
+  ! -- PRT multi package types, ordered for memload
+  integer(I4B), parameter :: PRT_NMULTIPKG = 50
+  character(len=LENPACKAGETYPE), dimension(PRT_NMULTIPKG) :: PRT_MULTIPKG
+  data PRT_MULTIPKG/'PRP6 ', '     ', '     ', '     ', '     ', & !  5
+                   &45*'     '/ ! 50
 
   ! -- size of supported model package arrays
   integer(I4B), parameter :: NIUNIT_GWF = GWF_NBASEPKG + GWF_NMULTIPKG
   integer(I4B), parameter :: NIUNIT_GWT = GWT_NBASEPKG + GWT_NMULTIPKG
+  integer(I4B), parameter :: NIUNIT_PRT = PRT_NBASEPKG + PRT_NMULTIPKG
 
   !> @brief derived type for loadable package type
   !!
@@ -145,6 +162,11 @@ contains
       allocate (pkgtypes(numpkgs))
       pkgtypes = [GWT_BASEPKG, GWT_MULTIPKG]
       !
+    case ('PRT6')
+      numpkgs = PRT_NBASEPKG + PRT_NMULTIPKG
+      allocate (pkgtypes(numpkgs))
+      pkgtypes = [PRT_BASEPKG, PRT_MULTIPKG]
+      !
     case default
     end select
     !
@@ -211,6 +233,14 @@ contains
       case ('GWT')
         do n = 1, GWT_NMULTIPKG
           if (GWT_MULTIPKG(n) == pkgtype) then
+            multi_pkg = .true.
+            exit
+          end if
+        end do
+        !
+      case ('PRT')
+        do n = 1, PRT_NMULTIPKG
+          if (PRT_MULTIPKG(n) == pkgtype) then
             multi_pkg = .true.
             exit
           end if

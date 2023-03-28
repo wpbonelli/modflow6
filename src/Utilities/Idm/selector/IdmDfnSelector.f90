@@ -14,6 +14,11 @@ module IdmDfnSelectorModule
                                      gwt_block_definitions, &
                                      gwt_idm_multi_package, &
                                      gwt_idm_integrated
+  use IdmPrtDfnSelectorModule, only: prt_param_definitions, &
+                                     prt_aggregate_definitions, &
+                                     prt_block_definitions, &
+                                     prt_idm_multi_package, &
+                                     prt_idm_integrated
   use IdmSimDfnSelectorModule, only: sim_param_definitions, &
                                      sim_aggregate_definitions, &
                                      sim_block_definitions, &
@@ -40,6 +45,8 @@ contains
       input_definition => gwf_param_definitions(subcomponent)
     case ('GWT')
       input_definition => gwt_param_definitions(subcomponent)
+    case ('PRT')
+      input_definition => prt_param_definitions(subcomponent)
     case ('SIM')
       input_definition => sim_param_definitions(subcomponent)
     case default
@@ -57,6 +64,8 @@ contains
       input_definition => gwf_aggregate_definitions(subcomponent)
     case ('GWT')
       input_definition => gwt_aggregate_definitions(subcomponent)
+    case ('PRT')
+      input_definition => prt_aggregate_definitions(subcomponent)
     case ('SIM')
       input_definition => sim_aggregate_definitions(subcomponent)
     case default
@@ -74,6 +83,8 @@ contains
       input_definition => gwf_block_definitions(subcomponent)
     case ('GWT')
       input_definition => gwt_block_definitions(subcomponent)
+    case ('PRT')
+      input_definition => prt_block_definitions(subcomponent)
     case ('SIM')
       input_definition => sim_block_definitions(subcomponent)
     case default
@@ -90,6 +101,8 @@ contains
       multi_package = gwf_idm_multi_package(subcomponent)
     case ('GWT')
       multi_package = gwt_idm_multi_package(subcomponent)
+    case ('PRT')
+      multi_package = prt_idm_multi_package(subcomponent)
     case ('SIM')
       multi_package = sim_idm_multi_package(subcomponent)
     case default
@@ -110,6 +123,8 @@ contains
       integrated = gwf_idm_integrated(subcomponent)
     case ('GWT')
       integrated = gwt_idm_integrated(subcomponent)
+    case ('PRT')
+      integrated = prt_idm_integrated(subcomponent)
     case ('SIM')
       integrated = sim_idm_integrated(subcomponent)
     case default

@@ -10,6 +10,7 @@
 module SimModule
 
   use KindModule, only: DP, I4B
+  use VersionModule, only: IDEVELOPMODE
   use DefinedMacros, only: get_os
   use ConstantsModule, only: MAXCHARLEN, LINELENGTH, &
                              DONE, &
@@ -40,6 +41,7 @@ module SimModule
   public :: store_error_unit
   public :: store_error_filename
   public :: MaxErrors
+  public :: dev_feature
 
   type(MessageType) :: sim_errors
   type(MessageType) :: sim_uniterrors
@@ -611,5 +613,25 @@ contains
     ! -- return
     return
   end subroutine sim_closefiles
+
+  !> @ brief Development feature
+  !!
+  !! Terminate the program with an error if the IDEVELOPMODE flag
+  !! is set to 0. This is used to permit features to be developed
+  !! in the main branch while disabling them in release versions.
+  !!
+  !<
+  subroutine dev_feature(errmsg)
+    ! -- dummy
+    character(len=*), intent(in) :: errmsg
+    !
+    ! -- store error and terminate if in release mode
+    if (IDEVELOPMODE == 0) then
+      call store_error(errmsg, terminate=.true.)
+    end if
+    !
+    ! -- return
+    return
+  end subroutine dev_feature
 
 end module SimModule

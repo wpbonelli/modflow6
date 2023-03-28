@@ -50,7 +50,7 @@ contains
     use SimVariablesModule, only: idm_context
     type(BlockParserType), intent(inout) :: parser !< block parser
     character(len=*), intent(in) :: pkgtype !< file type to load, such as DIS6, DISV6, NPF6
-    character(len=*), intent(in) :: component_type !< component type, such as GWF or GWT
+    character(len=*), intent(in) :: component_type !< component type, such as GWF, GWT, PRT
     character(len=*), intent(in) :: subcomponent_type !< subcomponent type, such as DIS or NPF
     character(len=*), intent(in) :: component_name !< component name, such as MYGWFMODEL
     character(len=*), intent(in) :: subcomponent_name !< subcomponent name, such as MYWELLPACKAGE
@@ -414,7 +414,7 @@ contains
           cycle
         end if
         !
-        ! -- set indexex (where first column is blocknum)
+        ! -- set indexes (where first column is blocknum)
         iwords = icol
       else
         !
