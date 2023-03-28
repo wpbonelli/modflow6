@@ -1,6 +1,7 @@
 module SimulationModule
 
   use KindModule, only: DP, I4B, LGP, write_kindinfo
+  use DevFeatureModule, only: dev_feature
   use ConstantsModule, only: LINELENGTH, LENMODELNAME, LENBIGLINE, &
                              DZERO, LENEXCHANGENAME, LENMEMPATH, LENPACKAGETYPE
   use CharacterStringModule, only: CharacterStringType
