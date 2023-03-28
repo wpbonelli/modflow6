@@ -939,12 +939,28 @@ if __name__ == "__main__":
             SRC_PATH / "Model" / "GroundWaterTransport" / "gwt1ic1idm.f90",
         ],
         [
+            DFN_PATH / "prt-dis.dfn",
+            SRC_PATH / "Model" / "ParticleTracking" / "prt1dis1idm.f90",
+        ],
+        [
+            DFN_PATH / "prt-disv.dfn",
+            SRC_PATH / "Model" / "ParticleTracking" / "prt1disv1idm.f90",
+        ],
+        [
+            DFN_PATH / "prt-mip.dfn",
+            SRC_PATH / "Model" / "ParticleTracking" / "prt1mip1idm.f90",
+        ],
+        [
             DFN_PATH / "gwf-nam.dfn",
             SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3idm.f90",
         ],
         [
             DFN_PATH / "gwt-nam.dfn",
             SRC_PATH / "Model" / "GroundWaterTransport" / "gwt1idm.f90",
+        ],
+        [
+            DFN_PATH / "prt-nam.dfn",
+            SRC_PATH / "Model" / "ParticleTracking" / "prt1idm.f90",
         ],
         [
             DFN_PATH / "exg-gwfgwf.dfn",
@@ -957,6 +973,10 @@ if __name__ == "__main__":
         [
             DFN_PATH / "exg-gwtgwt.dfn",
             SRC_PATH / "Exchange" / "gwtgwtidm.f90",
+        ],
+        [
+            DFN_PATH / "exg-gwfprt.dfn",
+            SRC_PATH / "Exchange" / "gwfprtidm.f90",
         ],
         [
             DFN_PATH / "sim-nam.dfn",

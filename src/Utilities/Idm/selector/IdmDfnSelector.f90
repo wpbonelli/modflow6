@@ -7,6 +7,7 @@ module IdmDfnSelectorModule
                                    InputBlockDefinitionType
   use IdmGwfDfnSelectorModule
   use IdmGwtDfnSelectorModule
+  use IdmPrtDfnSelectorModule
   use IdmExgDfnSelectorModule
   use IdmSimDfnSelectorModule
 
@@ -31,6 +32,8 @@ contains
       input_definition => gwf_param_definitions(subcomponent)
     case ('GWT')
       input_definition => gwt_param_definitions(subcomponent)
+    case ('PRT')
+      input_definition => prt_param_definitions(subcomponent)
     case ('EXG')
       input_definition => exg_param_definitions(subcomponent)
     case ('SIM')
@@ -50,6 +53,8 @@ contains
       input_definition => gwf_aggregate_definitions(subcomponent)
     case ('GWT')
       input_definition => gwt_aggregate_definitions(subcomponent)
+    case ('PRT')
+      input_definition => prt_aggregate_definitions(subcomponent)
     case ('EXG')
       input_definition => exg_aggregate_definitions(subcomponent)
     case ('SIM')
@@ -69,6 +74,8 @@ contains
       input_definition => gwf_block_definitions(subcomponent)
     case ('GWT')
       input_definition => gwt_block_definitions(subcomponent)
+    case ('PRT')
+      input_definition => prt_block_definitions(subcomponent)
     case ('EXG')
       input_definition => exg_block_definitions(subcomponent)
     case ('SIM')
@@ -87,6 +94,8 @@ contains
       multi_package = gwf_idm_multi_package(subcomponent)
     case ('GWT')
       multi_package = gwt_idm_multi_package(subcomponent)
+    case ('PRT')
+      multi_package = prt_idm_multi_package(subcomponent)
     case ('EXG')
       multi_package = exg_idm_multi_package(subcomponent)
     case ('SIM')
@@ -109,6 +118,8 @@ contains
       integrated = gwf_idm_integrated(subcomponent)
     case ('GWT')
       integrated = gwt_idm_integrated(subcomponent)
+    case ('PRT')
+      integrated = prt_idm_integrated(subcomponent)
     case ('EXG')
       integrated = exg_idm_integrated(subcomponent)
     case ('SIM')
@@ -126,6 +137,8 @@ contains
     case ('GWF')
       integrated = .true.
     case ('GWT')
+      integrated = .true.
+    case ('PRT')
       integrated = .true.
     case ('EXG')
       integrated = .true.

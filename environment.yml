@@ -17,9 +17,10 @@ dependencies:
   - numpy
   - pyshp
   - shapely
+  - scipy
   - pip
   - pip:
-      - git+https://github.com/modflowpy/flopy.git
+      - https://github.com/wpbonelli/flopy/archive/prt-utils.zip
       - git+https://github.com/modflowpy/pymake.git
       - git+https://github.com/Deltares/xmipy.git
       - git+https://github.com/MODFLOW-USGS/modflowapi.git
