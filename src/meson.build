@@ -7,13 +7,13 @@ dfn_path = root_path / 'doc' / 'mf6io' / 'mf6ivar' / 'dfn'
 
 # locate some programs
 py = find_program('python', required : true) 
-fypp = find_program('fypp', required : false)
+fypp = find_program('fypp', required : true)
 
-# configurable model and exchange selection
-numerical_models = get_option('numerical-models')
-explicit_models = get_option('explicit-models')
-models = numerical_models + explicit_models
+# model and exchange selection
+models = get_option('models')
 exchanges = get_option('exchanges')
+message(f'Selected models: @models@')
+message(f'Selected exchanges: @exchanges@')
 
 # external source files
 external_libraries = files(
@@ -60,7 +60,6 @@ modflow_sources = files(
     'Model' / 'ModelUtilities' / 'DiscretizationBase.f90',
     'Model' / 'ModelUtilities' / 'DisvGeom.f90',
     'Model' / 'ModelUtilities' / 'FlowModelInterface.f90',
-    'Model' / 'ModelUtilities' / 'ModelPackageInput.f90',
     'Model' / 'ModelUtilities' / 'Mover.f90',
     'Model' / 'ModelUtilities' / 'PackageMover.f90',
     'Model' / 'ModelUtilities' / 'SfrCrossSectionManager.f90',
@@ -96,6 +95,8 @@ modflow_sources = files(
     'Solution' / 'NumericalSolution.f90',
     'Solution' / 'SolutionFactory.F90',
     'Solution' / 'SolutionGroup.f90',
+    'Solution' / 'BaseSolution.f90',
+    'Solution' / 'ExplicitSolution.f90',
     'Timing' / 'ats.f90',
     'Timing' / 'tdis.f90',
     'Utilities' / 'ArrayRead' / 'ArrayReaderBase.f90',
@@ -159,6 +160,7 @@ modflow_sources = files(
     'Utilities' / 'CharString.f90',
     'Utilities' / 'comarg.f90',
     'Utilities' / 'compilerversion.F90',
+    'Utilities' / 'CharString.f90',
     'Utilities' / 'Constants.f90',
     'Utilities' / 'defmacro.F90',
     'Utilities' / 'DevFeature.f90',
@@ -181,7 +183,7 @@ modflow_sources = files(
     'Utilities' / 'SimVariables.f90',
     'Utilities' / 'SmoothingFunctions.f90',
     'Utilities' / 'sort.f90',
-    'Utilities' / 'Sparse.f90',    
+    'Utilities' / 'Sparse.f90',
     'Utilities' / 'STLVecInt.f90',
     'Utilities' / 'StringList.f90',
     'Utilities' / 'Table.f90',
@@ -195,7 +197,7 @@ modflow_sources = files(
     'RunControlFactory.F90',
 )
 
-# generate factories for configurable mf6 components
+# generate component factories
 foreach f : ['Model', 'Exchange']
   input = f'@f@Factory.fypp'
   output = f'@f@Factory.f90'
@@ -204,20 +206,18 @@ foreach f : ['Model', 'Exchange']
       fypp,
       src_path / input,
       src_path / output,
-      '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-      '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+      '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
       '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
     ],
     input: input,
     output: output
   )
   modflow_sources += files(output)
-  # uncomment below to generate at build time
+  # uncomment below to generate in builddir not persistently in srcdir
   # args = [
   #   src_path / input,
   #   '@BUILD_DIR@' / output,
-  #   '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-  #   '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+  #   '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
   #   '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
   # ]
   # gen = generator(fypp, output: '@BASENAME@.f90', arguments: args)
@@ -266,7 +266,24 @@ subdir('IDM')
 #   endif
 # endforeach
 
+# generate IDM model package input file
+input = 'IdmModelPackageInput.fypp'
+output = 'IdmModelPackageInput.f90'
+configure_file(
+  command: [
+    fypp,
+    src_path / input,
+    src_path / output,
+    '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
+  ],
+  input: input,
+  output: output
+)
+modflow_sources += files(output)
+
 # generate IDM selector file
+input = 'IdmDfnSelector.fypp'
+output = 'IdmDfnSelector.f90'
 packages = []
 foreach l : fs.read(root_path / 'utils' / 'idmloader' / 'dfns.txt').split('\n')
   foreach m : models
@@ -275,15 +292,12 @@ foreach l : fs.read(root_path / 'utils' / 'idmloader' / 'dfns.txt').split('\n')
     endif
   endforeach
 endforeach
-input = 'IdmDfnSelector.fypp'
-output = 'IdmDfnSelector.f90'
 configure_file(
   command: [
     fypp,
     src_path / input,
     src_path / output,
-    '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-    '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+    '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
     '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]'),
     '-DPACKAGES=' + (packages.length() > 0 ? ('["' + '", "'.join(packages) + '"]') : '[]')
   ],
@@ -295,8 +309,7 @@ modflow_sources += files(output)
 # args = [
 #   src_path / input,
 #   '@BUILD_DIR@' / output,
-#   '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-#   '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+#   '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
 #   '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]'),
 #   '-DPACKAGES=' + (packages.length() > 0 ? ('["' + '", "'.join(packages) + '"]') : '[]')
 # ]

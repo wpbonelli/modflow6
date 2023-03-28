@@ -1,19 +1,15 @@
-!> @brief This module contains the ModelPackageInputModule
-!!
-!! Add an input model type to routines in this module
-!! to integrate the Model with IDM.
-!!
-!<
 module ModelPackageInputModule
 
   use KindModule, only: DP, I4B, LGP
   use SimVariablesModule, only: errmsg
   use ConstantsModule, only: LENFTYPE, LENPACKAGETYPE
   use SimModule, only: store_error, store_error_filename
-  use GwfModule, only: GWF_NBASEPKG, GWF_NMULTIPKG, &
+  use gwfModule, only: GWF_NBASEPKG, GWF_NMULTIPKG, &
                        GWF_BASEPKG, GWF_MULTIPKG
-  use GwtModule, only: GWT_NBASEPKG, GWT_NMULTIPKG, &
+  use gwtModule, only: GWT_NBASEPKG, GWT_NMULTIPKG, &
                        GWT_BASEPKG, GWT_MULTIPKG
+  use prtModule, only: PRT_NBASEPKG, PRT_NMULTIPKG, &
+                       PRT_BASEPKG, PRT_MULTIPKG
 
   implicit none
   private
@@ -43,12 +39,14 @@ contains
       numpkgs = GWF_NBASEPKG + GWF_NMULTIPKG
       allocate (pkgtypes(numpkgs))
       pkgtypes = [GWF_BASEPKG, GWF_MULTIPKG]
-      !
     case ('GWT6')
       numpkgs = GWT_NBASEPKG + GWT_NMULTIPKG
       allocate (pkgtypes(numpkgs))
       pkgtypes = [GWT_BASEPKG, GWT_MULTIPKG]
-      !
+    case ('PRT6')
+      numpkgs = PRT_NBASEPKG + PRT_NMULTIPKG
+      allocate (pkgtypes(numpkgs))
+      pkgtypes = [PRT_BASEPKG, PRT_MULTIPKG]
     case default
     end select
     !
@@ -80,7 +78,6 @@ contains
           exit
         end if
       end do
-      !
     case ('GWT')
       do n = 1, GWT_NMULTIPKG
         if (GWT_MULTIPKG(n) == pkgtype) then
@@ -88,7 +85,13 @@ contains
           exit
         end if
       end do
-      !
+    case ('PRT')
+      do n = 1, PRT_NMULTIPKG
+        if (PRT_MULTIPKG(n) == pkgtype) then
+          multi_package = .true.
+          exit
+        end if
+      end do
     case default
     end select
     !

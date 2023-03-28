@@ -13,7 +13,7 @@ module IdmDfnSelectorModule
   use Exg${l}$${r}$InputModule
   #:endfor
 
-  #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+  #:for m in MODELS
   #:for p in [pkg for pkg in PACKAGES if pkg.startswith(m)]
   use ${p.replace('-', '')}$InputModule
   #:endfor
@@ -41,7 +41,7 @@ module IdmDfnSelectorModule
   public :: sim_idm_multi_package
   public :: sim_idm_integrated
 
-  #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+  #:for m in MODELS
   public :: ${m}$_param_definitions
   public :: ${m}$_aggregate_definitions
   public :: ${m}$_block_definitions
@@ -59,7 +59,7 @@ contains
     select case (component)
     case ('SIM')
       def => sim_param_definitions(subcomponent)
-    #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+    #:for m in MODELS
     case ('${m.upper()}$')
       def => ${m}$_param_definitions(subcomponent)
     #:endfor
@@ -78,7 +78,7 @@ contains
     select case (component)
     case ('SIM')
       def => sim_aggregate_definitions(subcomponent)
-    #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+    #:for m in MODELS
     case ('${m.upper()}$')
       def => ${m}$_aggregate_definitions(subcomponent)
     #:endfor
@@ -97,7 +97,7 @@ contains
     select case (component)
     case ('SIM')
       def => sim_block_definitions(subcomponent)
-    #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+    #:for m in MODELS
     case ('${m.upper()}$')
       def => ${m}$_block_definitions(subcomponent)
     #:endfor
@@ -115,7 +115,7 @@ contains
     select case (component)
     case ('SIM')
       multi_package = sim_idm_multi_package(subcomponent)
-    #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+    #:for m in MODELS
     case ('${m.upper()}$')
       multi_package = ${m}$_idm_multi_package(subcomponent)
     #:endfor
@@ -137,7 +137,7 @@ contains
     select case (component)
     case ('SIM')
       integrated = sim_idm_integrated(subcomponent)
-    #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+    #:for m in MODELS
     case ('${m.upper()}$')
       integrated = ${m}$_idm_integrated(subcomponent)
     #:endfor
@@ -155,7 +155,7 @@ contains
     select case (component)
     case ('SIM')
       integrated = .true.
-    #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+    #:for m in MODELS
     case ('${m.upper()}$')
       integrated = .true.
     #:endfor
@@ -334,7 +334,7 @@ contains
     return
   end function sim_idm_integrated
 
-  #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+  #:for m in MODELS
   subroutine ${m}$_set_param_pointer(input_dfn, input_dfn_target)
     type(InputParamDefinitionType), dimension(:), pointer :: input_dfn
     type(InputParamDefinitionType), dimension(:), target :: input_dfn_target
@@ -342,7 +342,7 @@ contains
   end subroutine ${m}$_set_param_pointer
   #:endfor
 
-  #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+  #:for m in MODELS
   subroutine ${m}$_set_block_pointer(input_dfn, input_dfn_target)
     type(InputBlockDefinitionType), dimension(:), pointer :: input_dfn
     type(InputBlockDefinitionType), dimension(:), target :: input_dfn_target
@@ -350,7 +350,7 @@ contains
   end subroutine ${m}$_set_block_pointer
   #:endfor
 
-  #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+  #:for m in MODELS
   function ${m}$_param_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
     type(InputParamDefinitionType), dimension(:), pointer :: def
@@ -366,7 +366,7 @@ contains
   end function ${m}$_param_definitions
   #:endfor
 
-  #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+  #:for m in MODELS
   function ${m}$_aggregate_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
     type(InputParamDefinitionType), dimension(:), pointer :: def
@@ -382,7 +382,7 @@ contains
   end function ${m}$_aggregate_definitions
   #:endfor
 
-  #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+  #:for m in MODELS
   function ${m}$_block_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
     type(InputBlockDefinitionType), dimension(:), pointer :: def
@@ -398,7 +398,7 @@ contains
   end function ${m}$_block_definitions
   #:endfor
 
-  #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+  #:for m in MODELS
   function ${m}$_idm_multi_package(subcomponent) result(multi_package)
     character(len=*), intent(in) :: subcomponent
     logical :: multi_package
@@ -416,7 +416,7 @@ contains
   end function ${m}$_idm_multi_package
   #:endfor
 
-  #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
+  #:for m in MODELS
   function ${m}$_idm_integrated(subcomponent) result(integrated)
     character(len=*), intent(in) :: subcomponent
     logical :: integrated

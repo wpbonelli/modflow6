@@ -1,9 +1,7 @@
 import argparse
 import sys
-import os
 from pathlib import Path
 from pprint import pprint
-from typing import Union
 import textwrap
 import yaml
 

@@ -17,8 +17,8 @@ contains
 
   subroutine add_gwf_model(n, im, fname)
     ! -- modules
-    use NumericalModelModule, only: NumericalModelType, &
-                                    GetNumericalModelFromList
+    use BaseModelModule, only: BaseModelType, &
+                               GetBaseModelFromList
     use GwfModule, only: gwf_cr
     use VirtualGwfModelModule, only: add_virtual_gwf_model
     ! -- dummy
@@ -26,7 +26,7 @@ contains
     integer(I4B), intent(inout) :: im
     character(len=*), intent(in) :: fname
     ! -- local
-    class(NumericalModelType), pointer :: model
+    class(BaseModelType), pointer :: model
 
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
@@ -34,7 +34,7 @@ contains
       write (iout, '(4x,2a,i0,a)') 'GWF6', ' model ', &
         n, ' will be created'
       call gwf_cr(fname, n, model_names(n))
-      model => GetNumericalModelFromList(basemodellist, im)
+      model => GetBaseModelFromList(basemodellist, im)
       model_loc_idx(n) = im
     end if
     call add_virtual_gwf_model(n, model_names(n), model)
@@ -43,8 +43,8 @@ contains
 
   subroutine add_gwt_model(n, im, fname)
     ! -- modules
-    use NumericalModelModule, only: NumericalModelType, &
-                                    GetNumericalModelFromList
+    use BaseModelModule, only: BaseModelType, &
+                               GetBaseModelFromList
     use GwtModule, only: gwt_cr
     use VirtualGwtModelModule, only: add_virtual_gwt_model
     ! -- dummy
@@ -52,7 +52,7 @@ contains
     integer(I4B), intent(inout) :: im
     character(len=*), intent(in) :: fname
     ! -- local
-    class(NumericalModelType), pointer :: model
+    class(BaseModelType), pointer :: model
 
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
@@ -60,12 +60,38 @@ contains
       write (iout, '(4x,2a,i0,a)') 'GWT6', ' model ', &
         n, ' will be created'
       call gwt_cr(fname, n, model_names(n))
-      model => GetNumericalModelFromList(basemodellist, im)
+      model => GetBaseModelFromList(basemodellist, im)
       model_loc_idx(n) = im
     end if
     call add_virtual_gwt_model(n, model_names(n), model)
 
   end subroutine add_gwt_model
+
+  subroutine add_prt_model(n, im, fname)
+    ! -- modules
+    use BaseModelModule, only: BaseModelType, &
+                               GetBaseModelFromList
+    use PrtModule, only: prt_cr
+    use VirtualPrtModelModule, only: add_virtual_prt_model
+    ! -- dummy
+    integer(I4B), intent(in) :: n
+    integer(I4B), intent(inout) :: im
+    character(len=*), intent(in) :: fname
+    ! -- local
+    class(BaseModelType), pointer :: model
+
+    model => null() ! can be null for remote models
+    if (model_ranks(n) == proc_id) then
+      im = im + 1
+      write (iout, '(4x,2a,i0,a)') 'PRT6', ' model ', &
+        n, ' will be created'
+      call prt_cr(fname, n, model_names(n))
+      model => GetBaseModelFromList(basemodellist, im)
+      model_loc_idx(n) = im
+    end if
+    call add_virtual_prt_model(n, model_names(n), model)
+
+  end subroutine add_prt_model
 
   !> @brief Check that the model name is valid
   !<
@@ -131,6 +157,8 @@ contains
         call add_gwf_model(n, im, fname)
       case ('GWT6')
         call add_gwt_model(n, im, fname)
+      case ('PRT6')
+        call add_prt_model(n, im, fname)
       case default
         write (errmsg, '(a,a)') &
           'Unknown simulation model type: ', trim(model_type)
