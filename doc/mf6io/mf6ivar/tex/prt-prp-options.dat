@@ -1,0 +1,9 @@
+BEGIN OPTIONS
+  [BOUNDNAMES]
+  [STOPTIME <stoptime>]
+  [STOPTRAVELTIME <stoptraveltime>]
+  [STOP_AT_WEAK_SINK]
+  [ISTOPZONE <istopzone>]
+  [OUTPUT_FOR_INACTIVE]
+  [DRAPE]
+END OPTIONS

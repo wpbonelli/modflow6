@@ -344,7 +344,7 @@ contains
 
   end subroutine extend_integer
 
-  !> @brief Grows or allocated the array with the passed increment,
+  !> @brief Grows or allocates the array with the passed increment,
   !< the old value of the array pointer is rendered invalid
   subroutine extend_string(array, increment)
     character(len=*), dimension(:), pointer, contiguous :: array

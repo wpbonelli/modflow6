@@ -71,7 +71,6 @@ module GwtModule
     procedure :: model_ot => gwt_ot
     procedure :: model_da => gwt_da
     procedure :: model_bdentry => gwt_bdentry
-
     procedure :: allocate_scalars
     procedure, private :: package_create
     procedure, private :: ftype_check
@@ -89,13 +88,8 @@ module GwtModule
 
 contains
 
+  !> @brief Create a new groundwater transport model object
   subroutine gwt_cr(filename, id, modelname)
-! ******************************************************************************
-! gwt_cr -- Create a new groundwater transport model object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use ListsModule, only: basemodellist
     use BaseModelModule, only: AddBaseModelToList
@@ -115,15 +109,15 @@ contains
     character(len=LENMEMPATH) :: input_mempath
     character(len=LINELENGTH) :: lst_fname
     type(GwfNamParamFoundType) :: found
-    ! -- format
 ! ------------------------------------------------------------------------------
     !
-    ! -- Allocate a new GWT Model (this) and add it to basemodellist
+    ! -- Allocate a new GWT Model (this)
     allocate (this)
     !
     ! -- Set memory path before allocation in memory manager can be done
     this%memoryPath = create_mem_path(modelname)
     !
+    ! -- Allocate scalars and add model to basemodellist
     call this%allocate_scalars(modelname)
     model => this
     call AddBaseModelToList(basemodellist, model)
@@ -168,15 +162,13 @@ contains
     return
   end subroutine gwt_cr
 
+  !> @brief Define packages of the model
+  !
+  ! (1) call df routines for each package
+  ! (2) set variables and pointers
+  !
+  !<
   subroutine gwt_df(this)
-! ******************************************************************************
-! gwt_df -- Define packages of the model
-! Subroutine: (1) call df routines for each package
-!             (2) set variables and pointers
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use ModelPackageInputsModule, only: NIUNIT_GWT
     ! -- dummy
@@ -220,13 +212,9 @@ contains
     return
   end subroutine gwt_df
 
+  !> @brief Add the internal connections of this model to the sparse matrix
+  !<
   subroutine gwt_ac(this, sparse)
-! ******************************************************************************
-! gwt_ac -- Add the internal connections of this model to the sparse matrix
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use SparseModule, only: sparsematrix
     ! -- dummy
@@ -252,14 +240,8 @@ contains
     return
   end subroutine gwt_ac
 
+  !> @brief Map connection positions in numerical solution coefficient matrix.
   subroutine gwt_mc(this, matrix_sln)
-! ******************************************************************************
-! gwt_mc -- Map the positions of this models connections in the
-! numerical solution coefficient matrix.
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(GwtModelType) :: this
     class(MatrixBaseType), pointer :: matrix_sln !< global system matrix
@@ -283,15 +265,13 @@ contains
     return
   end subroutine gwt_mc
 
+  !> @brief Allocate and Read
+  !
+  ! (1) allocates and reads packages part of this model,
+  ! (2) allocates memory for arrays part of this model object
+  !
+  !<
   subroutine gwt_ar(this)
-! ******************************************************************************
-! gwt_ar -- GroundWater Transport Model Allocate and Read
-! Subroutine: (1) allocates and reads packages part of this model,
-!             (2) allocates memory for arrays part of this model object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: DHNOFLO
     ! -- dummy
@@ -331,14 +311,9 @@ contains
     return
   end subroutine gwt_ar
 
+  !> @brief Read and prepare (calls package read and prepare routines)
+  !<
   subroutine gwt_rp(this)
-! ******************************************************************************
-! gwt_rp -- GroundWater Transport Model Read and Prepare
-! Subroutine: (1) calls package read and prepare routines
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use TdisModule, only: readnewdata
     ! -- dummy
@@ -368,14 +343,9 @@ contains
     return
   end subroutine gwt_rp
 
+  !> @brief Time step advance (calls package advance subroutines)
+  !<
   subroutine gwt_ad(this)
-! ******************************************************************************
-! gwt_ad -- GroundWater Transport Model Time Step Advance
-! Subroutine: (1) calls package advance subroutines
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use SimVariablesModule, only: isimcheck, iFailedStepRetry
     ! -- dummy
@@ -429,14 +399,9 @@ contains
     return
   end subroutine gwt_ad
 
+  !> @brief Calculate coefficients
+  !<
   subroutine gwt_cf(this, kiter)
-! ******************************************************************************
-! gwt_cf -- GroundWater Transport Model calculate coefficients
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-    ! -- modules
     ! -- dummy
     class(GwtModelType) :: this
     integer(I4B), intent(in) :: kiter
@@ -455,14 +420,9 @@ contains
     return
   end subroutine gwt_cf
 
+  !> @brief Fill coefficients
+  !<
   subroutine gwt_fc(this, kiter, matrix_sln, inwtflag)
-! ******************************************************************************
-! gwt_fc -- GroundWater Transport Model fill coefficients
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-    ! -- modules
     ! -- dummy
     class(GwtModelType) :: this
     integer(I4B), intent(in) :: kiter
@@ -505,14 +465,9 @@ contains
     return
   end subroutine gwt_fc
 
+  !> @brief Final convergence check (calls package cc routines)
+  !<
   subroutine gwt_cc(this, innertot, kiter, iend, icnvgmod, cpak, ipak, dpak)
-! ******************************************************************************
-! gwt_cc -- GroundWater Transport Model Final Convergence Check
-! Subroutine: (1) calls package cc routines
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(GwtModelType) :: this
     integer(I4B), intent(in) :: innertot
@@ -523,8 +478,8 @@ contains
     integer(I4B), intent(inout) :: ipak
     real(DP), intent(inout) :: dpak
     ! -- local
-    !class(BndType), pointer :: packobj
-    !integer(I4B) :: ip
+    ! class(BndType), pointer :: packobj
+    ! integer(I4B) :: ip
     ! -- formats
 ! ------------------------------------------------------------------------------
     !
@@ -532,23 +487,18 @@ contains
     if (this%inmvt > 0) call this%mvt%mvt_cc(kiter, iend, icnvgmod, cpak, dpak)
     !
     ! -- Call package cc routines
-    !do ip = 1, this%bndlist%Count()
-    !  packobj => GetBndFromList(this%bndlist, ip)
-    !  call packobj%bnd_cc(iend, icnvg, hclose, rclose)
-    !enddo
+    ! do ip = 1, this%bndlist%Count()
+    !   packobj => GetBndFromList(this%bndlist, ip)
+    !   call packobj%bnd_cc(iend, icnvg, hclose, rclose)
+    ! enddo
     !
     ! -- return
     return
   end subroutine gwt_cc
 
+  !> @brief Calculate intercell flows (flowja)
+  !<
   subroutine gwt_cq(this, icnvg, isuppress_output)
-! ******************************************************************************
-! gwt_cq --Groundwater transport model calculate flow
-! Subroutine: (1) Calculate intercell flows (flowja)
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use SparseModule, only: csr_diagsum
     ! -- dummy
@@ -594,15 +544,13 @@ contains
     return
   end subroutine gwt_cq
 
+  !> @brief Model budget
+  !
+  ! (1) Calculate intercell flows (flowja)
+  ! (2) Calculate package contributions to model budget
+  !
+  !<
   subroutine gwt_bd(this, icnvg, isuppress_output)
-! ******************************************************************************
-! gwt_bd --GroundWater Transport Model Budget
-! Subroutine: (1) Calculate intercell flows (flowja)
-!             (2) Calculate package contributions to model budget
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     use ConstantsModule, only: DZERO
     ! -- dummy
     class(GwtModelType) :: this
@@ -635,13 +583,9 @@ contains
     return
   end subroutine gwt_bd
 
+  !> @brief Print and/or save model output
+  !<
   subroutine gwt_ot(this)
-! ******************************************************************************
-! gwt_ot -- GroundWater Transport Model Output
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use TdisModule, only: kstp, kper, tdis_ot, endofperiod
     ! -- dummy
@@ -700,6 +644,8 @@ contains
     return
   end subroutine gwt_ot
 
+  !> @brief Calculate and save observations
+  !<
   subroutine gwt_ot_obs(this)
     class(GwtModelType) :: this
     class(BndType), pointer :: packobj
@@ -718,6 +664,8 @@ contains
 
   end subroutine gwt_ot_obs
 
+  !> @brief Save flows
+  !<
   subroutine gwt_ot_flow(this, icbcfl, ibudfl, icbcun)
     class(GwtModelType) :: this
     integer(I4B), intent(in) :: icbcfl
@@ -770,13 +718,9 @@ contains
 
   end subroutine gwt_ot_flow
 
+  !> @brief Write intercell flows
+  !<
   subroutine gwt_ot_flowja(this, nja, flowja, icbcfl, icbcun)
-! ******************************************************************************
-! gwt_ot_flowja -- Write intercell flows
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(GwtModelType) :: this
     integer(I4B), intent(in) :: nja
@@ -807,6 +751,8 @@ contains
     return
   end subroutine gwt_ot_flowja
 
+  !> @brief Print dependent variables
+  !<
   subroutine gwt_ot_dv(this, idvsave, idvprint, ipflag)
     class(GwtModelType) :: this
     integer(I4B), intent(in) :: idvsave
@@ -826,6 +772,8 @@ contains
 
   end subroutine gwt_ot_dv
 
+  !> @brief Print budget summary
+  !<
   subroutine gwt_ot_bdsummary(this, ibudfl, ipflag)
     use TdisModule, only: kstp, kper, totim
     class(GwtModelType) :: this
@@ -857,12 +805,9 @@ contains
 
   end subroutine gwt_ot_bdsummary
 
+  !> @brief Deallocate
+  !<
   subroutine gwt_da(this)
-! ******************************************************************************
-! gwt_da -- Deallocate
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
@@ -988,13 +933,9 @@ contains
     return
   end function gwt_get_iasym
 
+  !> @brief Allocate memory for non-allocatable members
+  !<
   subroutine allocate_scalars(this, modelname)
-! ******************************************************************************
-! allocate_scalars -- Allocate memory for non-allocatable members
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_allocate
     ! -- dummy
@@ -1030,13 +971,10 @@ contains
     return
   end subroutine allocate_scalars
 
+  !> @brief Create boundary condition packages for this model
+  !<
   subroutine package_create(this, filtyp, ipakid, ipaknum, pakname, inunit, &
                             iout)
-! ******************************************************************************
-! package_create -- Create boundary condition packages for this model
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: LINELENGTH
@@ -1109,12 +1047,9 @@ contains
     return
   end subroutine package_create
 
+  !> @brief Make sure required input files have been specified
+  !<
   subroutine ftype_check(this, indis)
-! ******************************************************************************
-! ftype_check -- Check to make sure required input files have been specified
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: LINELENGTH
@@ -1284,7 +1219,7 @@ contains
       mempath = mempaths(n)
       inunit => inunits(n)
       !
-      ! -- create dis package as it is a prerequisite for other packages
+      ! -- create dis package first as it is a prerequisite for other packages
       select case (pkgtype)
       case ('DIS6')
         indis = 1
