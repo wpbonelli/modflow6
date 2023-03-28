@@ -9,7 +9,7 @@ module IdmMf6FileModule
   use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: LINELENGTH, LENMEMPATH, LENMODELNAME, &
                              LENPACKAGENAME, LENFTYPE, LENPACKAGETYPE
-  use SimModule, only: store_error, store_error_filename
+  use SimModule, only: store_error, store_error_filename, dev_feature
   use InputOutputModule, only: openfile, getunit
   use BlockParserModule, only: BlockParserType
   use ModflowInputModule, only: ModflowInputType, getModflowInput
@@ -254,26 +254,26 @@ contains
     inunit = getunit()
     call openfile(inunit, iout, trim(mfname), 'NAM')
     !
+    ! -- define error message
+    write (errmsg, '(a,a,a,a,a)') &
+      'Unknown simulation model type &
+      &[model=', trim(mname), &
+      ', type=', trim(mtype), '].'
+    !
     select case (mtype)
     case ('GWF6')
-      !
       ! -- load model namfile to the input context
       call input_load('GWF6', 'GWF', 'NAM', mname, 'NAM', inunit, iout)
-      !
       ! -- load and create descriptions of model package files
       call modelpkgs_load(mtype, mfname, mname, iout)
-      !
     case ('GWT6')
-      !
       call input_load('GWT6', 'GWT', 'NAM', mname, 'NAM', inunit, iout)
-      !
       call modelpkgs_load(mtype, mfname, mname, iout)
-      !
+    case ('PRT6')
+      call dev_feature(errmsg)
+      call input_load('PRT6', 'PRT', 'NAM', mname, 'NAM', inunit, iout)
+      call modelpkgs_load(mtype, mfname, mname, iout)
     case default
-      write (errmsg, '(a,a,a,a,a)') &
-        'Unknown simulation model type &
-        &[model=', trim(mname), &
-        ', type=', trim(mtype), '].'
       call store_error(errmsg)
       call store_error_filename(simfile)
     end select

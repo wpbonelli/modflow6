@@ -32,13 +32,11 @@ To build and test a parallel version of the program, first read the instructions
 - [Building](#building)
 - [Testing](#testing)
   - [Configuring a test environment](#configuring-a-test-environment)
-    - [Building development binaries](#building-development-binaries)
-    - [Rebuilding and installing release binaries](#rebuilding-and-installing-release-binaries)
-    - [Updating `flopy` plugins](#updating-flopy-plugins)
-    - [External model repositories](#external-model-repositories)
-    - [Installing external repos](#installing-external-repos)
-      - [Test models](#test-models)
-      - [Example models](#example-models)
+    - [Unit tests](#unit-tests)
+    - [Integration tests](#integration-tests)
+      - [Rebuilding and installing release binaries](#rebuilding-and-installing-release-binaries)
+      - [Updating `flopy` plugins](#updating-flopy-plugins)
+      - [Installing external model repositories](#installing-external-model-repositories)
   - [Running Tests](#running-tests)
     - [Selecting tests with markers](#selecting-tests-with-markers)
     - [External model tests](#external-model-tests)
@@ -261,29 +259,15 @@ The binaries can then be found in the `bin` folder. `meson install` also trigger
 
 ## Testing
 
-MODFLOW 6 tests are driven with [`pytest`](https://docs.pytest.org/en/7.1.x/), with the help of plugins like `pytest-xdist` and `pytest-cases`. Testing dependencies are included in the Conda environment `environment.yml`.
+MODFLOW 6 unit tests are written with [`test-drive`](https://github.com/fortran-lang/test-drive) and driven with `meson`.
+
+MODFLOW 6 integration tests use [`pytest`](https://docs.pytest.org/en/7.1.x/), with the help of plugins like `pytest-xdist` and `pytest-cases`.
+
+Testing dependencies are included in the Conda environment `environment.yml`.
 
 **Note:** the entire test suite should pass before a pull request is submitted. Tests run in GitHub Actions CI and a PR can only be merged with passing tests. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for more information.
 
 ### Configuring a test environment
-
-A few tasks must be completed before running tests:
-
-- build local MODFLOW 6 development version
-- rebuild the last MODFLOW 6 release
-- install additional executables
-- update FloPy packages and plugins
-- clone MODFLOW 6 test model and example repositories
-
-Tests expect binaries to live in the `bin` directory relative to the project root, as configured above in the `meson` commands. Binaries are organized as follows:
-
-- local development binaries in the top-level `bin` folder
-- binaries rebuilt in development mode from the latest release in `bin/rebuilt`
-- related programs installed from the [executables distribution](https://github.com/MODFLOW-USGS/executables/releases) live in `bin/downloaded`
-
-Tests must be run from the `autotest` folder.
-
-#### Building development binaries
 
 Before running tests, the local development version of MODFLOW 6 must be built with `meson` as described above. The `autotest/build_exes.py` script is provided as a shortcut to easily rebuild local binaries. The script can be run from the project root with:
 
@@ -299,7 +283,28 @@ pytest build_exes.py
 
 By default, binaries will be placed in the `bin` directory relative to the project root, as in the `meson` commands described above. To change the location of the binaries, use the `--path` option.
 
-#### Rebuilding and installing release binaries
+#### Unit tests
+
+Unit tests are [driven with Meson](https://mesonbuild.com/Unit-tests.html) and must be run from the project root. There is no further configuration necessary beyond compiling MODFLOW 6. See below for instructions on running unit tests.
+
+#### Integration tests
+
+A few more tasks must be completed before integration testing:
+
+- rebuild the last MODFLOW 6 release
+- install MODFLOW-related executables
+- update FloPy packages and plugins
+- install MODFLOW 6 example and test model repositories
+
+Binaries are expected to live in the `bin` subdirectory of the project root, as configured above in the `meson` commands. This directory is organized as follows:
+
+- local development binaries in the top-level `bin` folder
+- binaries rebuilt in development mode from the latest release in `bin/rebuilt`
+- related programs installed from the [executables distribution](https://github.com/MODFLOW-USGS/executables/releases) live in `bin/downloaded`
+
+Integration tests must be run from the `autotest` folder.
+
+##### Rebuilding and installing release binaries
 
 Tests require the latest official MODFLOW 6 release to be compiled in develop mode with the same Fortran compiler as the development version. A number of binaries distributed from the [executables repo](https://github.com/MODFLOW-USGS/executables) must also be installed. The script `autotest/get_exes.py` does both of these things. It can be run from the project root with:
 
@@ -315,7 +320,7 @@ pytest get_exes.py
 
 By default, binaries will be placed in the `bin` directory relative to the project root, as in the `meson` commands described above. Nested `bin/downloaded` and `bin/rebuilt` directories are created to contain the rebuilt last release and the downloaded executables, respectively. To change the location of the binaries, use the `--path` option.
 
-#### Updating `flopy` plugins
+##### Updating `flopy` plugins
 
 Plugins should be regenerated from DFN files before running tests for the first time or after definition files change. This can be done with the `autotest/update_flopy.py` script, which wipes and regenerates plugin classes for the `flopy` installed in the Python environment.
 
@@ -328,7 +333,7 @@ python autotest/update_flopy.py
 python autotest/update_flopy.py doc/mf6io/mf6ivar/dfn
 ```
 
-#### External model repositories
+##### Installing external model repositories
 
 Some autotests load example models from external repositories:
 
@@ -336,13 +341,9 @@ Some autotests load example models from external repositories:
 - [`MODFLOW-USGS/modflow6-largetestmodels`](https://github.com/MODFLOW-USGS/modflow6-largetestmodels)
 - [`MODFLOW-USGS/modflow6-examples`](https://github.com/MODFLOW-USGS/modflow6-examples)
 
-#### Installing external repos
-
 By default, the tests expect these repositories side-by-side with (i.e. in the same parent directory as) the `modflow6` repository. If the repos are somewhere else, you can set the `REPOS_PATH` environment variable to point to their parent directory. If external model repositories are not found, tests requiring them will be skipped.
 
 **Note:** a convenient way to persist environment variables needed for tests is to store them in a `.env` file in the `autotest` folder. Each variable should be defined on a separate line, with format `KEY=VALUE`. The `pytest-dotenv` plugin will then automatically load any variables found in this file into the test process' environment.
-
-##### Test models
 
 The test model repos can simply be cloned &mdash; ideally, into the parent directory of the `modflow6` repository, so that repositories live side-by-side:
 
@@ -351,9 +352,7 @@ git clone MODFLOW-USGS/modflow6-testmodels
 git clone MODFLOW-USGS/modflow6-largetestmodels
 ```
 
-##### Example models
-
-First clone the example models repo:
+To install example models, first clone the example models repo:
 
 ```shell
 git clone MODFLOW-USGS/modflow6-examples
@@ -376,7 +375,29 @@ This will build the examples for subsequent use by the tests.
 
 ### Running Tests
 
-Tests are driven by `pytest` and must be run from the `autotest` folder. To run tests in a particular file, showing verbose output, use:
+MODFLOW 6 has two kinds of test: unit tests, written in Fortran and driven with `meson`, and integration tests, written in Python and driven with `pytest`.
+
+#### Unit tests
+
+To run unit tests in verbose mode:
+
+```shell
+meson test --verbose --no-rebuild -C builddir
+```
+
+Without the `--no-rebuild` option, Meson will rebuild the project before running tests.
+
+Tests can be selected by module name (as it appears in `driver.f90`), e.g. to test the `ListModule`:
+
+```shell
+meson test --verbose --no-rebuild -C builddir list
+```
+
+To start a test module in the `gdb` debugger, just add the `--gdb` flag to the test command.
+
+#### Integration tests
+
+Integration tests are driven by `pytest` and must be run from the `autotest` folder. To run tests in a particular file, showing verbose output, use:
 
 ```shell
 pytest -v <file>
@@ -388,7 +409,7 @@ Tests can be run in parallel with the `-n` option, which accepts an integer argu
 pytest -v -n auto
 ```
 
-#### Selecting tests with markers
+##### Selecting tests with markers
 
 Markers can be used to select subsets of tests. Markers provided in `pytest.ini` include:
 
@@ -411,7 +432,7 @@ pytest -v -n auto -S
 
 [Smoke testing](https://modflow-devtools.readthedocs.io/en/latest/md/markers.html#smoke-testing) is a form of integration testing which aims to test a decent fraction of the codebase quickly enough to run often during development.
 
-#### External model tests
+##### External model tests
 
 Tests using models from external repositories can be selected with the `repo` marker:
 
@@ -443,9 +464,62 @@ pytest -v -n auto test_z03_largetestmodels.py
 
 Tests load external models from fixtures provided by `modflow-devtools`. External model tests can be selected by model or simulation name, or by packages used. See the [`modflow-devtools` documentation](https://modflow-devtools.readthedocs.io/en/latest/md/fixtures.html#filtering) for usage examples. Note that filtering options only apply to tests using external models, and will not filter tests defining models in code &mdash; for that, the `pytest` built-in `-k` option may be used.
 
-#### Writing tests
+### Writing tests
 
-Tests should ideally follow a few conventions for easier maintenance:
+MODFLOW 6 has two kinds of tests: Fortran unit tests and Python integration tests. The Fortran tests exercise modules individually or in combination, while the Python tests use FloPy to construct, run and evaluate the results of MODFLOW 6 models.
+
+#### Unit tests
+
+Fortran unit tests are written with [`test-drive`](https://github.com/fortran-lang/test-drive). The `test-drive` library is reproduced in `autotest/testdrive.f90`.
+
+Adding a new test module involves a few steps:
+
+1. Introduce a new file `test_something.F90` in `autotest/`.
+
+```
+module test_something
+    use testdrive, only : error_type, unittest_type, new_unittest, check
+    implicit none
+    private
+    public :: collect_something
+  contains
+  
+  subroutine collect_something(testsuite)
+    type(unittest_type), allocatable, intent(out) :: testsuite(:)
+    testsuite = [new_unittest("add", test_add)]
+  end subroutine collect_something
+
+  subroutine test_add(error)
+    type(error_type), allocatable, intent(out) :: error
+    call check(error, 1 + 1 == 2, "Pass!")
+    if (allocated(error)) return
+  end subroutine test_add
+end module test_something
+```
+
+2. Add the module name to the list of `tests` in `autotest/meson.build`.
+
+```
+tests = [
+  'something',
+  'something_else'
+]
+```
+
+3. Add a `use` statement for the test module in `driver.f90`, and add it to the array of `testsuites`, for instance:
+
+```
+testsuites = [ &
+  new_testsuite("something", collect_something), &
+  new_testsuite("something_else", collect_something_else) &
+]
+```
+
+#### Integration tests
+
+Integration tests are written with [`pytest`](https://docs.pytest.org/en/7.3.x/). To be included at collection time, new test files must begin with prefix `test_`.
+
+Integration tests should ideally follow a few conventions for easier maintenance:
 
 - Use temporary directory fixtures. Tests which write to disk should use `pytest`'s built-in `tmp_path` fixtures or one of the [keepable temporary directory fixtures from `modflow-devtools`](https://modflow-devtools.readthedocs.io/en/latest/md/fixtures.html#keepable-temporary-directories). This prevents tests from polluting one another's state.
 
