@@ -12,6 +12,7 @@ module MethodCellPoolModule ! kluge
   type(MethodCellPollockType), pointer, public :: methodCellPollock => null() ! method for the method pool
   type(MethodCellPollockQuadType), pointer, public :: methodCellPollockQuad   => null()   ! method for the method pool
   type(MethodCellTernaryType), pointer, public :: methodCellTernary => null() ! method for the method pool
+  type(MethodCellPassToBotType), pointer, public :: methodCellPassToBot       => null()   ! method for the method pool
 
 contains
 
@@ -29,6 +30,7 @@ contains
     call create_methodCellPollock(methodCellPollock)
     call create_methodCellPollockQuad(methodCellPollockQuad)
     call create_methodCellTernary(methodCellTernary)
+    call create_methodCellPassToBot(methodCellPassToBot)
     !
     return
     !
@@ -50,6 +52,8 @@ contains
     deallocate (methodCellPollockQuad)
     call methodCellTernary%destroy()
     deallocate (methodCellTernary)
+    call methodCellPassToBot%destroy()
+    deallocate(methodCellPassToBot)
     !
     return
     !

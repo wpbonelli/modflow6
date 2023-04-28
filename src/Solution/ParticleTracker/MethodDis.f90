@@ -117,52 +117,55 @@ contains
     double precision :: areax, areay, areaz
     double precision :: dx, dy, dz
     double precision :: factor, term
+    double precision :: top, bot
     !
-    ! -- Load cell
     ic = particle%iTrackingDomain(levelNext) ! kluge note: is cell number always known coming in?
+    ! -- load cellDefn
     call this%load_cellDefn(ic, this%cellRect%cellDefn)
-    select type (dis => this%fmi%dis) ! kluge???
-    type is (GwfDisType)
+    if (this%fmi%ibdgwfsat0(ic) == 0) then              ! kluge note: use cellDefn%sat == DZERO here instead?
+      ! -- Cell is active but dry, so select and initialize pass-to-bottom
+      ! -- cell method and set cell method pointer
+      call methodCellPassToBot%init(particle, this%cellRect%cellDefn,          &
+                                    this%trackdata)
+      submethod => methodCellPassToBot
+    else
+      ! -- load rectangular cell
+      select type (dis => this%fmi%dis)       ! kluge???
+      type is (GwfDisType)
       icu = dis%get_nodeuser(ic)
       call get_ijk(icu, dis%nrow, dis%ncol, dis%nlay, irow, jcol, klay)
       dx = dis%delr(jcol)
       dy = dis%delc(irow)
+      end select
       dz = this%cellRect%cellDefn%top - this%cellRect%cellDefn%bot
       this%cellRect%dx = dx
       this%cellRect%dy = dy
       this%cellRect%dz = dz
       this%cellRect%sinrot = DZERO
       this%cellRect%cosrot = DONE
-      this%cellRect%xOrigin = this%cellRect%cellDefn%polyvert(1)%x ! kluge note: could avoid using polyvert here
+      this%cellRect%xOrigin = this%cellRect%cellDefn%polyvert(1)%x    ! kluge note: could avoid using polyvert here
       this%cellRect%yOrigin = this%cellRect%cellDefn%polyvert(1)%y
       this%cellRect%zOrigin = this%cellRect%cellDefn%bot
       this%cellRect%ipvOrigin = 1
-      areax = dx * dz
-      areay = dy * dz
-      areaz = dx * dy
-      ! this%cellRect%vx1 = this%cellRect%cellDefn%faceflow(1)/areax ! kluge note: assuming porosity=1. and velmult=1. for now
-      ! this%cellRect%vx2 = -this%cellRect%cellDefn%faceflow(3)/areax
-      ! this%cellRect%vy1 = this%cellRect%cellDefn%faceflow(4)/areay
-      ! this%cellRect%vy2 = -this%cellRect%cellDefn%faceflow(2)/areay
-      ! this%cellRect%vz1 = this%cellRect%cellDefn%faceflow(6)/areaz
-      ! this%cellRect%vz2 = -this%cellRect%cellDefn%faceflow(7)/areaz
-      ! factor = this%cellRect%cellDefn%velfactor/this%cellRect%cellDefn%porosity
-      factor = DONE / this%cellRect%cellDefn%retfactor
-      factor = factor / this%cellRect%cellDefn%porosity
-      term = factor / areax
-      this%cellRect%vx1 = this%cellRect%cellDefn%faceflow(1) * term
-      this%cellRect%vx2 = -this%cellRect%cellDefn%faceflow(3) * term
-      term = factor / areay
-      this%cellRect%vy1 = this%cellRect%cellDefn%faceflow(4) * term
-      this%cellRect%vy2 = -this%cellRect%cellDefn%faceflow(2) * term
-      term = factor / areaz
-      this%cellRect%vz1 = this%cellRect%cellDefn%faceflow(6) * term
-      this%cellRect%vz2 = -this%cellRect%cellDefn%faceflow(7) * term
-    end select
-    !
-    ! -- Select and initialize cell method and set cell method pointer
-    call methodCellPollock%init(particle, this%cellRect, this%trackdata)
-    submethod => methodCellPollock
+      areax = dy*dz
+      areay = dx*dz
+      areaz = dx*dy
+      factor = DONE/this%cellRect%cellDefn%retfactor
+      factor = factor/this%cellRect%cellDefn%porosity
+      term = factor/areax
+      this%cellRect%vx1 = this%cellRect%cellDefn%faceflow(1)*term
+      this%cellRect%vx2 = -this%cellRect%cellDefn%faceflow(3)*term
+      term = factor/areay
+      this%cellRect%vy1 = this%cellRect%cellDefn%faceflow(4)*term
+      this%cellRect%vy2 = -this%cellRect%cellDefn%faceflow(2)*term
+      term = factor/areaz
+      this%cellRect%vz1 = this%cellRect%cellDefn%faceflow(6)*term
+      this%cellRect%vz2 = -this%cellRect%cellDefn%faceflow(7)*term
+      ! -- Select and initialize Pollock's cell method and set cell method
+      ! -- pointer
+      call methodCellPollock%init(particle, this%cellRect, this%trackdata)
+      submethod => methodCellPollock
+    end if
     !
     return
     !
@@ -376,6 +379,7 @@ contains
     top = bot + sat * (top - bot)
     cellDefn%top = top
     cellDefn%bot = bot
+    cellDefn%sat = sat
     !
     ! -- Load porosity, retfactor, and izone
     cellDefn%porosity = this%porosity(ic)

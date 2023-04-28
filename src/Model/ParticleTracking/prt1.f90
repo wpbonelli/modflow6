@@ -367,7 +367,7 @@ contains
         iprp = iprp + 1
         itrack1 => this%itrack(iprp)
         itrack2 => this%itrack(iprp + 1)
-        call packobj%prp_set_pointers(itrack1, itrack2, this%trackdata) ! kluge
+        call packobj%prp_set_pointers(this%ibound, itrack1, itrack2, this%trackdata)   ! kluge
       end select
       ! -- Read and allocate package
       call packobj%bnd_ar()
@@ -1409,14 +1409,14 @@ contains
           ! -- If particle inactive, record (unchanged) location in track data
           ! -- and skip tracking
           if (packobj%partlist%istatus(np) .ne. 1) then
-            ntrack = this%trackdata%ntrack + 1
-            this%trackdata%ntrack = ntrack
-            this%trackdata%iptrack(ntrack) = np
-          this%trackdata%ictrack(ntrack) = packobj%partlist%iTrackingDomain(np, 2)
-            this%trackdata%xtrack(ntrack) = packobj%partlist%x(np)
-            this%trackdata%ytrack(ntrack) = packobj%partlist%y(np)
-            this%trackdata%ztrack(ntrack) = packobj%partlist%z(np)
-            this%trackdata%ttrack(ntrack) = packobj%partlist%ttrack(np)
+!            ntrack = this%trackdata%ntrack + 1   ! kluge note: temporarily commented out recording of inactive particle data; want it, maybe as an option???
+!            this%trackdata%ntrack = ntrack
+!            this%trackdata%iptrack(ntrack) = np
+!          this%trackdata%ictrack(ntrack) = packobj%partlist%iTrackingDomain(np, 2)
+!            this%trackdata%xtrack(ntrack) = packobj%partlist%x(np)
+!            this%trackdata%ytrack(ntrack) = packobj%partlist%y(np)
+!            this%trackdata%ztrack(ntrack) = packobj%partlist%z(np)
+!            this%trackdata%ttrack(ntrack) = packobj%partlist%ttrack(np)
             cycle
           end if
           !
