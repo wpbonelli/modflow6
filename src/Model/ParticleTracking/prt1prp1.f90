@@ -202,9 +202,10 @@ contains
 
   !> @ brief Set pointers to model variables
   !<
-  subroutine prp_set_pointers(this, itrack1, itrack2, trackdata)
+  subroutine prp_set_pointers(this, ibound, itrack1, itrack2, trackdata)
     ! -- dummy variables
     class(PrtPrpType) :: this !< PrtPrpType object
+    integer(I4B), dimension(:), pointer, contiguous :: ibound
     integer(I4B), pointer :: itrack1
     integer(I4B), pointer :: itrack2
     ! integer(I4B), dimension(:), pointer :: iptrack
@@ -214,6 +215,8 @@ contains
     ! real(DP), dimension(:), pointer :: ttrack
     type(TrackDataType), pointer :: trackdata
     !
+    ! -- Set pointer to PRT model ibound
+    this%ibound => ibound
     ! -- Set pointers to track data
     this%itrack1 => itrack1
     this%itrack2 => itrack2
@@ -429,6 +432,18 @@ contains
     ! -- Do the release, if there is one
     if (isRelease) then
       do nps = 1, this%nreleasepts
+        ic = this%noder(nps)  ! reduced node number (cell ID)
+        ! -- If drape option activated, release particle in highest active
+        ! -- cell vertically below release point. If no such active cell,
+        ! -- do not release particle.
+        if (this%idrape /= 0) then
+          if (this%ibound(ic) == 0) then
+            ! -- Search for highest active cell
+            call this%dis%highest_active(ic, this%ibound)
+            ! -- If returned cell is inactive, do not release particle
+            if (this%ibound(ic) == 0) cycle   ! kluge note: somehow record for the user that a particle was scheduled but not released?
+          end if
+        end if
         np = this%npart + 1   ! particle index
         this%npart = np       ! ???
         trelease = totimc     ! release time
@@ -441,17 +456,9 @@ contains
           if (this%stoptime < tstop) tstop = this%stoptime
         end if
 
-        ic = this%noder(nps)  ! reduced node number (cell ID)
         this%partlist%x(np) = this%x(nps) ! kluge note: need check that specified coords are within the cell
         this%partlist%y(np) = this%y(nps)
-        top = this%fmi%dis%top(ic)
-        bot = this%fmi%dis%bot(ic)
-        sat = this%fmi%gwfsat(ic)
-        top = bot + sat * (top - bot)
-
-        ! -- If the particle is above the water table, place it at the
-        ! -- water table          ! kluge note: want more sophisticated options? also need to handle dry cell
-        this%partlist%z(np) = min(this%z(nps), top)
+        this%partlist%z(np) = this%z(nps)
         this%partlist%trelease(np) = trelease ! kluge
         this%partlist%tstop(np) = tstop
         this%partlist%ttrack(np) = trelease
@@ -804,9 +811,7 @@ contains
     case ('DRAPE')
       this%idrape = 1
       found = .true.
-      print *, "DRAPE option read in but not programmed yet" ! kluge
-      ! pause
-      stop
+
     case default
       found = .false.
     end select

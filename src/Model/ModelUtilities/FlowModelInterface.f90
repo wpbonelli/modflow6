@@ -46,7 +46,7 @@ module FlowModelInterfaceModule
     real(DP), dimension(:, :), pointer, contiguous :: gwfspdis => null() !< pointer to npf specific discharge array
     real(DP), dimension(:), pointer, contiguous :: gwfhead => null() !< pointer to the GWF head array
     real(DP), dimension(:), pointer, contiguous :: gwfsat => null() !< pointer to the GWF saturation array
-    ! integer(I4B), dimension(:), pointer, contiguous :: ibdgwfsat0 => null()      !< mark cells with saturation = 0 to exclude from dispersion
+    integer(I4B), dimension(:), pointer, contiguous :: ibdgwfsat0 => null()      !< mark cells with saturation = 0 to exclude from dispersion
     real(DP), dimension(:), pointer, contiguous :: gwfstrgss => null() !< pointer to flow model QSTOSS
     real(DP), dimension(:), pointer, contiguous :: gwfstrgsy => null() !< pointer to flow model QSTOSY
     integer(I4B), pointer :: igwfstrgss => null() !< indicates if gwfstrgss is available
@@ -335,7 +335,7 @@ contains
     ! call mem_deallocate(this%flowcorrect)
     ! call mem_deallocate(this%iatp)
     call mem_deallocate(this%igwfmvrterm)
-    ! call mem_deallocate(this%ibdgwfsat0)
+    call mem_deallocate(this%ibdgwfsat0)
     !
     if (this%flows_from_file) then
       call mem_deallocate(this%gwfstrgss)
@@ -428,13 +428,13 @@ contains
     !   this%flowcorrect(n) = DZERO
     ! enddo
     ! !
-    ! ! -- Allocate ibdgwfsat0, which is an indicator array marking cells with
-    ! !    saturation greater than 0.0 with a value of 1
-    ! call mem_allocate(this%ibdgwfsat0, nodes, 'IBDGWFSAT0', this%memoryPath)
-    ! do n = 1, nodes
-    !   this%ibdgwfsat0(n) = 1
-    ! end do
-    ! !
+    ! -- Allocate ibdgwfsat0, which is an indicator array marking cells with
+    !    saturation greater than 0.0 with a value of 1
+    call mem_allocate(this%ibdgwfsat0, nodes, 'IBDGWFSAT0', this%memoryPath)
+    do n = 1, nodes
+      this%ibdgwfsat0(n) = 1
+    end do
+    !
     ! -- Allocate differently depending on whether or not flows are
     !    being read from a file.
     if (this%flows_from_file) then

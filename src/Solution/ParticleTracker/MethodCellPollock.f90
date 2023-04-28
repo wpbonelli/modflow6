@@ -1,6 +1,7 @@
 module MethodCellPollockModule
 
   use KindModule, only: DP, I4B
+  use ConstantsModule, only: DONE
   use MethodModule
   use MethodSubcellPoolModule
   ! use CellModule
@@ -92,9 +93,10 @@ contains
     integer, intent(in) :: levelNext
     class(MethodType), pointer, intent(inout) :: submethod
     !
-    ! -- Load subcell for injection into subcell method
-    call this%load_subcell(particle, levelNext, this%subcellRect)
-    ! -- Initialize subcell method and set subcell method pointer
+    ! -- Load rectangular subcell for injection into Pollock's subcell method
+    call this%load_subcell(particle,levelNext,this%subcellRect)
+    ! -- Select and initialize Pollock's subcell method and set subcell
+    ! -- method pointer
     call methodSubcellPollock%init(this%subcellRect)
     submethod => methodSubcellPollock
     !
@@ -192,6 +194,22 @@ contains
         ! return
       end if
     else
+      !
+      ! -- If the particle is above the top of the cell (which is presumed to
+      ! -- represent a water table above the cell bottom), pass the particle
+      ! -- vertically and instantaneously to the cell top elevation.
+      if (particle%z > this%cellRect%cellDefn%top) then
+        particle%z = this%cellRect%cellDefn%top
+        ! -- Store track data
+        ntrack = this%trackdata%ntrack + 1    ! kluge?
+        this%trackdata%ntrack = ntrack
+        this%trackdata%iptrack(ntrack) = particle%ipart
+        this%trackdata%ictrack(ntrack) = particle%iTrackingDomain(2)
+        this%trackdata%xtrack(ntrack) = particle%x
+        this%trackdata%ytrack(ntrack) = particle%y
+        this%trackdata%ztrack(ntrack) = particle%z
+        this%trackdata%ttrack(ntrack) = particle%ttrack
+      end if
       !
       ! -- Transform particle location into local cell coordinates
       xOrigin = this%cellRect%xOrigin

@@ -403,6 +403,7 @@ contains
     top = bot + sat * (top - bot)
     cellDefn%top = top
     cellDefn%bot = bot
+    cellDefn%sat = sat
     !
     ! -- Load porosity, retfactor, and izone
     cellDefn%porosity = this%porosity(ic)
