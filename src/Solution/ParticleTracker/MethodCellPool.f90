@@ -3,6 +3,7 @@ module MethodCellPoolModule ! kluge
   use MethodCellPollockModule
   use MethodCellPollockQuadModule
   use MethodCellTernaryModule
+  use MethodCellPassToBotModule
   implicit none
 
   private
