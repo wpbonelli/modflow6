@@ -124,22 +124,30 @@ contains
     type(CellRectQuadType), pointer :: cellRectQuad
     ! class(CellType), pointer :: cell
     !
-    ! -- Load cell
     ic = particle%iTrackingDomain(levelNext) ! kluge note: is cell number always known coming in?
+    ! -- load cellDefn
     call this%load_cellDefn(ic, this%cellPoly%cellDefn)
     !
-    ! -- Select and initialize cell method and set cell method pointer
-    if (this%cellPoly%cellDefn%canBeCellRect) then
-      call CellPolyToCellRect(this%cellPoly, cellRect, istatus)
-      call methodCellPollock%init(particle, cellRect, this%trackdata)
-      submethod => methodCellPollock
-    else if (this%cellPoly%cellDefn%canBeCellRectQuad) then
-      call CellPolyToCellRectQuad(this%cellPoly, cellRectQuad, istatus)
-      call methodCellPollockQuad%init(particle, cellRectQuad, this%trackdata)
-      submethod => methodCellPollockQuad
+    if (this%fmi%ibdgwfsat0(ic) == 0) then              ! kluge note: use cellDefn%sat == DZERO here instead?
+      ! -- Cell is active but dry, so select and initialize pass-to-bottom
+      ! -- cell method and set cell method pointer
+      call methodCellPassToBot%init(particle, this%cellPoly%cellDefn,          &
+                                    this%trackdata)
+      submethod => methodCellPassToBot
     else
-      call methodCellTernary%init(particle, this%cellPoly, this%trackdata)
-      submethod => methodCellTernary
+      ! -- Select and initialize cell method and set cell method pointer
+      if (this%cellPoly%cellDefn%canBeCellRect) then
+        call CellPolyToCellRect(this%cellPoly, cellRect, istatus)
+        call methodCellPollock%init(particle, cellRect, this%trackdata)
+        submethod => methodCellPollock
+      else if (this%cellPoly%cellDefn%canBeCellRectQuad) then
+        call CellPolyToCellRectQuad(this%cellPoly, cellRectQuad, istatus)
+        call methodCellPollockQuad%init(particle, cellRectQuad, this%trackdata)
+        submethod => methodCellPollockQuad
+      else
+        call methodCellTernary%init(particle, this%cellPoly, this%trackdata)
+        submethod => methodCellTernary
+      end if
     end if
     !
     return
