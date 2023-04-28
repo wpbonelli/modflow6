@@ -252,6 +252,22 @@ contains
       end if
     else
       !
+      ! -- If the particle is above the top of the cell (which is presumed to
+      ! -- represent a water table above the cell bottom), pass the particle
+      ! -- vertically and instantaneously to the cell top elevation.
+      if (particle%z > this%cellPoly%cellDefn%top) then
+        particle%z = this%cellPoly%cellDefn%top
+        ! -- Store track data
+        ntrack = this%trackdata%ntrack + 1    ! kluge?
+        this%trackdata%ntrack = ntrack
+        this%trackdata%iptrack(ntrack) = particle%ipart
+        this%trackdata%ictrack(ntrack) = particle%iTrackingDomain(2)
+        this%trackdata%xtrack(ntrack) = particle%x
+        this%trackdata%ytrack(ntrack) = particle%y
+        this%trackdata%ztrack(ntrack) = particle%z
+        this%trackdata%ttrack(ntrack) = particle%ttrack
+      end if
+      !
       npolyverts = this%cellPoly%cellDefn%npolyverts
       !
       xsum = DZERO
