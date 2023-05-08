@@ -5,35 +5,37 @@ include ./makedefaults
 
 # Define the source file directories
 SOURCEDIR1=../src
-SOURCEDIR2=../src/Exchange
-SOURCEDIR3=../src/Distributed
-SOURCEDIR4=../src/Solution
+SOURCEDIR2=../src/Timing
+SOURCEDIR3=../src/Solution
+SOURCEDIR4=../src/Solution/PETSc
 SOURCEDIR5=../src/Solution/LinearMethods
-SOURCEDIR6=../src/Solution/PETSc
-SOURCEDIR7=../src/Timing
-SOURCEDIR8=../src/Utilities
-SOURCEDIR9=../src/Utilities/Idm
-SOURCEDIR10=../src/Utilities/Idm/selector
-SOURCEDIR11=../src/Utilities/Idm/mf6blockfile
-SOURCEDIR12=../src/Utilities/TimeSeries
-SOURCEDIR13=../src/Utilities/Memory
-SOURCEDIR14=../src/Utilities/OutputControl
-SOURCEDIR15=../src/Utilities/ArrayRead
-SOURCEDIR16=../src/Utilities/Libraries
-SOURCEDIR17=../src/Utilities/Libraries/rcm
-SOURCEDIR18=../src/Utilities/Libraries/blas
-SOURCEDIR19=../src/Utilities/Libraries/sparskit2
-SOURCEDIR20=../src/Utilities/Libraries/daglib
-SOURCEDIR21=../src/Utilities/Libraries/sparsekit
-SOURCEDIR22=../src/Utilities/Vector
-SOURCEDIR23=../src/Utilities/Matrix
-SOURCEDIR24=../src/Utilities/Observation
-SOURCEDIR25=../src/Model
-SOURCEDIR26=../src/Model/Connection
-SOURCEDIR27=../src/Model/GroundWaterTransport
-SOURCEDIR28=../src/Model/ModelUtilities
-SOURCEDIR29=../src/Model/GroundWaterFlow
-SOURCEDIR30=../src/Model/Geometry
+SOURCEDIR6=../src/Solution/ParticleTracker
+SOURCEDIR7=../src/Model
+SOURCEDIR8=../src/Model/GroundWaterFlow
+SOURCEDIR9=../src/Model/Connection
+SOURCEDIR10=../src/Model/ModelUtilities
+SOURCEDIR11=../src/Model/GroundWaterTransport
+SOURCEDIR12=../src/Model/ParticleTracking
+SOURCEDIR13=../src/Model/Geometry
+SOURCEDIR14=../src/Distributed
+SOURCEDIR15=../src/Exchange
+SOURCEDIR16=../src/Utilities
+SOURCEDIR17=../src/Utilities/TimeSeries
+SOURCEDIR18=../src/Utilities/OutputControl
+SOURCEDIR19=../src/Utilities/Observation
+SOURCEDIR20=../src/Utilities/Libraries
+SOURCEDIR21=../src/Utilities/Libraries/rcm
+SOURCEDIR22=../src/Utilities/Libraries/blas
+SOURCEDIR23=../src/Utilities/Libraries/sparsekit
+SOURCEDIR24=../src/Utilities/Libraries/sparskit2
+SOURCEDIR25=../src/Utilities/Libraries/daglib
+SOURCEDIR26=../src/Utilities/Vector
+SOURCEDIR27=../src/Utilities/ArrayRead
+SOURCEDIR28=../src/Utilities/Memory
+SOURCEDIR29=../src/Utilities/Matrix
+SOURCEDIR30=../src/Utilities/Idm
+SOURCEDIR31=../src/Utilities/Idm/selector
+SOURCEDIR32=../src/Utilities/Idm/mf6blockfile
 
 VPATH = \
 ${SOURCEDIR1} \
@@ -65,7 +67,9 @@ ${SOURCEDIR26} \
 ${SOURCEDIR27} \
 ${SOURCEDIR28} \
 ${SOURCEDIR29} \
-${SOURCEDIR30} 
+${SOURCEDIR30} \
+${SOURCEDIR31} \
+${SOURCEDIR32} 
 
 .SUFFIXES: .f90 .F90 .o
 
@@ -126,6 +130,18 @@ $(OBJDIR)/Budget.o \
 $(OBJDIR)/sort.o \
 $(OBJDIR)/SfrCrossSectionUtils.o \
 $(OBJDIR)/BudgetTerm.o \
+$(OBJDIR)/SeqVector.o \
+$(OBJDIR)/GlobalData.o \
+$(OBJDIR)/BoundaryPackage.o \
+$(OBJDIR)/BaseModel.o \
+$(OBJDIR)/SparseMatrix.o \
+$(OBJDIR)/LinearSolverBase.o \
+$(OBJDIR)/ims8reordering.o \
+$(OBJDIR)/TernaryUtil.o \
+$(OBJDIR)/Ternary.o \
+$(OBJDIR)/TrackData.o \
+$(OBJDIR)/Particle.o \
+$(OBJDIR)/CellDefn.o \
 $(OBJDIR)/VirtualBase.o \
 $(OBJDIR)/STLVecInt.o \
 $(OBJDIR)/BoundaryPackage.o \
@@ -134,11 +150,23 @@ $(OBJDIR)/InputDefinition.o \
 $(OBJDIR)/SfrCrossSectionManager.o \
 $(OBJDIR)/dag_module.o \
 $(OBJDIR)/BudgetObject.o \
+$(OBJDIR)/NumericalModel.o \
+$(OBJDIR)/BaseExchange.o \
+$(OBJDIR)/ImsLinearSolver.o \
+$(OBJDIR)/ims8base.o \
+$(OBJDIR)/TernarySolveTrack.o \
+$(OBJDIR)/SubcellTri.o \
+$(OBJDIR)/Method.o \
+$(OBJDIR)/UtilMisc.o \
+$(OBJDIR)/SubcellRect.o \
 $(OBJDIR)/VirtualDataLists.o \
 $(OBJDIR)/VirtualDataContainer.o \
 $(OBJDIR)/SimStages.o \
 $(OBJDIR)/NumericalModel.o \
 $(OBJDIR)/simnamidm.o \
+$(OBJDIR)/prt1idm.o \
+$(OBJDIR)/prt1disv1idm.o \
+$(OBJDIR)/prt1dis1idm.o \
 $(OBJDIR)/gwt1idm.o \
 $(OBJDIR)/gwt1dsp1idm.o \
 $(OBJDIR)/gwt1disv1idm.o \
@@ -163,9 +191,12 @@ $(OBJDIR)/GwfVscInputData.o \
 $(OBJDIR)/gwf3ghb8.o \
 $(OBJDIR)/gwf3drn8.o \
 $(OBJDIR)/IndexMap.o \
+$(OBJDIR)/MethodSubcellTernary.o \
+$(OBJDIR)/MethodSubcellPollock.o \
 $(OBJDIR)/VirtualModel.o \
 $(OBJDIR)/BaseExchange.o \
 $(OBJDIR)/IdmSimDfnSelector.o \
+$(OBJDIR)/IdmPrtDfnSelector.o \
 $(OBJDIR)/IdmGwtDfnSelector.o \
 $(OBJDIR)/IdmGwfDfnSelector.o \
 $(OBJDIR)/UzfCellGroup.o \
@@ -179,6 +210,10 @@ $(OBJDIR)/gwf3vsc8.o \
 $(OBJDIR)/GwfNpfOptions.o \
 $(OBJDIR)/InterfaceMap.o \
 $(OBJDIR)/SeqVector.o \
+$(OBJDIR)/MethodSubcellPool.o \
+$(OBJDIR)/CellPoly.o \
+$(OBJDIR)/CellRectQuad.o \
+$(OBJDIR)/CellRect.o \
 $(OBJDIR)/CellWithNbrs.o \
 $(OBJDIR)/NumericalExchange.o \
 $(OBJDIR)/IdmDfnSelector.o \
@@ -202,6 +237,12 @@ $(OBJDIR)/SparseMatrix.o \
 $(OBJDIR)/LinearSolverBase.o \
 $(OBJDIR)/ims8reordering.o \
 $(OBJDIR)/ArrayReaderBase.o \
+$(OBJDIR)/gwf3disv8.o \
+$(OBJDIR)/FlowModelInterface.o \
+$(OBJDIR)/MethodCellTernary.o \
+$(OBJDIR)/MethodCellPollockQuad.o \
+$(OBJDIR)/MethodCellPollock.o \
+$(OBJDIR)/MethodCellPassToBot.o \
 $(OBJDIR)/VirtualExchange.o \
 $(OBJDIR)/gwf3disu8.o \
 $(OBJDIR)/GridSorting.o \
@@ -222,7 +263,6 @@ $(OBJDIR)/gwt1ist1.o \
 $(OBJDIR)/gwt1dsp1.o \
 $(OBJDIR)/gwt1cnc1.o \
 $(OBJDIR)/gwt1adv1.o \
-$(OBJDIR)/gwf3disv8.o \
 $(OBJDIR)/gwf3dis8.o \
 $(OBJDIR)/gwf3api8.o \
 $(OBJDIR)/gwf3wel8.o \
@@ -241,6 +281,10 @@ $(OBJDIR)/RouterBase.o \
 $(OBJDIR)/ImsLinearSolver.o \
 $(OBJDIR)/ims8base.o \
 $(OBJDIR)/Integer2dReader.o \
+$(OBJDIR)/ExplicitModel.o \
+$(OBJDIR)/prt1fmi1.o \
+$(OBJDIR)/MethodCellPool.o \
+$(OBJDIR)/CellUtil.o \
 $(OBJDIR)/GridConnection.o \
 $(OBJDIR)/DistributedVariable.o \
 $(OBJDIR)/gwt1.o \
@@ -255,7 +299,13 @@ $(OBJDIR)/IdmLogger.o \
 $(OBJDIR)/Integer1dReader.o \
 $(OBJDIR)/Double2dReader.o \
 $(OBJDIR)/Double1dReader.o \
-$(OBJDIR)/ExplicitModel.o \
+$(OBJDIR)/TrackingModel.o \
+$(OBJDIR)/prt1prp1.o \
+$(OBJDIR)/prt1oc1.o \
+$(OBJDIR)/prt1obs1.o \
+$(OBJDIR)/prt1mip.o \
+$(OBJDIR)/MethodDisv.o \
+$(OBJDIR)/MethodDis.o \
 $(OBJDIR)/SpatialModelConnection.o \
 $(OBJDIR)/GwtInterfaceModel.o \
 $(OBJDIR)/GwtGwtExchange.o \
@@ -269,6 +319,7 @@ $(OBJDIR)/ModflowInput.o \
 $(OBJDIR)/LayeredArrayReader.o \
 $(OBJDIR)/DefinitionSelect.o \
 $(OBJDIR)/ExplicitSolution.o \
+$(OBJDIR)/prt1.o \
 $(OBJDIR)/GwtGwtConnection.o \
 $(OBJDIR)/GwfGwfConnection.o \
 $(OBJDIR)/VirtualDataManager.o \
@@ -280,6 +331,7 @@ $(OBJDIR)/VirtualGwfModel.o \
 $(OBJDIR)/VirtualGwfExchange.o \
 $(OBJDIR)/SolutionGroup.o \
 $(OBJDIR)/SolutionFactory.o \
+$(OBJDIR)/GwfPrtExchange.o \
 $(OBJDIR)/GwfGwtExchange.o \
 $(OBJDIR)/RunControl.o \
 $(OBJDIR)/IdmMf6File.o \

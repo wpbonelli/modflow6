@@ -35,13 +35,8 @@ module GwfPrtExchangeModule
 
 contains
 
+  !> @brief Create a new GWF to PRT exchange object
   subroutine gwfprt_cr(filename, id, m1id, m2id)
-! ******************************************************************************
-! gwfprt_cr -- Create a new GWF to PRT exchange object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use SimVariablesModule, only: model_loc_idx
     ! -- dummy
@@ -53,7 +48,6 @@ contains
     class(BaseExchangeType), pointer :: baseexchange => null()
     type(GwfPrtExchangeType), pointer :: exchange => null()
     character(len=20) :: cint
-! ------------------------------------------------------------------------------
     !
     ! -- Create a new exchange and add it to the baseexchangelist container
     allocate (exchange)
@@ -81,12 +75,6 @@ contains
   end subroutine gwfprt_cr
 
   subroutine set_model_pointers(this)
-! ******************************************************************************
-! set_model_pointers -- allocate and read
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     ! -- dummy
     class(GwfPrtExchangeType) :: this
@@ -94,7 +82,6 @@ contains
     class(BaseModelType), pointer :: mb => null()
     type(GwfModelType), pointer :: gwfmodel => null()
     type(PrtModelType), pointer :: prtmodel => null()
-! ------------------------------------------------------------------------------
     !
     ! -- set gwfmodel
     mb => GetBaseModelFromList(basemodellist, this%m1id)
@@ -136,12 +123,6 @@ contains
   end subroutine set_model_pointers
 
   subroutine exg_df(this)
-! ******************************************************************************
-! exg_df -- define
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_checkin
     ! -- dummy
@@ -152,7 +133,6 @@ contains
     type(PrtModelType), pointer :: prtmodel => null()
     integer(I4B) :: ngwfpack, ip
     class(BndType), pointer :: packobj => null()
-! ------------------------------------------------------------------------------
     !
     !
     ! -- set gwfmodel
@@ -182,8 +162,8 @@ contains
     ! -- Set pointer to flowja
     prtmodel%fmi%gwfflowja => gwfmodel%flowja
     call mem_checkin(prtmodel%fmi%gwfflowja, &
-                    'GWFFLOWJA', prtmodel%fmi%memoryPath, &
-                    'FLOWJA', gwfmodel%memoryPath)
+                     'GWFFLOWJA', prtmodel%fmi%memoryPath, &
+                     'FLOWJA', gwfmodel%memoryPath)
     !
     ! -- Set the npf flag so that specific discharge is available for
     !    transport calculations if dispersion is active
@@ -204,12 +184,6 @@ contains
   end subroutine exg_df
 
   subroutine exg_ar(this)
-! ******************************************************************************
-! exg_ar --
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_checkin
     ! -- dummy
@@ -225,7 +199,6 @@ contains
       &  GWF Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
       &  PRT Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
       &  Ensure discretization packages, including IDOMAIN, are identical.')"
-! ------------------------------------------------------------------------------
     !
     ! -- set gwfmodel
     mb => GetBaseModelFromList(basemodellist, this%m1id)
@@ -255,16 +228,16 @@ contains
     ! -- setup pointers to gwf variables allocated in gwf_ar
     prtmodel%fmi%gwfhead => gwfmodel%x
     call mem_checkin(prtmodel%fmi%gwfhead, &
-                    'GWFHEAD', prtmodel%fmi%memoryPath, &
-                    'X', gwfmodel%memoryPath)
+                     'GWFHEAD', prtmodel%fmi%memoryPath, &
+                     'X', gwfmodel%memoryPath)
     prtmodel%fmi%gwfsat => gwfmodel%npf%sat
     call mem_checkin(prtmodel%fmi%gwfsat, &
-                    'GWFSAT', prtmodel%fmi%memoryPath, &
-                    'SAT', gwfmodel%npf%memoryPath)
+                     'GWFSAT', prtmodel%fmi%memoryPath, &
+                     'SAT', gwfmodel%npf%memoryPath)
     prtmodel%fmi%gwfspdis => gwfmodel%npf%spdis
     call mem_checkin(prtmodel%fmi%gwfspdis, &
-                    'GWFSPDIS', prtmodel%fmi%memoryPath, &
-                    'SPDIS', gwfmodel%npf%memoryPath)
+                     'GWFSPDIS', prtmodel%fmi%memoryPath, &
+                     'SPDIS', gwfmodel%npf%memoryPath)
     !
     ! -- setup pointers to the flow storage rates. GWF strg arrays are
     !    available after the gwf_ar routine is called.
@@ -302,18 +275,11 @@ contains
   ! todo subroutines: gwfconn2prtconn and link_connections
 
   subroutine exg_da(this)
-! ******************************************************************************
-! allocate_scalars
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
     ! -- dummy
     class(GwfPrtExchangeType) :: this
     ! -- local
-! ------------------------------------------------------------------------------
     !
     call mem_deallocate(this%m1id)
     call mem_deallocate(this%m2id)
@@ -323,18 +289,11 @@ contains
   end subroutine exg_da
 
   subroutine allocate_scalars(this)
-! ******************************************************************************
-! allocate_scalars
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_allocate, mem_checkin
     ! -- dummy
     class(GwfPrtExchangeType) :: this
     ! -- local
-! ------------------------------------------------------------------------------
     !
     call mem_allocate(this%m1id, 'M1ID', this%memoryPath)
     call mem_allocate(this%m2id, 'M2ID', this%memoryPath)
@@ -346,12 +305,6 @@ contains
   end subroutine allocate_scalars
 
   subroutine gwfbnd2prtfmi(this)
-! ******************************************************************************
-! gwfbnd2prtfmi
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     ! -- dummy
     class(GwfPrtExchangeType) :: this
@@ -361,7 +314,6 @@ contains
     type(GwfModelType), pointer :: gwfmodel => null()
     type(PrtModelType), pointer :: prtmodel => null()
     class(BndType), pointer :: packobj => null()
-! ------------------------------------------------------------------------------
     !
     ! -- set gwfmodel
     mb => GetBaseModelFromList(basemodellist, this%m1id)

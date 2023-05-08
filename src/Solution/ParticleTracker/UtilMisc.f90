@@ -11,7 +11,7 @@ contains
 
   SUBROUTINE UTRIMALL(LINE)
     CHARACTER * (*) LINE
-    INTEGER IFIRST, ILAST, NFIRST, NLAST, N, M, LENGTH, OFFSET
+    INTEGER IFIRST, NLAST, N, M, LENGTH, OFFSET
 
     NLAST = LEN_TRIM(LINE)
     IF (NLAST .EQ. 0) RETURN
@@ -77,7 +77,6 @@ contains
   subroutine TrimAll(string, firstNonBlank, lastNonBlank, trimmedLength)
     implicit none
     character * (*) string
-    character(len=:), allocatable :: newString
     integer, intent(inout) :: firstNonBlank, lastNonBlank, trimmedLength
     integer :: n
 
@@ -277,8 +276,6 @@ contains
     ! -- dummy
     class(VertexType), allocatable, intent(inout) :: varray(:)
     integer, intent(in) :: mindim
-    ! -- local
-    integer :: m
 ! ------------------------------------------------------------------------------
     !
     if (.not. ALLOCATED(varray)) then

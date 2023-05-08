@@ -8,7 +8,10 @@ module GlobalDataModule
   integer, save :: particleGroupCount
   integer, save :: gridFileType
   integer, parameter :: niunit = 100
-  character(len=200) :: mpnamFile, mpsimFile, mplistFile, mpbasFile, disFile, &
-                 tdisFile, gridFile, headFile, budgetFile, traceFile, gridMetaFile
-  integer, parameter :: levelMin=0, levelMax=4, levelRelMax=levelMax-levelMin
+  character(len=200) :: mpnamFile, mpsimFile, mplistFile, &
+                        mpbasFile, disFile, &
+                        tdisFile, gridFile, headFile, &
+                        budgetFile, traceFile, gridMetaFile
+  integer, parameter :: levelMin = 0, levelMax = 4, &
+                        levelRelMax = levelMax - levelMin
 end module

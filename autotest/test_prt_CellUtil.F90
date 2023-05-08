@@ -21,8 +21,10 @@ module test_prt_CellUtil
         ! dummy
         type(error_type), allocatable, intent(out) :: error
         ! local
-        type(CellRectType), pointer :: cellRect
-        double precision :: xpt, ypt
+        ! type(CellRectType), pointer :: cellRect
+        ! double precision :: xpt, ypt
+
+        call check(error, 1 + 1 == 2)
 
         ! todo debug
         ! call create_cellRect(cellRect)
