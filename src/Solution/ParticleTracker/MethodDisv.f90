@@ -24,11 +24,12 @@ module MethodDisvModule
     ! type(CellDefnType), pointer :: cellDefn ! cellDefn object injected into cell method
     real(DP), dimension(:), pointer, contiguous :: flowja => null() !< intercell flows
     type(CellPolyType), pointer :: cellPoly ! polygonal cell
-    real(DP), dimension(:), pointer, contiguous :: porosity => null() !< pointer to aquifer porosity
-    real(DP), dimension(:), pointer, contiguous :: retfactor => null() !< pointer to retardation factor
-    integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< pointer to zone number
+    real(DP), dimension(:), pointer, contiguous :: porosity => null() !< ptr to aquifer porosity
+    real(DP), dimension(:), pointer, contiguous :: retfactor => null() !< ptr to retardation factor
+    integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< ptr to zone number
   contains
-    procedure, public :: destroy ! destructor for the method      ! kluge note: must procedures like this be denoted as public (as and throughout)???
+    ! kluge note: must procedures like this be denoted as public (as and throughout)???
+    procedure, public :: destroy ! destructor for the method
     procedure, public :: init ! initializes the method
     procedure, public :: apply => apply_mGDv ! applies the DISV-grid method
     procedure, public :: pass => pass_mGDv ! passes the particle to the next cell
@@ -43,9 +44,12 @@ module MethodDisvModule
     procedure, public :: load_cellDefn_flows ! loads flows to a cell object
     procedure, public :: load_cellDefn_ispv180 ! loads 180-degree vertex indicator to a cell object
     procedure, public :: load_cellDefn_basic ! loads basic components to a cell object from its grid
-    procedure, public :: addBoundaryFlows_cellRect ! adds BoundaryFlows from the grid to the faceflow array of a rectangular cell
-    procedure, public :: addBoundaryFlows_cellRectQuad ! adds BoundaryFlows from the grid to the faceflow array of a rectangular-quad cell
-    procedure, public :: addBoundaryFlows_cellPoly ! adds BoundaryFlows from the grid to the faceflow array of a polygonal cell
+    ! adds BoundaryFlows from grid to faceflow array of a rectangular cell
+    procedure, public :: addBoundaryFlows_cellRect
+    ! adds BoundaryFlows from the grid to the faceflow array of a rectangular-quad cell
+    procedure, public :: addBoundaryFlows_cellRectQuad
+    ! adds BoundaryFlows from the grid to the faceflow array of a polygonal cell
+    procedure, public :: addBoundaryFlows_cellPoly
   end type MethodDisvType
 
 contains
@@ -124,14 +128,14 @@ contains
     type(CellRectQuadType), pointer :: cellRectQuad
     ! class(CellType), pointer :: cell
     !
+    ! load cell definition
     ic = particle%iTrackingDomain(levelNext) ! kluge note: is cell number always known coming in?
-    ! -- load cellDefn
     call this%load_cellDefn(ic, this%cellPoly%cellDefn)
     !
-    if (this%fmi%ibdgwfsat0(ic) == 0) then              ! kluge note: use cellDefn%sat == DZERO here instead?
+    if (this%fmi%ibdgwfsat0(ic) == 0) then ! kluge note: use cellDefn%sat == DZERO here instead?
       ! -- Cell is active but dry, so select and initialize pass-to-bottom
       ! -- cell method and set cell method pointer
-      call methodCellPassToBot%init(particle, this%cellPoly%cellDefn,          &
+      call methodCellPassToBot%init(particle, this%cellPoly%cellDefn, &
                                     this%trackdata)
       submethod => methodCellPassToBot
     else
@@ -170,15 +174,15 @@ contains
     if (inbr .eq. 0) then
       ! -- Exterior face; no neighbor to map to
       ! particle%iTrackingDomain(1) = 0
-      ! particle%iTrackingDomain(2) = 0      ! kluge note: set a "has_exited" attribute instead???
+      ! particle%iTrackingDomain(2) = 0   ! kluge note: "has_exited" attribute instead???
       ! particle%iTrackingDomain(1) = -abs(particle%iTrackingDomain(1))   ! kluge???
       ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
-      particle%istatus = 2 ! kluge note: use -2 to allow check for transfer to another model???
+      particle%istatus = 2 ! kluge note: use -2 to check for transfer to another model???
       ! particle%iTrackingDomainBoundary(2) = -1
     else
       idiag = this%fmi%dis%con%ia(this%cellPoly%cellDefn%icell)
       ipos = idiag + inbr
-      ic = this%fmi%dis%con%ja(ipos) ! kluge note: use PRT model's DIS instead of fmi's???
+      ic = this%fmi%dis%con%ja(ipos) ! kluge note: use PRT model's DIS instead of fmi's??
       particle%iTrackingDomain(2) = ic
       call this%mapToNbrCell(this%cellPoly%cellDefn, inface, z)
       particle%iTrackingDomainBoundary(2) = inface
@@ -222,7 +226,8 @@ contains
       j = this%fmi%dis%con%ia(icin)
       ic = this%fmi%dis%con%ja(j + inbr)
       call create_cellDefn(cellDefn)
-      call this%load_cellDefn(ic, cellDefn) ! kluge  ! kluge note: really only need to load facenbr and npolyverts for this purpose
+      ! kluge note: really only need to load facenbr and npolyverts for this
+      call this%load_cellDefn(ic, cellDefn) ! kluge
       npolyvertsin = cellDefnin%npolyverts
       npolyverts = cellDefn%npolyverts
       if (inface .eq. npolyvertsin + 2) then
@@ -234,7 +239,8 @@ contains
       else
         ! -- Exits and enters through shared polygon face
         j = this%fmi%dis%con%ia(ic)
-        do m = 1, npolyverts + 3 ! kluge note: use shared_edge in DisvGeom to find shared polygon face???
+        ! kluge note: use shared_edge in DisvGeom to find shared polygon face???
+        do m = 1, npolyverts + 3
           inbrnbr = cellDefn%facenbr(m)
           if (this%fmi%dis%con%ja(j + inbrnbr) .eq. icin) then
             inface = m
@@ -247,7 +253,8 @@ contains
         topfrom = cellDefnin%top
         botfrom = cellDefnin%bot
         zrel = (z - botfrom) / (topfrom - botfrom)
-        top = this%fmi%dis%top(ic) ! kluge note: use PRT model's DIS instead of fmi's???
+        ! kluge note: use PRT model's DIS instead of fmi's???
+        top = this%fmi%dis%top(ic)
         bot = this%fmi%dis%bot(ic)
         sat = this%fmi%gwfsat(ic)
         z = bot + zrel * sat * (top - bot)
@@ -266,7 +273,7 @@ contains
     class(MethodDisvType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-    ! doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
+    ! doubleprecision :: initialTime,maximumTime,t  ! kluge not in arg list yet
     ! -- local
     !
     ! -- Track across cells
@@ -284,7 +291,7 @@ contains
     class(MethodDisvType), intent(inout) :: this
     integer, intent(in) :: ic
     ! -- local
-    integer :: lay, icu, icu2d
+    integer :: icu, icu2d
     integer :: ncpl ! kluge???
     ! -- result
     integer :: npolyverts
@@ -313,10 +320,10 @@ contains
     ! -- local
     integer :: ncpl, icu
     !
-    ! select type (dis => this%fmi%dis)                           ! kluge??? ...
+    ! select type (dis => this%fmi%dis)                     ! kluge??? ...
     ! type is (GwfDisvType)
     !   ncpl = dis%get_ncpl()
-    ! end select                                              ! ... kluge???
+    ! end select                                           ! ... kluge???
     ! if (ic.le.ncpl) then
     !   iatop = -ic
     ! else
@@ -335,7 +342,7 @@ contains
 
   !> @brief Get top elevation based on index iatop
   !! kluge note: not needed???
-  function get_top(this, iatop) result(top) 
+  function get_top(this, iatop) result(top)
     implicit none
     ! -- dummy
     class(MethodDisvType), intent(inout) :: this
@@ -396,7 +403,7 @@ contains
     !
     ! ! -- Load nnbrs
     ! nnbrs = this%fmi%dis%con%ia(ic+1) - this%fmi%dis%con%ia(ic) - 1
-    ! cellDefn%nnbrs = nnbrs          ! kluge note: is this actually needed anywhere???
+    ! cellDefn%nnbrs = nnbrs   ! kluge note: is this actually needed anywhere???
     ! !
     ! -- Load npolyverts
     cellDefn%npolyverts = this%get_npolyverts(ic)
@@ -430,7 +437,7 @@ contains
     class(MethodDisvType), intent(inout) :: this
     type(CellDefnType), pointer, intent(inout) :: cellDefn
     ! -- local
-    integer :: ig, ic, npolyverts, iavert, iavertm1, m, j, icu, icu2d
+    integer :: ic, npolyverts, iavert, iavertm1, m, j, icu, icu2d
     integer :: ncpl ! kluge???
     !
     ic = cellDefn%icell
@@ -512,14 +519,14 @@ contains
                              iedgeface)
         if (iedgeface /= 0) then
           ! -- Edge (polygon) face neighbor
-          cellDefn%facenbr(iedgeface) = iloc
+          cellDefn%facenbr(iedgeface) = int(iloc, 1)
         else
           if (k2 > k1) then
             ! -- Bottom face neighbor
-            cellDefn%facenbr(npolyverts + 2) = iloc
+            cellDefn%facenbr(npolyverts + 2) = int(iloc, 1)
           else if (k2 < k1) then
             ! -- Top face neighbor
-            cellDefn%facenbr(npolyverts + 3) = iloc
+            cellDefn%facenbr(npolyverts + 3) = int(iloc, 1)
           else
             print *, "Error -- k2 should be <> k1, since no shared edge face"
           end if
@@ -543,7 +550,7 @@ contains
   !!
   !! kluge note: based on DisvGeom shared_edge
   !<
-  subroutine shared_edgeface(ivlist1, ivlist2, iedgeface) 
+  subroutine shared_edgeface(ivlist1, ivlist2, iedgeface)
     integer(I4B), dimension(:) :: ivlist1
     integer(I4B), dimension(:) :: ivlist2
     integer(I4B), intent(out) :: iedgeface
@@ -582,10 +589,7 @@ contains
     class(MethodDisvType), intent(inout) :: this
     type(CellDefnType), intent(inout) :: cellDefn
     ! -- local
-    integer :: ig, ic, npolyverts, m, n
-
-    integer :: ioffset, nbf, m1, m2, mdiff ! kluge
-    double precision :: qbf ! kluge
+    integer :: ic, npolyverts, m, n
     !
     ic = cellDefn%icell
     !
@@ -606,7 +610,7 @@ contains
       n = cellDefn%facenbr(m)
       if (n > 0) &
         cellDefn%faceflow(m) = this%fmi%gwfflowja(this%fmi%dis%con%ia(ic) + n)
-        ! if (cellDefn%faceflow(m) < 0d0) cellDefn%inoexitface = 0
+      ! if (cellDefn%faceflow(m) < 0d0) cellDefn%inoexitface = 0
     end do
     call this%addBoundaryFlows_cellPoly(cellDefn)
     ! -- Set inoexitface flag
@@ -631,31 +635,38 @@ contains
   end subroutine load_cellDefn_flows
 
   !> @brief Load boundary flows from the grid into a rectangular cell
-  subroutine addBoundaryFlows_cellRect(this, cellDefn) 
+  subroutine addBoundaryFlows_cellRect(this, cellDefn)
     implicit none
     ! -- dummy
     class(MethodDisvType), intent(inout) :: this
     type(CellDefnType), intent(inout) :: cellDefn
     ! -- local
-    integer :: ig, ic, npolyverts, m, n
+    integer :: ic, npolyverts
     integer :: ioffset
     !
     ic = cellDefn%icell
     npolyverts = cellDefn%npolyverts
     !
     ! kluge note - assignment of BoundaryFlows to faceflow below assumes vertex 1
-    !  is at upper left of a rectangular cell and that BoundaryFlows still use old iface ordering
+    ! is at upper left of rectangular cell, and BoundaryFlows use old iface order
     ! ioffset = (ic - 1)*6
     ioffset = (ic - 1) * 10
-    cellDefn%faceflow(1) = cellDefn%faceflow(1) + this%fmi%BoundaryFlows(ioffset + 4) ! kluge note: should these be additive (seems so)???
-    cellDefn%faceflow(2) = cellDefn%faceflow(2) + this%fmi%BoundaryFlows(ioffset + 2)
-    cellDefn%faceflow(3) = cellDefn%faceflow(3) + this%fmi%BoundaryFlows(ioffset + 3)
-    cellDefn%faceflow(4) = cellDefn%faceflow(4) + this%fmi%BoundaryFlows(ioffset + 1)
+    ! kluge note: should these be additive (seems so)???
+    cellDefn%faceflow(1) = cellDefn%faceflow(1) + &
+                           this%fmi%BoundaryFlows(ioffset + 4)
+    cellDefn%faceflow(2) = cellDefn%faceflow(2) + &
+                           this%fmi%BoundaryFlows(ioffset + 2)
+    cellDefn%faceflow(3) = cellDefn%faceflow(3) + &
+                           this%fmi%BoundaryFlows(ioffset + 3)
+    cellDefn%faceflow(4) = cellDefn%faceflow(4) + &
+                           this%fmi%BoundaryFlows(ioffset + 1)
     cellDefn%faceflow(5) = cellDefn%faceflow(1)
     ! cellDefn%faceflow(6) = cellDefn%faceflow(6) + this%fmi%BoundaryFlows(ioffset+5)
     ! cellDefn%faceflow(7) = cellDefn%faceflow(7) + this%fmi%BoundaryFlows(ioffset+6)
-    cellDefn%faceflow(6) = cellDefn%faceflow(6) + this%fmi%BoundaryFlows(ioffset + 9)
-    cellDefn%faceflow(7) = cellDefn%faceflow(7) + this%fmi%BoundaryFlows(ioffset + 10)
+    cellDefn%faceflow(6) = cellDefn%faceflow(6) + &
+                           this%fmi%BoundaryFlows(ioffset + 9)
+    cellDefn%faceflow(7) = cellDefn%faceflow(7) + &
+                           this%fmi%BoundaryFlows(ioffset + 10)
     !
     return
     !
@@ -668,7 +679,7 @@ contains
     class(MethodDisvType), intent(inout) :: this
     type(CellDefnType), intent(inout) :: cellDefn
     ! -- local
-    integer :: ig, ic, npolyverts, m, n, nn
+    integer :: ic, npolyverts, m, n, nn
     integer :: ioffset, nbf, m1, m2, mdiff
     double precision :: qbf
     integer :: irectvert(5) ! kluge
@@ -677,7 +688,7 @@ contains
     npolyverts = cellDefn%npolyverts
     !
     ! kluge note - assignment of BoundaryFlows to faceflow below assumes vertex 1
-    !  is at upper left of a rectangular cell and that BoundaryFlows still use old iface ordering
+    ! is at upper left of rectangular cell, and BoundaryFlows use old iface order
     ! ioffset = (ic - 1)*6
     ioffset = (ic - 1) * 10
     ! -- Polygon faces in positions 1 through npolyverts
@@ -719,11 +730,13 @@ contains
     ! -- Bottom in position npolyverts+2
     m = m + 1
     ! cellDefn%faceflow(m) = cellDefn%faceflow(m) + this%fmi%BoundaryFlows(ioffset+5)
-    cellDefn%faceflow(m) = cellDefn%faceflow(m) + this%fmi%BoundaryFlows(ioffset + 9)
+    cellDefn%faceflow(m) = cellDefn%faceflow(m) + &
+                           this%fmi%BoundaryFlows(ioffset + 9)
     ! -- Top in position npolyverts+3
     m = m + 1
     ! cellDefn%faceflow(m) = cellDefn%faceflow(m) + this%fmi%BoundaryFlows(ioffset+6)
-    cellDefn%faceflow(m) = cellDefn%faceflow(m) + this%fmi%BoundaryFlows(ioffset + 10)
+    cellDefn%faceflow(m) = cellDefn%faceflow(m) + &
+                           this%fmi%BoundaryFlows(ioffset + 10)
     !
     return
     !
@@ -742,15 +755,23 @@ contains
     npolyverts = cellDefn%npolyverts
     !
     ! ioffset = (ic - 1)*6
-    ioffset = (ic - 1) * 10 ! kluge note: hardwired for max 8 polygon faces plus top and bottom for now
+    ! kluge note: hardwired for max 8 polygon faces plus top and bottom for now
+    ioffset = (ic - 1) * 10
     do iv = 1, npolyverts
-      cellDefn%faceflow(iv) = cellDefn%faceflow(iv) + this%fmi%BoundaryFlows(ioffset+iv)  ! kluge note: should these be additive (seems so)???
+      ! kluge note: should these be additive (seems so)???
+      cellDefn%faceflow(iv) = &
+        cellDefn%faceflow(iv) + &
+        this%fmi%BoundaryFlows(ioffset + iv)
     end do
     cellDefn%faceflow(npolyverts + 1) = cellDefn%faceflow(1)
     ! cellDefn%faceflow(npolyverts+2) = cellDefn%faceflow(npolyverts+2) + this%fmi%BoundaryFlows(ioffset+npolyverts+1)
     ! cellDefn%faceflow(npolyverts+3) = cellDefn%faceflow(npolyverts+3) + this%fmi%BoundaryFlows(ioffset+npolyverts+2)
-    cellDefn%faceflow(npolyverts+2) = cellDefn%faceflow(npolyverts+2) + this%fmi%BoundaryFlows(ioffset+9)
-    cellDefn%faceflow(npolyverts+3) = cellDefn%faceflow(npolyverts+3) + this%fmi%BoundaryFlows(ioffset+10)
+    cellDefn%faceflow(npolyverts + 2) = &
+      cellDefn%faceflow(npolyverts + 2) + &
+      this%fmi%BoundaryFlows(ioffset + 9)
+    cellDefn%faceflow(npolyverts + 3) = &
+      cellDefn%faceflow(npolyverts + 3) + &
+      this%fmi%BoundaryFlows(ioffset + 10)
     !
     return
     !
@@ -770,11 +791,12 @@ contains
     type(CellDefnType), pointer, intent(inout) :: cellDefn
     ! -- local
     ! integer :: ig,ic,npolyverts,iapnbr,iapv180
-    integer :: npolyverts, m, j, m0, m1, m2
+    integer :: npolyverts, m, m0, m1, m2
     integer :: ic
     integer :: num90, num180, numacute
     double precision :: x0, y0, x1, y1, x2, y2
-    double precision :: epsang,epslen,s0x,s0y,s0mag,s2x,s2y,s2mag,sinang,dotprod
+    double precision :: epsang, epslen, s0x, s0y, &
+      s0mag, s2x, s2y, s2mag, sinang, dotprod
     logical last180
     !
     ic = cellDefn%icell
@@ -797,7 +819,9 @@ contains
     num180 = 0
     numacute = 0
     last180 = .false.
-    do m = 1, npolyverts ! kluge note: assumes non-self-intersecting polygon; no checks for self-intersection (e.g., star)
+    ! kluge note: assumes non-self-intersecting polygon;
+    ! no checks for self-intersection (e.g., star)
+    do m = 1, npolyverts
       m1 = m
       if (m1 .eq. 1) then
         m0 = npolyverts
@@ -822,7 +846,8 @@ contains
       s2y = y2 - y1
       s2mag = dsqrt(s2x * s2x + s2y * s2y)
       sinang = (s0x * s2y - s0y * s2x) / (s0mag * s2mag)
-      if (dabs(sinang) .lt. epsang) then ! kluge note: is it better to check in terms of angle rather than sin{angle}???
+      ! kluge note: is it better to check in terms of angle rather than sin{angle}???
+      if (dabs(sinang) .lt. epsang) then
         dotprod = s0x * s2x + s0y * s2y
         if (dotprod .gt. 0d0) then
           print *, "Cell ", ic, " has a zero angle" ! kluge
@@ -831,17 +856,21 @@ contains
           stop
         else
           if (last180) then
-            print *, "Cell ", ic, " has consecutive 180-deg angles - not supported" ! kluge
+            print *, "Cell ", ic, &
+              " has consecutive 180-deg angles - not supported" ! kluge
             print *, "      (tolerance epsang = ", epsang, ")"
             !!pause
             stop
           else if (dabs((s2mag - s0mag) / max(s2mag, s0mag)) .gt. epslen) then
-            print *, "Cell ", ic, " has a non-bisecting 180-deg vertex - not supported" ! kluge
+            print *, "Cell ", ic, &
+              " has a non-bisecting 180-deg vertex - not supported" ! kluge
             print *, "      (tolerance epslen = ", epslen, ")"
             !!pause
             stop
           end if
-          num180 = num180 + 1 ! kluge note: want to evaluate 180-deg vertex using one criterion implemented in one place (procedure) to avoid potential disparities between multiple checks
+          ! kluge note: want to evaluate 180-deg vertex using one criterion implemented in
+          ! one place (procedure) to avoid potential disparities between multiple checks
+          num180 = num180 + 1
           last180 = .true.
           cellDefn%ispv180(m) = .true.
         end if
@@ -850,14 +879,16 @@ contains
         if (dabs(1d0 - sinang) .lt. epsang) num90 = num90 + 1
         last180 = .false.
       else
-        print *, "Cell ", ic, " has an obtuse angle and so is nonconvex" ! kluge
+        print *, "Cell ", ic, &
+          " has an obtuse angle and so is nonconvex" ! kluge
         print *, "      (tolerance epsang = ", epsang, ")"
         !!pause
         stop
       end if
     end do
     if ((num90 .ne. 4) .and. (num180 .ne. 0)) then
-      print *, "Cell ", ic, " is a non-rectangle with a 180-deg angle - not supported" ! kluge
+      print *, "Cell ", ic, &
+        " is a non-rectangle with a 180-deg angle - not supported" ! kluge
       print *, "      (tolerance epsang = ", epsang, ")"
       ! pause
       stop

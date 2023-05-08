@@ -6,11 +6,13 @@ tests = [
   'GenericUtils',
   'prt_UtilMisc',
   'prt_CellUtil',
-  'prt_MethodSubcellPollock'
+  'prt_MethodSubcellPollock',
+  'prt_TernaryUtil',
+  'prt_TernarySolveTrack'
 ]
 
 test_srcs = files(
-  'testdrive.f90',
+  'testdrive.F90',
   'driver.f90',
 )
 foreach t : tests

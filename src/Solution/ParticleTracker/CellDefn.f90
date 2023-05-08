@@ -28,7 +28,7 @@ module CellDefnModule
     integer, public :: inoexitface ! no exit face indicator
     integer, public :: iatop ! kluge???               ! index of cell top in grid's top/bot arrays (<0 => top array)
     double precision, public :: top, bot ! top and bottom elevations of cell
-    double precision, public :: sat                            ! cell saturation
+    double precision, public :: sat ! cell saturation
     class(VertexType), allocatable, public :: polyvert(:) ! vertices for cell polygon
     logical, allocatable, public :: ispv180(:) ! indicator of 180-degree vertices (.true. = 180-degree angle at vertex)
     integer(kind=1), allocatable, public :: facenbr(:) ! neighbors that correspond to faces(/vertices)

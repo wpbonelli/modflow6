@@ -46,7 +46,7 @@ module FlowModelInterfaceModule
     real(DP), dimension(:, :), pointer, contiguous :: gwfspdis => null() !< pointer to npf specific discharge array
     real(DP), dimension(:), pointer, contiguous :: gwfhead => null() !< pointer to the GWF head array
     real(DP), dimension(:), pointer, contiguous :: gwfsat => null() !< pointer to the GWF saturation array
-    integer(I4B), dimension(:), pointer, contiguous :: ibdgwfsat0 => null()      !< mark cells with saturation = 0 to exclude from dispersion
+    integer(I4B), dimension(:), pointer, contiguous :: ibdgwfsat0 => null() !< mark cells with saturation = 0 to exclude from dispersion
     real(DP), dimension(:), pointer, contiguous :: gwfstrgss => null() !< pointer to flow model QSTOSS
     real(DP), dimension(:), pointer, contiguous :: gwfstrgsy => null() !< pointer to flow model QSTOSY
     integer(I4B), pointer :: igwfstrgss => null() !< indicates if gwfstrgss is available
@@ -181,7 +181,7 @@ contains
 
   !> @brief Read and prepare the package
   !! kluge note: this subroutine needed?
-  subroutine fmi_rp(this) 
+  subroutine fmi_rp(this)
     ! ! -- modules
     ! use TdisModule, only: kper, kstp
     ! -- dummy
@@ -438,7 +438,8 @@ contains
     ! -- Allocate differently depending on whether or not flows are
     !    being read from a file.
     if (this%flows_from_file) then
-      call mem_allocate(this%gwfflowja, this%dis%con%nja, 'GWFFLOWJA', this%memoryPath)
+      call mem_allocate(this%gwfflowja, this%dis%con%nja, &
+                        'GWFFLOWJA', this%memoryPath)
       call mem_allocate(this%gwfsat, nodes, 'GWFSAT', this%memoryPath)
       call mem_allocate(this%gwfhead, nodes, 'GWFHEAD', this%memoryPath)
       call mem_allocate(this%gwfspdis, 3, nodes, 'GWFSPDIS', this%memoryPath)
@@ -491,11 +492,16 @@ contains
     integer(I4B) :: ierr
     logical :: isfound, endOfBlock
     logical(LGP) :: foundchildclassoption
+
+    ! kluge note: belongs in GWTFMI?
     character(len=*), parameter :: fmtisvflow = &
-            "(4x,'CELL-BY-CELL FLOW INFORMATION WILL BE SAVED TO BINARY FILE "// &
-            "WHENEVER ICBCFL IS NOT ZERO AND FLOW IMBALANCE CORRECTION ACTIVE.')" ! kluge note: belongs in GWTFMI?
+                                   "(4x,'CELL-BY-CELL FLOW INFORMATION "// &
+                                   "WILL BE SAVED TO BINARY FILE "// &
+                                   "WHENEVER ICBCFL IS NOT ZERO AND "// &
+                                   "FLOW IMBALANCE CORRECTION ACTIVE.')"
     character(len=*), parameter :: fmtifc = &
-          "(4x,'MASS WILL BE ADDED OR REMOVED TO COMPENSATE FOR FLOW IMBALANCE.')"
+                                   "(4x,'MASS WILL BE ADDED OR REMOVED "// &
+                                   "TO COMPENSATE FOR FLOW IMBALANCE.')"
     !
     ! -- get options block
     call this%parser%GetBlock('OPTIONS', isfound, ierr, blockRequired=.false., &
@@ -736,7 +742,7 @@ contains
   !!
   !! Advance the budget file reader by reading the next chunk
   !! of information for the current time step and stress period.
-  !! 
+  !!
   !<
   subroutine advance_bfr(this)
     ! -- modules
@@ -752,10 +758,13 @@ contains
     logical :: readnext
     ! -- format
     character(len=*), parameter :: fmtkstpkper = &
-                 "(1x,/1x,'FMI READING BUDGET TERMS FOR KSTP ', i0, ' KPER ', i0)"
+                 "(1x,/1x,'FMI READING BUDGET TERMS &
+                 &FOR KSTP ', i0, ' KPER ', i0)"
     character(len=*), parameter :: fmtbudkstpkper = &
-      "(1x,/1x, 'FMI SETTING BUDGET TERMS FOR KSTP ', i0, ' AND KPER ',        &
-      &i0, ' TO BUDGET FILE TERMS FROM KSTP ', i0, ' AND KPER ', i0)"
+      "(1x,/1x, 'FMI SETTING BUDGET TERMS &
+      &FOR KSTP ', i0, ' AND KPER ',        &
+      &i0, ' TO BUDGET FILE TERMS FROM &
+      &KSTP ', i0, ' AND KPER ', i0)"
     !
     ! -- If the latest record read from the budget file is from a stress
     ! -- period with only one time step, reuse that record (do not read a
@@ -914,7 +923,8 @@ contains
     logical :: readnext
     logical :: success
     character(len=*), parameter :: fmtkstpkper = &
-                         "(1x,/1x,'FMI READING HEAD FOR KSTP ', i0, ' KPER ', i0)"
+                         "(1x,/1x,'FMI READING HEAD FOR &
+                         &KSTP ', i0, ' KPER ', i0)"
     character(len=*), parameter :: fmthdskstpkper = &
       "(1x,/1x, 'FMI SETTING HEAD FOR KSTP ', i0, ' AND KPER ',        &
       &i0, ' TO BINARY FILE HEADS FROM KSTP ', i0, ' AND KPER ', i0)"

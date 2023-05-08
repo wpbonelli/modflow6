@@ -4,7 +4,9 @@ module MethodSubcellTernaryModule
   use MethodModule
   use SubcellTriModule
   use ParticleModule
-  use ternarymod ! kluge
+  use Ternary
+  use TernaryUtil, only: rotate, skew
+  use TernarySolveTrack, only: traverse_triangle, step_analytical, canonical
   implicit none
 
   private
@@ -14,25 +16,20 @@ module MethodSubcellTernaryModule
   ! -- Extend MethodType to the ternary subcell-method type (MethodSubcellTernaryType)
   type, extends(MethodType) :: MethodSubcellTernaryType
     private
-    type(SubcellTriType), pointer, public :: subcellTri => null() ! tracking domain for the method
+    type(SubcellTriType), pointer, public :: subcellTri => null() ! tracking domain
+    integer, allocatable :: ivert_polygon(:, :) ! kluge
   contains
     procedure, public :: destroy ! destructor for the method
     procedure, public :: init ! initializes the method
-    procedure, public :: apply => apply_mST ! applies the ternary subcell method (tracks particle)
+    procedure, public :: apply => apply_mST ! applies ternary subcell tracking method
   end type MethodSubcellTernaryType
 
 contains
 
+  !> @brief Create a new ternary subcell-method object
   subroutine create_methodSubcellTernary(methodSubcellTernary)
-! ******************************************************************************
-! create_methodSubcellTernary -- Create a new ternary subcell-method object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     type(MethodSubcellTernaryType), pointer :: methodSubcellTernary
-! ------------------------------------------------------------------------------
     !
     allocate (methodSubcellTernary)
     !
@@ -42,23 +39,18 @@ contains
     !
     ! -- Create tracking domain for this method and set trackingDomain pointer
     call create_subcellTri(methodSubcellTernary%subcellTri)
-!!    methodSubcellTernary%trackingDomain => methodSubcellTernary%subcellTri
-   methodSubcellTernary%trackingDomainType => methodSubcellTernary%subcellTri%type
+    ! methodSubcellTernary%trackingDomain => methodSubcellTernary%subcellTri
+    methodSubcellTernary%trackingDomainType => &
+      methodSubcellTernary%subcellTri%type
     !
     return
     !
   end subroutine create_methodSubcellTernary
 
+  !> @brief Destructor for a ternary subcell-method object
   subroutine destroy(this)
-! ******************************************************************************
-! destroy -- Destructor for a ternary subcell-method object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(MethodSubcellTernaryType), intent(inout) :: this
-! ------------------------------------------------------------------------------
     !
     deallocate (this%trackingDomainType)
     !
@@ -66,17 +58,11 @@ contains
     !
   end subroutine destroy
 
+  !> @brief Initialize a ternary subcell-method object
   subroutine init(this, subcellTri)
-! ******************************************************************************
-! init -- Initialize a ternary subcell-method object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(MethodSubcellTernaryType), intent(inout) :: this
     type(SubcellTriType), pointer :: subcellTri
-! ------------------------------------------------------------------------------
     !
     this%subcellTri => subcellTri
     !
@@ -84,44 +70,31 @@ contains
     !
   end subroutine init
 
+  !> @brief Apply the ternary method to a polygonal cell
   subroutine apply_mST(this, particle, tmax)
-! ******************************************************************************
-! apply_mST -- Apply the ternary method to a polygonal cell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! dummy
     class(MethodSubcellTernaryType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-!!!    doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
+    ! doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
     ! local
-! ------------------------------------------------------------------------------
     !
-!!!    initialTime = 0d0         ! kluge test
-!!!    maximumTime = 9d99        ! kluge test
-!!!    call track_sub(this%subcellTri,particle,initialTime,maximumTime,t)
+    ! initialTime = 0d0         ! kluge test
+    ! maximumTime = 9d99        ! kluge test
+    ! call track_sub(this%subcellTri,particle,initialTime,maximumTime,t)
     call track_sub(this%subcellTri, particle, tmax)
     !
     return
     !
   end subroutine apply_mST
 
-!!!  subroutine track_sub(subcellTri,particle,initialTime,maximumTime,t)   ! kluge note: rename???
+  !> @brief Track a particle across a triangular subcell using the ternary method
   subroutine track_sub(subcellTri, particle, tmax) ! kluge note: rename???
-! ******************************************************************************
-! track_sub -- Track a particle across a triangular subcell using the ternary
-!              method
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! dummy
     class(SubcellTriType), intent(in) :: subcellTri
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-!!!    doubleprecision :: initialTime,maximumTime,t
+    ! doubleprecision :: initialTime,maximumTime,t
     ! local
     integer :: exitFace
     logical :: lbary ! kluge
@@ -133,17 +106,15 @@ contains
     double precision :: alp, bet, dt, t, dtexitxy, texit, xc, yc, x, y, z
     integer :: izstatus, itopbotexit
     integer :: ntmax, nsave, isolv, itrifaceenter, itrifaceexit
-    double precision :: diff,rdiff,tol,step,dtexit,alpexit,betexit,xcexit,ycexit
-    double precision :: xexit, yexit, zexit
+    double precision :: diff, rdiff, tol, step, dtexit, alpexit, betexit
     integer :: ntdebug ! kluge
-    ! ------------------------------------------------------------------------------
     !
     lbary = .true. ! kluge
     ntmax = 10000
     nsave = 1 ! needed???
-!!    isolv = 1
+    ! isolv = 1
     isolv = 1
-!!    tol = 1d-7     ! adjustable
+    ! tol = 1d-7     ! adjustable
     tol = 1d-7
     step = 1e-3 ! needed only for euler
     !
@@ -176,15 +147,19 @@ contains
     vztop = subcellTri%vztop
     !
     ! -- Translate and rotate coordinates to "canonical" configuration
-    call canonical(x0, y0, x1, y1, x2, y2, v0x, v0y, v1x, v1y, v2x, v2y, xi, yi, &
-   rxx, rxy, ryx, ryy, sxx, sxy, syy, lbary, alp0, bet0, alp1, bet1, alp2, bet2, &
+    call canonical(x0, y0, x1, y1, x2, y2, v0x, v0y, &
+                   v1x, v1y, v2x, v2y, xi, yi, &
+                   rxx, rxy, ryx, ryy, sxx, sxy, syy, &
+                   lbary, alp0, bet0, alp1, bet1, alp2, bet2, &
                    alpi, beti)
     !
     ! -- Do calculations related to analytical z solution, which can be done
     ! -- after traverse_triangle call if results not needed for adaptive time
-    ! -- stepping during triangle (subcell) traversal   ! kluge note: actually, can probably do z calculation just once for each cell
+    ! -- stepping during triangle (subcell) traversal
+    ! kluge note: actually, can probably do z calculation just once for each cell
     zirel = (zi - zbot) / dz
-  call pr_CalculateDT_kluge(vzbot, vztop, dz, zirel, vzi, az, dtexitz, izstatus, &
+    call pr_CalculateDT_kluge(vzbot, vztop, dz, zirel, vzi, &
+                              az, dtexitz, izstatus, &
                               itopbotexit)
     vziodz = vzi / dz
     !
@@ -192,16 +167,24 @@ contains
     ntdebug = -999 ! kluge debug bludebug
     itrifaceenter = particle%iTrackingDomainBoundary(3) - 1
     if (itrifaceenter .eq. -1) itrifaceenter = 999
-    call traverse_triangle(ntmax, nsave, diff, rdiff, isolv, tol, step, & ! kluge note: can probably avoid calculating alpexit
-dtexitxy, alpexit, betexit, itrifaceenter, itrifaceexit, rxx, rxy, ryx, ryy, & !   here in many cases and wait to calculate it later,
-sxx, sxy, syy, lbary, alp0, bet0, alp1, bet1, alp2, bet2, alpi, beti, vziodz, az) !   once the final trajectory time is known
+
+    ! kluge note: can probably avoid calculating alpexit
+    ! here in many cases and wait to calculate it later,
+    ! once the final trajectory time is known
+    call traverse_triangle(ntmax, nsave, diff, rdiff, &
+                           isolv, tol, step, &
+                           dtexitxy, alpexit, betexit, itrifaceenter, &
+                           itrifaceexit, rxx, rxy, ryx, ryy, &
+                           sxx, sxy, syy, lbary, alp0, &
+                           bet0, alp1, bet1, alp2, bet2, &
+                           alpi, beti, vziodz, az)
     !
     ! -- Check for no exit face
     if ((itopbotexit .eq. 0) .and. (itrifaceexit .eq. 0)) then
-!!      exitFace = 0
-!!      particle%iTrackingDomainBoundary(3) = exitFace
-!!      particle%istatus = 5
-!!      return
+      ! exitFace = 0
+      ! particle%iTrackingDomainBoundary(3) = exitFace
+      ! particle%istatus = 5
+      ! return
       print *, "======================================"
       print *, "Subcell with no exit face" ! kluge
       print *, "Particle ", particle%ipart
@@ -255,7 +238,9 @@ sxx, sxy, syy, lbary, alp0, bet0, alp1, bet1, alp2, bet2, alpi, beti, vziodz, az
     end if
     !
     ! -- Calculate final particle location
-    call step_analytical(dt, alp, bet) ! kluge note: need to evaluate both alpha and beta here only for exitFace=0, otherwise just one or the other
+    ! -- kluge note: need to evaluate both alpha and beta here only
+    ! -- for exitFace=0, otherwise just one or the other
+    call step_analytical(dt, alp, bet)
     if (exitFace .eq. 1) then
       bet = 0d0
     else if (exitFace .eq. 2) then
@@ -293,17 +278,17 @@ sxx, sxy, syy, lbary, alp0, bet0, alp1, bet1, alp2, bet2, alpi, beti, vziodz, az
     particle%z = z
     particle%ttrack = t
     particle%iTrackingDomainBoundary(3) = exitFace
-!!    write(*,*) itopbotexit, itrifaceexit, exitFace        ! kluge debug
-!!    write(*,'(4G)') x, y, z, dt                           ! kluge debug
-!!    write(69,*) itopbotexit, itrifaceexit, exitFace       ! kluge debug
-!!    write(69,'(4G)') x, y, z, dt                          ! kluge debug
+    ! write(*,*) itopbotexit, itrifaceexit, exitFace        ! kluge debug
+    ! write(*,'(4G)') x, y, z, dt                           ! kluge debug
+    ! write(69,*) itopbotexit, itrifaceexit, exitFace       ! kluge debug
+    ! write(69,'(4G)') x, y, z, dt                          ! kluge debug
     !
     return
     !
   end subroutine track_sub
 
-!-----------------------------------------------------------------------------
-subroutine pr_CalculateDT_kluge(v1, v2, dx, xL, v, dvdx, dt, status, itopbotexit) ! kluge
+  subroutine pr_CalculateDT_kluge(v1, v2, dx, xL, v, dvdx, &
+                                  dt, status, itopbotexit)
     implicit none
     doubleprecision, intent(in) :: v1, v2, dx, xL
     doubleprecision, intent(inout) :: v, dvdx, dt
@@ -311,7 +296,6 @@ subroutine pr_CalculateDT_kluge(v1, v2, dx, xL, v, dvdx, dt, status, itopbotexit
     doubleprecision :: vr1, vr2, vr, v1v2
     integer :: status, itopbotexit
     logical :: noOutflow
-! ------------------------------------------------------------------------------
     !
     ! -- This subroutine consists partly or entirely of code written by
     ! -- David W. Pollock of the USGS for MODPATH 7. The authors of the present
@@ -391,8 +375,8 @@ subroutine pr_CalculateDT_kluge(v1, v2, dx, xL, v, dvdx, dt, status, itopbotexit
       end if
     end if
 
-    ! If there is a flow divide, this check finds out what side of the divide the particle
-    ! is on and sets the value of vr appropriately to reflect that location.
+    ! If there is a flow divide, find out what side of the divide the particle
+    ! is on and set the value of vr appropriately to reflect that location.
     vr1 = v1 / v
     vr2 = v2 / v
     vr = vr1
@@ -402,9 +386,9 @@ subroutine pr_CalculateDT_kluge(v1, v2, dx, xL, v, dvdx, dt, status, itopbotexit
       itopbotexit = -2
     end if
 
-    ! Check to see if the velocity is in the same direction throughout the cell (i.e. no flow divide).
-    ! Check to see if the product v1*v2 > 0 then the velocity is in the same direction throughout
-    ! the cell (i.e. no flow divide). If so, set the value of vr to reflect the appropriate direction.
+    ! Check if velocity is in the same direction throughout cell (i.e. no flow divide).
+    ! Check if product v1*v2 > 0 then the velocity is in the same direction throughout
+    ! the cell (i.e. no flow divide). If so, set vr to reflect appropriate direction.
     v1v2 = v1 * v2
     if (v1v2 .gt. 0d0) then
       if (v .gt. 0d0) then

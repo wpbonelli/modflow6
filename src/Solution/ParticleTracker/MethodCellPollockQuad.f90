@@ -19,29 +19,23 @@ module MethodCellPollockQuadModule
   type, extends(MethodType) :: MethodCellPollockQuadType
     private
     type(CellRectQuadType), pointer :: cellRectQuad => null() ! tracking domain for the method
-    type(SubcellRectType), pointer :: subcellRect => null() ! subcell object injected into subcell method
+    type(SubcellRectType), pointer :: subcellRect => null() ! subcell obj injected into method
   contains
     procedure, public :: destroy ! destructor for the method
     procedure, public :: init ! initializes the method
     procedure, public :: apply => apply_mCPQ ! applies Pollock's cell-quad method
-    procedure, public :: pass => pass_mCPQ ! passes the particle to the next subcell or to the cell face
+    procedure, public :: pass => pass_mCPQ ! passes particle to next subcell or to cell face
     procedure, public :: loadsub => loadsub_mCPQ ! loads the subcell method
     procedure, public :: load_subcell ! loads the subcell
   end type MethodCellPollockQuadType
 
 contains
 
+  !> @brief Create a new Pollock's cell-quad-method object
   subroutine create_methodCellPollockQuad(methodCellPollockQuad)
-! ******************************************************************************
-! create_methodCellPollockQuad -- Create a new Pollock's cell-quad-method object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     type(MethodCellPollockQuadType), pointer :: methodCellPollockQuad
     ! -- local
-! ------------------------------------------------------------------------------
     !
     allocate (methodCellPollockQuad)
     !
@@ -50,7 +44,8 @@ contains
     !
     ! -- Create tracking domain for this method and set trackingDomain pointer
     call create_cellRectQuad(methodCellPollockQuad%cellRectQuad)
-    methodCellPollockQuad%trackingDomainType => methodCellPollockQuad%cellRectQuad%type
+    methodCellPollockQuad%trackingDomainType => &
+      methodCellPollockQuad%cellRectQuad%type
     !
     ! -- Create subdomain to be loaded and injected into the submethod
     call create_subcellRect(methodCellPollockQuad%subcellRect)
@@ -59,17 +54,11 @@ contains
     !
   end subroutine create_methodCellPollockQuad
 
+  !> @brief Destructor for a Pollock's cell-quad-method object
   subroutine destroy(this)
-! ******************************************************************************
-! destroy -- Destructor for a Pollock's cell-quad-method object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(MethodCellPollockQuadType), intent(inout) :: this
     ! -- local
-! ------------------------------------------------------------------------------
     !
     deallocate (this%trackingDomainType)
     !
@@ -77,19 +66,13 @@ contains
     !
   end subroutine destroy
 
+  !> @brief Initialize a Pollock's cell-quad-method object
   subroutine init(this, particle, cellRectQuad, trackdata)
-! ******************************************************************************
-! init -- Initialize a Pollock's cell-quad-method object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(MethodCellPollockQuadType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellRectQuadType), pointer, intent(in) :: cellRectQuad
     type(TrackDataType), pointer :: trackdata
-! ------------------------------------------------------------------------------
     !
     ! -- Set pointer to cell definition
     this%cellRectQuad => cellRectQuad
@@ -101,19 +84,13 @@ contains
     !
   end subroutine init
 
+  !> @brief Load subcell to inject into subcell method
   subroutine loadsub_mCPQ(this, particle, levelNext, submethod)
-! ******************************************************************************
-! loadsub_mCPQ -- Load subcell method
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(MethodCellPollockQuadType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     integer, intent(in) :: levelNext
     class(MethodType), pointer, intent(inout) :: submethod
-    ! ------------------------------------------------------------------------------
     !
     ! -- Load subcell for injection into subcell method
     call this%load_subcell(particle, levelNext, this%subcellRect)
@@ -125,20 +102,13 @@ contains
     !
   end subroutine loadsub_mCPQ
 
+  !> @brief Pass particle to next subcell if there is one, or to the cell face
   subroutine pass_mCPQ(this, particle)
-! ******************************************************************************
-! pass_mCPQ -- Pass a particle to the next subcell, if there is one, or to
-!              the cell face
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(MethodCellPollockQuadType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     ! -- local
     integer :: isc, exitFace, npolyverts, inface, infaceoff
-! ------------------------------------------------------------------------------
     !
     exitFace = particle%iTrackingDomainBoundary(3)
     isc = particle%iTrackingDomain(3)
@@ -239,19 +209,19 @@ contains
       ! -- Subcell top (cell top)
       inface = npolyverts + 3 ! kluge note: want Domain(2) = -Domain(2); Boundary(2) = inface
     end select
-!!    if ((inface.ge.1).and.(inface.le.4)) then
-!!      ! -- Account for local cell rotation
-!!      inface = inface + this%cellRectQuad%irvOrigin - 1
-!!      if (inface.gt.4) inface = inface - 4
-!!      inface = this%cellRectQuad%irectvert(inface) + infaceoff
-!!      if (inface.lt.1) inface = inface + npolyverts
-!!    end if
-!!    particle%iTrackingDomainBoundary(2) = inface
-!!    if (inface.ne.0) particle%iTrackingDomain(3) = 0
+    ! if ((inface.ge.1).and.(inface.le.4)) then
+    !   ! -- Account for local cell rotation
+    !   inface = inface + this%cellRectQuad%irvOrigin - 1
+    !   if (inface.gt.4) inface = inface - 4
+    !   inface = this%cellRectQuad%irectvert(inface) + infaceoff
+    !   if (inface.lt.1) inface = inface + npolyverts
+    ! end if
+    ! particle%iTrackingDomainBoundary(2) = inface
+    ! if (inface.ne.0) particle%iTrackingDomain(3) = 0
     if (inface .eq. -1) then
-!!      particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
-!!      particle%iTrackingDomainBoundary(2) = 0
-!!      particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
+      ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))  ! kluge???
+      ! particle%iTrackingDomainBoundary(2) = 0
+      ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))  ! kluge???
       particle%iTrackingDomainBoundary(2) = 0
     else if (inface .eq. 0) then
       particle%iTrackingDomainBoundary(2) = 0
@@ -263,54 +233,51 @@ contains
         inface = this%cellRectQuad%irectvert(inface) + infaceoff
         if (inface .lt. 1) inface = inface + npolyverts
       end if
-!!      particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
+      ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
       particle%iTrackingDomainBoundary(2) = inface
-!!      particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
+      ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
     end if
- !!   if (inface.ne.0) particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
+    ! if (inface.ne.0) particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3)) ! kluge???
     !
     return
     !
   end subroutine pass_mCPQ
 
+  !> @brief Apply Pollock's quad method to a rectangular-quad cell
   subroutine apply_mCPQ(this, particle, tmax)
-! ******************************************************************************
-! apply_mCPQ -- Apply Pollock's quad method to a rectangular-quad cell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     use UtilMiscModule
     ! -- dummy
     class(MethodCellPollockQuadType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
     ! -- local
-    double precision :: x, y, z, xOrigin, yOrigin, zOrigin, sinrot, cosrot
+    double precision :: xOrigin, yOrigin, zOrigin, sinrot, cosrot
     integer(I4B) :: ntrack
-! ------------------------------------------------------------------------------
     !
     if (this%cellRectQuad%cellDefn%izone .ne. 0) then
       if (particle%istopzone .eq. this%cellRectQuad%cellDefn%izone) then
         ! -- Stop zone
-!!        particle%iTrackingDomainBoundary(3) = 0
+        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 6
-!!        write(*,'(A,I,A,I)') "particle ", particle%ipart, " terminated in stop zone cell: ", particle%iTrackingDomain(2)  ! kluge
-!!        return
+        ! write(*,'(A,I,A,I)') "particle ", particle%ipart, &
+        ! " terminated in stop zone cell: ", particle%iTrackingDomain(2)  ! kluge
+        ! return
       end if
     else if (this%cellRectQuad%cellDefn%inoexitface .ne. 0) then
       ! -- No exit face
-!!      particle%iTrackingDomainBoundary(3) = 0
+      ! particle%iTrackingDomainBoundary(3) = 0
       particle%istatus = 5
-!!      write(*,'(A,I,A,I)') "particle ", particle%ipart, " terminated at cell w/ no exit face: ", particle%iTrackingDomain(2)  ! kluge
-!!      return
+      ! write(*,'(A,I,A,I)') "particle ", particle%ipart, &
+      ! " terminated at cell w/ no exit face: ", particle%iTrackingDomain(2)  ! kluge
+      ! return
     else if (particle%istopweaksink .ne. 0) then
       if (this%cellRectQuad%cellDefn%iweaksink .ne. 0) then
         ! -- Weak sink
-!!        particle%iTrackingDomainBoundary(3) = 0
+        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 3
-!!        write(*,'(A,I,A,I)')  "particle ", particle%ipart, " terminated at weak sink cell: ", particle%iTrackingDomain(2)  ! kluge
-!!        return
+        ! write(*,'(A,I,A,I)')  "particle ", particle%ipart, &
+        ! " terminated at weak sink cell: ", particle%iTrackingDomain(2)  ! kluge
+        ! return
       end if
     else
       !
@@ -320,7 +287,7 @@ contains
       if (particle%z > this%cellRectQuad%cellDefn%top) then
         particle%z = this%cellRectQuad%cellDefn%top
         ! -- Store track data
-        ntrack = this%trackdata%ntrack + 1    ! kluge?
+        ntrack = this%trackdata%ntrack + 1 ! kluge?
         this%trackdata%ntrack = ntrack
         this%trackdata%iptrack(ntrack) = particle%ipart
         this%trackdata%ictrack(ntrack) = particle%iTrackingDomain(2)
@@ -364,13 +331,8 @@ contains
     !
   end subroutine apply_mCPQ
 
+  !> @brief Load the rectangular subcell from the rectangular cell
   subroutine load_subcell(this, particle, levelNext, subcellRect)
-! ******************************************************************************
-! load_subcell -- Loads the rectangular subcell from the rectangular cell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: DONE
     ! -- dummy
@@ -379,17 +341,17 @@ contains
     integer, intent(in) :: levelNext
     class(SubcellRectType), intent(inout) :: subcellRect
     ! -- local
-!!    double precision :: velmult       ! kluge note: maybe (in general) do tracking calc without velmult and divide exit time by velmult at the end???
-    double precision :: x1,y1,x2,y2,x3,y3,x4,y4,dx21,dy21,dx41,dy41,dxp1,dyp1
-    double precision :: dx, dy, dz, sinrot, cosrot, areax, areay, areaz
-    double precision :: dxp, dyp, dzp, dxprel, dyprel
-    integer :: isc, npolyverts, m, m1, m2, m3, m4
+    ! kluge note: (in general) do tracking calc without velmult and divide exit
+    ! time by velmult at the end???
+    ! double precision :: velmult
+    double precision :: dx, dy, dz, areax, areay, areaz
+    double precision :: dxprel, dyprel
+    integer :: isc, npolyverts, m1, m2
     double precision :: qextl1, qextl2, qintl1, qintl2
     double precision :: factor, term
-! ------------------------------------------------------------------------------
     !
-!!    velmult = particle%velmult
-!!    factor = this%cellRectQuad%cellDefn%velfactor
+    ! velmult = particle%velmult
+    ! factor = this%cellRectQuad%cellDefn%velfactor
     factor = DONE / this%cellRectQuad%cellDefn%retfactor
     factor = factor / this%cellRectQuad%cellDefn%porosity
     npolyverts = this%cellRectQuad%cellDefn%npolyverts
@@ -410,8 +372,9 @@ contains
         else if (dyprel .gt. 5d-1) then
           isc = 4
         else
-          print *, "particle initially on shared subcell edge" ! kluge note: need to resolve this ambiguity based on flow direction
-          !!pause
+          ! kluge note: need to resolve this ambiguity based on flow direction
+          print *, "particle initially on shared subcell edge"
+          ! pause
           stop
         end if
       else if (dxprel .gt. 5d-1) then
@@ -420,22 +383,27 @@ contains
         else if (dyprel .gt. 5d-1) then
           isc = 1
         else
-          print *, "particle initially on shared subcell edge" ! kluge note: need to resolve this ambiguity based on flow direction
-          !!pause
+          ! kluge note: need to resolve this ambiguity based on flow direction
+          print *, "particle initially on shared subcell edge"
+          ! pause
           stop
         end if
       else
-        print *, "particle initially on shared subcell edge" ! kluge note: need to resolve this ambiguity based on flow direction
-        !!pause
+        ! kluge note: need to resolve this ambiguity based on flow direction
+        print *, "particle initially on shared subcell edge"
+        ! pause
         stop
       end if
       subcellRect%isubcell = isc
-      particle%iTrackingDomain(3) = isc ! kluge note: as a matter of form, do we want to allow this subroutine to modify the particle???
+      ! kluge note: as a matter of form, do we want to allow
+      ! this subroutine to modify the particle???
+      particle%iTrackingDomain(3) = isc
       ! kluge note: initial insubface is not currently being determined
     end if
     dx = 5d-1 * dx
     dy = 5d-1 * dy
-    dz = this%cellRectQuad%cellDefn%top - this%cellRectQuad%cellDefn%bot ! kluge note: need to account for partial saturation
+    dz = this%cellRectQuad%cellDefn%top - &
+         this%cellRectQuad%cellDefn%bot ! kluge note: need to account for partial saturation
     areax = dy * dz
     areay = dx * dz
     areaz = dx * dy
@@ -450,16 +418,16 @@ contains
     subcellRect%dz = dz
     subcellRect%sinrot = 0d0
     subcellRect%cosrot = 1d0
-!!    subcellRect%zOrigin = this%cellRectQuad%cellDefn%bot
+    ! subcellRect%zOrigin = this%cellRectQuad%cellDefn%bot
     subcellRect%zOrigin = 0d0
     select case (isc)
     case (1)
       subcellRect%xOrigin = dx
       subcellRect%yOrigin = dy
-!!        subcellRect%vx1 = velmult*qintl1/areax     ! kluge note: porosity not explicitly included yet
-!!        subcellRect%vx2 = -velmult*qextl2/areax
-!!        subcellRect%vy1 = -velmult*qintl2/areay
-!!        subcellRect%vy2 = -velmult*qextl1/areay
+      ! subcellRect%vx1 = velmult*qintl1/areax     ! kluge note: porosity not explicitly included yet
+      ! subcellRect%vx2 = -velmult*qextl2/areax
+      ! subcellRect%vy1 = -velmult*qintl2/areay
+      ! subcellRect%vy2 = -velmult*qextl1/areay
       term = factor / areax
       subcellRect%vx1 = qintl1 * term
       subcellRect%vx2 = -qextl2 * term
@@ -469,10 +437,10 @@ contains
     case (2)
       subcellRect%xOrigin = dx
       subcellRect%yOrigin = 0d0
-!!        subcellRect%vx1 = -velmult*qintl2/areax     ! kluge note: porosity not explicitly included yet
-!!        subcellRect%vx2 = -velmult*qextl1/areax
-!!        subcellRect%vy1 = velmult*qextl2/areay
-!!        subcellRect%vy2 = -velmult*qintl1/areay
+      ! subcellRect%vx1 = -velmult*qintl2/areax     ! kluge note: porosity not explicitly included yet
+      ! subcellRect%vx2 = -velmult*qextl1/areax
+      ! subcellRect%vy1 = velmult*qextl2/areay
+      ! subcellRect%vy2 = -velmult*qintl1/areay
       term = factor / areax
       subcellRect%vx1 = -qintl2 * term
       subcellRect%vx2 = -qextl1 * term
@@ -482,10 +450,10 @@ contains
     case (3)
       subcellRect%xOrigin = 0d0
       subcellRect%yOrigin = 0d0
-!!        subcellRect%vx1 = velmult*qextl2/areax     ! kluge note: porosity not explicitly included yet
-!!        subcellRect%vx2 = -velmult*qintl1/areax
-!!        subcellRect%vy1 = velmult*qextl1/areay
-!!        subcellRect%vy2 = velmult*qintl2/areay
+      ! subcellRect%vx1 = velmult*qextl2/areax   ! kluge note: porosity not explicitly included yet
+      ! subcellRect%vx2 = -velmult*qintl1/areax
+      ! subcellRect%vy1 = velmult*qextl1/areay
+      ! subcellRect%vy2 = velmult*qintl2/areay
       term = factor / areax
       subcellRect%vx1 = qextl2 * term
       subcellRect%vx2 = -qintl1 * term
@@ -495,10 +463,10 @@ contains
     case (4)
       subcellRect%xOrigin = 0d0
       subcellRect%yOrigin = dy
-!!        subcellRect%vx1 = velmult*qextl1/areax     ! kluge note: porosity not explicitly included yet
-!!        subcellRect%vx2 = velmult*qintl2/areax
-!!        subcellRect%vy1 = velmult*qintl1/areay
-!!        subcellRect%vy2 = -velmult*qextl2/areay
+      ! subcellRect%vx1 = velmult*qextl1/areax   ! kluge note: porosity not explicitly included yet
+      ! subcellRect%vx2 = velmult*qintl2/areax
+      ! subcellRect%vy1 = velmult*qintl1/areay
+      ! subcellRect%vy2 = -velmult*qextl2/areay
       term = factor / areax
       subcellRect%vx1 = qextl1 * term
       subcellRect%vx2 = qintl2 * term
@@ -508,8 +476,9 @@ contains
     end select
     m1 = npolyverts + 2
     m2 = m1 + 1
-!!    subcellRect%vz1 = velmult*2.5d-1*this%cellRectQuad%cellDefn%faceflow(m1)/areaz     ! kluge note: porosity not explicitly included yet
-!!    subcellRect%vz2 = -velmult*2.5d-1*this%cellRectQuad%cellDefn%faceflow(m2)/areaz
+    ! kluge note: porosity not explicitly included yet
+    ! subcellRect%vz1 = velmult*2.5d-1*this%cellRectQuad%cellDefn%faceflow(m1)/areaz
+    ! subcellRect%vz2 = -velmult*2.5d-1*this%cellRectQuad%cellDefn%faceflow(m2)/areaz
     term = factor / areaz
     subcellRect%vz1 = 2.5d-1 * this%cellRectQuad%cellDefn%faceflow(m1) * term
     subcellRect%vz2 = -2.5d-1 * this%cellRectQuad%cellDefn%faceflow(m2) * term

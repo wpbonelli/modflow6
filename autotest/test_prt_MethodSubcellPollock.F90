@@ -18,7 +18,7 @@ module test_prt_MethodSubcellPollock
     type(error_type), allocatable, intent(out) :: error
     ! local
     doubleprecision :: v1, v2, dx, xL, v, dvdx, dt
-    integer :: status
+    ! integer :: status
 
     v1 = -0.029491455779586524
     v2 = -0

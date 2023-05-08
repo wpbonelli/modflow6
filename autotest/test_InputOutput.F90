@@ -37,9 +37,9 @@ module test_InputOutput
 
     subroutine test_get_ijk(error)
       type(error_type), allocatable, intent(out) :: error
-      integer :: i
-      integer :: j
-      integer :: k
+      ! integer :: i
+      ! integer :: j
+      ! integer :: k
 
       ! todo
       call check(error, 1 + 1 == 2)

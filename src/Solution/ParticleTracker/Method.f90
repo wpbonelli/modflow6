@@ -54,12 +54,7 @@ contains
     integer :: levelNext
     class(methodType), pointer :: submethod
     logical :: isStillAdvancing
-    character(len=40) :: formatString ! kluge???
     !
-    ! write(formatString,'(A,I2,A)') "(1X,",(level+1)*4,"X,A,I)"                             ! kluge???
-    ! write(*,formatString) TRIM(this%trackingDomain%type), particle%iTrackingDomain(level)  ! kluge???
-    ! write(*,formatString) TRIM(this%trackingDomainType), particle%iTrackingDomain(level)  ! kluge???
-    ! !
     ! -- Set next level
     levelNext = level + 1
     !
@@ -94,8 +89,8 @@ contains
     class(MethodType), pointer :: submethod
     logical :: isStillAdvancing
     ! local
-    character(len=40) :: typeSubdomain ! kluge???
-    integer :: ip, iSubdomain
+    ! character(len=40) :: typeSubdomain ! kluge???
+    integer :: ip !, iSubdomain
     !
     ! ! -- Check whether the particle stopped advancing within the last tracking
     ! ! -- subdomain or has exited the tracking domain. If not, advance to the next
