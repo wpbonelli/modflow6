@@ -51,7 +51,7 @@ module ModelPackageInputsModule
   data GWT_MULTIPKG/'CNC6 ', 'SRC6 ', 'LKT6 ', 'IST6 ', '     ', & !  5
                    &'SFT6 ', 'MWT6 ', 'UZT6 ', 'API6 ', '     ', & ! 10
                    &40*'     '/ ! 50
-  
+
   ! -- PRT base package types, ordered for memload
   integer(I4B), parameter :: PRT_NBASEPKG = 50
   character(len=LENPACKAGETYPE), dimension(PRT_NBASEPKG) :: PRT_BASEPKG
@@ -61,7 +61,7 @@ module ModelPackageInputsModule
                   &'LKT6 ', 'SFT6 ', 'MWT6 ', 'UZT6 ', 'MVT6 ', & ! 20
                   &'API6 ', '     ', '     ', '     ', '     ', & ! 25
                   25*'     '/ ! 50
-  
+
   ! -- PRT multi package types, ordered for memload
   integer(I4B), parameter :: PRT_NMULTIPKG = 50
   character(len=LENPACKAGETYPE), dimension(PRT_NMULTIPKG) :: PRT_MULTIPKG

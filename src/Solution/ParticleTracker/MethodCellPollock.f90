@@ -94,7 +94,7 @@ contains
     class(MethodType), pointer, intent(inout) :: submethod
     !
     ! -- Load rectangular subcell for injection into Pollock's subcell method
-    call this%load_subcell(particle,levelNext,this%subcellRect)
+    call this%load_subcell(particle, levelNext, this%subcellRect)
     ! -- Select and initialize Pollock's subcell method and set subcell
     ! -- method pointer
     call methodSubcellPollock%init(this%subcellRect)
@@ -139,9 +139,9 @@ contains
     ! end if
     ! particle%iTrackingDomainBoundary(2) = inface
     if (inface .eq. -1) then
-    ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
-    ! particle%iTrackingDomainBoundary(2) = 0
-    ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
+      ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
+      ! particle%iTrackingDomainBoundary(2) = 0
+      ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
       particle%iTrackingDomainBoundary(2) = 0
     else
       if ((inface .ge. 1) .and. (inface .le. 4)) then
@@ -168,7 +168,7 @@ contains
     real(DP), intent(in) :: tmax
     ! doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
     ! -- local
-    double precision :: x, y, z, xOrigin, yOrigin, zOrigin, sinrot, cosrot
+    double precision :: xOrigin, yOrigin, zOrigin, sinrot, cosrot
     integer(I4B) :: ntrack
     !
     if (this%cellRect%cellDefn%izone .ne. 0) then
@@ -201,7 +201,7 @@ contains
       if (particle%z > this%cellRect%cellDefn%top) then
         particle%z = this%cellRect%cellDefn%top
         ! -- Store track data
-        ntrack = this%trackdata%ntrack + 1    ! kluge?
+        ntrack = this%trackdata%ntrack + 1 ! kluge?
         this%trackdata%ntrack = ntrack
         this%trackdata%iptrack(ntrack) = particle%ipart
         this%trackdata%ictrack(ntrack) = particle%iTrackingDomain(2)
@@ -249,7 +249,7 @@ contains
 
   !> @brief Loads the lone rectangular subcell from the rectangular cell
   !! kluge note: is levelNext needed here and in similar "load" routines???
-  subroutine load_subcell(this, particle, levelNext, subcellRect) ! 
+  subroutine load_subcell(this, particle, levelNext, subcellRect) !
     ! -- dummy
     class(MethodCellPollockType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle

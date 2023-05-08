@@ -32,19 +32,13 @@ module PrtFmiModule
 
 contains
 
+  !> @brief Create a new PrtFmi object
   subroutine prtfmi_cr(prtfmiobj, name_model, inunit, iout)
-! ******************************************************************************
-! prtfmi_cr -- Create a new PrtFmi object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     type(PrtFmiType), pointer :: prtfmiobj
     character(len=*), intent(in) :: name_model
     integer(I4B), intent(inout) :: inunit
     integer(I4B), intent(in) :: iout
-! ------------------------------------------------------------------------------
     !
     ! -- Create the object
     allocate (prtfmiobj)
@@ -71,13 +65,8 @@ contains
     return
   end subroutine prtfmi_cr
 
+  !> @brief Define the flow model interface
   subroutine prtfmi_df(this, dis)
-! ******************************************************************************
-! prtfmi_df -- Define
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use SimModule, only: store_error
     ! -- dummy
@@ -89,8 +78,8 @@ contains
       "(1x,/1x,'PRTFMI -- PRT FLOW MODEL INTERFACE, VERSION 1, 8/29/2017',     &
       &' INPUT READ FROM UNIT ', i0, //)" ! kluge note: update
     character(len=*), parameter :: fmtfmi0 = &
-"(1x,/1x,'PRTFMI -- PRT FLOW MODEL INTERFACE, VERSION 1, 8/29/2017')" ! kluge note: update
-! ------------------------------------------------------------------------------
+"(1x,/1x,'PRTFMI -- PRT FLOW MODEL INTERFACE, &
+&VERSION 1, 8/29/2017')" ! kluge note: update
     !
     ! --print a message identifying the FMI package.
     if (this%inunit /= 0) then
@@ -118,13 +107,8 @@ contains
     return
   end subroutine prtfmi_df
 
+  !> @brief Time step advance
   subroutine prtfmi_ad(this)
-! ******************************************************************************
-! prtfmi_ad -- advance
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: DHDRY
     ! -- dummy
@@ -136,24 +120,24 @@ contains
      &"(/1X,'WARNING: DRY CELL ENCOUNTERED AT ',a,';  RESET AS INACTIVE')"
     character(len=*), parameter :: fmtrewet = &
      &"(/1X,'DRY CELL REACTIVATED AT ', a)"
-! ------------------------------------------------------------------------------
     !
     ! -- Call parent class advance
     call this%FlowModelInterfaceType%fmi_ad()
     !
-!!    ! -- If advanced package flows are being read from file, read the next set of records
-!!    if (this%flows_from_file .and. this%inunit /= 0) then
-!!      do n = 1, size(this%aptbudobj)
-!!        call this%aptbudobj(n)%ptr%bfr_advance(this%dis, this%iout)  ! kluge note: need GWF advanced-package flows from separate files?
-!!      end do
-!!    end if
+    ! ! -- If advanced package flows are being read from file, read the next set of records
+    ! if (this%flows_from_file .and. this%inunit /= 0) then
+    !   do n = 1, size(this%aptbudobj)
+    !     ! kluge note: need GWF advanced-package flows from separate files?
+    !     call this%aptbudobj(n)%ptr%bfr_advance(this%dis, this%iout)
+    !   end do
+    ! end if
     ! -- Accumulate flows
     call this%accumulate_flows()
     !
     ! -- if flow cell is dry, then set this%ibound = 0
     do n = 1, this%dis%nodes
       !
-      ! -- Calculate the ibound-like array that has 0 if saturation 
+      ! -- Calculate the ibound-like array that has 0 if saturation
       !    is zero and 1 otherwise
       if (this%gwfsat(n) > DZERO) then
         this%ibdgwfsat0(n) = 1
@@ -186,13 +170,8 @@ contains
     return
   end subroutine prtfmi_ad
 
+  !> @brief Accumulate flows
   subroutine accumulate_flows(this)
-! ******************************************************************************
-! accumulate_flows -- Accumulates flows
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     use GwfDisvModule ! kluge???
     use ConstantsModule, only: LENAUXNAME ! kluge???
     implicit none
@@ -200,11 +179,10 @@ contains
     class(PrtFmiType) :: this
     ! -- local
     integer :: j, i, ip, ib
-    integer :: ioffset, iflowface, iauxiflowface, iface
+    integer :: ioffset, iflowface, iauxiflowface !, iface
     double precision :: qbnd
     character(len=LENAUXNAME) :: auxname
     integer(I4B) :: naux
-! ------------------------------------------------------------------------------
     !
     this%StorageFlows = 0d0
     if (this%igwfstrgss /= 0) &
@@ -213,7 +191,7 @@ contains
     if (this%igwfstrgsy /= 0) &
       this%StorageFlows = this%StorageFlows + &
                           this%gwfstrgsy
-    ! kluge note: Do we need separate SourceFlows and SinkFlows? Are they just for budget-reporting purposes?
+    ! kluge note: need separate SourceFlows and SinkFlows? just for budget-reporting?
     ! kluge note: SinkFlows used to identify weak sinks
     this%SourceFlows = 0d0
     this%SinkFlows = 0d0
@@ -227,25 +205,26 @@ contains
           if (trim(adjustl(auxname)) == "IFLOWFACE") then
             iauxiflowface = j
             exit
-!!          else if (trim(adjustl(auxname)) == "IFACE") then   ! kluge note: allow IFACE and do conversion???
-!!            iauxiflowface = -j
-!!            exit
+            ! else if (trim(adjustl(auxname)) == "IFACE") then   ! kluge note: allow IFACE and do conversion???
+            !   iauxiflowface = -j
+            !   exit
           end if
         end do
       end if
       do ib = 1, this%gwfpackages(ip)%nbound
         i = this%gwfpackages(ip)%nodelist(ib)
-!!        if (this%gwfibound(i) <= 0) cycle
+        ! if (this%gwfibound(i) <= 0) cycle
         if (this%ibound(i) <= 0) cycle
         qbnd = this%gwfpackages(ip)%get_flow(ib)
         iflowface = 0 ! kluge note: eventually have default iflowface values for different packages
         if (iauxiflowface > 0) then
-          iflowface = this%gwfpackages(ip)%auxvar(iauxiflowface, ib)
-          if (iflowface < 0) iflowface = iflowface + 11 ! kluge note: bot -> 9, top -> 10; see note regarding max faces below
-!!        else if (iauxiflowface < 0) then                    ! kluge note: allow IFACE and do conversion???
-!!          ! kluge note: is it possible to check for a rectangular-celled grid here???
-!!          iface = this%gwfpackages(ip)%auxvar(-iauxiflowface, ib)
-!!          iflowface = iface   ! kluge note: will need to convert
+          ! expected int here... ok to round??
+          iflowface = NINT(this%gwfpackages(ip)%auxvar(iauxiflowface, ib))
+          if (iflowface < 0) iflowface = iflowface + 11 ! bot -> 9, top -> 10; see note re: max faces below
+          ! else if (iauxiflowface < 0) then                    ! kluge note: allow IFACE and do conversion???
+          !   ! kluge note: is it possible to check for a rectangular-celled grid here???
+          !   iface = this%gwfpackages(ip)%auxvar(-iauxiflowface, ib)
+          !   iflowface = iface   ! kluge note: will need to convert
         end if
         if (iflowface .gt. 0) then
           ioffset = (i - 1) * 10 ! kluge note: hardwired for max 8 polygon faces plus top and bottom for now

@@ -1,12 +1,8 @@
-import os
-from math import sqrt
 from pathlib import Path
 import flopy
 import numpy as np
 import pytest
-from flaky import flaky
 from pathlib import Path
-from modflow_devtools.executables import Executables
 from modflow_devtools.case import Case
 from flopy.utils.binaryfile import write_budget, write_head
 from flopy.utils.gridutil import uniform_flow_field
@@ -695,9 +691,9 @@ class PrtCases:
         )
 
         # Create an explicit model solution (EMS) for the MODFLOW 6 prt model
-        ems = flopy.mf6.ModflowIms(
-            sim, pname="ems",
-            outer_maximum=100,
+        ems = flopy.mf6.ModflowEms(
+            sim,
+            pname="ems",
             filename="{}.ems".format(nm_prt),
         )
         sim.register_solution_package(ems, [prt.name])
@@ -1266,7 +1262,6 @@ class PrtCases:
         pass
 
 
-@flaky(max_runs=3)  # todo: debug intermittent p01 invalid memory reference error
 @parametrize_with_cases("case", cases=PrtCases)
 def test_prt_models(case, targets):
     # cases are tuples (context, simulation, optional comparison simulation, evaluation function)

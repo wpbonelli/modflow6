@@ -29,13 +29,13 @@ module TrackingModelModule
     real(DP), dimension(:), pointer, contiguous :: x => null() !dependent variable (head, conc, etc)
     real(DP), dimension(:), pointer, contiguous :: rhs => null() !right-hand side vector
     real(DP), dimension(:), pointer, contiguous :: cond => null() !conductance matrix
-    integer(I4B), dimension(:), pointer, contiguous :: idxglo => null() !pointer to position in solution matrix
-    real(DP), dimension(:), pointer, contiguous :: xold => null() !dependent variable for previous timestep
+    integer(I4B), dimension(:), pointer, contiguous :: idxglo => null() !ptr to position in sln matrix
+    real(DP), dimension(:), pointer, contiguous :: xold => null() !dependent variable for prev timestep
     real(DP), dimension(:), pointer, contiguous :: flowja => null() !intercell flows
     integer(I4B), dimension(:), pointer, contiguous :: ibound => null() !ibound array
     !
     ! -- Derived types
-    ! type(ParticleListType), dimension(:), pointer   :: partlist => null()        !list of particle data
+    ! type(ParticleListType), dimension(:), pointer   :: partlist => null()   !list of particle data
     type(ParticleListType), pointer :: partlist => null() !list of particle data
 
   contains
@@ -247,7 +247,8 @@ contains
     ! deallocate(this%partlist%istopweaksink)
     ! deallocate(this%partlist%istopzone)
     ! deallocate(this%partlist%istatus)
-    ! deallocate(this%partlist)      ! kluge note: structure of arrays - deallocate pointer elsewhere???
+    ! kluge note: structure of arrays - deallocate pointer elsewhere???
+    ! deallocate(this%partlist)
     call mem_deallocate(this%ibound)
     !
     ! -- nullify pointers
@@ -322,13 +323,14 @@ contains
     use MemoryManagerModule, only: mem_allocate
     class(TrackingModelType) :: this
     integer(I4B) :: i
-    integer(I4B) :: np
+    ! integer(I4B) :: np
     !
     call mem_allocate(this%xold, this%neq, 'XOLD', this%memoryPath)
     call mem_allocate(this%flowja, this%nja, 'FLOWJA', this%memoryPath)
     call mem_allocate(this%idxglo, this%nja, 'IDXGLO', this%memoryPath)
-    ! call mem_allocate(this%partlist, this%npartmax, 'PARTLIST', this%memoryPath)   ! kluge note: update memory manager for this derived type???
-    ! allocate(this%partlist(this%npartmax))                                          ! kluge
+    ! kluge note: update memory manager for this derived type???
+    ! call mem_allocate(this%partlist, this%npartmax, 'PARTLIST', this%memoryPath)
+    ! allocate(this%partlist(this%npartmax))                                    ! kluge
     ! do np=1,this%npartmax
     !   call create_particle(this%partlist(np)%particle)
     ! end do
@@ -340,8 +342,10 @@ contains
     ! allocate(this%partlist%xlocal(this%npartmax))
     ! allocate(this%partlist%ylocal(this%npartmax))
     ! allocate(this%partlist%zlocal(this%nreleasepts))
-    ! allocate(this%partlist%iTrackingDomain(this%npartmax,levelMin:levelMax))         ! kluge note: ditch crazy dims
-    ! allocate(this%partlist%iTrackingDomainBoundary(this%npartmax,levelMin:levelMax)) ! kluge note: ditch crazy dims
+    ! kluge note: ditch crazy dims
+    ! allocate(this%partlist%iTrackingDomain(this%npartmax,levelMin:levelMax))
+    ! kluge note: ditch crazy dims
+    ! allocate(this%partlist%iTrackingDomainBoundary(this%npartmax,levelMin:levelMax))
     ! allocate(this%partlist%trelease(this%npartmax))
     ! allocate(this%partlist%tstop(this%npartmax))
     ! allocate(this%partlist%ttrack(this%npartmax))
@@ -398,7 +402,8 @@ contains
     ! -- local
     ! -- code
     this%ibound => iboundsln(this%moffset + 1:this%moffset + this%neq)
-  call mem_checkin(this%ibound, 'IBOUND', this%memoryPath, varNameTgt, memPathTgt)
+    call mem_checkin(this%ibound, 'IBOUND', this%memoryPath, &
+                     varNameTgt, memPathTgt)
   end subroutine set_iboundptr
 
   subroutine get_mcellid(this, node, mcellid)

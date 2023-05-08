@@ -1,10 +1,10 @@
 module MethodCellPassToBotModule
 
-  use KindModule,              only: DP, I4B
+  use KindModule, only: DP, I4B
   use MethodModule
   use CellDefnModule
   use ParticleModule
-  use TrackDataModule,         only: TrackDataType
+  use TrackDataModule, only: TrackDataType
   implicit none
 
   private
@@ -15,16 +15,16 @@ module MethodCellPassToBotModule
   ! -- (MethodCellPassToBot)
   type, extends(MethodType) :: MethodCellPassToBotType
     private
-    type(CellDefnType), pointer, public :: cellDefn => null()                ! tracking domain for the method
+    type(CellDefnType), pointer, public :: cellDefn => null() ! tracking domain for the method
   contains
-    procedure, public :: destroy                               ! destructor for the method
-    procedure, public :: init                                  ! initializes the method
-    procedure, public :: apply => apply_mCVP                   ! applies pass-to-bottom cell method
+    procedure, public :: destroy ! destructor for the method
+    procedure, public :: init ! initializes the method
+    procedure, public :: apply => apply_mCVP ! applies pass-to-bottom cell method
 !!    procedure, public :: pass => pass_mCVP                     ! passes the particle to the cell face
 !!    procedure, public :: loadsub => loadsub_mCVP               ! loads the subcell method
 !!    procedure, public :: load_subcell                          ! loads the lone subcell (subcell = cell)
   end type MethodCellPassToBotType
-  
+
 contains
 
   subroutine create_methodCellPassToBot(methodCellPassToBot)
@@ -35,7 +35,7 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- dummy
-    type (MethodCellPassToBotType), pointer :: methodCellPassToBot
+    type(MethodCellPassToBotType), pointer :: methodCellPassToBot
     ! -- local
 ! ------------------------------------------------------------------------------
     !
@@ -48,7 +48,7 @@ contains
     ! -- Create tracking domain for this method and set trackingDomain pointer
     call create_cellDefn(methodCellPassToBot%cellDefn)
 !!    methodCellPassToBot%trackingDomain => methodCellPassToBot%cellDefn
-    methodCellPassToBot%trackingDomainType = "CellDefn"   ! kluge???
+    methodCellPassToBot%trackingDomainType = "CellDefn" ! kluge???
     !
     return
     !
@@ -62,7 +62,7 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- dummy
-    class (MethodCellPassToBotType), intent(inout) :: this
+    class(MethodCellPassToBotType), intent(inout) :: this
     ! -- local
 ! ------------------------------------------------------------------------------
     !
@@ -81,9 +81,9 @@ contains
 ! ------------------------------------------------------------------------------
     ! -- dummy
     class(MethodCellPassToBotType), intent(inout) :: this
-    type(ParticleType), pointer, intent(inout) :: particle  ! kluge note: is particle needed???
+    type(ParticleType), pointer, intent(inout) :: particle ! kluge note: is particle needed???
     type(cellDefnType), pointer, intent(in) :: cellDefn
-    type(TrackDataType), pointer                     :: trackdata
+    type(TrackDataType), pointer :: trackdata
 ! ------------------------------------------------------------------------------
     !
     ! -- Set pointer to cell definition
@@ -96,7 +96,7 @@ contains
     !
   end subroutine init
 
-  subroutine apply_mCVP(this,particle,tmax)
+  subroutine apply_mCVP(this, particle, tmax)
 ! ******************************************************************************
 ! apply_mCVP -- Apply pass-to-bottom method to a cell
 ! ******************************************************************************
@@ -144,7 +144,7 @@ contains
     end if
     !
     ! -- Store track data
-    ntrack = this%trackdata%ntrack + 1    ! kluge?
+    ntrack = this%trackdata%ntrack + 1 ! kluge?
     this%trackdata%ntrack = ntrack
     this%trackdata%iptrack(ntrack) = particle%ipart
     this%trackdata%ictrack(ntrack) = particle%iTrackingDomain(2)

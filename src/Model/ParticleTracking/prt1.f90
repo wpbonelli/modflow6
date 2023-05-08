@@ -4,7 +4,8 @@ module PrtModule
 
   use KindModule, only: DP, I4B, LGP
   use InputOutputModule, only: ParseLine, upcase, lowcase
-  use ConstantsModule, only: LENFTYPE, LENMEMPATH, DZERO, DONE, LENPAKLOC, LENBUDTXT
+  use ConstantsModule, only: LENFTYPE, LENMEMPATH, DZERO, &
+                             DONE, LENPAKLOC, LENBUDTXT
   use VersionModule, only: write_listfile_header
   use TrackingModelModule, only: TrackingModelType
   use ExplicitModelModule, only: ExplicitModelType
@@ -137,7 +138,6 @@ contains
     character(len=LENMEMPATH) :: input_mempath
     character(len=LINELENGTH) :: lst_fname
     type(GwfNamParamFoundType) :: found
-! ------------------------------------------------------------------------------
     !
     ! -- Allocate a new PRT Model (this)
     allocate (this)
@@ -204,7 +204,6 @@ contains
     ! -- local
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Define packages and utility objects
     call this%dis%dis_df()
@@ -234,11 +233,11 @@ contains
       call packobj%bnd_df(this%neq, this%dis)
       packobj%TsManager%iout = this%iout
       packobj%TasManager%iout = this%iout
-    ! select type(packobj)
-    ! type is (PrtPrpType)    ! kluge
-    !   this%npartmax = this%npartmax + packobj%maxpartrelsd
-    !   this%npartmax = this%npartmax + packobj%nreleasepts   ! kluge note: does not account for repeating releases
-    ! end select
+      ! select type(packobj)
+      ! type is (PrtPrpType)    ! kluge
+      !   this%npartmax = this%npartmax + packobj%maxpartrelsd
+      !   this%npartmax = this%npartmax + packobj%nreleasepts   ! kluge note: does not account for repeating releases
+      ! end select
     end do
     ! this%npartmax = this%npartmax * 100      ! kluge hardwire for some breathing space intially
     !
@@ -335,7 +334,6 @@ contains
     integer(I4B) :: iprp
     integer(I4B), pointer :: itrack1
     integer(I4B), pointer :: itrack2
-! ------------------------------------------------------------------------------
     !
     ! -- Allocate and read modules attached to model
     call this%fmi%fmi_ar(this%ibound)
@@ -360,14 +358,17 @@ contains
     iprp = 0
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
-    ! call packobj%set_pointers(this%dis%nodes, this%ibound, this%x,           &
-    !                           this%xold, this%flowja)
+      ! call packobj%set_pointers(this%dis%nodes, this%ibound, this%x,           &
+      !                           this%xold, this%flowja)
       select type (packobj)
       type is (PrtPrpType) ! kluge
         iprp = iprp + 1
         itrack1 => this%itrack(iprp)
         itrack2 => this%itrack(iprp + 1)
-        call packobj%prp_set_pointers(this%ibound, itrack1, itrack2, this%trackdata)   ! kluge
+        call packobj%prp_set_pointers(this%ibound, &
+                                      itrack1, &
+                                      itrack2, &
+                                      this%trackdata) ! kluge
       end select
       ! -- Read and allocate package
       call packobj%bnd_ar()
@@ -394,7 +395,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- In fmi, check for mvt and mvrbudobj consistency
     ! call this%fmi%fmi_rp(this%inmvt)
@@ -428,7 +428,6 @@ contains
     ! -- local
     integer(I4B) :: irestore
     integer(I4B) :: ip, n, i
-! ------------------------------------------------------------------------------
     !
     ! -- Reset state variable
     irestore = 0
@@ -498,7 +497,6 @@ contains
     ! -- local
     ! class(BndType), pointer :: packobj
     ! integer(I4B) :: ip
-    ! ------------------------------------------------------------------------------
     !
     ! -- Call package cf routines
     ! do ip = 1, this%bndlist%Count()
@@ -572,7 +570,6 @@ contains
     ! class(BndType), pointer :: packobj
     ! integer(I4B) :: ip
     ! -- formats
-! ------------------------------------------------------------------------------
     !
     ! -- If mover is on, then at least 2 outers required
     ! if (this%inmvt > 0) call this%mvt%mvt_cc(kiter, iend, icnvgmod, cpak, dpak)
@@ -603,7 +600,6 @@ contains
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
     real(DP) :: tled
-! ------------------------------------------------------------------------------
     !
     ! -- Flowja is calculated each time, even if output is suppressed.
     !    Flowja represents flow of particle mass and is positive into a cell.
@@ -672,7 +668,6 @@ contains
     integer(I4B) :: istatus
     real(DP) :: tled
     real(DP) :: rate
-! ------------------------------------------------------------------------------
     !
     ! -- Reciprocal of time step size.
     tled = DONE / delt
@@ -727,7 +722,6 @@ contains
     class(BndType), pointer :: packobj
     real(DP) :: rin
     real(DP) :: rout
-! ------------------------------------------------------------------------------
     !
     ! -- Save the solution convergence flag
     this%icnvg = icnvg
@@ -772,7 +766,6 @@ contains
     character(len=*), parameter :: fmtnocnvg = &
       "(1X,/9X,'****FAILED TO COMPLETE SOLUTION IN TIME STEP ', &
       &I0,' OF STRESS PERIOD ',I0,'****')"
-! ------------------------------------------------------------------------------
     !
     ! -- Set write and print flags
     idvsave = 0
@@ -908,7 +901,6 @@ contains
     ! -- local
     integer(I4B) :: ibinun
     ! -- formats
-! ------------------------------------------------------------------------------
     !
     ! -- Set unit number for binary output
     if (this%ipakcb < 0) then
@@ -946,8 +938,8 @@ contains
     real(DP) :: qnm
     ! -- formats
     character(len=*), parameter :: fmtiprflow = &
-                "(/,4x,'CALCULATED INTERCELL FLOW FOR PERIOD ', i0, ' STEP ', i0)"
-! ------------------------------------------------------------------------------
+                "(/,4x,'CALCULATED INTERCELL FLOW &
+                &FOR PERIOD ', i0, ' STEP ', i0)"
     !
     ! -- Write flowja to list file if requested
     if (ibudfl /= 0 .and. this%iprflow > 0) then
@@ -1033,7 +1025,6 @@ contains
   !> @brief Deallocate
   !<
   subroutine prt_da(this)
-! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
     use MemoryManagerExtModule, only: memorylist_remove
@@ -1045,7 +1036,6 @@ contains
     ! -- local
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Deallocate idm memory
     call memorylist_remove(this%name, 'NAM', idm_context)
@@ -1139,7 +1129,6 @@ contains
     class(PrtModelType) :: this
     ! -- local
     integer(I4B) :: iasym
-! ------------------------------------------------------------------------------
     !
     ! -- Start by setting iasym to zero
     iasym = 0
@@ -1161,7 +1150,6 @@ contains
     ! -- dummy
     class(PrtModelType) :: this
     character(len=*), intent(in) :: modelname
-! ------------------------------------------------------------------------------
     !
     ! -- allocate members from parent class
     call this%TrackingModelType%allocate_scalars(modelname)
@@ -1207,18 +1195,28 @@ contains
     ! -- Allocate arrays in TrackingModelType
     call this%TrackingModelType%allocate_arrays()
     !
-    call mem_allocate(this%itrack, this%nprp + 1, 'ITRACK', this%memorypath)
     ntrackmx = 1000000 ! kluge hardwire
-    call mem_allocate(this%trackdata%iptrack, ntrackmx, 'IPTRACK', this%memorypath) ! kluge note: ok that it's in %trackdata ?
-    call mem_allocate(this%trackdata%ictrack, ntrackmx, 'ICTRACK', this%memorypath)
-    call mem_allocate(this%trackdata%xtrack, ntrackmx, 'XTRACK', this%memorypath)
-    call mem_allocate(this%trackdata%ytrack, ntrackmx, 'YTRACK', this%memorypath)
-    call mem_allocate(this%trackdata%ztrack, ntrackmx, 'ZTRACK', this%memorypath)
-    call mem_allocate(this%trackdata%ttrack, ntrackmx, 'TTRACK', this%memorypath)
+    call mem_allocate(this%itrack, this%nprp + 1, &
+                      'ITRACK', this%memorypath)
+    call mem_allocate(this%trackdata%iptrack, ntrackmx, &
+                      'IPTRACK', this%memorypath) ! kluge note: ok that it's in %trackdata ?
+    call mem_allocate(this%trackdata%ictrack, ntrackmx, &
+                      'ICTRACK', this%memorypath)
+    call mem_allocate(this%trackdata%xtrack, ntrackmx, &
+                      'XTRACK', this%memorypath)
+    call mem_allocate(this%trackdata%ytrack, ntrackmx, &
+                      'YTRACK', this%memorypath)
+    call mem_allocate(this%trackdata%ztrack, ntrackmx, &
+                      'ZTRACK', this%memorypath)
+    call mem_allocate(this%trackdata%ttrack, ntrackmx, &
+                      'TTRACK', this%memorypath)
     !
-    call mem_allocate(this%masssto, this%dis%nodes, 'MASSSTO', this%memoryPath)
-    call mem_allocate(this%massstoold, this%dis%nodes, 'MASSSTOOLD', this%memoryPath)
-    call mem_allocate(this%ratesto, this%dis%nodes, 'RATESTO', this%memoryPath)
+    call mem_allocate(this%masssto, this%dis%nodes, &
+                      'MASSSTO', this%memoryPath)
+    call mem_allocate(this%massstoold, this%dis%nodes, &
+                      'MASSSTOOLD', this%memoryPath)
+    call mem_allocate(this%ratesto, this%dis%nodes, &
+                      'RATESTO', this%memoryPath)
     !
     ! -- initialize
     do n = 1, this%dis%nodes
@@ -1235,7 +1233,6 @@ contains
   !<
   subroutine package_create(this, filtyp, ipakid, ipaknum, pakname, inunit, &
                             iout)
-! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: LINELENGTH
     ! use PrtCncModule, only: cnc_create
@@ -1259,31 +1256,30 @@ contains
     class(BndType), pointer :: packobj
     class(BndType), pointer :: packobj2
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- This part creates the package object
     select case (filtyp)
-    ! case('CNC6')
-    ! call cnc_create(packobj, ipakid, ipaknum, inunit, iout, this%name, pakname)
+      ! case('CNC6')
+      ! call cnc_create(packobj, ipakid, ipaknum, inunit, iout, this%name, pakname)
     case ('PRP6')
       this%nprp = this%nprp + 1 ! kluge?
       call prp_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
                       pakname, this%fmi)
-    ! case('LKT6')
-    !   call lkt_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-    !                   pakname, this%fmi)
-    ! case('SFT6')
-    !   call sft_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-    !                   pakname, this%fmi)
-    ! case('MWT6')
-    !   call mwt_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-    !                   pakname, this%fmi)
-    ! case('UZT6')
-    !   call uzt_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-    !                   pakname, this%fmi)
-    ! case('IST6')
-    !   call ist_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-    !                   pakname, this%fmi, this%mst)
+      ! case('LKT6')
+      !   call lkt_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
+      !                   pakname, this%fmi)
+      ! case('SFT6')
+      !   call sft_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
+      !                   pakname, this%fmi)
+      ! case('MWT6')
+      !   call mwt_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
+      !                   pakname, this%fmi)
+      ! case('UZT6')
+      !   call uzt_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
+      !                   pakname, this%fmi)
+      ! case('IST6')
+      !   call ist_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
+      !                   pakname, this%fmi, this%mst)
     case ('API6')
       call api_create(packobj, ipakid, ipaknum, inunit, iout, this%name, pakname)
     case default
@@ -1311,7 +1307,6 @@ contains
   !> @brief Check to make sure required input files have been specified
   !<
   subroutine ftype_check(this, indis)
-! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: LINELENGTH
     ! -- dummy
@@ -1319,7 +1314,6 @@ contains
     integer(I4B), intent(in) :: indis
     ! -- local
     character(len=LINELENGTH) :: errmsg
-! ------------------------------------------------------------------------------
     !
     ! -- Check for DIS(u) and MIP. Stop if not present.
     ! -- Check for PIN6, DIS(u), and MST. Stop if not present.
@@ -1355,7 +1349,7 @@ contains
 
   !> @brief Cast to PrtModelType
   !<
-  function CastAsPrtModel(model) result (prtmodel)
+  function CastAsPrtModel(model) result(prtmodel)
     class(*), pointer :: model
     class(PrtModelType), pointer :: prtmodel
     !
@@ -1371,7 +1365,8 @@ contains
   !<
   subroutine prt_solve(this)
     ! -- modules
-    use TdisModule, only: kper, totimc, delt, totim ! kluge note: kper for plotting only; is delt needed?
+    ! kluge note: kper for plotting only; is delt needed?
+    use TdisModule, only: kper, totimc, totim
     ! -- modules
     use TdisModule, only: nper, nstp
     use PrtPrpModule, only: PrtPrpType
@@ -1404,12 +1399,13 @@ contains
         ! -- Loop over particles in package
         do np = 1, packobj%npart
           !
-        ! -- Skip particle if inactive
-        ! if (packobj%partlist%istatus(np).ne.1) cycle
+          ! -- Skip particle if inactive
+          ! if (packobj%partlist%istatus(np).ne.1) cycle
           ! -- If particle inactive, record (unchanged) location in track data
           ! -- and skip tracking
           if (packobj%partlist%istatus(np) .ne. 1) then
-!            ntrack = this%trackdata%ntrack + 1   ! kluge note: temporarily commented out recording of inactive particle data; want it, maybe as an option???
+! kluge note: temporarily commented out recording of inactive particle data; want it, maybe as an option???
+!            ntrack = this%trackdata%ntrack + 1
 !            this%trackdata%ntrack = ntrack
 !            this%trackdata%iptrack(ntrack) = np
 !          this%trackdata%ictrack(ntrack) = packobj%partlist%iTrackingDomain(np, 2)
@@ -1429,9 +1425,11 @@ contains
           ! particle%xlocal = this%partlist%xlocal(np)
           ! particle%ylocal = this%partlist%ylocal(np)
           ! particle%zlocal = this%partlist%zlocal(np)
-          particle%iTrackingDomain(levelMin:levelMax) = packobj%partlist%iTrackingDomain(np,levelMin:levelMax)
+          particle%iTrackingDomain(levelMin:levelMax) = &
+            packobj%partlist%iTrackingDomain(np, levelMin:levelMax)
           particle%iTrackingDomain(1) = this%id ! kluge note: set this elsewhere???
-          particle%iTrackingDomainBoundary(levelMin:levelMax) = packobj%partlist%iTrackingDomainBoundary(np,levelMin:levelMax)
+          particle%iTrackingDomainBoundary(levelMin:levelMax) = &
+            packobj%partlist%iTrackingDomainBoundary(np, levelMin:levelMax)
           particle%trelease = packobj%partlist%trelease(np)
           particle%tstop = packobj%partlist%tstop(np)
           particle%ttrack = packobj%partlist%ttrack(np)
@@ -1440,8 +1438,8 @@ contains
           particle%istatus = -1
           particle%irpt = packobj%partlist%irpt(np) ! kluge note: necessary to (re)set this here?
           ! if (particle%iTrackingDomain(2).eq.0) then
-            ! if (particle%iTrackingDomain(2).lt.0) then
-              ! -- Particle is finished, so skip it
+          ! if (particle%iTrackingDomain(2).lt.0) then
+          ! -- Particle is finished, so skip it
           !   cycle
           ! else if (particle%trelease.lt.totim) then
           ! if (particle%trelease.lt.totim) then
@@ -1487,8 +1485,14 @@ contains
           ! this%partlist%xlocal(np) = particle%xlocal
           ! this%partlist%ylocal(np) = particle%ylocal
           ! this%partlist%zlocal(np) = particle%zlocal
-          packobj%partlist%iTrackingDomain(np,levelMin:levelMax) = particle%iTrackingDomain(levelMin:levelMax)
-          packobj%partlist%iTrackingDomainBoundary(np,levelMin:levelMax) = particle%iTrackingDomainBoundary(levelMin:levelMax)
+          packobj%partlist%iTrackingDomain( &
+            np, &
+            levelMin:levelMax) = &
+            particle%iTrackingDomain(levelMin:levelMax)
+          packobj%partlist%iTrackingDomainBoundary( &
+            np, &
+            levelMin:levelMax) = &
+            particle%iTrackingDomainBoundary(levelMin:levelMax)
           packobj%partlist%ttrack(np) = particle%ttrack
           packobj%partlist%istatus(np) = particle%istatus
           packobj%partlist%irpt(np) = particle%irpt ! kluge note: necessary to (re)set this here?
@@ -1641,7 +1645,7 @@ contains
     integer(I4B), dimension(:), allocatable :: bndpkgs
     integer(I4B) :: n
     integer(I4B) :: indis = 0 ! DIS enabled flag
-    character(len=LENMEMPATH) :: mempathdsp = ''
+    ! character(len=LENMEMPATH) :: mempathdsp = ''
     !
     ! -- set input memory paths, input/model and input/model/namfile
     model_mempath = create_mem_path(component=this%name, context=idm_context)
@@ -1671,22 +1675,22 @@ contains
       case ('DISU6')
         indis = 1
         call disu_cr(this%dis, this%name, mempath, indis, this%iout)
-      ! case ('PIN6')
-      !   this%inpin = inunit
+        ! case ('PIN6')
+        !   this%inpin = inunit
       case ('MIP6')
         this%inmip = inunit
       case ('FMI6')
         this%infmi = inunit
-      ! case ('MVT6')
-      !   this%inmvt = inunit
-      ! case ('MST6')
-      !   this%inmst = inunit
-      ! case ('ADV6')
-      !   this%inadv = inunit
-      ! case ('DSP6')
-      !   this%indsp = inunit
-      ! case ('SSM6')
-      !   this%inssm = inunit
+        ! case ('MVT6')
+        !   this%inmvt = inunit
+        ! case ('MST6')
+        !   this%inmst = inunit
+        ! case ('ADV6')
+        !   this%inadv = inunit
+        ! case ('DSP6')
+        !   this%indsp = inunit
+        ! case ('SSM6')
+        !   this%inssm = inunit
       case ('OC6')
         this%inoc = inunit
       case ('OBS6')
@@ -1717,7 +1721,7 @@ contains
     ! call ssm_cr(this%ssm, this%name, this%inssm, this%iout, this%fmi)
     ! call mvt_cr(this%mvt, this%name, this%inmvt, this%iout, this%fmi)
     call oc_cr(this%oc, this%name, this%inoc, this%iout)
-    call prt_obs_cr(this%obs, this%inobs)   
+    call prt_obs_cr(this%obs, this%inobs)
     !
     ! -- Check to make sure that required ftype's have been specified
     call this%ftype_check(indis)

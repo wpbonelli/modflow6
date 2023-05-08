@@ -10,6 +10,8 @@ program tester
   use test_prt_UtilMisc, only : collect_prt_UtilMisc
   use test_prt_CellUtil, only: collect_prt_CellUtil
   use test_prt_MethodSubcellPollock, only : collect_prt_MethodSubcellPollock
+  use test_prt_TernaryUtil, only : collect_prt_TernaryUtil
+  use test_prt_TernarySolveTrack, only : collect_prt_TernarySolveTrack
   implicit none
   integer :: stat, is
   character(len=:), allocatable :: suite_name, test_name
@@ -25,7 +27,9 @@ program tester
     new_testsuite("GenericUtils", collect_GenericUtils), &
     new_testsuite("prt_UtilMisc", collect_prt_UtilMisc), &
     new_testsuite("prt_CellUtil", collect_prt_CellUtil), &
-    new_testsuite("prt_MethodSubcellPollock", collect_prt_MethodSubcellPollock) &
+    new_testsuite("prt_MethodSubcellPollock", collect_prt_MethodSubcellPollock), &
+    new_testsuite("prt_TernaryUtil", collect_prt_TernaryUtil), &
+    new_testsuite("prt_TernarySolveTrack", collect_prt_TernarySolveTrack) &
   ]
 
   call get_argument(1, suite_name)

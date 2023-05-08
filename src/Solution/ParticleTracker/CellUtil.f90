@@ -20,21 +20,18 @@ contains
     type(CellRectType), pointer :: cellRect
     integer :: istatus
     ! -- local
-    class(*), pointer :: obj
     type(CellDefnType), pointer :: cellDefn
     integer :: ipv, ipv1, ipv2, ipv3, ipv4
     integer, dimension(4) :: ipvnxt = (/2, 3, 4, 1/)
-    double precision :: x1, y1, x2, y2, x4, y4, xp, yp
+    double precision :: x1, y1, x2, y2, x4, y4
     double precision :: dx2, dy2, dx4, dy4, areax, areay, areaz
     double precision :: xOrigin, yOrigin, zOrigin, dx, dy, dz, sinrot, cosrot
-    integer :: m, m0, m1, m2
-    double precision :: epsang, s0x, s0y, s0mag, s2x, s2y, s2mag, sinang
     double precision :: factor, term
     !
     call create_cellRect(cellRect)
     cellDefn => cellPoly%cellDefn
     ! -- kluge note: no check whether conversion is possible; assumes it is
-    ! 
+    !
     ! -- Translate and rotate the rectangular cell into local coordinates
     ! -- with x varying from 0 to dx and y varying from 0 to dy. Choose the
     ! -- "south-west" vertex to be the local origin so that the rotation
@@ -136,9 +133,7 @@ contains
     type(CellRectQuadType), pointer :: cellRectQuad
     integer :: istatus
     ! -- local
-    class(*), pointer :: obj
-    double precision :: epsang, s0x, s0y, s0mag, s2x, s2y, s2mag, sinang
-    integer :: i, irvOrigin, irv, isc
+    integer :: i, irv, isc
     double precision :: qhalf, qdisttopbot, q1, q2, q4
     !
     call create_cellRectQuad(cellRectQuad)
@@ -151,8 +146,11 @@ contains
     ! -- coordinates.
     cellRectQuad%irvOrigin = cellRectQuad%get_irectvertSW() ! kluge note: no need to pass all that stuff in call below -- set internally in CellRectQuad
     call cellRectQuad%get_rectDimensionsRotation( &
-      cellRectQuad%irvOrigin,cellRectQuad%xOrigin,cellRectQuad%yOrigin,cellRectQuad%zOrigin, &
-      cellRectQuad%dx,cellRectQuad%dy,cellRectQuad%dz,cellRectQuad%sinrot,cellRectQuad%cosrot)
+      cellRectQuad%irvOrigin, cellRectQuad%xOrigin, &
+      cellRectQuad%yOrigin, cellRectQuad%zOrigin, &
+      cellRectQuad%dx, cellRectQuad%dy, &
+      cellRectQuad%dz, cellRectQuad%sinrot, &
+      cellRectQuad%cosrot)
     !
     ! -- Set the external and internal face flows used for subcells
     do i = 0, 3
@@ -194,7 +192,7 @@ contains
   !!
   !! kluge note: probably won't be needed in the long run
   !<
-  function MetricForPointInCellPolygon(xpt, ypt, cellDefn) result(value) 
+  function MetricForPointInCellPolygon(xpt, ypt, cellDefn) result(value)
     ! -- modules
     use CellDefnModule, only: CellDefnType
     ! -- dummy

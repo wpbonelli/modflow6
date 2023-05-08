@@ -11,26 +11,25 @@ module PrtPrpModule
   use BlockParserModule, only: BlockParserType
   use PrtFmiModule, only: PrtFmiType
   use ParticleModule, only: ParticleListType
-  use UTL8MODULE
   use SimModule, only: count_errors, store_error, store_error_unit, &
                        store_warning
   use SimVariablesModule, only: errmsg, warnmsg
   use ArrayHandlersModule, only: expandarray
   use GlobalDataModule
   use TrackDataModule, only: TrackDataType
-  
+
   implicit none
-  
+
   private
   public :: PrtPrpType
   public :: prp_create
-  
+
   character(len=LENFTYPE) :: ftype = 'PRP'
   character(len=16) :: text = '             PRP'
-  
+
   type, extends(BndType) :: PrtPrpType
     type(PrtFmiType), pointer :: fmi => null() !< flow model interface
-    ! type(ParticleListType), dimension(:), pointer :: partlist       => null()        !< list of particle data
+    ! type(ParticleListType), dimension(:), pointer :: partlist       => null()  !< list of particle data
     type(ParticleListType), pointer :: partlist => null() !< list of particle data for the package
     integer(I4B), pointer :: nreleasepts => null() !< number of particle release points
     integer(I4B), pointer :: npart => null() !< number of particles in the particle data list
@@ -38,29 +37,33 @@ module PrtPrpModule
     real(DP), pointer :: stoptime => null() !< stop time for all particles
     real(DP), pointer :: stoptraveltime => null() !< stop travel time for all particles
     integer(I4B), pointer :: istopweaksink => null() !< weak sink option: 0 = do not stop, 1 = stop
-    ! integer(I4B), pointer :: iextendfinalss => null() !< extend final steady state option: 0 = do not extend, 1 = extend
+    !< extend final steady state option: 0 = do not extend, 1 = extend
+    ! integer(I4B), pointer :: iextendfinalss => null()
     integer(I4B), pointer :: istopzone => null() !< optional stop zone number; 0 = no stop zone
-    integer(I4B), pointer :: ioutinactive => null() !< output for inactive particles option: 0 = no output, 1 = output
+    integer(I4B), pointer :: ioutinactive => null() !< output for inactive particles: 0 = no output, 1 = output
     integer(I4B), pointer :: idrape => null() !< drape option: 0 = do not drape, 1 = drape to topmost active cell
-    integer(I4B), dimension(:), pointer, contiguous :: noder => null() !< reduced node number of particle release point
+    integer(I4B), dimension(:), pointer, contiguous :: noder => null() !< reduced node number of release point
     real(DP), dimension(:), pointer, contiguous :: x => null() !< x coordinate of particle release point
     real(DP), dimension(:), pointer, contiguous :: y => null() !< y coordinate of particle release point
     real(DP), dimension(:), pointer, contiguous :: z => null() !< z coordinate of particle release point
     ! real(DP), dimension(:), pointer, contiguous :: tbegin => null() !< begin time of particle release point
-    ! real(DP), dimension(:), pointer, contiguous :: trepeat => null() !< repeat time interval of particle release point
+    ! real(DP), dimension(:), pointer, contiguous :: trepeat => null() !< repeat time interval of release point
     ! real(DP), dimension(:), pointer, contiguous :: tend => null() !< end time of particle release point
-    real(DP), dimension(:), pointer, contiguous :: tstop => null() !< stop time of particles released by particle release point  ! kluge note: don't need this array if going with "global" stoptime value
-    character(len=LENBOUNDNAME), dimension(:), pointer, contiguous :: rptname => null() !< name of particle release point
-    real(DP), dimension(:), pointer, contiguous :: massrls => null() !< particle mass released into the model during time step
+    !< stop time of particles released by particle release point
+    ! kluge note: don't need this array if going with "global" stoptime value
+    real(DP), dimension(:), pointer, contiguous :: tstop => null()
+    character(len=LENBOUNDNAME), dimension(:), pointer, contiguous :: rptname &
+                                                                      => null() !< release point name
+    real(DP), dimension(:), pointer, contiguous :: massrls => null() !< mass released during time step
     ! real(DP), dimension(:), pointer, contiguous :: porosity => null() !< aquifer porosity
     ! real(DP), dimension(:), pointer, contiguous :: retfactor => null() !< retardation factor
     ! integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< zone number
-    integer(I4B), allocatable, dimension(:) :: kstp_list_rls !< allocatable time step list for releases in period
+    integer(I4B), allocatable, dimension(:) :: kstp_list_rls !< allocatable time steps for releases in period
     integer(I4B), pointer :: ifreq_rls => null() !< release frequency (time steps) in period
-    logical(LGP), pointer :: rls_first => null() !< flag for release on first time step in period (start of period)
+    logical(LGP), pointer :: rls_first => null() !< flag for release on first time step in period
     logical(LGP), pointer :: rls_all => null() !< flag for release on all time steps in period
     logical(LGP), pointer :: rls_any => null() !< flag that indicates whether any release in period
-    logical(LGP), pointer :: noperiodblocks => null() !< flag that indicates whether there are no period blocks for the simulation
+    logical(LGP), pointer :: noperiodblocks => null() !< flag indicating if there are no period blocks in sim
     integer(I4B), pointer :: itrack1 => null() ! pointer to start of prp track data
     integer(I4B), pointer :: itrack2 => null() ! pointer to end of prp track data
     type(TrackDataType), pointer :: trackdata => null() ! pointer to model track data
@@ -270,8 +273,12 @@ contains
     ! allocate(this%partlist%xlocal(this%npartmax))
     ! allocate(this%partlist%ylocal(this%npartmax))
     ! allocate(this%partlist%zlocal(this%nreleasepts))
-    allocate (this%partlist%iTrackingDomain(this%npartmax, levelMin:levelMax)) ! kluge note: ditch crazy dims
-    allocate (this%partlist%iTrackingDomainBoundary(this%npartmax, levelMin:levelMax)) ! kluge note: ditch crazy dims
+    ! kluge note: ditch crazy dims
+    allocate (this%partlist%iTrackingDomain(this%npartmax, &
+                                            levelMin:levelMax))
+    ! kluge note: ditch crazy dims
+    allocate (this%partlist%iTrackingDomainBoundary(this%npartmax, &
+                                                    levelMin:levelMax))
     allocate (this%partlist%trelease(this%npartmax))
     allocate (this%partlist%tstop(this%npartmax))
     allocate (this%partlist%ttrack(this%npartmax))
@@ -349,7 +356,6 @@ contains
     class(PrtPrpType), intent(inout) :: this !< PrtPrpType object
     ! -- local variables
     integer(I4B) :: n
-    integer(I4B) :: ierr
     !
     ! -- allocate and read observations
     call this%obs%obs_ar()
@@ -384,15 +390,14 @@ contains
   !<
   subroutine prp_ad(this)
     ! -- modules
-    use TdisModule, only: kper, kstp, totimc
+    use TdisModule, only: kstp, totimc
     ! -- dummy
     class(PrtPrpType) :: this
     ! -- local
     integer(I4B) :: i, n, ic
     integer(I4B) :: nps, np
-    integer(I4B) :: icell ! kluge?
-    real(DP) :: x, y, z, trelease, tstop ! kluge?
-    real(DP) :: top, bot, sat
+    real(DP) :: trelease, tstop ! kluge?
+    ! real(DP) :: top, bot, sat
     logical(LGP) :: isRelease
     !
     ! -- Reset particle mass released for time step
@@ -424,7 +429,8 @@ contains
       n = size(this%kstp_list_rls)
       if (n > 0) then
         do i = 1, n
-          if (this%kstp_list_rls(i) == kstp) isRelease = .true. ! kluge note: store advancing counter to avoid re-searching entire array each time?
+          ! kluge note: store advancing counter to avoid re-searching entire array each time?
+          if (this%kstp_list_rls(i) == kstp) isRelease = .true.
         end do
       end if
     end if
@@ -432,7 +438,7 @@ contains
     ! -- Do the release, if there is one
     if (isRelease) then
       do nps = 1, this%nreleasepts
-        ic = this%noder(nps)  ! reduced node number (cell ID)
+        ic = this%noder(nps) ! reduced node number (cell ID)
         ! -- If drape option activated, release particle in highest active
         ! -- cell vertically below release point. If no such active cell,
         ! -- do not release particle.
@@ -441,14 +447,14 @@ contains
             ! -- Search for highest active cell
             call this%dis%highest_active(ic, this%ibound)
             ! -- If returned cell is inactive, do not release particle
-            if (this%ibound(ic) == 0) cycle   ! kluge note: somehow record for the user that a particle was scheduled but not released?
+            if (this%ibound(ic) == 0) cycle ! kluge note: somehow record for the user that a particle was scheduled but not released?
           end if
         end if
-        np = this%npart + 1   ! particle index
-        this%npart = np       ! ???
-        trelease = totimc     ! release time
+        np = this%npart + 1 ! particle index
+        this%npart = np ! ???
+        trelease = totimc ! release time
 
-        ! -- Set stopping time to the earlier of the times specified by STOPTIME and STOPTRAVELTIME
+        ! -- Set stopping time to earlier of times specified by STOPTIME and STOPTRAVELTIME
         if (this%stoptraveltime == huge(1d0)) then ! kluge huge?
           tstop = this%stoptime
         else
@@ -474,7 +480,7 @@ contains
         this%partlist%iTrackingDomainBoundary(np, 2) = 0
         this%partlist%iTrackingDomain(np, 3) = 0
         this%partlist%iTrackingDomainBoundary(np, 3) = 0
-        
+
         ! -- Each particle currently assigned unit mass
         this%massrls(nps) = this%massrls(nps) + DONE
       end do
@@ -489,11 +495,11 @@ contains
   subroutine prp_rp(this)
     ! -- modules
     use TdisModule, only: kper, nper
+    use InputOutputModule, only: urword
     ! -- dummy variables
     class(PrtPrpType), intent(inout) :: this !< PrtPrpType object
     ! -- local variables
     integer(I4B) :: ierr
-    integer(I4B) :: nlist
     integer(I4B) :: n
     integer(I4B) :: lloc, istart, istop, ival
     real(DP) :: rval
@@ -504,7 +510,8 @@ contains
     character(len=:), allocatable :: line
     ! -- formats
     character(len=*), parameter :: fmtblkerr = &
-                      "('Looking for BEGIN PERIOD iper.  Found ', a, ' instead.')"
+                      "('Looking for BEGIN PERIOD iper.  &
+                      &Found ', a, ' instead.')"
     character(len=*), parameter :: fmt_steps = &
                                    "(6x,'TIME STEP(S) ',50(I0,' '))" ! kluge 50 (similar to STEPS in OC)?
     character(len=*), parameter :: fmt_freq = &
@@ -544,7 +551,10 @@ contains
       end if
     end if
     !
-    ! ! -- clear period data   ! kluge note: releases occur only when explcitly specified for a period (consider a default exception for period 1)
+    ! ! -- clear period data
+    ! kluge note: releases occur only when explcitly specified for a
+    ! period (consider a default exception for period 1)
+    !
     ! if(allocated(this%kstp_list_rls)) deallocate(this%kstp_list_rls)
     ! allocate(this%kstp_list_rls(0))
     ! this%ifreq_rls = 0
@@ -661,7 +671,7 @@ contains
     use TdisModule, only: delt
     ! -- dummy variables
     class(PrtPrpType) :: this !< PrtPrpType object
-    real(DP), dimension(:), intent(in) :: hnew ! kluge note: not needed, but part of the interface   !< current dependent-variable value
+    real(DP), dimension(:), intent(in) :: hnew ! kluge note: not needed but part of interface
     real(DP), dimension(:), intent(inout) :: flowja !< flow between package and model
     integer(I4B), intent(in) :: imover !< flag indicating if the mover package is active
     ! -- local variables
@@ -684,9 +694,11 @@ contains
         !
         ! -- If cell is no-flow or constant-head, then ignore it.
         rrate = DZERO
-        if (node > 0) then ! kluge note: think about condition(s) under which to ignore cell
+        ! kluge note: think about condition(s) under which to ignore cell
+        if (node > 0) then
           idiag = this%dis%con%ia(node)
-          ! if(this%ibound(node) > 0) then   ! kluge note: think about condition(s) under which to ignore cell
+          ! kluge note: think about condition(s) under which to ignore cell
+          ! if(this%ibound(node) > 0) then
           ! -- Calculate the flow rate into the cell.
           rrate = this%massrls(i) * tled
           ! end if
@@ -752,7 +764,6 @@ contains
     class(PrtPrpType) :: this
     ! -- local
     integer(I4B) :: indx
-    ! ------------------------------------------------------------------------------
     call this%obs%StoreObsType('prp', .true., indx)
     this%obs%obsData(indx)%ProcessIdPtr => DefaultObsIdProcessor
     !
@@ -769,15 +780,11 @@ contains
   !<
   subroutine prp_options(this, option, found)
     use ConstantsModule, only: MAXCHARLEN, DZERO
-    use OpenSpecModule, only: access, form
     use InputOutputModule, only: urword, getunit, openfile
     ! -- dummy
     class(PrtPrpType), intent(inout) :: this
     character(len=*), intent(inout) :: option
     logical, intent(inout) :: found
-    ! -- local
-    character(len=MAXCHARLEN) :: fname, keyword
-    ! -- formats
     !
     ! ! -- reinitialize stoptime and stoptraveltime to huge    ! kluge?
     ! this%stoptime = huge(1d0)
@@ -793,12 +800,12 @@ contains
     case ('STOP_AT_WEAK_SINK')
       this%istopweaksink = 1
       found = .true.
-    ! case ('EXTEND_FINAL_SS')
-    !   this%iextendfinalss = 1
-    !   found = .true.
-    !   print *, "EXTEND_FINAL_SS option read in but not programmed yet"  ! kluge
-    !   !!pause
-    !   stop
+      ! case ('EXTEND_FINAL_SS')
+      !   this%iextendfinalss = 1
+      !   found = .true.
+      !   print *, "EXTEND_FINAL_SS option read in but not programmed yet"  ! kluge
+      !   !!pause
+      !   stop
     case ('ISTOPZONE')
       this%istopzone = this%parser%GetInteger()
       found = .true.
@@ -827,29 +834,25 @@ contains
     ! -- dummy
     class(PrtPrpType), intent(inout) :: this
     ! -- local
-    character(len=LINELENGTH) :: text
-    character(len=LINELENGTH) :: keyword
-    character(len=LINELENGTH) :: cstr
     character(len=LINELENGTH) :: cellid
     character(len=LENBOUNDNAME) :: bndName
-    character(len=LENBOUNDNAME) :: bndNameTemp
+    ! character(len=LENBOUNDNAME) :: bndNameTemp
     character(len=9) :: cno
     logical :: isfound
     logical :: endOfBlock
     integer(I4B) :: ival
     integer(I4B) :: n
-    integer(I4B) :: j
-    integer(I4B) :: ii
-    integer(I4B) :: jj
-    integer(I4B) :: ieqn
-    integer(I4B) :: itmp
+    ! integer(I4B) :: j
+    ! integer(I4B) :: ii
+    ! integer(I4B) :: jj
+    ! integer(I4B) :: ieqn
+    ! integer(I4B) :: itmp
     integer(I4B) :: ierr
-    integer(I4B) :: idx
-    real(DP) :: rval
-    real(DP), pointer :: bndElem => null()
+    ! integer(I4B) :: idx
+    ! real(DP), pointer :: bndElem => null()
     ! -- local allocatable arrays
     character(len=LENBOUNDNAME), dimension(:), allocatable :: nametxt
-    character(len=50), dimension(:, :), allocatable :: caux
+    ! character(len=50), dimension(:, :), allocatable :: caux
     integer(I4B), dimension(:), allocatable :: nboundchk
     integer(I4B), dimension(:), allocatable :: noder
     real(DP), dimension(:), allocatable :: x
@@ -891,8 +894,8 @@ contains
     !
     ! -- parse block if detected
     if (isfound) then
-    ! write(this%iout,'(/1x,a)')                                                &
-    !   'PROCESSING ' // trim(adjustl(this%text)) // ' PACKAGEDATA'
+      ! write(this%iout,'(/1x,a)')                                                &
+      !   'PROCESSING ' // trim(adjustl(this%text)) // ' PACKAGEDATA'
       write (this%iout, '(/1x,a)') 'PROCESSING '//trim(adjustl(this%packName)) &
         //' PACKAGEDATA'
       do
@@ -1057,7 +1060,8 @@ contains
         case ('NRELEASEPTS')
           this%nreleasepts = this%parser%GetInteger()
         case default
-     write (errmsg, '(4x,a,a)') '****ERROR. UNKNOWN PARTICLE INPUT DIMENSION: ', &
+          write (errmsg, &
+                 '(4x,a,a)') '****ERROR. UNKNOWN PARTICLE INPUT DIMENSION: ', &
             trim(keyword)
           call store_error(errmsg)
           call this%parser%StoreErrorUnit()
@@ -1114,9 +1118,16 @@ contains
       auxtxt(:) = ['               x', '               y', '               z', &
                    '        trelease', '          ttrack']
       nlist = this%itrack2 - this%itrack1
-      call this%dis%record_srcdst_list_header(text, this%name_model, &
-            this%packName, this%name_model, this%packName, naux, auxtxt, icbcun, &
-                                              nlist, this%iout)
+      call this%dis%record_srcdst_list_header(text, &
+                                              this%name_model, &
+                                              this%packName, &
+                                              this%name_model, &
+                                              this%packName, &
+                                              naux, &
+                                              auxtxt, &
+                                              icbcun, &
+                                              nlist, &
+                                              this%iout)
       !
       ! -- Write a zero for Q, and then write particle x, y, z as aux variables
       do itrack = this%itrack1 + 1, this%itrack2

@@ -7,25 +7,22 @@ module MethodCellPoolModule ! kluge
   implicit none
 
   private
-  public :: create_methodCellPool ! create the cell method pool object
-  public :: destroy_methodCellPool ! destroy the cell method pool object
+  public :: create_methodCellPool
+  public :: destroy_methodCellPool
 
-  type(MethodCellPollockType), pointer, public :: methodCellPollock => null() ! method for the method pool
-  type(MethodCellPollockQuadType), pointer, public :: methodCellPollockQuad   => null()   ! method for the method pool
-  type(MethodCellTernaryType), pointer, public :: methodCellTernary => null() ! method for the method pool
-  type(MethodCellPassToBotType), pointer, public :: methodCellPassToBot       => null()   ! method for the method pool
+  type(MethodCellPollockType), pointer &
+    , public :: methodCellPollock => null() ! method for the method pool
+  type(MethodCellPollockQuadType), pointer &
+    , public :: methodCellPollockQuad => null() ! method for the method pool
+  type(MethodCellTernaryType), pointer &
+    , public :: methodCellTernary => null() ! method for the method pool
+  type(MethodCellPassToBotType), pointer &
+    , public :: methodCellPassToBot => null() ! method for the method pool
 
 contains
 
+  !> @brief Create the cell method pool
   subroutine create_methodCellPool()
-! ******************************************************************************
-! create_methodCellPool -- Create the cell method pool
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-    ! -- dummy
-! ------------------------------------------------------------------------------
     !
     ! -- Create cell method pool
     call create_methodCellPollock(methodCellPollock)
@@ -37,15 +34,8 @@ contains
     !
   end subroutine create_methodCellPool
 
+  !> @brief Destroy the cell method pool
   subroutine destroy_methodCellPool()
-! ******************************************************************************
-! destroy_methodCellPool -- Destroy the cell method pool
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-    ! -- dummy
-! ------------------------------------------------------------------------------
     !
     call methodCellPollock%destroy()
     deallocate (methodCellPollock)
@@ -54,7 +44,7 @@ contains
     call methodCellTernary%destroy()
     deallocate (methodCellTernary)
     call methodCellPassToBot%destroy()
-    deallocate(methodCellPassToBot)
+    deallocate (methodCellPassToBot)
     !
     return
     !

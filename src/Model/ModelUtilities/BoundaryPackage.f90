@@ -49,10 +49,14 @@ module BndModule
     ! -- characters
     character(len=LENLISTLABEL), pointer :: listlabel => null() !< title of table written for RP
     character(len=LENPACKAGENAME) :: text = '' !< text string for package flow term
-    character(len=LENAUXNAME), dimension(:), pointer, contiguous :: auxname => null() !< vector of auxname
-    type(CharacterStringType), dimension(:), pointer, contiguous :: auxname_cst => null() !< copy of vector auxname that can be stored in memory manager
-    character(len=LENBOUNDNAME), dimension(:), pointer, contiguous :: boundname => null() !< vector of boundnames
-    type(CharacterStringType), dimension(:), pointer, contiguous :: boundname_cst => null() !< copy of vector boundname that can be stored in memory manager
+    character(len=LENAUXNAME), dimension(:), pointer &
+      , contiguous :: auxname => null() !< vector of auxname
+    type(CharacterStringType), dimension(:), pointer &
+      , contiguous :: auxname_cst => null() !< copy of vector auxname that can be stored in memory manager
+    character(len=LENBOUNDNAME), dimension(:), pointer &
+      , contiguous :: boundname => null() !< vector of boundnames
+    type(CharacterStringType), dimension(:), pointer &
+      , contiguous :: boundname_cst => null() !< copy of vector boundname that can be stored in memory manager
     !
     ! -- scalars
     integer(I4B), pointer :: isadvpak => null() !< flag indicating package is advanced (1) or not (0)
