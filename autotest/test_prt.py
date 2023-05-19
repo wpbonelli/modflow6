@@ -1,12 +1,16 @@
+from math import sqrt
 from pathlib import Path
 import flopy
+from matplotlib import pyplot as plt
 import numpy as np
 import pytest
 from pathlib import Path
 from modflow_devtools.case import Case
 from flopy.utils.binaryfile import write_budget, write_head
 from flopy.utils.gridutil import uniform_flow_field
+from flopy.utils.gridintersect import GridIntersect
 from pytest_cases import parametrize_with_cases, parametrize
+from shapely.geometry import MultiPoint, LineString
 from simulation import TestSimulation
 
 
@@ -429,7 +433,11 @@ class PrtCases:
         pass
 
 
-    # modpath 7 example problem 1
+    # MODPATH 7 example problem 1
+    #
+    # Subproblems 1A and 1B are solved by a single MODFLOW 6 run and a single MODPATH 7 run,
+    # so they are included under one "scenario"; each of the two subproblems is represented
+    # by its own particle release package (for MODFLOW 6) or particle group (for MODPATH 7)
     case_mp7_p01 = Case(
         name="prtmp7p01",
         # discretization
@@ -703,7 +711,7 @@ class PrtCases:
     def eval_mp7_p01(self, ctx, sim):
         pass
 
-    # modpath 7 example problem 2
+    # MODPATH 7 example problem 2
     case_mp7_p02 = Case(
         name="prtmp7p02",
         # discretization
@@ -751,32 +759,435 @@ class PrtCases:
             name=case_mp7_p02.name + "b",
         )
     ]
+
+    @staticmethod
+    def get_refined_gridprops_p02(ws: Path, ctx, exe) -> dict:
+        ms = flopy.modflow.Modflow()
+        dis = flopy.modflow.ModflowDis(
+            ms,
+            nlay=ctx.nlay,
+            nrow=ctx.nrow,
+            ncol=ctx.ncol,
+            delr=ctx.delr,
+            delc=ctx.delc,
+            top=ctx.top,
+            botm=ctx.botm,
+        )
+
+        from flopy.utils.gridgen import Gridgen
+
+        # create Gridgen workspace
+        gridgen_ws = ws / "gridgen"
+        gridgen_ws.mkdir(parents=True, exist_ok=True)
+
+        # create Gridgen object
+        g = Gridgen(ms.modelgrid, model_ws=gridgen_ws, exe_name=exe)
+
+        # add polygon for each refinement level
+        outer_polygon = [
+            [(3500, 4000), (3500, 6500), (6000, 6500), (6000, 4000), (3500, 4000)]
+        ]
+        g.add_refinement_features([outer_polygon], "polygon", 1, range(ctx.nlay))
+        refshp0 = gridgen_ws / "rf0"
+
+        middle_polygon = [
+            [(4000, 4500), (4000, 6000), (5500, 6000), (5500, 4500), (4000, 4500)]
+        ]
+        g.add_refinement_features([middle_polygon], "polygon", 2, range(ctx.nlay))
+        refshp1 = gridgen_ws / "rf1"
+
+        inner_polygon = [
+            [(4500, 5000), (4500, 5500), (5000, 5500), (5000, 5000), (4500, 5000)]
+        ]
+        g.add_refinement_features([inner_polygon], "polygon", 3, range(ctx.nlay))
+        refshp2 = gridgen_ws / "rf2"
+
+        g.build(verbose=False)
+
+        return g.get_gridprops_disv()
     
-    @pytest.mark.skip(reason="indev: need to reproduce grid programmatically")
     @parametrize(ctx=cases_mp7_p02, ids=[c.name for c in cases_mp7_p02])
     def case_mp7_p02(self, ctx, function_tmpdir, targets):
-        nm_mf6 = ctx.name
-        nm_prt = ctx.name + "_prt"
-        nm_mp7a = ctx.name + "a"
-        nm_mp7b = ctx.name + "b"
 
-        headfile = "{}.hds".format(nm_mf6)
-        headfile_bkwd = "{}.hds".format(nm_mf6 + "_bkwd")
-        budgetfile = "{}.cbb".format(nm_mf6)
-        budgetfile_bkwd = "{}.cbb".format(nm_mf6 + "_bkwd")
-        budgetfile_prt = "{}.cbb".format(nm_prt)
+        sim_name = "mp7-p02"
+        gwf_name = sim_name
+        prt_name = sim_name + "_prt"
+        mp7_name = sim_name + "_mp7"
+        example_name = "ex-prt-" + sim_name
+
+        headfile = "{}.hds".format(gwf_name)
+        headfile_bkwd = "{}.hds".format(gwf_name + "_bkwd")
+        budgetfile = "{}.cbb".format(gwf_name)
+        budgetfile_bkwd = "{}.cbb".format(gwf_name + "_bkwd")
+        budgetfile_prt = "{}.cbb".format(prt_name)
 
         welcells = []
         rivcells = []
         releasepts = []
+
+        tdis_rc = [(1000.0, 1, 1.0)]
+        nper = len(tdis_rc)
+
+        length_units = "feet"
+        time_units = "days"
+
+        # Cell types by layer
+        icelltype = [1, 0, 0]
+
+        # Conductivities
+        k = [50.0, 0.01, 200.0]
+        k33 = [10.0, 0.01, 20.0]
+
+        # Well
+        # issue(flopyex): in the original flopy example, the well
+        #   coordinates were at the edge (not the center) of the cell,
+        #   but it apparently worked out anyway
+        wel_coords = [(4718.45, 5281.25)]
+        wel_q = [-150000.0]
+
+        # Recharge
+        rch = 0.005
+        rch_iface = 6
+        rch_iflowface = -1
+
+        # River
+        riv_h = 320.0
+        riv_z = 318.0
+        riv_c = 1.0e5
+        riv_iface = 6
+        riv_iflowface = -1
+
+        # porosity
+        porosity = 0.1
         
-        # todo build grid and finish constructing simulation
-        
+        # todo build/refine grid
+        disv_props = PrtCases.get_refined_gridprops_p02(function_tmpdir / "gridgen", ctx, targets.gridgen)
+
+        # retrieve GRIDGEN-generated gridprops
+        ncpl = disv_props["ncpl"]
+        top = disv_props["top"]
+        botm = disv_props["botm"]
+        nvert = disv_props["nvert"]
+        vertices = disv_props["vertices"]
+        cell2d = disv_props["cell2d"]
+
+        # determine whether this is part A or B
+        part = ctx.name[-1]
+
+        # Instantiate the MODFLOW 6 simulation object
+        sim = flopy.mf6.MFSimulation(
+            sim_name=gwf_name, exe_name=targets.mf6, version="mf6", sim_ws=function_tmpdir
+        )
+
+        # Instantiate the MODFLOW 6 temporal discretization package
+        flopy.mf6.ModflowTdis(
+            sim, pname="tdis", time_units="DAYS", perioddata=tdis_rc, nper=len(tdis_rc)
+        )
+
+        # Instantiate the MODFLOW 6 gwf (groundwater-flow) model
+        gwf = flopy.mf6.ModflowGwf(
+            sim, modelname=gwf_name, model_nam_file="{}.nam".format(gwf_name)
+        )
+        gwf.name_file.save_flows = True
+
+        # Instantiate the MODFLOW 6 gwf discretization package
+        flopy.mf6.ModflowGwfdisv(
+            gwf,
+            length_units=length_units,
+            **disv_props,
+        )
+
+        # GridIntersect object for setting up boundary conditions
+        ix = GridIntersect(gwf.modelgrid, method="vertex", rtree=True)
+
+        # Instantiate the MODFLOW 6 gwf initial conditions package
+        flopy.mf6.ModflowGwfic(gwf, pname="ic", strt=riv_h)
+
+        # Instantiate the MODFLOW 6 gwf node property flow package
+        flopy.mf6.ModflowGwfnpf(
+            gwf,
+            xt3doptions=[("xt3d")],
+            icelltype=icelltype,
+            k=k, k33=k33,
+            save_saturation=True, save_specific_discharge=True,
+        )
+
+        # Instantiate the MODFLOW 6 gwf recharge package
+        flopy.mf6.ModflowGwfrcha(
+            gwf, recharge=rch,
+            auxiliary=["iface", "iflowface"], aux=[rch_iface, rch_iflowface],
+        )
+
+        # Instantiate the MODFLOW 6 gwf well package
+        welcells = ix.intersects(MultiPoint(wel_coords))
+        welcells = [icpl for (icpl,) in welcells]
+        welspd = [[(2, icpl), wel_q[idx]] for idx, icpl in enumerate(welcells)]
+        flopy.mf6.ModflowGwfwel(
+            gwf, print_input=True, stress_period_data=welspd
+        )
+
+        # Instantiate the MODFLOW 6 gwf river package
+        riverline = [(ctx.Lx - 1.0, ctx.Ly), (ctx.Lx - 1.0, 0.0)]
+        rivcells = ix.intersects(LineString(riverline))
+        rivcells = [icpl for (icpl,) in rivcells]
+        rivspd = [[(0, icpl), riv_h, riv_c, riv_z, riv_iface, riv_iflowface]
+                for icpl in rivcells]
+        flopy.mf6.ModflowGwfriv(gwf, stress_period_data=rivspd,
+            auxiliary=[("iface", "iflowface")])
+
+        # Instantiate the MODFLOW 6 gwf output control package
+        headfile = "{}.hds".format(gwf_name)
+        head_record = [headfile]
+        budgetfile = "{}.cbb".format(gwf_name)
+        budget_record = [budgetfile]
+        flopy.mf6.ModflowGwfoc(
+            gwf,
+            pname="oc",
+            budget_filerecord=budget_record,
+            head_filerecord=head_record,
+            headprintrecord=[("COLUMNS", 10, "WIDTH", 15, "DIGITS", 6, "GENERAL")],
+            saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
+            printrecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
+        )
+
+        # Create an iterative model solution (IMS) for the MODFLOW 6 gwf model
+        ims = flopy.mf6.ModflowIms(
+            sim,
+            pname="ims",
+            print_option="SUMMARY",
+            complexity="SIMPLE",
+            outer_dvclose=1.0e-5,
+            outer_maximum=100,
+            under_relaxation="NONE",
+            inner_maximum=100,
+            inner_dvclose=1.0e-6,
+            rcloserecord=0.1,
+            linear_acceleration="BICGSTAB",
+            scaling_method="NONE",
+            reordering_method="NONE",
+            relaxation_factor=0.99,
+        )
+        sim.register_ims_package(ims, [gwf.name])
+
+        # set up PRT release point data
+        releasepts = []
+        welcellnode = welcells[0]
+        xctr = cell2d[welcellnode][1]
+        yctr = cell2d[welcellnode][2]
+        vert0 = cell2d[welcellnode][4]
+        vert1 = cell2d[welcellnode][5]
+        x0 = vertices[vert0][1]
+        y0 = vertices[vert0][2]
+        x1 = vertices[vert1][1]
+        y1 = vertices[vert1][2]
+        dx = x1 - x0
+        dy = y1 - y0
+        delcell = sqrt(dx * dx + dy * dy)
+        delcellhalf = 0.5 * delcell
+        if part == "a":
+            zrpt = 0.5 * (botm[1][welcellnode] + botm[2][welcellnode])
+            npart_on_side = 4
+            delta = delcell / npart_on_side
+            baseoffset = 0.5 * (npart_on_side + 1) * delta
+            xbase = xctr - baseoffset
+            ybase = yctr - baseoffset
+            nrpt = -1
+            for idiv in range(npart_on_side):
+                i = idiv + 1
+                xrpt = xbase + i * delta
+                yrpt = yctr + delcellhalf
+                nrpt += 1
+                rpt = [nrpt, (2, welcellnode), xrpt, yrpt, zrpt]
+                releasepts.append(rpt)
+                yrpt = yctr - delcellhalf
+                nrpt += 1
+                rpt = [nrpt, (2, welcellnode), xrpt, yrpt, zrpt]
+                releasepts.append(rpt)
+                yrpt = ybase + i * delta
+                xrpt = xctr + delcellhalf
+                nrpt += 1
+                rpt = [nrpt, (2, welcellnode), xrpt, yrpt, zrpt]
+                releasepts.append(rpt)
+                xrpt = xctr - delcellhalf
+                nrpt += 1
+                rpt = [nrpt, (2, welcellnode), xrpt, yrpt, zrpt]
+                releasepts.append(rpt)
+        else:
+            # 4x4 array of particles on top of well cell
+            zrpt = botm[1][welcellnode]
+            npart_on_side = 4
+            delta = delcell / npart_on_side
+            baseoffset = 0.5 * (npart_on_side + 1) * delta
+            xbase = xctr - baseoffset
+            ybase = yctr - baseoffset
+            nrpt = -1
+            for idivx in range(npart_on_side):
+                ix = idivx + 1
+                xrpt = xbase + ix * delta
+                for idivy in range(npart_on_side):
+                    iy = idivy + 1
+                    yrpt = ybase + iy * delta
+                    nrpt += 1
+                    rpt = [nrpt, (2, welcellnode), xrpt, yrpt, zrpt]
+                    releasepts.append(rpt)
+            # 10x10 arrays of particles on the four sides of well cell
+            zwel = 0.5 * (botm[1][welcellnode] + botm[2][welcellnode])
+            npart_on_side = 10
+            delcellz = botm[1][welcellnode] - botm[2][welcellnode]
+            delta = delcell / npart_on_side
+            deltaz = delcellz / npart_on_side
+            baseoffset = 0.5 * (npart_on_side + 1) * delta
+            baseoffsetz = 0.5 * (npart_on_side + 1) * deltaz
+            xbase = xctr - baseoffset
+            ybase = yctr - baseoffset
+            zbase = zwel - baseoffsetz
+            for idivz in range(npart_on_side):
+                iz = idivz + 1
+                zrpt = zbase + iz * deltaz
+                for idiv in range(npart_on_side):
+                    i = idiv + 1
+                    xrpt = xbase + i * delta
+                    yrpt = yctr + delcellhalf
+                    nrpt += 1
+                    rpt = [nrpt, (2, welcellnode), xrpt, yrpt, zrpt]
+                    releasepts.append(rpt)
+                    yrpt = yctr - delcellhalf
+                    nrpt += 1
+                    rpt = [nrpt, (2, welcellnode), xrpt, yrpt, zrpt]
+                    releasepts.append(rpt)
+                    yrpt = ybase + i * delta
+                    xrpt = xctr + delcellhalf
+                    nrpt += 1
+                    rpt = [nrpt, (2, welcellnode), xrpt, yrpt, zrpt]
+                    releasepts.append(rpt)
+                    xrpt = xctr - delcellhalf
+                    nrpt += 1
+                    rpt = [nrpt, (2, welcellnode), xrpt, yrpt, zrpt]
+                    releasepts.append(rpt)
+
+        nodew = ncpl * 2 + welcells[0]
+
+        # set up MODPATH 7 particle release points
+        if part == "a":
+            pcoord = np.array(
+                [
+                    [0.000, 0.125, 0.500],
+                    [0.000, 0.375, 0.500],
+                    [0.000, 0.625, 0.500],
+                    [0.000, 0.875, 0.500],
+                    [1.000, 0.125, 0.500],
+                    [1.000, 0.375, 0.500],
+                    [1.000, 0.625, 0.500],
+                    [1.000, 0.875, 0.500],
+                    [0.125, 0.000, 0.500],
+                    [0.375, 0.000, 0.500],
+                    [0.625, 0.000, 0.500],
+                    [0.875, 0.000, 0.500],
+                    [0.125, 1.000, 0.500],
+                    [0.375, 1.000, 0.500],
+                    [0.625, 1.000, 0.500],
+                    [0.875, 1.000, 0.500],
+                ]
+            )
+            plocs = [nodew for i in range(pcoord.shape[0])]
+            pgdata = flopy.modpath.ParticleData(
+                plocs,
+                structured=False,
+                localx=pcoord[:, 0],
+                localy=pcoord[:, 1],
+                localz=pcoord[:, 2],
+                drape=0,
+            )
+        else:
+            facedata = flopy.modpath.FaceDataType(
+                drape=0,
+                verticaldivisions1=10,
+                horizontaldivisions1=10,
+                verticaldivisions2=10,
+                horizontaldivisions2=10,
+                verticaldivisions3=10,
+                horizontaldivisions3=10,
+                verticaldivisions4=10,
+                horizontaldivisions4=10,
+                rowdivisions5=0,
+                columndivisions5=0,
+                rowdivisions6=4,
+                columndivisions6=4,
+            )
+            pgdata = flopy.modpath.NodeParticleData(subdivisiondata=facedata, nodes=nodew)
+
+        # Set particle release point data according to the scenario
+        prpname = f"prp2{part}"
+        prpfilename = f"{prt_name}_2{part}.prp"
+        nreleasepts = len(releasepts)
+
+        # Create a time discretization for backward tracking;
+        # since there is only a single period with a single time step,
+        # the time discretization is the same backward as forward
+        tdis_bkwd = tdis_rc
+
+        # Instantiate the MODFLOW 6 prt model
+        prt = flopy.mf6.ModflowPrt(
+            sim, modelname=prt_name, model_nam_file="{}.nam".format(prt_name)
+        )
+
+        # Instantiate the MODFLOW 6 prt discretization package
+        flopy.mf6.ModflowGwfdisv(
+            prt,
+            length_units=length_units,
+            **disv_props,
+        )
+
+        # Instantiate the MODFLOW 6 prt model input package
+        flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
+
+        # Instantiate the MODFLOW 6 prt particle release point (prp) package
+        pd = {0: ["FIRST"], 1: []}
+        flopy.mf6.ModflowPrtprp(
+            prt, pname=prpname, filename=prpfilename,
+            nreleasepts=nreleasepts, packagedata=releasepts,
+            perioddata=pd, 
+        )
+
+        # Instantiate the MODFLOW 6 prt output control package
+        budgetfile_prt = "{}.cbb".format(prt_name)
+        budget_record = [budgetfile_prt]
+        flopy.mf6.ModflowPrtoc(
+            prt,
+            pname="oc",
+            budget_filerecord=budget_record,
+            saverecord=[("BUDGET", "ALL")],
+        )
+
+        # Instantiate the MODFLOW 6 prt flow model interface
+        # using "time-reversed" budget and head files
+        pd = [
+            ("GWFHEAD", headfile_bkwd),
+            ("GWFBUDGET", budgetfile_bkwd),
+        ]
+        flopy.mf6.ModflowPrtfmi(prt, packagedata=pd)
+
+        # create exchange
+        flopy.mf6.ModflowGwfprt(
+            sim, exgtype="GWF6-PRT6",
+            exgmnamea=gwf_name, exgmnameb=prt_name,
+            filename=f"{prt_name}.gwfprt",
+        )
+
+        # Create an explicit model solution (EMS) for the MODFLOW 6 prt model
+        ems = flopy.mf6.ModflowEms(
+            sim, pname="ems",
+            filename="{}.ems".format(prt_name),
+        )
+        sim.register_solution_package(ems, [prt.name])
+
+        return ctx, sim, None, self.eval_mp7_p02
+
 
     def eval_mp7_p02(self, ctx, sim):
         pass
 
-    # modpath 7 example problem 3
+    # MODPATH 7 example problem 3
     cases_mp7_p03 = []
 
     @pytest.mark.skip(reason="indev: need finer-grained particle release timing")
@@ -787,7 +1198,7 @@ class PrtCases:
     def eval_mp7_p03(self, ctx, sim):
         pass
 
-    # modpath 7 example problem 4
+    # MODPATH 7 example problem 4
     cases_mp7_p04 = [
         Case(
             name="prtmp7p04",
