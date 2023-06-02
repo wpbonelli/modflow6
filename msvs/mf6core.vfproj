@@ -258,7 +258,6 @@
 		<File RelativePath="..\src\Solution\ParticleTracker\MethodSubcellPool.f90"/>
 		<File RelativePath="..\src\Solution\ParticleTracker\MethodSubcellTernary.f90"/>
 		<File RelativePath="..\src\Solution\ParticleTracker\Particle.f90"/>
-		<File RelativePath="..\src\Solution\ParticleTracker\plotting.f90"/>
 		<File RelativePath="..\src\Solution\ParticleTracker\SubcellRect.f90"/>
 		<File RelativePath="..\src\Solution\ParticleTracker\SubcellTri.f90"/>
 		<File RelativePath="..\src\Solution\ParticleTracker\Ternary.f90"/>
