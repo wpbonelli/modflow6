@@ -5,7 +5,6 @@ on:
       - master
       - develop
       - ci-diagnose*
-      - PRT
     paths-ignore:
       - '**.md'
       - 'doc/**'
@@ -13,7 +12,6 @@ on:
     branches:
       - master
       - develop
-      - PRT
     paths-ignore:
       - '**.md'
       - 'doc/**'
