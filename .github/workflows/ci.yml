@@ -5,6 +5,7 @@ on:
       - master
       - develop
       - ci-diagnose*
+      - win-petsc
     paths-ignore:
       - "**.md"
       - "doc/**"
@@ -571,11 +572,13 @@ jobs:
           cache-environment: true
           cache-downloads: true
 
-      # - name: Setup Intel Fortran
-      #   uses: modflowpy/install-intelfortran-action@v1
-
       - name: Setup Intel Fortran
-        uses: ./modflow6
+        uses: w-bonelli/install-intelfortran-action@develop-mkl
+        with:
+          cache: false
+
+      # - name: Setup Intel Fortran
+      #   uses: ./modflow6
 
       - name: Fix Micromamba path (Windows)
         shell: pwsh
