@@ -1,8 +1,11 @@
 from math import sqrt
+import os
 from pathlib import Path
+from typing import Optional
 import flopy
 from matplotlib import pyplot as plt
 import numpy as np
+import pandas as pd
 import pytest
 from pathlib import Path
 from modflow_devtools.case import Case
@@ -11,13 +14,123 @@ from flopy.utils.gridutil import uniform_flow_field
 from flopy.utils.gridintersect import GridIntersect
 from pytest_cases import parametrize_with_cases, parametrize
 from shapely.geometry import MultiPoint, LineString
+from framework import TestFramework
 from simulation import TestSimulation
+
+
+# expected format of particle track data
+dtype = {
+    "names": ["kper", "kstp", "iprp", "irpt", "icell", "izone", "istatus", "ireason", "trelease", "t", "x", "y", "z"],
+    "formats": ["<i4", "<i4", "<i4", "<i4", "<i4", "<i4", "<i4", "<i4", "<f8", "<f8", "<f8", "<f8", "<f8"],
+}
+
+def load_track_data(cbb):
+    """
+    Temporary method to read particle track data from a cell budget file,
+    until the dedicated output file method is completed in mf6 and FloPy.
+    """
+
+    upn = cbb.get_unique_package_names(decode=True)
+    times = cbb.get_times()
+    tracks = []
+    for prpnam in upn:
+        for totim in times:
+            data = cbb.get_data(text='DATA-PRTCL', paknam=prpnam, totim=totim)
+            for ploc in data[0]:
+                kper, kstp, iprp, ip, icell, izone, istatus, ireason, trelease, t, x, y, z, = [ploc[i] for i in range(3, 16)]
+                pathpoint = (kper, kstp, iprp, ip, icell, izone, istatus, ireason, trelease, t, x, y, z)
+                tracks.append(pathpoint)
+        break
+
+    return np.core.records.fromrecords(tracks, dtype=dtype)
+
+def get_track_dtype(path: os.PathLike):
+    """Get the dtype of the track data recarray from the ascii header file."""
+
+    hdr_lns = open(path).readlines()
+    hdr_lns_spl = [[ll.strip() for ll in l.split(',')] for l in hdr_lns]
+    return np.dtype(list(zip(hdr_lns_spl[0], hdr_lns_spl[1])))
+
+def check_track_dtype(data: np.recarray):
+    """Check that the dtype of the track data recarray is correct."""
+
+    assert np.array_equal(data.dtype.names, dtype["names"])
+    assert np.array_equal([v[0] for v in data.dtype.fields.values()], dtype["formats"])
+    assert data.dtype == dtype
+
+def check_track_data(
+        track_bin: os.PathLike,
+        track_hdr: os.PathLike,
+        track_csv: os.PathLike,
+        track_bud: Optional[os.PathLike] = None):
+    """Check that track data written to binary, CSV, and budget files are equal."""   
+
+    # get dtype from ascii header file
+    dt = get_track_dtype(track_hdr)
+
+    # read output files
+    data_bin = np.fromfile(track_bin, dtype=dt)
+    data_csv = np.genfromtxt(track_csv, dtype=dt, delimiter=',', skip_header=True)
+    if track_bud:
+        data_bud = load_track_data(flopy.utils.CellBudgetFile(track_bud))
+
+    # check dtypes
+    check_track_dtype(data_bin)
+    check_track_dtype(data_csv)
+    if track_bud:
+        check_track_dtype(data_bud)
+
+    assert data_bin.shape == data_csv.shape, f"Binary and CSV track data shapes do not match: {data_bin.shape} != {data_csv.shape}"
+    if track_bud:
+        assert data_bin.shape == data_bud.shape, f"Binary and budget track data shapes do not match: {data_bin.shape} != {data_bud.shape}"
+
+    # check particle tracks written to all output files are equal
+    # check each column separately to avoid:
+    # TypeError: The DType <class 'numpy._FloatAbstractDType'> could not be promoted by <class 'numpy.dtype[void]'>
+    for k in data_bin.dtype.names:
+        assert np.allclose(data_bin[k], data_csv[k], equal_nan=True)
+        if track_bud:
+            assert np.allclose(data_bin[k], data_bud[k], equal_nan=True)
+
+def check_budget_data(ctx, lst: os.PathLike, cbb: os.PathLike):
+    # load PRT model's list file
+    mflist = flopy.utils.mflistfile.ListBudget(
+        lst,
+        budgetkey="MASS BUDGET FOR ENTIRE MODEL"
+    )
+    names = mflist.get_record_names()
+    entries = mflist.entries
+
+    # check timesteps
+    inc = mflist.get_incremental()
+    v = inc["totim"][-1]
+    assert v == ctx.perlen, f"Last time should be {ctx.perlen}.  Found {v}"
+
+    # entries should be a subset of names
+    assert all(e in names for e in entries)
+
+    # todo what other record names should we expect?
+    expected_entries = [
+        "PRP_IN",
+        "PRP_OUT",
+    ]
+    assert all(en in names for en in expected_entries)
+
+    # load and check cell budget file
+    mfbud = flopy.utils.binaryfile.CellBudgetFile(cbb)
+    assert mfbud.nlay == ctx.nlay
+    assert mfbud.nrow == ctx.nrow
+    assert mfbud.ncol == ctx.ncol
+    assert len(mfbud.times) == 1
+    assert mfbud.times[0] == ctx.perlen
 
 
 def test_fmi_basic(function_tmpdir, targets):
     """
-    tests ability to run GWF model first, then PRT model
-    in separate simulations via the flow model interface
+    Tests ability to run a GWF model then a PRT model
+    in separate simulations via flow model interface.
+    Also tests for correct output files, and compares
+    data written to output files of different formats.
     """
 
     name = "prtfmi0"
@@ -51,7 +164,10 @@ def test_fmi_basic(function_tmpdir, targets):
             saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
         )
         sim.write_simulation()
-        sim.run_simulation()
+        success, _ = sim.run_simulation()
+        assert success
+
+        # check output files
         assert (ws / budget_file).is_file()
         assert (ws / head_file).is_file()
 
@@ -66,16 +182,24 @@ def test_fmi_basic(function_tmpdir, targets):
             # particle id, k, i, j, localx, localy, localz
             (0, 0, 0, 0, 0.5, 0.5, 0.5)
         ]
+        prp_track_file = f"{name}.prp.trk"
+        prp_track_csv_file = f"{name}.prp.trk.csv"
         prp = flopy.mf6.ModflowPrtprp(
             prt, pname="prp1", filename=f"{name}_1.prp",
+            track_filerecord=[prp_track_file],
+            trackcsv_filerecord=[prp_track_csv_file],
             nreleasepts=len(releasepts), packagedata=releasepts,
             perioddata={0: ["FIRST"]},
         )
         prt_budget_file = f"{name}.cbb"
+        prt_track_file = f"{name}.trk"
+        prt_track_csv_file = f"{name}.trk.csv"
         oc = flopy.mf6.ModflowPrtoc(
             prt,
             pname="oc",
             budget_filerecord=[prt_budget_file],
+            track_filerecord=[prt_track_file],
+            trackcsv_filerecord=[prt_track_csv_file],
             saverecord=[("BUDGET", "ALL")],
         )
         gwf_budget_file = f"{name}.bud"
@@ -91,8 +215,22 @@ def test_fmi_basic(function_tmpdir, targets):
         )
         sim.register_solution_package(ems, [prt.name])
         sim.write_simulation()
-        sim.run_simulation()
+        success, _ = sim.run_simulation()
+        assert success
+
+        # make sure output files exist
         assert (ws / prt_budget_file).is_file()
+        assert (ws / prt_track_file).is_file()
+        assert (ws / prt_track_csv_file).is_file()
+        assert (ws / prp_track_file).is_file()
+        assert (ws / prp_track_csv_file).is_file()
+
+        check_track_data(
+            track_bin=ws / prt_track_file,
+            track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
+            track_csv=ws / prt_track_csv_file,
+            track_bud=ws / prt_budget_file
+        )
 
     run_flow_model()
     run_tracking_model()
@@ -218,6 +356,8 @@ class PrtCases:
             prt,
             pname="oc",
             budget_filerecord=[f"{ctx.name}.cbb"],
+            track_filerecord=[f"{ctx.name}.trk"],
+            trackcsv_filerecord=[f"{ctx.name}.trk.csv"],
             saverecord=[("BUDGET", "ALL")],
         )
 
@@ -238,44 +378,29 @@ class PrtCases:
         return ctx, sim, None, self.eval_fmi
     
     def eval_fmi(self, ctx, sim):
-        print("evaluating particle tracking results...")
+        print(f"Evaluating results for sim {sim.name}")
         simpath = Path(sim.simpath)
-
-        # load PRT model's list file
-        mflist = flopy.utils.mflistfile.ListBudget(
+        
+        # check budget data
+        check_budget_data(
+            ctx,
             simpath / f"{sim.name}.lst",
-            budgetkey="MASS BUDGET FOR ENTIRE MODEL"
+            simpath / f"{sim.name}.cbb")
+
+        # check particle track data
+        prt_track_file = simpath / f"{sim.name}.trk"
+        prt_track_hdr_file = simpath / f"{sim.name}.trk.hdr"
+        prt_track_csv_file = simpath / f"{sim.name}.trk.csv"
+        prt_track_bud_file = simpath / f"{sim.name}.cbb"
+        assert prt_track_file.exists()
+        assert prt_track_hdr_file.exists()
+        assert prt_track_csv_file.exists()
+        check_track_data(
+            track_bin=prt_track_file,
+            track_hdr=prt_track_hdr_file,
+            track_csv=prt_track_csv_file,
+            track_bud=prt_track_bud_file
         )
-        names = mflist.get_record_names()
-        entries = mflist.entries
-
-        # check timesteps
-        inc = mflist.get_incremental()
-        v = inc["totim"][-1]
-        assert v == ctx.perlen, f"Last time should be {ctx.perlen}.  Found {v}"
-
-        # entries should be a subset of names
-        assert all(e in names for e in entries)
-
-        # todo what other record names should we expect?
-        expected_entries = [
-            "PRP_IN",
-            "PRP_OUT",
-        ]
-        assert all(en in names for en in expected_entries)
-
-        # load and check PRT models' budget file
-        mfbud = flopy.utils.binaryfile.CellBudgetFile(
-            simpath / f"{sim.name}.cbb"
-        )
-        assert mfbud.nlay == ctx.nlay
-        assert mfbud.nrow == ctx.nrow
-        assert mfbud.ncol == ctx.ncol
-        assert len(mfbud.times) == 1
-        assert mfbud.times[0] == ctx.perlen
-
-        # todo check pathlines/endpoints once FloPy
-        # CellBudgetFile has methods to load them
 
 
     # gwf+prt models in same simulation via exchange
@@ -298,8 +423,8 @@ class PrtCases:
     @parametrize(ctx=cases_exg, ids=[c.name for c in cases_exg])
     def case_exg(self, ctx, function_tmpdir, targets):
         workspace = function_tmpdir
-        gwfname = f"gwf_{ctx.name}"
-        prtname = f"prt_{ctx.name}"
+        gwfname = f"{ctx.name}"
+        prtname = f"{ctx.name}_prt"
 
         # create simulation
         sim = flopy.mf6.MFSimulation(
@@ -402,6 +527,8 @@ class PrtCases:
             prt,
             pname="oc",
             budget_filerecord=[f"{prtname}.cbb"],
+            track_filerecord=[f"{prtname}.trk"],
+            trackcsv_filerecord=[f"{prtname}.trk.csv"],
             saverecord=[("BUDGET", "ALL")],
         )
 
@@ -429,8 +556,29 @@ class PrtCases:
         return ctx, sim, None, self.eval_exg
     
     def eval_exg(self, ctx, sim):
-        # todo
-        pass
+        print(f"Evaluating results for sim {sim.name}")
+        simpath = Path(sim.simpath)
+        
+        # check budget data
+        check_budget_data(
+            ctx,
+            simpath / f"{sim.name}_prt.lst",
+            simpath / f"{sim.name}_prt.cbb")
+
+        # check particle track data
+        prt_track_file = simpath / f"{sim.name}_prt.trk"
+        prt_track_hdr_file = simpath / f"{sim.name}_prt.trk.hdr"
+        prt_track_csv_file = simpath / f"{sim.name}_prt.trk.csv"
+        prt_track_bud_file = simpath / f"{sim.name}_prt.cbb"
+        assert prt_track_file.exists()
+        assert prt_track_hdr_file.exists()
+        assert prt_track_csv_file.exists()
+        check_track_data(
+            track_bin=prt_track_file,
+            track_hdr=prt_track_hdr_file,
+            track_csv=prt_track_csv_file,
+            track_bud=prt_track_bud_file
+        )
 
 
     # MODPATH 7 example problem 1
@@ -655,8 +803,10 @@ class PrtCases:
         # for example 1A
         nreleasepts1a = len(releasepts['1A'])
         pd = {0: ["FIRST"],}
+        track_csv_1a = "{}_1a.trk.csv".format(nm_prt)
         flopy.mf6.ModflowPrtprp(
             prt, pname="prp1a", filename="{}_1a.prp".format(nm_prt),
+            trackcsv_filerecord=[track_csv_1a],
             nreleasepts=nreleasepts1a, packagedata=releasepts['1A'],
             perioddata=pd,
         )
@@ -665,18 +815,24 @@ class PrtCases:
         # for example 1B
         nreleasepts1b = len(releasepts['1B'])
         pd = {0: ["FIRST"],}
+        track_csv_1b = "{}_1b.trk.csv".format(nm_prt)
         flopy.mf6.ModflowPrtprp(
             prt, pname="prp1b", filename="{}_1b.prp".format(nm_prt),
+            trackcsv_filerecord=[track_csv_1b],
             nreleasepts=nreleasepts1b, packagedata=releasepts['1B'],
             perioddata=pd,
         )
 
         # Instantiate the MODFLOW 6 prt output control package
         budget_record = [budgetfile_prt]
+        track_record = [f"{nm_prt}.trk"]
+        trackcsv_record = [f"{nm_prt}.trk.csv"]
         flopy.mf6.ModflowPrtoc(
             prt,
             pname="oc",
             budget_filerecord=budget_record,
+            track_filerecord=track_record,
+            trackcsv_filerecord=trackcsv_record,
             saverecord=[("BUDGET", "ALL")],
         )
 
@@ -709,7 +865,50 @@ class PrtCases:
         return ctx, sim, None, self.eval_mp7_p01
 
     def eval_mp7_p01(self, ctx, sim):
-        pass
+        print(f"Evaluating results for sim {sim.name}")
+        simpath = Path(sim.simpath)
+        
+        # check budget data
+        check_budget_data(
+            ctx,
+            simpath / f"{sim.name}_prt.lst",
+            simpath / f"{sim.name}_prt.cbb")
+
+        # check model-level particle track data
+        prt_track_bin_file = simpath / f"{sim.name}_prt.trk"
+        prt_track_hdr_file = simpath / f"{sim.name}_prt.trk.hdr"
+        prt_track_csv_file = simpath / f"{sim.name}_prt.trk.csv"
+        prt_track_bud_file = simpath / f"{sim.name}_prt.cbb"
+        assert prt_track_bin_file.exists()
+        assert prt_track_hdr_file.exists()
+        assert prt_track_csv_file.exists()
+        check_track_data(
+            track_bin=prt_track_bin_file,
+            track_hdr=prt_track_hdr_file,
+            track_csv=prt_track_csv_file,
+            # kluge: not checking cbb because track data are overwritten
+            # for each PRP, so it doesn't contain the full track dataset
+            # track_bud=prt_track_bud_file
+        )
+
+        # check PRP-level particle track data
+        track_csv_file_1a = Path(sim.simpath) / f"{ctx.name}_prt_1a.trk.csv"
+        track_csv_file_1b = Path(sim.simpath) / f"{ctx.name}_prt_1b.trk.csv"
+        assert track_csv_file_1a.is_file()
+        assert track_csv_file_1b.is_file()
+
+        # stack PRP-level track data, then
+        # check equal to model-level track data
+        # get dtype from ascii header file
+        dt = get_track_dtype(prt_track_hdr_file)
+        prt_data_bin = np.fromfile(prt_track_bin_file, dtype=dt)
+        prt_data_csv = np.genfromtxt(prt_track_csv_file, dtype=dt, delimiter=',', skip_header=True)
+        prp_data_csv_1a = np.genfromtxt(track_csv_file_1a, dtype=dt, delimiter=',', skip_header=True)
+        prp_data_csv_1b = np.genfromtxt(track_csv_file_1b, dtype=dt, delimiter=',', skip_header=True)
+        prp_data_csv = np.hstack((prp_data_csv_1a, prp_data_csv_1b))
+        assert prt_data_bin.shape == prt_data_csv.shape == prp_data_csv.shape
+        for k in prt_data_csv.dtype.names:
+            assert np.allclose(prt_data_csv[k], prp_data_csv[k], equal_nan=True)
 
     # MODPATH 7 example problem 2
     case_mp7_p02 = Case(
@@ -1681,16 +1880,15 @@ def test_prt_models(case, targets):
     if cmp:
         cmp.write_simulation()
     
-    test = TestSimulation(
-        name=ctx.name,
-        exe_dict=targets,
-        exfunc=lambda s: evl(ctx, s),  # hack the context into the evaluation function for now
-        idxsim=0,
-        mf6_regression=True,
-        require_failure=ctx.xfail,
-        make_comparison=False,
-    )
-
-    test.set_model(sim.simulation_data.mfpath.get_sim_path(), testModel=False)
-    test.run()
-    test.compare()
+    test = TestFramework()
+    test.run(
+        TestSimulation(
+            name=ctx.name,
+            exe_dict=targets,
+            exfunc=lambda s: evl(ctx, s),  # hack the context into the evaluation function for now
+            idxsim=0,
+            mf6_regression=True,
+            require_failure=ctx.xfail,
+            make_comparison=False,
+        ),
+        sim.simulation_data.mfpath.get_sim_path())

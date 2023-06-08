@@ -26,7 +26,7 @@ module MethodDisvModule
     type(CellPolyType), pointer :: cellPoly ! polygonal cell
     real(DP), dimension(:), pointer, contiguous :: porosity => null() !< ptr to aquifer porosity
     real(DP), dimension(:), pointer, contiguous :: retfactor => null() !< ptr to retardation factor
-    integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< ptr to zone number
+    integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< pointer to zone number
   contains
     ! kluge note: must procedures like this be denoted as public (as and throughout)???
     procedure, public :: destroy ! destructor for the method

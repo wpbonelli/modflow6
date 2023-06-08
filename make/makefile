@@ -5,37 +5,37 @@ include ./makedefaults
 
 # Define the source file directories
 SOURCEDIR1=../src
-SOURCEDIR2=../src/Timing
-SOURCEDIR3=../src/Solution
-SOURCEDIR4=../src/Solution/PETSc
+SOURCEDIR2=../src/Exchange
+SOURCEDIR3=../src/Distributed
+SOURCEDIR4=../src/Solution
 SOURCEDIR5=../src/Solution/LinearMethods
 SOURCEDIR6=../src/Solution/ParticleTracker
-SOURCEDIR7=../src/Model
-SOURCEDIR8=../src/Model/GroundWaterFlow
-SOURCEDIR9=../src/Model/Connection
-SOURCEDIR10=../src/Model/ModelUtilities
-SOURCEDIR11=../src/Model/GroundWaterTransport
-SOURCEDIR12=../src/Model/ParticleTracking
-SOURCEDIR13=../src/Model/Geometry
-SOURCEDIR14=../src/Distributed
-SOURCEDIR15=../src/Exchange
-SOURCEDIR16=../src/Utilities
-SOURCEDIR17=../src/Utilities/TimeSeries
-SOURCEDIR18=../src/Utilities/OutputControl
-SOURCEDIR19=../src/Utilities/Observation
-SOURCEDIR20=../src/Utilities/Libraries
-SOURCEDIR21=../src/Utilities/Libraries/rcm
-SOURCEDIR22=../src/Utilities/Libraries/blas
-SOURCEDIR23=../src/Utilities/Libraries/sparsekit
-SOURCEDIR24=../src/Utilities/Libraries/sparskit2
-SOURCEDIR25=../src/Utilities/Libraries/daglib
-SOURCEDIR26=../src/Utilities/Vector
-SOURCEDIR27=../src/Utilities/ArrayRead
-SOURCEDIR28=../src/Utilities/Memory
-SOURCEDIR29=../src/Utilities/Matrix
-SOURCEDIR30=../src/Utilities/Idm
-SOURCEDIR31=../src/Utilities/Idm/selector
-SOURCEDIR32=../src/Utilities/Idm/mf6blockfile
+SOURCEDIR7=../src/Solution/PETSc
+SOURCEDIR8=../src/Timing
+SOURCEDIR9=../src/Utilities
+SOURCEDIR10=../src/Utilities/Idm
+SOURCEDIR11=../src/Utilities/Idm/selector
+SOURCEDIR12=../src/Utilities/Idm/mf6blockfile
+SOURCEDIR13=../src/Utilities/TimeSeries
+SOURCEDIR14=../src/Utilities/Memory
+SOURCEDIR15=../src/Utilities/OutputControl
+SOURCEDIR16=../src/Utilities/ArrayRead
+SOURCEDIR17=../src/Utilities/Libraries
+SOURCEDIR18=../src/Utilities/Libraries/rcm
+SOURCEDIR19=../src/Utilities/Libraries/blas
+SOURCEDIR20=../src/Utilities/Libraries/sparskit2
+SOURCEDIR21=../src/Utilities/Libraries/daglib
+SOURCEDIR22=../src/Utilities/Libraries/sparsekit
+SOURCEDIR23=../src/Utilities/Vector
+SOURCEDIR24=../src/Utilities/Matrix
+SOURCEDIR25=../src/Utilities/Observation
+SOURCEDIR26=../src/Model
+SOURCEDIR27=../src/Model/Connection
+SOURCEDIR28=../src/Model/ParticleTracking
+SOURCEDIR29=../src/Model/GroundWaterTransport
+SOURCEDIR30=../src/Model/ModelUtilities
+SOURCEDIR31=../src/Model/GroundWaterFlow
+SOURCEDIR32=../src/Model/Geometry
 
 VPATH = \
 ${SOURCEDIR1} \
@@ -121,12 +121,15 @@ $(OBJDIR)/Observe.o \
 $(OBJDIR)/TimeArraySeriesLink.o \
 $(OBJDIR)/ObsUtility.o \
 $(OBJDIR)/ObsContainer.o \
+$(OBJDIR)/GlobalData.o \
 $(OBJDIR)/BudgetFileReader.o \
 $(OBJDIR)/TimeArraySeriesManager.o \
 $(OBJDIR)/PackageMover.o \
 $(OBJDIR)/Obs3.o \
 $(OBJDIR)/NumericalPackage.o \
 $(OBJDIR)/Budget.o \
+$(OBJDIR)/SeqVector.o \
+$(OBJDIR)/Particle.o \
 $(OBJDIR)/sort.o \
 $(OBJDIR)/SfrCrossSectionUtils.o \
 $(OBJDIR)/BudgetTerm.o \
@@ -140,7 +143,6 @@ $(OBJDIR)/ims8reordering.o \
 $(OBJDIR)/TernaryUtil.o \
 $(OBJDIR)/Ternary.o \
 $(OBJDIR)/TrackData.o \
-$(OBJDIR)/Particle.o \
 $(OBJDIR)/CellDefn.o \
 $(OBJDIR)/VirtualBase.o \
 $(OBJDIR)/STLVecInt.o \

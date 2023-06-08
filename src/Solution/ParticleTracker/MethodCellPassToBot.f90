@@ -96,44 +96,40 @@ contains
     !
   end subroutine init
 
+  !> @brief Apply pass-to-bottom method to a cell
   subroutine apply_mCVP(this, particle, tmax)
-! ******************************************************************************
-! apply_mCVP -- Apply pass-to-bottom method to a cell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
+    ! -- modules
     use UtilMiscModule
+    use TdisModule, only: kper, kstp
     ! -- dummy
     class(MethodCellPassToBotType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-!!!    doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
+    ! doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
     ! -- local
     integer(I4B) :: ntrack
-! ------------------------------------------------------------------------------
     !
     if (this%cellDefn%izone .ne. 0) then
       if (particle%istopzone .eq. this%cellDefn%izone) then
         ! -- Stop zone
-!!        particle%iTrackingDomainBoundary(3) = 0
+        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 6
-!!        write(*,'(A,I,A,I)') "particle ", particle%ipart, " terminated in stop zone cell: ", particle%iTrackingDomain(2)  ! kluge
-!!        return
+        ! write(*,'(A,I,A,I)') "particle ", particle%ipart, " terminated in stop zone cell: ", particle%iTrackingDomain(2)  ! kluge
+        ! return
       end if
     else if (this%cellDefn%inoexitface .ne. 0) then
       ! -- No exit face
-!!      particle%iTrackingDomainBoundary(3) = 0
+      ! particle%iTrackingDomainBoundary(3) = 0
       particle%istatus = 5
-!!      write(*,'(A,I,A,I)') "particle ", particle%ipart, " terminated at cell w/ no exit face: ", particle%iTrackingDomain(2)  ! kluge
-!!      return
+      ! write(*,'(A,I,A,I)') "particle ", particle%ipart, " terminated at cell w/ no exit face: ", particle%iTrackingDomain(2)  ! kluge
+      ! return
     else if (particle%istopweaksink .ne. 0) then
       if (this%cellDefn%iweaksink .ne. 0) then
         ! -- Weak sink
-!!        particle%iTrackingDomainBoundary(3) = 0
+        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 3
-!!        write(*,'(A,I,A,I)')  "particle ", particle%ipart, " terminated at weak sink cell: ", particle%iTrackingDomain(2)  ! kluge
-!!        return
+        ! write(*,'(A,I,A,I)')  "particle ", particle%ipart, " terminated at weak sink cell: ", particle%iTrackingDomain(2)  ! kluge
+        ! return
       end if
     else
       !
@@ -144,15 +140,25 @@ contains
     end if
     !
     ! -- Store track data
-    ntrack = this%trackdata%ntrack + 1 ! kluge?
-    this%trackdata%ntrack = ntrack
-    this%trackdata%iptrack(ntrack) = particle%ipart
-    this%trackdata%ictrack(ntrack) = particle%iTrackingDomain(2)
-    this%trackdata%xtrack(ntrack) = particle%x
-    this%trackdata%ytrack(ntrack) = particle%y
-    this%trackdata%ztrack(ntrack) = particle%z
-    this%trackdata%ttrack(ntrack) = particle%ttrack
-!!    write(*,'(I,4G)') particle%ipart,particle%x,particle%y,particle%z,particle%ttrack  ! kluge debug
+    ntrack = this%trackdata%nrows + 1 ! kluge?
+    this%trackdata%nrows = ntrack
+    this%trackdata%kper(ntrack) = kper
+    this%trackdata%kstp(ntrack) = kstp
+    this%trackdata%iprp(ntrack) = particle%iprp
+    this%trackdata%irpt(ntrack) = particle%ipart
+    this%trackdata%icell(ntrack) = particle%iTrackingDomain(2)
+    this%trackdata%izone(ntrack) = this%cellDefn%izone
+    this%trackdata%istatus(ntrack) = particle%istatus
+    if (particle%istatus > 1) then
+      this%trackdata%ireason(ntrack) = 3 ! termination
+    else
+      this%trackdata%ireason(ntrack) = 1 ! crossing cell boundary
+    end if
+    this%trackdata%trelease(ntrack) = particle%trelease
+    this%trackdata%t(ntrack) = particle%ttrack
+    this%trackdata%x(ntrack) = particle%x
+    this%trackdata%y(ntrack) = particle%y
+    this%trackdata%z(ntrack) = particle%z
     !
     return
     !

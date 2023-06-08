@@ -176,6 +176,7 @@ contains
 
   !> @brief Apply the ternary method to a polygonal cell
   subroutine apply_mCT(this, particle, tmax)
+    use TdisModule, only: kper, kstp
     use ConstantsModule, only: DZERO, DONE, DHALF ! kluge???
     ! dummy
     class(MethodCellTernaryType), intent(inout) :: this
@@ -223,14 +224,25 @@ contains
       if (particle%z > this%cellPoly%cellDefn%top) then
         particle%z = this%cellPoly%cellDefn%top
         ! -- Store track data
-        ntrack = this%trackdata%ntrack + 1 ! kluge?
-        this%trackdata%ntrack = ntrack
-        this%trackdata%iptrack(ntrack) = particle%ipart
-        this%trackdata%ictrack(ntrack) = particle%iTrackingDomain(2)
-        this%trackdata%xtrack(ntrack) = particle%x
-        this%trackdata%ytrack(ntrack) = particle%y
-        this%trackdata%ztrack(ntrack) = particle%z
-        this%trackdata%ttrack(ntrack) = particle%ttrack
+        ntrack = this%trackdata%nrows + 1 ! kluge?
+        this%trackdata%nrows = ntrack
+        this%trackdata%kper(ntrack) = kper
+        this%trackdata%kstp(ntrack) = kstp
+        this%trackdata%iprp(ntrack) = particle%iprp
+        this%trackdata%irpt(ntrack) = particle%ipart
+        this%trackdata%icell(ntrack) = particle%iTrackingDomain(2)
+        this%trackdata%izone(ntrack) = this%cellPoly%cellDefn%izone
+        this%trackdata%istatus(ntrack) = particle%istatus
+        if (particle%istatus > 1) then
+          this%trackdata%ireason(ntrack) = 3 ! termination
+        else
+          this%trackdata%ireason(ntrack) = 1 ! crossing cell boundary
+        end if
+        this%trackdata%trelease(ntrack) = particle%trelease
+        this%trackdata%t(ntrack) = particle%ttrack
+        this%trackdata%x(ntrack) = particle%x
+        this%trackdata%y(ntrack) = particle%y
+        this%trackdata%z(ntrack) = particle%z
       end if
       !
       npolyverts = this%cellPoly%cellDefn%npolyverts
@@ -311,14 +323,25 @@ contains
     end if
     !
     ! -- Store track data
-    ntrack = this%trackdata%ntrack + 1 ! kluge?
-    this%trackdata%ntrack = ntrack
-    this%trackdata%iptrack(ntrack) = particle%ipart
-    this%trackdata%ictrack(ntrack) = particle%iTrackingDomain(2)
-    this%trackdata%xtrack(ntrack) = particle%x
-    this%trackdata%ytrack(ntrack) = particle%y
-    this%trackdata%ztrack(ntrack) = particle%z
-    this%trackdata%ttrack(ntrack) = particle%ttrack
+    ntrack = this%trackdata%nrows + 1 ! kluge?
+    this%trackdata%nrows = ntrack
+    this%trackdata%kper(ntrack) = kper
+    this%trackdata%kstp(ntrack) = kstp
+    this%trackdata%iprp(ntrack) = particle%iprp
+    this%trackdata%irpt(ntrack) = particle%ipart
+    this%trackdata%icell(ntrack) = particle%iTrackingDomain(2)
+    this%trackdata%izone(ntrack) = this%cellPoly%cellDefn%izone
+    this%trackdata%istatus(ntrack) = particle%istatus
+    if (particle%istatus > 1) then
+      this%trackdata%ireason(ntrack) = 3 ! termination
+    else
+      this%trackdata%ireason(ntrack) = 1 ! crossing cell boundary
+    end if
+    this%trackdata%trelease(ntrack) = particle%trelease
+    this%trackdata%t(ntrack) = particle%ttrack
+    this%trackdata%x(ntrack) = particle%x
+    this%trackdata%y(ntrack) = particle%y
+    this%trackdata%z(ntrack) = particle%z
     !
     return
     !

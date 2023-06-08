@@ -2,9 +2,10 @@ module PrtOcModule
 
   use BaseDisModule, only: DisBaseType
   use KindModule, only: DP, I4B
-  use ConstantsModule, only: LENMODELNAME
+  use ConstantsModule, only: LENMODELNAME, MNORMAL
   use OutputControlModule, only: OutputControlType
   use OutputControlDataModule, only: OutputControlDataType, ocd_cr
+  use SimVariablesModule, only: errmsg, warnmsg
 
   implicit none
   private
@@ -16,8 +17,18 @@ module PrtOcModule
   !!  PRT Model
   !<
   type, extends(OutputControlType) :: PrtOcType
+
+    ! output files
+    integer(I4B), pointer :: itrkout => null()
+    integer(I4B), pointer :: itrkhdr => null()
+    integer(I4B), pointer :: itrkcsv => null()
+
   contains
     procedure :: oc_ar
+    procedure :: oc_da => prt_oc_da
+    procedure :: allocate_scalars => prt_oc_allocate_scalars
+    procedure :: read_options => prt_oc_read_options
+
   end type PrtOcType
 
 contains
@@ -34,7 +45,6 @@ contains
     character(len=*), intent(in) :: name_model !< name of the model
     integer(I4B), intent(in) :: inunit !< unit number for input
     integer(I4B), intent(in) :: iout !< unit number for output
-! ------------------------------------------------------------------------------
     !
     ! -- Create the object
     allocate (ocobj)
@@ -53,12 +63,46 @@ contains
     return
   end subroutine oc_cr
 
+  subroutine prt_oc_allocate_scalars(this, name_model)
+    ! -- modules
+    use MemoryManagerModule, only: mem_allocate
+    use MemoryHelperModule, only: create_mem_path
+    ! -- dummy
+    class(PrtOcType) :: this
+    character(len=*), intent(in) :: name_model !< name of model
+    !
+    this%memoryPath = create_mem_path(name_model, 'OC')
+    !
+    allocate (this%name_model)
+    call mem_allocate(this%inunit, 'INUNIT', this%memoryPath)
+    call mem_allocate(this%iout, 'IOUT', this%memoryPath)
+    call mem_allocate(this%ibudcsv, 'IBUDCSV', this%memoryPath)
+    call mem_allocate(this%iperoc, 'IPEROC', this%memoryPath)
+    call mem_allocate(this%iocrep, 'IOCREP', this%memoryPath)
+    call mem_allocate(this%itrkout, 'ITRKOUT', this%memoryPath)
+    call mem_allocate(this%itrkhdr, 'ITRKHDR', this%memoryPath)
+    call mem_allocate(this%itrkcsv, 'ITRKCSV', this%memoryPath)
+    !
+    this%name_model = name_model
+    this%inunit = 0
+    this%iout = 0
+    this%ibudcsv = 0
+    this%iperoc = 0
+    this%iocrep = 0
+    this%itrkout = 0
+    this%itrkhdr = 0
+    this%itrkcsv = 0
+    !
+    return
+  end subroutine prt_oc_allocate_scalars
+
   !> @ brief Allocate and read PrtOcType
   !!
-  !!  Setup concentration and budget as output control variables.
-  !!
+  !!  Setup concentration, budget, and particle tracks as output control variables.
   !<
   subroutine oc_ar(this, conc, dis, dnodata)
+    ! -- modules
+    use MemoryManagerModule, only: mem_allocate
     ! -- dummy
     class(PrtOcType) :: this !< PrtOcType object
     real(DP), dimension(:), pointer, contiguous, intent(in) :: conc !< model concentration
@@ -97,5 +141,147 @@ contains
     ! -- Return
     return
   end subroutine oc_ar
+
+  subroutine prt_oc_da(this)
+    ! -- modules
+    use MemoryManagerModule, only: mem_deallocate
+    ! -- dummy
+    class(PrtOcType) :: this
+    integer(I4B) :: i
+    !
+    do i = 1, size(this%ocdobj)
+      call this%ocdobj(i)%ocd_da()
+    end do
+    deallocate (this%ocdobj)
+    !
+    deallocate (this%name_model)
+    call mem_deallocate(this%inunit)
+    call mem_deallocate(this%iout)
+    call mem_deallocate(this%ibudcsv)
+    call mem_deallocate(this%iperoc)
+    call mem_deallocate(this%iocrep)
+    call mem_deallocate(this%itrkout)
+    call mem_deallocate(this%itrkhdr)
+    call mem_deallocate(this%itrkcsv)
+  end subroutine prt_oc_da
+
+  subroutine prt_oc_read_options(this)
+    ! -- modules
+    use OpenSpecModule, only: access, form
+    use InputOutputModule, only: getunit, openfile, lowcase
+    use ConstantsModule, only: LINELENGTH
+    use TrackDataModule, only: TRACKHEADERS, TRACKTYPES
+    use SimModule, only: store_error, store_error_unit
+    use InputOutputModule, only: openfile, getunit
+    ! -- dummy
+    class(PrtOcType) :: this
+    ! -- local
+    character(len=LINELENGTH) :: keyword
+    character(len=LINELENGTH) :: keyword2
+    character(len=LINELENGTH) :: fname
+    character(len=:), allocatable :: line
+    integer(I4B) :: ierr
+    integer(I4B) :: ipos
+    logical :: isfound, found, endOfBlock
+    type(OutputControlDataType), pointer :: ocdobjptr
+    ! -- formats
+    character(len=*), parameter :: fmttrkbin = &
+      "(4x, 'PARTICLE TRACKS WILL BE SAVED TO BINARY FILE: ', a, /4x, &
+    &'OPENED ON UNIT: ', I0)"
+    character(len=*), parameter :: fmttrkcsv = &
+      "(4x, 'PARTICLE TRACKS WILL BE SAVED TO CSV FILE: ', a, /4x, &
+    &'OPENED ON UNIT: ', I0)"
+    !
+    ! -- get options block
+    call this%parser%GetBlock('OPTIONS', isfound, ierr, &
+                              supportOpenClose=.true., blockRequired=.false.)
+    !
+    ! -- parse options block if detected
+    if (isfound) then
+      write (this%iout, '(/,1x,a,/)') 'PROCESSING OC OPTIONS'
+      do
+        call this%parser%GetNextLine(endOfBlock)
+        if (endOfBlock) exit
+        call this%parser%GetStringCaps(keyword)
+        found = .false.
+        select case (keyword)
+        case ('BUDGETCSV')
+          call this%parser%GetStringCaps(keyword2)
+          if (keyword2 /= 'FILEOUT') then
+            errmsg = "BUDGETCSV must be followed by FILEOUT and then budget &
+              &csv file name.  Found '"//trim(keyword2)//"'."
+            call store_error(errmsg)
+            call this%parser%StoreErrorUnit()
+          end if
+          call this%parser%GetString(fname)
+          this%ibudcsv = GetUnit()
+          call openfile(this%ibudcsv, this%iout, fname, 'CSV', &
+                        filstat_opt='REPLACE')
+          found = .true.
+        case ('TRACK')
+          call this%parser%GetStringCaps(keyword)
+          if (keyword == 'FILEOUT') then
+            ! parse filename
+            call this%parser%GetString(fname)
+            ! open binary track output file
+            this%itrkout = getunit()
+            call openfile(this%itrkout, this%iout, fname, 'DATA(BINARY)', &
+                          form, access, filstat_opt='REPLACE', &
+                          mode_opt=MNORMAL)
+            write (this%iout, fmttrkbin) trim(adjustl(fname)), this%itrkout
+            ! open and write ascii track header file
+            this%itrkhdr = getunit()
+            fname = trim(fname)//'.hdr'
+            call openfile(this%itrkhdr, this%iout, fname, 'CSV', &
+                          filstat_opt='REPLACE', mode_opt=MNORMAL)
+            write (this%itrkhdr, '(a,/,a)') TRACKHEADERS, TRACKTYPES
+          else
+            call store_error('OPTIONAL TRACK KEYWORD MUST BE '// &
+                             'FOLLOWED BY FILEOUT')
+          end if
+          found = .true.
+        case ('TRACKCSV')
+          call this%parser%GetStringCaps(keyword)
+          if (keyword == 'FILEOUT') then
+            ! parse filename
+            call this%parser%GetString(fname)
+            ! open CSV track output file and write headers
+            this%itrkcsv = getunit()
+            call openfile(this%itrkcsv, this%iout, fname, 'CSV', &
+                          filstat_opt='REPLACE')
+            write (this%iout, fmttrkcsv) trim(adjustl(fname)), this%itrkcsv
+            write (this%itrkcsv, '(a)') TRACKHEADERS
+          else
+            call store_error('OPTIONAL TRACKCSV KEYWORD MUST BE &
+              &FOLLOWED BY FILEOUT')
+          end if
+          found = .true.
+        case default
+          found = .false.
+        end select
+
+        if (.not. found) then
+          do ipos = 1, size(this%ocdobj)
+            ocdobjptr => this%ocdobj(ipos)
+            if (keyword == trim(ocdobjptr%cname)) then
+              found = .true.
+              exit
+            end if
+          end do
+          if (.not. found) then
+            errmsg = "UNKNOWN OC OPTION '"//trim(keyword)//"'."
+            call store_error(errmsg)
+            call this%parser%StoreErrorUnit()
+          end if
+          call this%parser%GetRemainingLine(line)
+          call ocdobjptr%set_option(line, this%parser%iuactive, this%iout)
+        end if
+      end do
+      write (this%iout, '(1x,a)') 'END OF OC OPTIONS'
+    end if
+    !
+    ! -- return
+    return
+  end subroutine prt_oc_read_options
 
 end module PrtOcModule
