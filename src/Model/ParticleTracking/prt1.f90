@@ -5,13 +5,14 @@ module PrtModule
   use KindModule, only: DP, I4B, LGP
   use InputOutputModule, only: ParseLine, upcase, lowcase
   use ConstantsModule, only: LENFTYPE, LENMEMPATH, DZERO, &
-                             DONE, LENPAKLOC, LENBUDTXT
+                             DONE, LENPAKLOC, LENBUDTXT, MNORMAL
   use VersionModule, only: write_listfile_header
   use TrackingModelModule, only: TrackingModelType
   use ExplicitModelModule, only: ExplicitModelType
   use BaseModelModule, only: BaseModelType
   use BndModule, only: BndType, AddBndToList, GetBndFromList
   ! use PrtPinModule, only: PrtPinType
+  use PrtPrpModule, only: PrtPrpType
   use PrtFmiModule, only: PrtFmiType
   use PrtMipModule, only: PrtMipType
   ! use PrtAdvModule, only: PrtAdvType
@@ -70,9 +71,8 @@ module PrtModule
     integer(I4B), pointer :: inoc => null() ! unit number OC
     integer(I4B), pointer :: inobs => null() ! unit number OBS
     integer(I4B), pointer :: nprp => null() ! number of PRP packages in the model
-    integer(I4B), dimension(:), pointer, contiguous :: itrack ! kluge
+    integer(I4B), dimension(:), pointer, contiguous :: itrack
     type(TrackDataType), pointer :: trackdata ! kluge?
-
     real(DP), dimension(:), pointer, contiguous :: masssto => null() !< particle mass storage in cells, new value
     real(DP), dimension(:), pointer, contiguous :: massstoold => null() !< particle mass storage in cells, old value
     real(DP), dimension(:), pointer, contiguous :: ratesto => null() !< particle mass storage rate in cells
@@ -348,7 +348,7 @@ contains
     ! if (this%inobs > 0) call this%obs%prt_obs_ar(this%pin, this%x, this%flowja)
     !
     ! -- Call dis_ar to write binary grid file
-    !call this%dis%dis_ar(this%npf%icelltype)
+    !call this%dis%dis_ar(this%npf%icellidtype)
     !
     ! -- set up output control
     call this%oc%oc_ar(this%x, this%dis, DHNOFLO)
@@ -380,6 +380,8 @@ contains
     call this%methodDisv%init(this%fmi, this%flowja, this%mip%porosity, &
                               this%mip%retfactor, this%mip%izone, &
                               this%trackdata)
+    !
+
     !
     ! -- return
     return
@@ -569,7 +571,6 @@ contains
     ! -- local
     ! class(BndType), pointer :: packobj
     ! integer(I4B) :: ip
-    ! -- formats
     !
     ! -- If mover is on, then at least 2 outers required
     ! if (this%inmvt > 0) call this%mvt%mvt_cc(kiter, iend, icnvgmod, cpak, dpak)
@@ -577,8 +578,8 @@ contains
     ! -- Call package cc routines
     ! do ip = 1, this%bndlist%Count()
     !   packobj => GetBndFromList(this%bndlist, ip)
-    !   call packobj%bnd_cc(iend, icnvg, hclose, rclose)
-    ! enddo
+    !   call packobj%bnd_cc(innertot, kiter, iend, icnvgmod, cpak, ipak, dpak)
+    ! end do
     !
     ! -- return
     return
@@ -783,16 +784,16 @@ contains
     ibudfl = this%oc%set_print_flag('BUDGET', this%icnvg, endofperiod)
     idvprint = this%oc%set_print_flag('CONCENTRATION', this%icnvg, endofperiod)
     !
-    !   Calculate and save observations
+    ! -- Calculate and save observations
     call this%prt_ot_obs()
     !
-    !   Save and print flows
+    ! -- Save and print flows
     call this%prt_ot_flow(icbcfl, ibudfl, icbcun)
     !
-    !   Save and print dependent variables
+    ! -- Save and print dependent variables
     call this%prt_ot_dv(idvsave, idvprint, ipflag)
     !
-    !   Print budget summaries
+    ! -- Print budget summaries
     call this%prt_ot_bdsummary(ibudfl, ipflag)
     !
     ! -- Timing Output; if any dependendent variables or budgets
@@ -858,7 +859,8 @@ contains
     !   call this%mvt%mvt_ot_saveflow(icbcfl, ibudfl)
     ! end if
 
-    ! -- Save particle information from PRP packages
+    ! -- kluge: save particle information from PRP packages
+    ! -- todo: remove now that dedicated track output files are implemented
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       select type (packobj)
@@ -985,6 +987,28 @@ contains
     ! -- save head and print head
     call this%oc%oc_ot(ipflag)
 
+    ! -- save particle tracks for full model
+    if (this%oc%itrkout /= 0) &
+      ! write track data to binary file
+      call this%trackdata%save_track_data(this%oc%itrkout, csv=.false., &
+                                          itrack1=1, &
+                                          itrack2=this%trackdata%nrows)
+
+    if (this%oc%itrkcsv /= 0) &
+      ! write track data to CSV file
+      call this%trackdata%save_track_data(this%oc%itrkcsv, csv=.true., &
+                                          itrack1=1, &
+                                          itrack2=this%trackdata%nrows)
+
+    ! -- save particle tracks for each PRP
+    do ip = 1, this%bndlist%Count()
+      packobj => GetBndFromList(this%bndlist, ip)
+      select type (packobj)
+      type is (PrtPrpType)
+        call packobj%prp_ot_trk()
+      end select
+    end do
+
   end subroutine prt_ot_dv
 
   !> @brief Print budget summary
@@ -1098,19 +1122,26 @@ contains
     call mem_deallocate(this%inoc)
     call mem_deallocate(this%inobs)
     call mem_deallocate(this%nprp)
-    call mem_deallocate(this%trackdata%ntrack)
+    call mem_deallocate(this%trackdata%nrows)
     !
     ! -- Arrays
     call mem_deallocate(this%masssto)
     call mem_deallocate(this%massstoold)
     call mem_deallocate(this%ratesto)
     call mem_deallocate(this%itrack)
-    call mem_deallocate(this%trackdata%iptrack)
-    call mem_deallocate(this%trackdata%ictrack)
-    call mem_deallocate(this%trackdata%xtrack)
-    call mem_deallocate(this%trackdata%ytrack)
-    call mem_deallocate(this%trackdata%ztrack)
-    call mem_deallocate(this%trackdata%ttrack)
+    call mem_deallocate(this%trackdata%kper)
+    call mem_deallocate(this%trackdata%kstp)
+    call mem_deallocate(this%trackdata%iprp)
+    call mem_deallocate(this%trackdata%irpt)
+    call mem_deallocate(this%trackdata%icell)
+    call mem_deallocate(this%trackdata%izone)
+    call mem_deallocate(this%trackdata%istatus)
+    call mem_deallocate(this%trackdata%ireason)
+    call mem_deallocate(this%trackdata%trelease)
+    call mem_deallocate(this%trackdata%t)
+    call mem_deallocate(this%trackdata%x)
+    call mem_deallocate(this%trackdata%y)
+    call mem_deallocate(this%trackdata%z)
     !
     ! -- Track data object
     deallocate (this%trackdata)
@@ -1166,7 +1197,7 @@ contains
     call mem_allocate(this%inoc, 'INOC ', this%memoryPath)
     call mem_allocate(this%inobs, 'INOBS', this%memoryPath)
     call mem_allocate(this%nprp, 'NPRP', this%memoryPath) ! kluge?
-    call mem_allocate(this%trackdata%ntrack, 'NTRACK', this%memoryPath) ! kluge?
+    call mem_allocate(this%trackdata%nrows, 'NTRACKROWS', this%memoryPath) ! kluge?
     !
     ! this%inpin  = 0
     this%infmi = 0
@@ -1179,7 +1210,7 @@ contains
     this%inoc = 0
     this%inobs = 0
     this%nprp = 0
-    this%trackdata%ntrack = 0
+    this%trackdata%nrows = 0
     !
     ! -- return
     return
@@ -1195,21 +1226,36 @@ contains
     ! -- Allocate arrays in TrackingModelType
     call this%TrackingModelType%allocate_arrays()
     !
-    ntrackmx = 1000000 ! kluge hardwire
+    ntrackmx = 1000000 ! kluge hardwire (todo dynamically resize)
+
     call mem_allocate(this%itrack, this%nprp + 1, &
                       'ITRACK', this%memorypath)
-    call mem_allocate(this%trackdata%iptrack, ntrackmx, &
-                      'IPTRACK', this%memorypath) ! kluge note: ok that it's in %trackdata ?
-    call mem_allocate(this%trackdata%ictrack, ntrackmx, &
-                      'ICTRACK', this%memorypath)
-    call mem_allocate(this%trackdata%xtrack, ntrackmx, &
-                      'XTRACK', this%memorypath)
-    call mem_allocate(this%trackdata%ytrack, ntrackmx, &
-                      'YTRACK', this%memorypath)
-    call mem_allocate(this%trackdata%ztrack, ntrackmx, &
-                      'ZTRACK', this%memorypath)
-    call mem_allocate(this%trackdata%ttrack, ntrackmx, &
-                      'TTRACK', this%memorypath)
+    call mem_allocate(this%trackdata%kper, ntrackmx, &
+                      'TRACKKPER', this%memorypath)
+    call mem_allocate(this%trackdata%kstp, ntrackmx, &
+                      'TRACKKSTP', this%memorypath)
+    call mem_allocate(this%trackdata%iprp, ntrackmx, &
+                      'TRACKIPRP', this%memorypath)
+    call mem_allocate(this%trackdata%irpt, ntrackmx, &
+                      'TRACKIRPT', this%memorypath)
+    call mem_allocate(this%trackdata%icell, ntrackmx, &
+                      'TRACKICELL', this%memorypath)
+    call mem_allocate(this%trackdata%izone, ntrackmx, &
+                      'TRACKIZONE', this%memorypath)
+    call mem_allocate(this%trackdata%istatus, ntrackmx, &
+                      'TRACKISTATUS', this%memorypath)
+    call mem_allocate(this%trackdata%ireason, ntrackmx, &
+                      'TRACKIREASON', this%memorypath)
+    call mem_allocate(this%trackdata%trelease, ntrackmx, &
+                      'TRACKTRELEASE', this%memorypath)
+    call mem_allocate(this%trackdata%t, ntrackmx, &
+                      'TRACKT', this%memorypath)
+    call mem_allocate(this%trackdata%x, ntrackmx, &
+                      'TRACKX', this%memorypath)
+    call mem_allocate(this%trackdata%y, ntrackmx, &
+                      'TRACKY', this%memorypath)
+    call mem_allocate(this%trackdata%z, ntrackmx, &
+                      'TRACKZ', this%memorypath)
     !
     call mem_allocate(this%masssto, this%dis%nodes, &
                       'MASSSTO', this%memoryPath)
@@ -1366,7 +1412,7 @@ contains
   subroutine prt_solve(this)
     ! -- modules
     ! kluge note: kper for plotting only; is delt needed?
-    use TdisModule, only: kper, totimc, totim
+    use TdisModule, only: kper, kstp, totimc, totim
     ! -- modules
     use TdisModule, only: nper, nstp
     use PrtPrpModule, only: PrtPrpType
@@ -1379,12 +1425,12 @@ contains
     class(MethodType), pointer :: method
     real(DP) :: tmax
     logical(LGP) :: limited
-    integer(I4B) :: iprp
+    integer(I4B) :: iprp, ic
     integer(I4B) :: ntrack
     !
     call create_particle(particle) ! kluge note: elsewhere???
     !
-    this%trackdata%ntrack = 0
+    this%trackdata%nrows = 0
     !
     ! -- Loop over PRP packages
     iprp = 0
@@ -1394,7 +1440,7 @@ contains
       type is (PrtPrpType) ! kluge
         !
         iprp = iprp + 1
-        this%itrack(iprp) = this%trackdata%ntrack
+        this%itrack(iprp) = this%trackdata%nrows
         !
         ! -- Loop over particles in package
         do np = 1, packobj%npart
@@ -1404,27 +1450,28 @@ contains
           ! -- If particle inactive, record (unchanged) location in track data
           ! -- and skip tracking
           if (packobj%partlist%istatus(np) .ne. 1) then
-! kluge note: temporarily commented out recording of inactive particle data; want it, maybe as an option???
-!            ntrack = this%trackdata%ntrack + 1
-!            this%trackdata%ntrack = ntrack
-!            this%trackdata%iptrack(ntrack) = np
-!          this%trackdata%ictrack(ntrack) = packobj%partlist%iTrackingDomain(np, 2)
-!            this%trackdata%xtrack(ntrack) = packobj%partlist%x(np)
-!            this%trackdata%ytrack(ntrack) = packobj%partlist%y(np)
-!            this%trackdata%ztrack(ntrack) = packobj%partlist%z(np)
-!            this%trackdata%ttrack(ntrack) = packobj%partlist%ttrack(np)
+            ! kluge note: temporarily commented out recording of inactive particle data; want it, maybe as an option???
+            ! ntrack = this%trackdata%nrows + 1
+            ! this%trackdata%nrows = ntrack
+            ! this%trackdata%iprp(ntrack) = iprp
+            ! this%trackdata%irpt(ntrack) = np
+            ! this%trackdata%icell(ntrack) = packobj%partlist%iTrackingDomain(np, 2)
+            ! this%trackdata%izone(ntrack) = ??
+            ! this%trackdata%ireason(ntrack) = 4
+            ! this%trackdata%istatus(ntrack) = ??
+            ! this%trackdata%x(ntrack) = packobj%partlist%x(np)
+            ! this%trackdata%y(ntrack) = packobj%partlist%y(np)
+            ! this%trackdata%z(ntrack) = packobj%partlist%z(np)
+            ! this%trackdata%t(ntrack) = packobj%partlist%ttrack(np)
             cycle
           end if
           !
-          ! particle => this%partlist(np)%particle
+          particle%iprp = iprp
           particle%ipart = np ! kluge note: make subroutine to load particle from list???
           ! particle%velmult = this%partlist%velmult(np)
           particle%x = packobj%partlist%x(np)
           particle%y = packobj%partlist%y(np)
           particle%z = packobj%partlist%z(np)
-          ! particle%xlocal = this%partlist%xlocal(np)
-          ! particle%ylocal = this%partlist%ylocal(np)
-          ! particle%zlocal = this%partlist%zlocal(np)
           particle%iTrackingDomain(levelMin:levelMax) = &
             packobj%partlist%iTrackingDomain(np, levelMin:levelMax)
           particle%iTrackingDomain(1) = this%id ! kluge note: set this elsewhere???
@@ -1461,30 +1508,35 @@ contains
             end if
           end if
           !
+          ! -- get the tracking method
+          method => this%get_method(particle)
+          !
           ! -- If particle released during this time step, record its
           ! -- initial location in track data
           if (particle%trelease .ge. totimc) then
-            ntrack = this%trackdata%ntrack + 1
-            this%trackdata%ntrack = ntrack
-            this%trackdata%iptrack(ntrack) = particle%ipart
-            this%trackdata%ictrack(ntrack) = particle%iTrackingDomain(2)
-            this%trackdata%xtrack(ntrack) = particle%x
-            this%trackdata%ytrack(ntrack) = particle%y
-            this%trackdata%ztrack(ntrack) = particle%z
-            this%trackdata%ttrack(ntrack) = particle%ttrack
+            ntrack = this%trackdata%nrows + 1
+            ic = particle%iTrackingDomain(2)
+            this%trackdata%nrows = ntrack
+            this%trackdata%kper(ntrack) = kper
+            this%trackdata%kstp(ntrack) = kstp
+            this%trackdata%iprp(ntrack) = iprp
+            this%trackdata%irpt(ntrack) = particle%ipart
+            this%trackdata%icell(ntrack) = ic
+            this%trackdata%izone(ntrack) = 1
+            this%trackdata%istatus(ntrack) = particle%istatus
+            this%trackdata%ireason(ntrack) = 0 ! release
+            this%trackdata%x(ntrack) = particle%x
+            this%trackdata%y(ntrack) = particle%y
+            this%trackdata%z(ntrack) = particle%z
+            this%trackdata%t(ntrack) = particle%ttrack
           end if
           !
-          !
-          ! -- Get and apply the tracking method
-          method => this%get_method(particle)
+          ! -- Apply the tracking method
           call method%apply(particle, tmax)
           !
           packobj%partlist%x(np) = particle%x ! kluge note: make subroutine to update particle in list???
           packobj%partlist%y(np) = particle%y
           packobj%partlist%z(np) = particle%z
-          ! this%partlist%xlocal(np) = particle%xlocal
-          ! this%partlist%ylocal(np) = particle%ylocal
-          ! this%partlist%zlocal(np) = particle%zlocal
           packobj%partlist%iTrackingDomain( &
             np, &
             levelMin:levelMax) = &
@@ -1497,11 +1549,10 @@ contains
           packobj%partlist%istatus(np) = particle%istatus
           packobj%partlist%irpt(np) = particle%irpt ! kluge note: necessary to (re)set this here?
           !
-          ! end if
         end do
       end select
     end do
-    this%itrack(this%nprp + 1) = this%trackdata%ntrack
+    this%itrack(this%nprp + 1) = this%trackdata%nrows
     !
     call particle%destroy() ! kluge???
     deallocate (particle)

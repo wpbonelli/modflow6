@@ -9,96 +9,9 @@ module UtilMiscModule
 
 contains
 
-  SUBROUTINE UTRIMALL(LINE)
-    CHARACTER * (*) LINE
-    INTEGER IFIRST, NLAST, N, M, LENGTH, OFFSET
-
-    NLAST = LEN_TRIM(LINE)
-    IF (NLAST .EQ. 0) RETURN
-
-    DO N = 1, NLAST
-    IF (LINE(N:N) .NE. ' ') THEN
-      IFIRST = N
-      LENGTH = NLAST - IFIRST + 1
-      EXIT
-    END IF
-    END DO
-
-    OFFSET = IFIRST - 1
-    IF (OFFSET .GT. 0) THEN
-    DO N = 1, LENGTH
-      M = N + OFFSET
-      LINE(N:N) = LINE(M:M)
-      LINE(M:M) = ' '
-    END DO
-    END IF
-
-    LINE = TRIM(LINE)
-
-    RETURN
-  END subroutine UTRIMALL
-
-  subroutine ustop_misc(stopMessage, fileUnit)
-!     ******************************************************************
-!     STOP PROGRAM, WITH OPTION TO PRINT MESSAGE BEFORE STOPPING
-!     ******************************************************************
-!        SPECIFICATIONS:
-!     ------------------------------------------------------------------
-    character stopMessage * (*)
-    integer :: fileUnit
-!     ------------------------------------------------------------------
-
-    if (stopMessage .ne. ' ') then
-      write (*, '(a)') stopMessage
-      write (fileUnit, '(a)') stopMessage
-    end if
-    stop
-
-  end subroutine ustop_misc
-
-  subroutine ulog(logMessage, fileUnit)
-!     ******************************************************************
-!     WRITE MESSAGE TO LOG FILE
-!     ******************************************************************
-!        SPECIFICATIONS:
-!     ------------------------------------------------------------------
-    character logMessage * (*)
-    integer :: fileUnit
-!     ------------------------------------------------------------------
-
-    if (logMessage .ne. ' ') then
-      write (fileUnit, '(a)') logMessage
-    end if
-    return
-
-  end subroutine ulog
-
-!------------------------------------------------------
-  subroutine TrimAll(string, firstNonBlank, lastNonBlank, trimmedLength)
-    implicit none
-    character * (*) string
-    integer, intent(inout) :: firstNonBlank, lastNonBlank, trimmedLength
-    integer :: n
-
-    firstNonBlank = 0
-    trimmedLength = 0
-    lastNonBlank = len_trim(string)
-    if (lastNonBlank .gt. 0) then
-      do n = 1, lastNonBlank
-        if (string(n:n) .ne. ' ') then
-          firstNonBlank = n
-          trimmedLength = lastNonBlank - firstNonBlank + 1
-          return
-        end if
-      end do
-    end if
-
-  end subroutine TrimAll
-
-!------------------------------------------------------
   function FirstNonBlank(string) result(firstChar)
     implicit none
-    character * (*) string
+    character(len=*), intent(in) :: string
     integer :: firstChar, length, n
 
     firstChar = 0
