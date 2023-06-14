@@ -207,7 +207,7 @@ jobs:
           fi
       
       - name: Setup usgslatex
-        uses: ./.github/actions/setup-usgslatex
+        uses: ./modflow6/.github/actions/setup-usgslatex
 
       - name: Install dependencies for ex-gwf-twri example model
         if: runner.os == 'Linux'

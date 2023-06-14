@@ -50,7 +50,7 @@ jobs:
         run: pip list
 
       - name: Setup usgslatex
-        uses: ./.github/actions/setup-usgslatex
+        uses: ./modflow6/.github/actions/setup-usgslatex
 
       - name: Test building files from dfn's for LaTeX
         working-directory: modflow6/autotest
