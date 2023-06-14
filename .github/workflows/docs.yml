@@ -35,12 +35,6 @@ jobs:
           repository: MODFLOW-USGS/modflow6-examples
           path: modflow6-examples
 
-      - name: Checkout usgslatex
-        uses: actions/checkout@v3
-        with:
-          repository: MODFLOW-USGS/usgslatex
-          path: usgslatex
-
       - name: Install Conda environment from environment.yml
         uses: mamba-org/setup-micromamba@v1
         with:
@@ -55,14 +49,8 @@ jobs:
       - name: Print python package versions
         run: pip list
 
-      - name: Install TeX Live
-        run: |
-          sudo apt-get update
-          sudo apt install texlive-latex-extra texlive-science texlive-font-utils
-
-      - name: Install USGS LaTeX style files and Univers font
-        working-directory: usgslatex/usgsLaTeX
-        run: sudo ./install.sh --all-users
+      - name: Setup usgslatex
+        uses: ./.github/actions/setup-usgslatex
 
       - name: Test building files from dfn's for LaTeX
         working-directory: modflow6/autotest

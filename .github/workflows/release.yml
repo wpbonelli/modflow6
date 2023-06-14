@@ -167,24 +167,8 @@ jobs:
           repository: MODFLOW-USGS/modflow6-examples
           path: modflow6-examples
 
-      - name: Install TeX Live
-        run: |
-          sudo apt-get update
-          sudo apt install texlive-science \
-            texlive-latex-extra \
-            texlive-font-utils \
-            texlive-fonts-recommended \
-            texlive-fonts-extra
-
-      - name: Checkout usgslatex
-        uses: actions/checkout@v3
-        with:
-          repository: MODFLOW-USGS/usgslatex
-          path: usgslatex
-
-      - name: Install USGS LaTeX style files and Univers font
-        working-directory: usgslatex/usgsLaTeX
-        run: sudo ./install.sh --all-users
+      - name: Setup usgslatex
+        uses: ./.github/actions/setup-usgslatex
 
       - name: Setup Micromamba
         uses: mamba-org/setup-micromamba@v1

@@ -193,8 +193,7 @@ jobs:
         working-directory: modflow6/autotest
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          pytest -v --durations 0 get_exes.py
+        run: pytest -v --durations 0 get_exes.py
 
       - name: Test modflow6
         working-directory: modflow6/autotest
@@ -207,29 +206,8 @@ jobs:
             pytest -v -n auto --durations 0 -m "not large"
           fi
       
-      # steps below run only on Linux to test distribution procedures, e.g.
-      # compiling binaries, building documentation
-      - name: Checkout usgslatex
-        if: runner.os == 'Linux'
-        uses: actions/checkout@v3
-        with:
-          repository: MODFLOW-USGS/usgslatex
-          path: usgslatex
-
-      - name: Install TeX Live
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt install texlive-science \
-            texlive-latex-extra \
-            texlive-font-utils \
-            texlive-fonts-recommended \
-            texlive-fonts-extra
-
-      - name: Install USGS LaTeX style files and Univers font
-        if: runner.os == 'Linux'
-        working-directory: usgslatex/usgsLaTeX
-        run: sudo ./install.sh --all-users
+      - name: Setup usgslatex
+        uses: ./.github/actions/setup-usgslatex
 
       - name: Install dependencies for ex-gwf-twri example model
         if: runner.os == 'Linux'
