@@ -97,7 +97,7 @@ jobs:
   make_dist:
     name: Make distribution
     needs: set_options
-    uses: MODFLOW-USGS/modflow6/.github/workflows/release.yml@develop
+    uses: w-bonelli/modflow6/.github/workflows/release.yml@v6.4.2
     with:
       # If the workflow is manually triggered, the maintainer must manually set approve=true to approve a release.
       # If triggered by pushing a release branch, the release is approved if the branch name doesn't contain "rc".
