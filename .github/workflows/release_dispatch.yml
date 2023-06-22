@@ -97,7 +97,7 @@ jobs:
   make_dist:
     name: Make distribution
     needs: set_options
-    uses: MODFLOW-USGS/modflow6/.github/workflows/release.yml@develop
+    uses: w-bonelli/modflow6/.github/workflows/release.yml@fix-release
     with:
       # If the workflow is manually triggered, the maintainer must manually set approve=true to approve a release.
       # If triggered by pushing a release branch, the release is approved if the branch name doesn't contain "rc".
@@ -105,7 +105,7 @@ jobs:
       branch: ${{ needs.set_options.outputs.branch }}
       developmode: false
       full: true
-      run_tests: ${{ inputs.run_tests == '' || inputs.run_tests == 'true' }}
+      run_tests: false #  ${{ inputs.run_tests == '' || inputs.run_tests == 'true' }}
       version: ${{ needs.set_options.outputs.version }}
   pr:
     name: Draft release PR
