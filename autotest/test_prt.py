@@ -20,9 +20,38 @@ from simulation import TestSimulation
 
 # expected format of particle track data
 dtype = {
-    "names": ["kper", "kstp", "iprp", "irpt", "icell", "izone", "istatus", "ireason", "trelease", "t", "x", "y", "z"],
-    "formats": ["<i4", "<i4", "<i4", "<i4", "<i4", "<i4", "<i4", "<i4", "<f8", "<f8", "<f8", "<f8", "<f8"],
+    "names": [
+        "kper",
+        "kstp",
+        "iprp",
+        "irpt",
+        "icell",
+        "izone",
+        "istatus",
+        "ireason",
+        "trelease",
+        "t",
+        "x",
+        "y",
+        "z",
+    ],
+    "formats": [
+        "<i4",
+        "<i4",
+        "<i4",
+        "<i4",
+        "<i4",
+        "<i4",
+        "<i4",
+        "<i4",
+        "<f8",
+        "<f8",
+        "<f8",
+        "<f8",
+        "<f8",
+    ],
 }
+
 
 def load_track_data(cbb):
     """
@@ -35,42 +64,80 @@ def load_track_data(cbb):
     tracks = []
     for prpnam in upn:
         for totim in times:
-            data = cbb.get_data(text='DATA-PRTCL', paknam=prpnam, totim=totim)
+            data = cbb.get_data(text="DATA-PRTCL", paknam=prpnam, totim=totim)
             for ploc in data[0]:
-                kper, kstp, iprp, ip, icell, izone, istatus, ireason, trelease, t, x, y, z, = [ploc[i] for i in range(3, 16)]
-                pathpoint = (kper, kstp, iprp, ip, icell, izone, istatus, ireason, trelease, t, x, y, z)
+                (
+                    kper,
+                    kstp,
+                    iprp,
+                    ip,
+                    icell,
+                    izone,
+                    istatus,
+                    ireason,
+                    trelease,
+                    t,
+                    x,
+                    y,
+                    z,
+                ) = [ploc[i] for i in range(3, 16)]
+                pathpoint = (
+                    kper,
+                    kstp,
+                    iprp,
+                    ip,
+                    icell,
+                    izone,
+                    istatus,
+                    ireason,
+                    trelease,
+                    t,
+                    x,
+                    y,
+                    z,
+                )
                 tracks.append(pathpoint)
         break
 
     return np.core.records.fromrecords(tracks, dtype=dtype)
 
+
 def get_track_dtype(path: os.PathLike):
     """Get the dtype of the track data recarray from the ascii header file."""
 
     hdr_lns = open(path).readlines()
-    hdr_lns_spl = [[ll.strip() for ll in l.split(',')] for l in hdr_lns]
+    hdr_lns_spl = [[ll.strip() for ll in l.split(",")] for l in hdr_lns]
     return np.dtype(list(zip(hdr_lns_spl[0], hdr_lns_spl[1])))
+
 
 def check_track_dtype(data: np.recarray):
     """Check that the dtype of the track data recarray is correct."""
 
     assert np.array_equal(data.dtype.names, dtype["names"])
-    assert np.array_equal([v[0] for v in data.dtype.fields.values()], dtype["formats"])
+    assert np.array_equal(
+        [v[0] for v in data.dtype.fields.values()], dtype["formats"]
+    )
     assert data.dtype == dtype
 
+
 def check_track_data(
-        track_bin: os.PathLike,
-        track_hdr: os.PathLike,
-        track_csv: os.PathLike,
-        track_bud: Optional[os.PathLike] = None):
-    """Check that track data written to binary, CSV, and budget files are equal."""   
+    track_bin: os.PathLike,
+    track_hdr: os.PathLike,
+    track_csv: os.PathLike,
+    track_bud: Optional[os.PathLike] = None,
+):
+    """Check that track data written to binary, CSV, and budget files are equal."""
 
     # get dtype from ascii header file
     dt = get_track_dtype(track_hdr)
 
     # read output files
     data_bin = np.fromfile(track_bin, dtype=dt)
-    data_csv = np.genfromtxt(track_csv, dtype=dt, delimiter=',', skip_header=True)
+    data_csv = np.genfromtxt(track_csv, dtype=dt, delimiter=",", names=True)
+    if len(data_csv.shape) == 0:
+        # this is really necessary??
+        # https://stackoverflow.com/a/24943993/6514033
+        data_csv = np.array([data_csv])
     if track_bud:
         data_bud = load_track_data(flopy.utils.CellBudgetFile(track_bud))
 
@@ -80,9 +147,13 @@ def check_track_data(
     if track_bud:
         check_track_dtype(data_bud)
 
-    assert data_bin.shape == data_csv.shape, f"Binary and CSV track data shapes do not match: {data_bin.shape} != {data_csv.shape}"
+    assert (
+        data_bin.shape == data_csv.shape
+    ), f"Binary and CSV track data shapes do not match: {data_bin.shape} != {data_csv.shape}"
     if track_bud:
-        assert data_bin.shape == data_bud.shape, f"Binary and budget track data shapes do not match: {data_bin.shape} != {data_bud.shape}"
+        assert (
+            data_bin.shape == data_bud.shape
+        ), f"Binary and budget track data shapes do not match: {data_bin.shape} != {data_bud.shape}"
 
     # check particle tracks written to all output files are equal
     # check each column separately to avoid:
@@ -92,11 +163,11 @@ def check_track_data(
         if track_bud:
             assert np.allclose(data_bin[k], data_bud[k], equal_nan=True)
 
+
 def check_budget_data(ctx, lst: os.PathLike, cbb: os.PathLike):
     # load PRT model's list file
     mflist = flopy.utils.mflistfile.ListBudget(
-        lst,
-        budgetkey="MASS BUDGET FOR ENTIRE MODEL"
+        lst, budgetkey="MASS BUDGET FOR ENTIRE MODEL"
     )
     names = mflist.get_record_names()
     entries = mflist.entries
@@ -153,7 +224,10 @@ def test_fmi_basic(function_tmpdir, targets):
             1: [[(0, 0, 0), 0.0, 0.0], [(0, 9, 9), 1.0, 2.0]],
         }
         chd = flopy.mf6.ModflowGwfchd(
-            gwf, pname="CHD-1", stress_period_data=spd, auxiliary=["concentration"]
+            gwf,
+            pname="CHD-1",
+            stress_period_data=spd,
+            auxiliary=["concentration"],
         )
         budget_file = f"{name}.bud"
         head_file = f"{name}.hds"
@@ -177,7 +251,7 @@ def test_fmi_basic(function_tmpdir, targets):
         tdis = flopy.mf6.ModflowTdis(sim, nper=len(pd), perioddata=pd)
         prt = flopy.mf6.ModflowPrt(sim, modelname=name)
         dis = flopy.mf6.ModflowGwfdis(prt, nrow=10, ncol=10)
-        mip = flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=.2)
+        mip = flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=0.2)
         releasepts = [
             # particle id, k, i, j, localx, localy, localz
             (0, 0, 0, 0, 0.5, 0.5, 0.5)
@@ -185,10 +259,13 @@ def test_fmi_basic(function_tmpdir, targets):
         prp_track_file = f"{name}.prp.trk"
         prp_track_csv_file = f"{name}.prp.trk.csv"
         prp = flopy.mf6.ModflowPrtprp(
-            prt, pname="prp1", filename=f"{name}_1.prp",
+            prt,
+            pname="prp1",
+            filename=f"{name}_1.prp",
             track_filerecord=[prp_track_file],
             trackcsv_filerecord=[prp_track_csv_file],
-            nreleasepts=len(releasepts), packagedata=releasepts,
+            nreleasepts=len(releasepts),
+            packagedata=releasepts,
             perioddata={0: ["FIRST"]},
         )
         prt_budget_file = f"{name}.cbb"
@@ -210,7 +287,8 @@ def test_fmi_basic(function_tmpdir, targets):
         ]
         fmi = flopy.mf6.ModflowPrtfmi(prt, packagedata=pd)
         ems = flopy.mf6.ModflowEms(
-            sim, pname="ems",
+            sim,
+            pname="ems",
             filename=f"{name}.ems",
         )
         sim.register_solution_package(ems, [prt.name])
@@ -229,7 +307,7 @@ def test_fmi_basic(function_tmpdir, targets):
             track_bin=ws / prt_track_file,
             track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
             track_csv=ws / prt_track_csv_file,
-            track_bud=ws / prt_budget_file
+            track_bud=ws / prt_budget_file,
         )
 
     run_flow_model()
@@ -272,13 +350,18 @@ class PrtCases:
     @parametrize(ctx=cases_fmi, ids=[c.name for c in cases_fmi])
     def case_fmi(self, ctx, function_tmpdir, targets):
         workspace = Path(function_tmpdir)
-        # create a heads file (with head equal top) for the prt model to consume
+        # create a head file (with head equal top) for the prt model to consume
         headfile_name = f"{ctx.name}.hds"
         with open(workspace / headfile_name, "wb") as fbin:
             for kstp in range(ctx.nstp):
-                write_head(fbin, ctx.top * np.ones((ctx.nrow, ctx.ncol)), kstp=kstp + 1)
-        
-        # create a budget file for the prt model to consume
+                write_head(
+                    fbin,
+                    ctx.top * np.ones((ctx.nrow, ctx.ncol)),
+                    kstp=kstp + 1,
+                )
+
+        # create a budget file for the prt model to consume,
+        # with no movement of water in the flow system
         qx = 0.0
         qy = 0.0
         qz = 0.0
@@ -293,14 +376,19 @@ class PrtCases:
             ]
         )
         sat = np.array(
-            [(i, i, 0.0, 1.0) for i in range(ctx.nlay * ctx.nrow * ctx.ncol)], dtype=dt
+            [(i, i, 0.0, 1.0) for i in range(ctx.nlay * ctx.nrow * ctx.ncol)],
+            dtype=dt,
         )
         budgetfile_name = f"{ctx.name}.bud"
         with open(workspace / budgetfile_name, "wb") as fbin:
             for kstp in range(ctx.nstp):
                 write_budget(fbin, flowja, kstp=kstp + 1)
                 write_budget(
-                    fbin, spdis, text="      DATA-SPDIS", imeth=6, kstp=kstp + 1
+                    fbin,
+                    spdis,
+                    text="      DATA-SPDIS",
+                    imeth=6,
+                    kstp=kstp + 1,
                 )
                 write_budget(
                     fbin, sat, text="        DATA-SAT", imeth=6, kstp=kstp + 1
@@ -311,13 +399,17 @@ class PrtCases:
             sim_name=ctx.name,
             exe_name=targets.mf6,
             version="mf6",
-            sim_ws=workspace
+            sim_ws=workspace,
         )
 
         # create tdis package
         pd = (ctx.perlen, ctx.nstp, ctx.tsmult)
         flopy.mf6.modflow.mftdis.ModflowTdis(
-            sim, pname="tdis", time_units="DAYS", nper=ctx.nper, perioddata=[pd]
+            sim,
+            pname="tdis",
+            time_units="DAYS",
+            nper=ctx.nper,
+            perioddata=[pd],
         )
 
         # create prt model
@@ -340,14 +432,17 @@ class PrtCases:
         # create mip package
         flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=ctx.porosity)
 
-        # create prp package
+        # create prp package with 1 particle
         releasepts = [
             # particle id, k, i, j, localx, localy, localz
             (0, 0, 0, 0, 0.5, 0.5, 0.5)
         ]
         flopy.mf6.ModflowPrtprp(
-            prt, pname="prp1", filename=f"{ctx.name}_1.prp",
-            nreleasepts=len(releasepts), packagedata=releasepts,
+            prt,
+            pname="prp1",
+            filename=f"{ctx.name}_1.prp",
+            nreleasepts=len(releasepts),
+            packagedata=releasepts,
             perioddata={0: ["FIRST"]},
         )
 
@@ -370,22 +465,22 @@ class PrtCases:
 
         # add explicit model solution
         ems = flopy.mf6.ModflowEms(
-            sim, pname="ems",
+            sim,
+            pname="ems",
             filename=f"{ctx.name}.ems",
         )
         sim.register_solution_package(ems, [prt.name])
 
         return ctx, sim, None, self.eval_fmi
-    
+
     def eval_fmi(self, ctx, sim):
         print(f"Evaluating results for sim {sim.name}")
         simpath = Path(sim.simpath)
-        
+
         # check budget data
         check_budget_data(
-            ctx,
-            simpath / f"{sim.name}.lst",
-            simpath / f"{sim.name}.cbb")
+            ctx, simpath / f"{sim.name}.lst", simpath / f"{sim.name}.cbb"
+        )
 
         # check particle track data
         prt_track_file = simpath / f"{sim.name}.trk"
@@ -399,9 +494,18 @@ class PrtCases:
             track_bin=prt_track_file,
             track_hdr=prt_track_hdr_file,
             track_csv=prt_track_csv_file,
-            track_bud=prt_track_bud_file
+            track_bud=prt_track_bud_file,
         )
 
+        # since there is no flow in this example, expect
+        # the particle to remain in its initial location
+        prt_track_csv = np.genfromtxt(
+            prt_track_csv_file, delimiter=",", names=True
+        )
+        # CSV files with only 1 line of data are subject
+        # to some strange numpy.genfromtxt behavior that
+        # makes it necessary to wrap with another array.
+        assert np.array([prt_track_csv]).shape == (1,)
 
     # gwf+prt models in same simulation via exchange
     cases_exg = [
@@ -416,7 +520,7 @@ class PrtCases:
             perlen=1.0,
             nstp=1,
             tsmult=1.0,
-            porosity=0.1
+            porosity=0.1,
         )
     ]
 
@@ -431,7 +535,7 @@ class PrtCases:
             sim_name=ctx.name,
             exe_name=targets.mf6,
             version="mf6",
-            sim_ws=workspace
+            sim_ws=workspace,
         )
 
         # create tdis package
@@ -441,15 +545,11 @@ class PrtCases:
             pname="tdis",
             time_units="DAYS",
             nper=ctx.nper,
-            perioddata=[pd]
+            perioddata=[pd],
         )
 
         # create gwf model
-        gwf = flopy.mf6.ModflowGwf(
-            sim,
-            modelname=gwfname,
-            save_flows=True
-        )
+        gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
 
         # create gwf discretization
         flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
@@ -466,7 +566,7 @@ class PrtCases:
         # create gwf node property flow package
         flopy.mf6.modflow.mfgwfnpf.ModflowGwfnpf(
             gwf,
-            pname="npf", 
+            pname="npf",
             save_saturation=True,
             save_specific_discharge=True,
         )
@@ -480,7 +580,7 @@ class PrtCases:
             gwf,
             pname="CHD-1",
             stress_period_data=spd,
-            auxiliary=["concentration"]
+            auxiliary=["concentration"],
         )
 
         # create gwf output control package
@@ -517,8 +617,11 @@ class PrtCases:
             (0, 0, 0, 0, 0.5, 0.5, 0.5)
         ]
         flopy.mf6.ModflowPrtprp(
-            prt, pname="prp1", filename=f"{prtname}_1.prp",
-            nreleasepts=len(releasepts), packagedata=releasepts,
+            prt,
+            pname="prp1",
+            filename=f"{prtname}_1.prp",
+            nreleasepts=len(releasepts),
+            packagedata=releasepts,
             perioddata={0: ["FIRST"]},
         )
 
@@ -541,29 +644,33 @@ class PrtCases:
 
         # create exchange
         flopy.mf6.ModflowGwfprt(
-            sim, exgtype="GWF6-PRT6",
-            exgmnamea=gwfname, exgmnameb=prtname,
+            sim,
+            exgtype="GWF6-PRT6",
+            exgmnamea=gwfname,
+            exgmnameb=prtname,
             filename=f"{gwfname}.gwfprt",
         )
 
         # add explicit model solution
         ems = flopy.mf6.ModflowEms(
-            sim, pname="ems",
+            sim,
+            pname="ems",
             filename=f"{prtname}.ems",
         )
         sim.register_solution_package(ems, [prt.name])
 
         return ctx, sim, None, self.eval_exg
-    
+
     def eval_exg(self, ctx, sim):
         print(f"Evaluating results for sim {sim.name}")
         simpath = Path(sim.simpath)
-        
+
         # check budget data
         check_budget_data(
             ctx,
             simpath / f"{sim.name}_prt.lst",
-            simpath / f"{sim.name}_prt.cbb")
+            simpath / f"{sim.name}_prt.cbb",
+        )
 
         # check particle track data
         prt_track_file = simpath / f"{sim.name}_prt.trk"
@@ -577,9 +684,8 @@ class PrtCases:
             track_bin=prt_track_file,
             track_hdr=prt_track_hdr_file,
             track_csv=prt_track_csv_file,
-            track_bud=prt_track_bud_file
+            track_bud=prt_track_bud_file,
         )
-
 
     # MODPATH 7 example problem 1
     #
@@ -589,8 +695,8 @@ class PrtCases:
     case_mp7_p01 = Case(
         name="prtmp7p01",
         # discretization
-        length_units = "feet",
-        time_units = "days",
+        length_units="feet",
+        time_units="days",
         nper=1,
         nstp=1,
         perlen=1.0,
@@ -625,7 +731,7 @@ class PrtCases:
         wel_zone=2,
     )
     cases_mp7_p01 = [case_mp7_p01]
-    
+
     @parametrize(ctx=cases_mp7_p01, ids=[c.name for c in cases_mp7_p01])
     def case_mp7_p01(self, ctx, function_tmpdir, targets):
         nm_mf6 = ctx.name
@@ -639,18 +745,23 @@ class PrtCases:
         wd = [(ctx.wel_loc, ctx.wel_q)]
 
         # River package
-        rd = [[
-            (0, i, ctx.ncol - 1),
-            ctx.riv_h,
-            ctx.riv_c,
-            ctx.riv_z,
-            ctx.riv_iface,
-            ctx.riv_iflowface
-        ] for i in range(ctx.nrow)]
+        rd = [
+            [
+                (0, i, ctx.ncol - 1),
+                ctx.riv_h,
+                ctx.riv_c,
+                ctx.riv_z,
+                ctx.riv_iface,
+                ctx.riv_iflowface,
+            ]
+            for i in range(ctx.nrow)
+        ]
 
         zones_lay1 = ctx.def_zone
         zones_lay2 = ctx.def_zone
-        zones_lay3 = np.full((ctx.nrow, ctx.ncol), ctx.def_zone, dtype=np.int32)
+        zones_lay3 = np.full(
+            (ctx.nrow, ctx.ncol), ctx.def_zone, dtype=np.int32
+        )
         zones_lay3[ctx.wel_loc[1:]] = ctx.wel_zone
 
         # Starting location template size for example 1B;
@@ -670,7 +781,7 @@ class PrtCases:
 
         # Example 1A release points
         releasepts = {}
-        releasepts['1A'] = []
+        releasepts["1A"] = []
         zrpt = ctx.top
         k = 0
         j = 2
@@ -679,10 +790,10 @@ class PrtCases:
             xrpt = (j + 0.5) * ctx.delr
             yrpt = (ctx.nrow - i - 0.5) * ctx.delc
             rpt = [nrpt, k, i, j, xrpt, yrpt, zrpt]
-            releasepts['1A'].append(rpt)
+            releasepts["1A"].append(rpt)
 
         # Example 1B release points
-        releasepts['1B'] = []
+        releasepts["1B"] = []
         ndivc = sloc_tmpl_size
         ndivr = sloc_tmpl_size
         deldivc = ctx.delc / ndivc
@@ -702,33 +813,43 @@ class PrtCases:
                         xrpt = x0 + dx
                         nrpt += 1
                         rpt = [nrpt, k, i, j, xrpt, yrpt, zrpt]
-                        releasepts['1B'].append(rpt)
-        
+                        releasepts["1B"].append(rpt)
+
         # Get well and river cell numbers
         nodes = {}
         k, i, j = ctx.wel_loc
-        nodes['well'] = ctx.ncol * (ctx.nrow * k + i) + j
-        nodes['river'] = []
+        nodes["well"] = ctx.ncol * (ctx.nrow * k + i) + j
+        nodes["river"] = []
         for rivspec in rd:
             k, i, j = rivspec[0]
             node = ctx.ncol * (ctx.nrow * k + i) + j
-            nodes['river'].append(node)
-        
+            nodes["river"].append(node)
+
         # Instantiate the MODFLOW 6 simulation object
         sim = flopy.mf6.MFSimulation(
-            sim_name=nm_mf6, exe_name=targets.mf6, version="mf6", sim_ws=function_tmpdir
+            sim_name=nm_mf6,
+            exe_name=targets.mf6,
+            version="mf6",
+            sim_ws=function_tmpdir,
         )
 
         # Instantiate the MODFLOW 6 temporal discretization package
         pd = (ctx.perlen, ctx.nstp, ctx.tsmult)
         flopy.mf6.modflow.mftdis.ModflowTdis(
-            sim, pname="tdis", time_units="DAYS", nper=ctx.nper, perioddata=[pd]
+            sim,
+            pname="tdis",
+            time_units="DAYS",
+            nper=ctx.nper,
+            perioddata=[pd],
         )
 
         # Instantiate the MODFLOW 6 gwf (groundwater-flow) model
         model_nam_file = "{}.nam".format(nm_mf6)
         gwf = flopy.mf6.ModflowGwf(
-            sim, modelname=nm_mf6, model_nam_file=model_nam_file, save_flows=True
+            sim,
+            modelname=nm_mf6,
+            model_nam_file=model_nam_file,
+            save_flows=True,
         )
 
         # Instantiate the MODFLOW 6 gwf discretization package
@@ -750,14 +871,21 @@ class PrtCases:
 
         # Instantiate the MODFLOW 6 gwf node property flow package
         flopy.mf6.modflow.mfgwfnpf.ModflowGwfnpf(
-            gwf, pname="npf", icelltype=ctx.laytyp, k=ctx.kh, k33=ctx.kv,
-            save_saturation=True, save_specific_discharge=True,
+            gwf,
+            pname="npf",
+            icelltype=ctx.laytyp,
+            k=ctx.kh,
+            k33=ctx.kv,
+            save_saturation=True,
+            save_specific_discharge=True,
         )
 
         # Instantiate the MODFLOW 6 gwf recharge package
         flopy.mf6.modflow.mfgwfrcha.ModflowGwfrcha(
-            gwf, recharge=ctx.rch,
-            auxiliary=["iface", "iflowface"], aux=[ctx.rch_iface, ctx.rch_iflowface],
+            gwf,
+            recharge=ctx.rch,
+            auxiliary=["iface", "iflowface"],
+            aux=[ctx.rch_iface, ctx.rch_iflowface],
         )
 
         # Instantiate the MODFLOW 6 gwf well package
@@ -789,11 +917,16 @@ class PrtCases:
 
         # Instantiate the MODFLOW 6 prt discretization package
         flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
-            prt, pname="dis",
-            nlay=ctx.nlay, nrow=ctx.nrow, ncol=ctx.ncol,
+            prt,
+            pname="dis",
+            nlay=ctx.nlay,
+            nrow=ctx.nrow,
+            ncol=ctx.ncol,
             length_units="FEET",
-            delr=ctx.delr, delc=ctx.delc,
-            top=ctx.top, botm=ctx.botm,
+            delr=ctx.delr,
+            delc=ctx.delc,
+            top=ctx.top,
+            botm=ctx.botm,
         )
 
         # Instantiate the MODFLOW 6 prt model input package
@@ -801,25 +934,35 @@ class PrtCases:
 
         # Instantiate the MODFLOW 6 prt particle release point (prp) package
         # for example 1A
-        nreleasepts1a = len(releasepts['1A'])
-        pd = {0: ["FIRST"],}
+        nreleasepts1a = len(releasepts["1A"])
+        pd = {
+            0: ["FIRST"],
+        }
         track_csv_1a = "{}_1a.trk.csv".format(nm_prt)
         flopy.mf6.ModflowPrtprp(
-            prt, pname="prp1a", filename="{}_1a.prp".format(nm_prt),
+            prt,
+            pname="prp1a",
+            filename="{}_1a.prp".format(nm_prt),
             trackcsv_filerecord=[track_csv_1a],
-            nreleasepts=nreleasepts1a, packagedata=releasepts['1A'],
+            nreleasepts=nreleasepts1a,
+            packagedata=releasepts["1A"],
             perioddata=pd,
         )
 
         # Instantiate the MODFLOW 6 prt particle release point (prp) package
         # for example 1B
-        nreleasepts1b = len(releasepts['1B'])
-        pd = {0: ["FIRST"],}
+        nreleasepts1b = len(releasepts["1B"])
+        pd = {
+            0: ["FIRST"],
+        }
         track_csv_1b = "{}_1b.trk.csv".format(nm_prt)
         flopy.mf6.ModflowPrtprp(
-            prt, pname="prp1b", filename="{}_1b.prp".format(nm_prt),
+            prt,
+            pname="prp1b",
+            filename="{}_1b.prp".format(nm_prt),
             trackcsv_filerecord=[track_csv_1b],
-            nreleasepts=nreleasepts1b, packagedata=releasepts['1B'],
+            nreleasepts=nreleasepts1b,
+            packagedata=releasepts["1B"],
             perioddata=pd,
         )
 
@@ -841,16 +984,20 @@ class PrtCases:
 
         # Create the MODFLOW 6 gwf-prt model exchange
         flopy.mf6.ModflowGwfprt(
-            sim, exgtype="GWF6-PRT6",
-            exgmnamea=nm_mf6, exgmnameb=nm_prt,
+            sim,
+            exgtype="GWF6-PRT6",
+            exgmnamea=nm_mf6,
+            exgmnameb=nm_prt,
             filename="{}.gwfprt".format(nm_mf6),
         )
 
         # Create an iterative model solution (IMS) for the MODFLOW 6 gwf model
         ims = flopy.mf6.ModflowIms(
-            sim, pname="ims",
+            sim,
+            pname="ims",
             complexity="SIMPLE",
-            outer_dvclose=1e-6, inner_dvclose=1e-6,
+            outer_dvclose=1e-6,
+            inner_dvclose=1e-6,
             rcloserecord=1e-6,
         )
 
@@ -867,12 +1014,13 @@ class PrtCases:
     def eval_mp7_p01(self, ctx, sim):
         print(f"Evaluating results for sim {sim.name}")
         simpath = Path(sim.simpath)
-        
+
         # check budget data
         check_budget_data(
             ctx,
             simpath / f"{sim.name}_prt.lst",
-            simpath / f"{sim.name}_prt.cbb")
+            simpath / f"{sim.name}_prt.cbb",
+        )
 
         # check model-level particle track data
         prt_track_bin_file = simpath / f"{sim.name}_prt.trk"
@@ -902,53 +1050,61 @@ class PrtCases:
         # get dtype from ascii header file
         dt = get_track_dtype(prt_track_hdr_file)
         prt_data_bin = np.fromfile(prt_track_bin_file, dtype=dt)
-        prt_data_csv = np.genfromtxt(prt_track_csv_file, dtype=dt, delimiter=',', skip_header=True)
-        prp_data_csv_1a = np.genfromtxt(track_csv_file_1a, dtype=dt, delimiter=',', skip_header=True)
-        prp_data_csv_1b = np.genfromtxt(track_csv_file_1b, dtype=dt, delimiter=',', skip_header=True)
+        prt_data_csv = np.genfromtxt(
+            prt_track_csv_file, dtype=dt, delimiter=",", skip_header=True
+        )
+        prp_data_csv_1a = np.genfromtxt(
+            track_csv_file_1a, dtype=dt, delimiter=",", skip_header=True
+        )
+        prp_data_csv_1b = np.genfromtxt(
+            track_csv_file_1b, dtype=dt, delimiter=",", skip_header=True
+        )
         prp_data_csv = np.hstack((prp_data_csv_1a, prp_data_csv_1b))
         assert prt_data_bin.shape == prt_data_csv.shape == prp_data_csv.shape
         for k in prt_data_csv.dtype.names:
-            assert np.allclose(prt_data_csv[k], prp_data_csv[k], equal_nan=True)
+            assert np.allclose(
+                prt_data_csv[k], prp_data_csv[k], equal_nan=True
+            )
 
     # MODPATH 7 example problem 2
     case_mp7_p02 = Case(
         name="prtmp7p02",
         # discretization
-        length_units = "feet",
-        time_units = "days",
-        tdis_rc = [(1000.0, 1, 1.0)],
-        nper = 1,
-        Lx = 10000.0,
-        Ly = 10500.0,
-        nlay = 3,
-        nrow = 21,
-        ncol = 20,
-        delr = 500.0,
-        delc = 500.0,
-        top = 400,
-        botm = [220, 200, 0],
-        ncpl = 651,
-        nvert = 723,
+        length_units="feet",
+        time_units="days",
+        tdis_rc=[(1000.0, 1, 1.0)],
+        nper=1,
+        Lx=10000.0,
+        Ly=10500.0,
+        nlay=3,
+        nrow=21,
+        ncol=20,
+        delr=500.0,
+        delc=500.0,
+        top=400,
+        botm=[220, 200, 0],
+        ncpl=651,
+        nvert=723,
         # Cell types by layer
-        icelltype = [1, 0, 0],
+        icelltype=[1, 0, 0],
         # Conductivities
-        k = [50.0, 0.01, 200.0],
-        k33 = [10.0, 0.01, 20.0],
+        k=[50.0, 0.01, 200.0],
+        k33=[10.0, 0.01, 20.0],
         # Well
-        wel_coords = [(4718.45, 5281.25)],
-        wel_q = [-150000.0],
+        wel_coords=[(4718.45, 5281.25)],
+        wel_q=[-150000.0],
         # Recharge
-        rch = 0.005,
-        rch_iface = 6,
-        rch_iflowface = -1,
+        rch=0.005,
+        rch_iface=6,
+        rch_iflowface=-1,
         # River
-        riv_h = 320.0,
-        riv_z = 318.0,
-        riv_c = 1.0e5,
-        riv_iface = 6,
-        riv_iflowface = -1,
+        riv_h=320.0,
+        riv_z=318.0,
+        riv_c=1.0e5,
+        riv_iface=6,
+        riv_iflowface=-1,
         # particle tracking
-        porosity = 0.1
+        porosity=0.1,
     )
     cases_mp7_p02 = [
         case_mp7_p02.copy_update(
@@ -956,7 +1112,7 @@ class PrtCases:
         ),
         case_mp7_p02.copy_update(
             name=case_mp7_p02.name + "b",
-        )
+        ),
     ]
 
     @staticmethod
@@ -984,30 +1140,53 @@ class PrtCases:
 
         # add polygon for each refinement level
         outer_polygon = [
-            [(3500, 4000), (3500, 6500), (6000, 6500), (6000, 4000), (3500, 4000)]
+            [
+                (3500, 4000),
+                (3500, 6500),
+                (6000, 6500),
+                (6000, 4000),
+                (3500, 4000),
+            ]
         ]
-        g.add_refinement_features([outer_polygon], "polygon", 1, range(ctx.nlay))
+        g.add_refinement_features(
+            [outer_polygon], "polygon", 1, range(ctx.nlay)
+        )
         refshp0 = gridgen_ws / "rf0"
 
         middle_polygon = [
-            [(4000, 4500), (4000, 6000), (5500, 6000), (5500, 4500), (4000, 4500)]
+            [
+                (4000, 4500),
+                (4000, 6000),
+                (5500, 6000),
+                (5500, 4500),
+                (4000, 4500),
+            ]
         ]
-        g.add_refinement_features([middle_polygon], "polygon", 2, range(ctx.nlay))
+        g.add_refinement_features(
+            [middle_polygon], "polygon", 2, range(ctx.nlay)
+        )
         refshp1 = gridgen_ws / "rf1"
 
         inner_polygon = [
-            [(4500, 5000), (4500, 5500), (5000, 5500), (5000, 5000), (4500, 5000)]
+            [
+                (4500, 5000),
+                (4500, 5500),
+                (5000, 5500),
+                (5000, 5000),
+                (4500, 5000),
+            ]
         ]
-        g.add_refinement_features([inner_polygon], "polygon", 3, range(ctx.nlay))
+        g.add_refinement_features(
+            [inner_polygon], "polygon", 3, range(ctx.nlay)
+        )
         refshp2 = gridgen_ws / "rf2"
 
         g.build(verbose=False)
 
         return g.get_gridprops_disv()
-    
+
     @parametrize(ctx=cases_mp7_p02, ids=[c.name for c in cases_mp7_p02])
     def case_mp7_p02(self, ctx, function_tmpdir, targets):
-
         sim_name = "mp7-p02"
         gwf_name = sim_name
         prt_name = sim_name + "_prt"
@@ -1058,9 +1237,11 @@ class PrtCases:
 
         # porosity
         porosity = 0.1
-        
+
         # todo build/refine grid
-        disv_props = PrtCases.get_refined_gridprops_p02(function_tmpdir / "gridgen", ctx, targets.gridgen)
+        disv_props = PrtCases.get_refined_gridprops_p02(
+            function_tmpdir / "gridgen", ctx, targets.gridgen
+        )
 
         # retrieve GRIDGEN-generated gridprops
         ncpl = disv_props["ncpl"]
@@ -1075,12 +1256,19 @@ class PrtCases:
 
         # Instantiate the MODFLOW 6 simulation object
         sim = flopy.mf6.MFSimulation(
-            sim_name=gwf_name, exe_name=targets.mf6, version="mf6", sim_ws=function_tmpdir
+            sim_name=gwf_name,
+            exe_name=targets.mf6,
+            version="mf6",
+            sim_ws=function_tmpdir,
         )
 
         # Instantiate the MODFLOW 6 temporal discretization package
         flopy.mf6.ModflowTdis(
-            sim, pname="tdis", time_units="DAYS", perioddata=tdis_rc, nper=len(tdis_rc)
+            sim,
+            pname="tdis",
+            time_units="DAYS",
+            perioddata=tdis_rc,
+            nper=len(tdis_rc),
         )
 
         # Instantiate the MODFLOW 6 gwf (groundwater-flow) model
@@ -1107,14 +1295,18 @@ class PrtCases:
             gwf,
             xt3doptions=[("xt3d")],
             icelltype=icelltype,
-            k=k, k33=k33,
-            save_saturation=True, save_specific_discharge=True,
+            k=k,
+            k33=k33,
+            save_saturation=True,
+            save_specific_discharge=True,
         )
 
         # Instantiate the MODFLOW 6 gwf recharge package
         flopy.mf6.ModflowGwfrcha(
-            gwf, recharge=rch,
-            auxiliary=["iface", "iflowface"], aux=[rch_iface, rch_iflowface],
+            gwf,
+            recharge=rch,
+            auxiliary=["iface", "iflowface"],
+            aux=[rch_iface, rch_iflowface],
         )
 
         # Instantiate the MODFLOW 6 gwf well package
@@ -1129,10 +1321,13 @@ class PrtCases:
         riverline = [(ctx.Lx - 1.0, ctx.Ly), (ctx.Lx - 1.0, 0.0)]
         rivcells = ix.intersects(LineString(riverline))
         rivcells = [icpl for (icpl,) in rivcells]
-        rivspd = [[(0, icpl), riv_h, riv_c, riv_z, riv_iface, riv_iflowface]
-                for icpl in rivcells]
-        flopy.mf6.ModflowGwfriv(gwf, stress_period_data=rivspd,
-            auxiliary=[("iface", "iflowface")])
+        rivspd = [
+            [(0, icpl), riv_h, riv_c, riv_z, riv_iface, riv_iflowface]
+            for icpl in rivcells
+        ]
+        flopy.mf6.ModflowGwfriv(
+            gwf, stress_period_data=rivspd, auxiliary=[("iface", "iflowface")]
+        )
 
         # Instantiate the MODFLOW 6 gwf output control package
         headfile = "{}.hds".format(gwf_name)
@@ -1144,7 +1339,9 @@ class PrtCases:
             pname="oc",
             budget_filerecord=budget_record,
             head_filerecord=head_record,
-            headprintrecord=[("COLUMNS", 10, "WIDTH", 15, "DIGITS", 6, "GENERAL")],
+            headprintrecord=[
+                ("COLUMNS", 10, "WIDTH", 15, "DIGITS", 6, "GENERAL")
+            ],
             saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
             printrecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
         )
@@ -1313,7 +1510,9 @@ class PrtCases:
                 rowdivisions6=4,
                 columndivisions6=4,
             )
-            pgdata = flopy.modpath.NodeParticleData(subdivisiondata=facedata, nodes=nodew)
+            pgdata = flopy.modpath.NodeParticleData(
+                subdivisiondata=facedata, nodes=nodew
+            )
 
         # Set particle release point data according to the scenario
         prpname = f"prp2{part}"
@@ -1343,9 +1542,12 @@ class PrtCases:
         # Instantiate the MODFLOW 6 prt particle release point (prp) package
         pd = {0: ["FIRST"], 1: []}
         flopy.mf6.ModflowPrtprp(
-            prt, pname=prpname, filename=prpfilename,
-            nreleasepts=nreleasepts, packagedata=releasepts,
-            perioddata=pd, 
+            prt,
+            pname=prpname,
+            filename=prpfilename,
+            nreleasepts=nreleasepts,
+            packagedata=releasepts,
+            perioddata=pd,
         )
 
         # Instantiate the MODFLOW 6 prt output control package
@@ -1368,20 +1570,22 @@ class PrtCases:
 
         # create exchange
         flopy.mf6.ModflowGwfprt(
-            sim, exgtype="GWF6-PRT6",
-            exgmnamea=gwf_name, exgmnameb=prt_name,
+            sim,
+            exgtype="GWF6-PRT6",
+            exgmnamea=gwf_name,
+            exgmnameb=prt_name,
             filename=f"{prt_name}.gwfprt",
         )
 
         # Create an explicit model solution (EMS) for the MODFLOW 6 prt model
         ems = flopy.mf6.ModflowEms(
-            sim, pname="ems",
+            sim,
+            pname="ems",
             filename="{}.ems".format(prt_name),
         )
         sim.register_solution_package(ems, [prt.name])
 
         return ctx, sim, None, self.eval_mp7_p02
-
 
     def eval_mp7_p02(self, ctx, sim):
         pass
@@ -1389,7 +1593,9 @@ class PrtCases:
     # MODPATH 7 example problem 3
     cases_mp7_p03 = []
 
-    @pytest.mark.skip(reason="indev: need finer-grained particle release timing")
+    @pytest.mark.skip(
+        reason="indev: need finer-grained particle release timing"
+    )
     @parametrize(ctx=cases_mp7_p03, ids=[c.name for c in cases_mp7_p03])
     def case_mp7_p03(self, ctx, function_tmpdir, targets):
         pass
@@ -1444,7 +1650,9 @@ class PrtCases:
         gridgen_ws.mkdir(parents=True, exist_ok=True)
 
         # create Gridgen object
-        g = Gridgen(ms.modelgrid, model_ws=gridgen_ws, exe_name=targets.gridgen)
+        g = Gridgen(
+            ms.modelgrid, model_ws=gridgen_ws, exe_name=targets.gridgen
+        )
 
         # add polygon for each refinement level
         outer_polygon = [
@@ -1464,7 +1672,9 @@ class PrtCases:
                 (2500, 6000),
             ]
         ]
-        g.add_refinement_features([outer_polygon], "polygon", 1, range(ctx.nlay))
+        g.add_refinement_features(
+            [outer_polygon], "polygon", 1, range(ctx.nlay)
+        )
         refshp0 = gridgen_ws / "rf0"
 
         middle_polygon = [
@@ -1484,7 +1694,9 @@ class PrtCases:
                 (3000, 6500),
             ]
         ]
-        g.add_refinement_features([middle_polygon], "polygon", 2, range(ctx.nlay))
+        g.add_refinement_features(
+            [middle_polygon], "polygon", 2, range(ctx.nlay)
+        )
         refshp1 = gridgen_ws / "rf1"
 
         inner_polygon = [
@@ -1504,7 +1716,9 @@ class PrtCases:
                 (3500, 7000),
             ]
         ]
-        g.add_refinement_features([inner_polygon], "polygon", 3, range(ctx.nlay))
+        g.add_refinement_features(
+            [inner_polygon], "polygon", 3, range(ctx.nlay)
+        )
         refshp2 = gridgen_ws / "rf2"
 
         g.build(verbose=False)
@@ -1597,11 +1811,16 @@ class PrtCases:
 
         # simulation
         sim = flopy.mf6.MFSimulation(
-            sim_name=ctx.name, sim_ws=function_tmpdir, exe_name=targets.mf6, version="mf6"
+            sim_name=ctx.name,
+            sim_ws=function_tmpdir,
+            exe_name=targets.mf6,
+            version="mf6",
         )
 
         # temporal discretization
-        tdis = flopy.mf6.ModflowTdis(sim, time_units="days", nper=ctx.nper, perioddata=ctx.tdis_rc)
+        tdis = flopy.mf6.ModflowTdis(
+            sim, time_units="days", nper=ctx.nper, perioddata=ctx.tdis_rc
+        )
 
         # iterative model solver
         ims = flopy.mf6.ModflowIms(
@@ -1622,12 +1841,17 @@ class PrtCases:
 
         # groundwater flow model
         gwf = flopy.mf6.ModflowGwf(
-            sim, modelname=gwf_name, model_nam_file=f"{gwf_name}.nam", save_flows=True
+            sim,
+            modelname=gwf_name,
+            model_nam_file=f"{gwf_name}.nam",
+            save_flows=True,
         )
 
         # grid discretization
-        
-        disv = flopy.mf6.ModflowGwfdisv(gwf, length_units="feet", idomain=idomain, **disv_props)
+
+        disv = flopy.mf6.ModflowGwfdisv(
+            gwf, length_units="feet", idomain=idomain, **disv_props
+        )
 
         # initial conditions
         ic = flopy.mf6.ModflowGwfic(gwf, strt=150.0)
@@ -1668,7 +1892,13 @@ class PrtCases:
             (0, 1549, 5000.0, 1, 4),
             (0, 1549, 5000.0, 4, 1),
             (0, 1332, 5000.0, 4, 1),
-            (0, 1332, 5000.0, 1, 5),  # why does IFLOWFACE need to be 5 here, not 4?
+            (
+                0,
+                1332,
+                5000.0,
+                1,
+                5,
+            ),  # why does IFLOWFACE need to be 5 here, not 4?
             (0, 1021, 2500.0, 1, 4),
             (0, 1021, 2500.0, 4, 1),
             (0, 1020, 5000.0, 1, 5),  # "
@@ -1806,7 +2036,7 @@ class PrtCases:
             (48, (0, 891), 4632.8125, 7687.5, 100.0),
             (49, (0, 891), 4648.4375, 7687.5, 100.0),
             (50, (0, 891), 4664.0625, 7687.5, 100.0),
-            (51, (0, 891), 4679.6875, 7687.5, 100.0)
+            (51, (0, 891), 4679.6875, 7687.5, 100.0),
         ]
 
         # Instantiate the MODFLOW 6 prt model
@@ -1852,8 +2082,10 @@ class PrtCases:
 
         # create exchange
         flopy.mf6.ModflowGwfprt(
-            sim, exgtype="GWF6-PRT6",
-            exgmnamea=gwf_name, exgmnameb=prt_name,
+            sim,
+            exgtype="GWF6-PRT6",
+            exgmnamea=gwf_name,
+            exgmnameb=prt_name,
             filename=f"{gwf_name}.gwfprt",
         )
 
@@ -1879,16 +2111,19 @@ def test_prt_models(case, targets):
     sim.write_simulation()
     if cmp:
         cmp.write_simulation()
-    
+
     test = TestFramework()
     test.run(
         TestSimulation(
             name=ctx.name,
             exe_dict=targets,
-            exfunc=lambda s: evl(ctx, s),  # hack the context into the evaluation function for now
+            exfunc=lambda s: evl(
+                ctx, s
+            ),  # hack the context into the evaluation function for now
             idxsim=0,
             mf6_regression=True,
             require_failure=ctx.xfail,
             make_comparison=False,
         ),
-        sim.simulation_data.mfpath.get_sim_path())
+        sim.simulation_data.mfpath.get_sim_path(),
+    )

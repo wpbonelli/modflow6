@@ -3,6 +3,7 @@ module MethodSubcellPollockModule
   use MethodModule
   use SubcellRectModule
   use ParticleModule
+  use TrackDataModule, only: TrackDataType
   implicit none
   private
   public :: MethodSubcellPollockType
@@ -52,12 +53,18 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a Pollock's subcell-method object
-  subroutine init(this, subcellRect)
+  subroutine init(this, subcellRect, trackdata)
     ! -- dummy
     class(MethodSubcellPollockType), intent(inout) :: this
     type(SubcellRectType), pointer :: subcellRect
+    type(TrackDataType), pointer :: trackdata
     !
+    ! -- Set pointer to subcell definition
     this%subcellRect => subcellRect
+    !
+    ! -- Set pointer to particle track data
+    this%trackdata => trackdata
+    !
     return
   end subroutine init
 
@@ -81,18 +88,16 @@ contains
     zOrigin = this%subcellRect%zOrigin
     sinrot = this%subcellRect%sinrot
     cosrot = this%subcellRect%cosrot
-    call transform_coords(particle%xlocal, particle%ylocal, particle%zlocal, &
-                          xOrigin, yOrigin, zOrigin, sinrot, cosrot, .false., &
-                          particle%xlocal, particle%ylocal, particle%zlocal)
+    ! -- sinrot and cosrot should be 0. and 1., respectively, i.e., there
+    ! -- is no rotation. Also no z translation; only x and y translations.
+    call particle%transf_coords(xOrigin, yOrigin)
     !
     ! -- Track the particle across the subcell
     ! call track_sub(this%subcellRect,particle,initialTime,maximumTime,t)
     call track_sub(this%subcellRect, particle, tmax)
     !
     ! -- Transform particle location back to local cell coordinates
-    call transform_coords(particle%xlocal, particle%ylocal, particle%zlocal, &
-                          xOrigin, yOrigin, zOrigin, sinrot, cosrot, .true., &
-                          particle%xlocal, particle%ylocal, particle%zlocal)
+    call particle%transf_coords(xOrigin, yOrigin, invert_opt=.true.)
     !
     return
     !
@@ -121,9 +126,9 @@ contains
     integer :: exitFace
     !
     ! -- Initial particle location in scaled subcell coordinates
-    initialX = particle%xlocal / subcellRect%dx
-    initialY = particle%ylocal / subcellRect%dy
-    initialZ = particle%zlocal / subcellRect%dz
+    initialX = particle%x / subcellRect%dx
+    initialY = particle%y / subcellRect%dy
+    initialZ = particle%z / subcellRect%dz
     !
     ! -- Make local copies of face velocities for convenience
     vx1 = subcellRect%vx1
@@ -147,9 +152,11 @@ contains
       ! particle%iTrackingDomainBoundary(3) = exitFace
       ! particle%istatus = 5
       ! return
+
+      ! kluge note: todo identify particle by "composite key" (not just irpt)
       print *, "======================================"
       print *, "Subcell with no exit face" ! kluge
-      print *, "Particle ", particle%ipart
+      print *, "Particle ", particle%irpt
       print *, "Cell ", particle%iTrackingDomain(2)
       print *, "======================================"
       !!pause
@@ -232,9 +239,9 @@ contains
     !
     ! -- Set final particle location in local (unscaled) subcell coordinates,
     ! -- final time for particle trajectory, and exit face
-    particle%xlocal = x * subcellRect%dx
-    particle%ylocal = y * subcellRect%dy
-    particle%zlocal = z * subcellRect%dz
+    particle%x = x * subcellRect%dx
+    particle%y = y * subcellRect%dy
+    particle%z = z * subcellRect%dz
     particle%ttrack = t
     particle%iTrackingDomainBoundary(3) = exitFace
     !
