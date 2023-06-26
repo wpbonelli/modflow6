@@ -71,6 +71,9 @@ contains
       ! -- continue delegating
       call submethod%apply(particle, tmax)
       !
+      ! -- Store particle trackdata as appropriate
+      call submethod%trackdata%add_track_data(particle, reason=1, level=levelNext)
+      !
       ! -- Advance particle
       call advance(this, particle, levelNext, submethod, isStillAdvancing)
       !
@@ -88,29 +91,7 @@ contains
     integer :: levelNext
     class(MethodType), pointer :: submethod
     logical :: isStillAdvancing
-    ! local
-    ! character(len=40) :: typeSubdomain ! kluge???
-    integer :: ip !, iSubdomain
     !
-    ! ! -- Check whether the particle stopped advancing within the last tracking
-    ! ! -- subdomain or has exited the tracking domain. If not, advance to the next
-    ! ! -- subdomain.
-    ! ip = particle%ipart
-    ! typeSubdomain = submethod%trackingDomainType
-    ! if (particle%iTrackingDomainBoundary(levelNext).eq.0) then
-    !   particle%iTrackingDomainBoundary = 0        ! kluge???
-    !   isStillAdvancing = .false.
-    ! else
-    !   call this%pass(particle)
-    !   iSubdomain = particle%iTrackingDomain(levelNext)
-    !   if (iSubdomain.lt.0) then
-    !     isStillAdvancing = .false.
-    !   end if
-    ! end if
-    ! -- Check whether the particle terminated within the last tracking
-    ! -- subdomain. If not, advance to the next subdomain, if there is one.
-    ip = particle%ipart
-    ! if (particle%iTrackingDomainBoundary(levelNext).eq.0) then
     if (particle%istatus .ne. -1) then
       particle%iTrackingDomainBoundary = 0 ! kluge???
       isStillAdvancing = .false.
@@ -120,31 +101,6 @@ contains
         isStillAdvancing = .false.
       end if
     end if
-    ! ip = particle%ipart
-    ! if (particle%istatus.eq.-1) then
-    !   ! -- Particle not finished or terminated
-    !   if (particle%iTrackingDomainBoundary(levelNext-1).eq.0) then  ! kluge note: pass in level instead of levelNext???
-    !     ! -- Particle in domain interior, so pass to next subdomain
-    !     call this%pass(particle)
-    !     if (particle%istatus.ne.-1) then
-    !       ! -- Particle finished or terminated, so no longer advancing
-    !       ! -- in current domain
-    !       isStillAdvancing = .false.
-    !     else if (particle%iTrackingDomainBoundary(levelNext-1).ne.0) then
-    !       ! -- Particle is at domain boundary, so no longer advancing
-    !       ! -- in current domain
-    !       isStillAdvancing = .false.
-    !     end if
-    !   else
-    !     ! -- Particle is at domain boundary, so no longer advancing
-    !     ! -- in current domain
-    !     isStillAdvancing = .false.
-    !   end if
-    ! else
-    !   ! -- Particle finished or terminated, so no longer advancing
-    !   ! -- in current domain
-    !   isStillAdvancing = .false.
-    ! end if
     !
     return
     !

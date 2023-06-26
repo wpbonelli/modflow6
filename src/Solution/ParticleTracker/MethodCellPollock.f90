@@ -97,7 +97,7 @@ contains
     call this%load_subcell(particle, levelNext, this%subcellRect)
     ! -- Select and initialize Pollock's subcell method and set subcell
     ! -- method pointer
-    call methodSubcellPollock%init(this%subcellRect)
+    call methodSubcellPollock%init(this%subcellRect, this%trackdata)
     submethod => methodSubcellPollock
     !
     return
@@ -161,38 +161,32 @@ contains
 
   !> @brief Apply Pollock's method to a rectangular cell
   subroutine apply_mCP(this, particle, tmax)
-    use TdisModule, only: kper, kstp
     use UtilMiscModule
     ! -- dummy
     class(MethodCellPollockType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-    ! doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
     ! -- local
     double precision :: xOrigin, yOrigin, zOrigin, sinrot, cosrot
-    integer(I4B) :: ntrack
+    !
+    ! -- Update particle zone
+    particle%izone = this%cellRect%cellDefn%izone
     !
     if (this%cellRect%cellDefn%izone .ne. 0) then
       if (particle%istopzone .eq. this%cellRect%cellDefn%izone) then
         ! -- Stop zone
         ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 6
-        ! write(*,'(A,I,A,I)') "particle ", particle%ipart, " terminated in stop zone cell: ", particle%iTrackingDomain(2)  ! kluge
-        ! return
       end if
     else if (this%cellRect%cellDefn%inoexitface .ne. 0) then
       ! -- No exit face
       ! particle%iTrackingDomainBoundary(3) = 0
       particle%istatus = 5
-      ! write(*,'(A,I,A,I)') "particle ", particle%ipart, " terminated at cell w/ no exit face: ", particle%iTrackingDomain(2)  ! kluge
-      ! return
     else if (particle%istopweaksink .ne. 0) then
       if (this%cellRect%cellDefn%iweaksink .ne. 0) then
         ! -- Weak sink
         ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 3
-        ! write(*,'(A,I,A,I)')  "particle ", particle%ipart, " terminated at weak sink cell: ", particle%iTrackingDomain(2)  ! kluge
-        ! return
       end if
     else
       !
@@ -202,36 +196,18 @@ contains
       if (particle%z > this%cellRect%cellDefn%top) then
         particle%z = this%cellRect%cellDefn%top
         ! -- Store track data
-        ntrack = this%trackdata%nrows + 1 ! kluge?
-        this%trackdata%nrows = ntrack
-        this%trackdata%kper(ntrack) = kper
-        this%trackdata%kstp(ntrack) = kstp
-        this%trackdata%iprp(ntrack) = particle%iprp
-        this%trackdata%irpt(ntrack) = particle%ipart
-        this%trackdata%icell(ntrack) = particle%iTrackingDomain(2)
-        this%trackdata%izone(ntrack) = this%cellRect%cellDefn%izone
-        this%trackdata%istatus(ntrack) = particle%istatus
-        if (particle%istatus > 1) then
-          this%trackdata%ireason(ntrack) = 3 ! termination
-        else
-          this%trackdata%ireason(ntrack) = 1 ! crossing cell boundary
-        end if
-        this%trackdata%trelease(ntrack) = particle%trelease
-        this%trackdata%t(ntrack) = particle%ttrack
-        this%trackdata%x(ntrack) = particle%x
-        this%trackdata%y(ntrack) = particle%y
-        this%trackdata%z(ntrack) = particle%z
+        call this%trackdata%add_track_data(particle, reason=1)
       end if
       !
-      ! -- Transform particle location into local cell coordinates
+      ! -- Transform particle location into local cell coordinates.
+      ! -- Translated and rotated but not scaled relative to model.
       xOrigin = this%cellRect%xOrigin
       yOrigin = this%cellRect%yOrigin
       zOrigin = this%cellRect%zOrigin
       sinrot = this%cellRect%sinrot
       cosrot = this%cellRect%cosrot
-      call transform_coords(particle%x, particle%y, particle%z, &
-                            xOrigin, yOrigin, zOrigin, sinrot, cosrot, .false., &
-                            particle%xlocal, particle%ylocal, particle%zlocal)
+      call particle%transf_coords(xOrigin, yOrigin, zOrigin, &
+                                  sinrot, cosrot, .false.)
       !
       ! -- Track across lone subcell
       call this%subtrack(particle, 2, tmax) ! kluge, hardwired to level 2
@@ -239,32 +215,13 @@ contains
       ! particle%iTrackingDomainBoundary(2) = 0
       ! !
       ! -- Transform particle location back to model coordinates
-      call transform_coords(particle%xlocal, particle%ylocal, particle%zlocal, &
-                            xOrigin, yOrigin, zOrigin, sinrot, cosrot, .true., &
-                            particle%x, particle%y, particle%z)
+      call particle%transf_coords(xOrigin, yOrigin, zOrigin, &
+                                  sinrot, cosrot, .true.)
+      !
+      ! -- Reset transformation and eliminate accumulated roundoff error
+      call particle%reset_transf()
       !
     end if
-    !
-    ! -- Store track data
-    ntrack = this%trackdata%nrows + 1 ! kluge?
-    this%trackdata%nrows = ntrack
-    this%trackdata%kper(ntrack) = kper
-    this%trackdata%kstp(ntrack) = kstp
-    this%trackdata%iprp(ntrack) = particle%iprp
-    this%trackdata%irpt(ntrack) = particle%ipart
-    this%trackdata%icell(ntrack) = particle%iTrackingDomain(2)
-    this%trackdata%izone(ntrack) = this%cellRect%cellDefn%izone
-    this%trackdata%istatus(ntrack) = particle%istatus
-    if (particle%istatus > 1) then
-      this%trackdata%ireason(ntrack) = 3 ! termination
-    else
-      this%trackdata%ireason(ntrack) = 1 ! crossing cell boundary
-    end if
-    this%trackdata%trelease(ntrack) = particle%trelease
-    this%trackdata%t(ntrack) = particle%ttrack
-    this%trackdata%x(ntrack) = particle%x
-    this%trackdata%y(ntrack) = particle%y
-    this%trackdata%z(ntrack) = particle%z
     !
     return
     !
