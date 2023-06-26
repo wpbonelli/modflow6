@@ -4,6 +4,7 @@ module MethodSubcellTernaryModule
   use MethodModule
   use SubcellTriModule
   use ParticleModule
+  use TrackDataModule, only: TrackDataType
   use Ternary
   use TernaryUtil, only: rotate, skew
   use TernarySolveTrack, only: traverse_triangle, step_analytical, canonical
@@ -59,12 +60,17 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a ternary subcell-method object
-  subroutine init(this, subcellTri)
+  subroutine init(this, subcellTri, trackdata)
     ! -- dummy
     class(MethodSubcellTernaryType), intent(inout) :: this
     type(SubcellTriType), pointer :: subcellTri
+    type(TrackDataType), pointer :: trackdata
     !
+    ! -- Set pointer to subcell definition
     this%subcellTri => subcellTri
+    !
+    ! -- Set pointer to particle track data
+    this%trackdata => trackdata
     !
     return
     !
@@ -185,9 +191,11 @@ contains
       ! particle%iTrackingDomainBoundary(3) = exitFace
       ! particle%istatus = 5
       ! return
+
+      ! kluge note: todo identify particle by "composite key" (not just irpt)
       print *, "======================================"
       print *, "Subcell with no exit face" ! kluge
-      print *, "Particle ", particle%ipart
+      print *, "Particle ", particle%irpt
       print *, "Cell ", particle%iTrackingDomain(2)
       print *, "======================================"
       !!pause

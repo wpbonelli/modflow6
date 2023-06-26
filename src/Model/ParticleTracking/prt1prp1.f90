@@ -189,18 +189,22 @@ contains
     ! call mem_deallocate(this%porosity)
     ! call mem_deallocate(this%retfactor)
     ! call mem_deallocate(this%izone)
+    !
+    deallocate (this%partlist%irpt)
+    deallocate (this%partlist%iprp)
+    deallocate (this%partlist%istopweaksink)
+    deallocate (this%partlist%istopzone)
+    deallocate (this%partlist%iTrackingDomain)
+    deallocate (this%partlist%iTrackingDomainBoundary)
+    deallocate (this%partlist%izone)
+    deallocate (this%partlist%istatus)
     deallocate (this%partlist%x) ! kluge note: use mem_deallocate for these arrays
     deallocate (this%partlist%y)
     deallocate (this%partlist%z)
-    deallocate (this%partlist%iTrackingDomain)
-    deallocate (this%partlist%iTrackingDomainBoundary)
     deallocate (this%partlist%trelease)
     deallocate (this%partlist%tstop)
     deallocate (this%partlist%ttrack)
-    deallocate (this%partlist%istopweaksink)
-    deallocate (this%partlist%istopzone)
-    deallocate (this%partlist%istatus)
-    deallocate (this%partlist%irpt)
+    !
     deallocate (this%partlist) ! kluge note: structure of arrays
     call mem_deallocate(this%massrls)
     !
@@ -265,23 +269,25 @@ contains
     !                   this%memoryPath)
     ! call mem_allocate(this%izone, this%dis%nodes, 'IZONE', this%memoryPath)
     allocate (this%partlist) ! kluge note: structure of arrays
-    ! allocate(this%partlist%velmult(this%npartmax))
-    allocate (this%partlist%x(this%npartmax)) ! kluge note: nprtmax is the initial max dimension
-    allocate (this%partlist%y(this%npartmax)) ! kluge note: use mem_allocate for these arrays
-    allocate (this%partlist%z(this%npartmax))
+    allocate (this%partlist%irpt(this%npartmax))
+    allocate (this%partlist%iprp(this%npartmax))
     ! kluge note: ditch crazy dims
     allocate (this%partlist%iTrackingDomain(this%npartmax, &
                                             levelMin:levelMax))
     ! kluge note: ditch crazy dims
     allocate (this%partlist%iTrackingDomainBoundary(this%npartmax, &
                                                     levelMin:levelMax))
+    allocate (this%partlist%izone(this%npartmax))
+    allocate (this%partlist%istatus(this%npartmax))
+    allocate (this%partlist%x(this%npartmax)) ! kluge note: nprtmax is the initial max dimension
+    allocate (this%partlist%y(this%npartmax)) ! kluge note: use mem_allocate for these arrays
+    allocate (this%partlist%z(this%npartmax))
     allocate (this%partlist%trelease(this%npartmax))
     allocate (this%partlist%tstop(this%npartmax))
     allocate (this%partlist%ttrack(this%npartmax))
     allocate (this%partlist%istopweaksink(this%npartmax))
     allocate (this%partlist%istopzone(this%npartmax))
-    allocate (this%partlist%istatus(this%npartmax))
-    allocate (this%partlist%irpt(this%npartmax))
+
     call mem_allocate(this%massrls, this%nreleasepts, 'MASSRLS', this%memoryPath)
     !
     ! -- Intialize

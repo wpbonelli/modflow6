@@ -104,7 +104,7 @@ contains
     ! -- Load subcell for injection into subcell method
     call this%load_subcell(particle, levelNext, this%subcellTri)
     ! -- Initialize subcell method and set subcell method pointer
-    call methodSubcellTernary%init(this%subcellTri)
+    call methodSubcellTernary%init(this%subcellTri, this%trackdata)
     submethod => methodSubcellTernary
     !
     return
@@ -176,7 +176,6 @@ contains
 
   !> @brief Apply the ternary method to a polygonal cell
   subroutine apply_mCT(this, particle, tmax)
-    use TdisModule, only: kper, kstp
     use ConstantsModule, only: DZERO, DONE, DHALF ! kluge???
     ! dummy
     class(MethodCellTernaryType), intent(inout) :: this
@@ -189,32 +188,25 @@ contains
     double precision :: x0, y0, x1, y1, x2, y2, xsum, ysum
     double precision :: vxsum, vysum, flow0, flow1, v0x, v0y
     double precision :: d01x, d01y, d02x, d02y, det, area, term
-    integer(I4B) :: ntrack
+    !
+    ! -- Update particle zone
+    particle%izone = this%cellPoly%cellDefn%izone
     !
     if (this%cellPoly%cellDefn%izone .ne. 0) then
       if (particle%istopzone .eq. this%cellPoly%cellDefn%izone) then
         ! -- Stop zone
         ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 6
-        ! write(*,'(A,I,A,I)') "particle ", particle%ipart, &
-        ! " terminated in stop zone cell: ", particle%iTrackingDomain(2)  ! kluge
-        ! return
       end if
     else if (this%cellPoly%cellDefn%inoexitface .ne. 0) then
       ! -- No exit face
       ! particle%iTrackingDomainBoundary(3) = 0
       particle%istatus = 5
-      ! write(*,'(A,I,A,I)') "particle ", particle%ipart, &
-      ! " terminated at cell w/ no exit face: ", particle%iTrackingDomain(2)  ! kluge
-      ! return
     else if (particle%istopweaksink .ne. 0) then
       if (this%cellPoly%cellDefn%iweaksink .ne. 0) then
         ! -- Weak sink
         ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 3
-        ! write(*,'(A,I,A,I)')  "particle ", particle%ipart, &
-        ! " terminated at weak sink cell: ", particle%iTrackingDomain(2)  ! kluge
-        ! return
       end if
     else
       !
@@ -224,25 +216,7 @@ contains
       if (particle%z > this%cellPoly%cellDefn%top) then
         particle%z = this%cellPoly%cellDefn%top
         ! -- Store track data
-        ntrack = this%trackdata%nrows + 1 ! kluge?
-        this%trackdata%nrows = ntrack
-        this%trackdata%kper(ntrack) = kper
-        this%trackdata%kstp(ntrack) = kstp
-        this%trackdata%iprp(ntrack) = particle%iprp
-        this%trackdata%irpt(ntrack) = particle%ipart
-        this%trackdata%icell(ntrack) = particle%iTrackingDomain(2)
-        this%trackdata%izone(ntrack) = this%cellPoly%cellDefn%izone
-        this%trackdata%istatus(ntrack) = particle%istatus
-        if (particle%istatus > 1) then
-          this%trackdata%ireason(ntrack) = 3 ! termination
-        else
-          this%trackdata%ireason(ntrack) = 1 ! crossing cell boundary
-        end if
-        this%trackdata%trelease(ntrack) = particle%trelease
-        this%trackdata%t(ntrack) = particle%ttrack
-        this%trackdata%x(ntrack) = particle%x
-        this%trackdata%y(ntrack) = particle%y
-        this%trackdata%z(ntrack) = particle%z
+        call this%trackdata%add_track_data(particle, reason=1)
       end if
       !
       npolyverts = this%cellPoly%cellDefn%npolyverts
@@ -322,27 +296,6 @@ contains
       !
     end if
     !
-    ! -- Store track data
-    ntrack = this%trackdata%nrows + 1 ! kluge?
-    this%trackdata%nrows = ntrack
-    this%trackdata%kper(ntrack) = kper
-    this%trackdata%kstp(ntrack) = kstp
-    this%trackdata%iprp(ntrack) = particle%iprp
-    this%trackdata%irpt(ntrack) = particle%ipart
-    this%trackdata%icell(ntrack) = particle%iTrackingDomain(2)
-    this%trackdata%izone(ntrack) = this%cellPoly%cellDefn%izone
-    this%trackdata%istatus(ntrack) = particle%istatus
-    if (particle%istatus > 1) then
-      this%trackdata%ireason(ntrack) = 3 ! termination
-    else
-      this%trackdata%ireason(ntrack) = 1 ! crossing cell boundary
-    end if
-    this%trackdata%trelease(ntrack) = particle%trelease
-    this%trackdata%t(ntrack) = particle%ttrack
-    this%trackdata%x(ntrack) = particle%x
-    this%trackdata%y(ntrack) = particle%y
-    this%trackdata%z(ntrack) = particle%z
-    !
     return
     !
   end subroutine apply_mCT
@@ -410,12 +363,13 @@ contains
         end if
       end do
       if (isc .le. 0) then
+        ! kluge note: todo identify particle by "composite key" (not just irpt)
         write (*, '(A,I0,A,I0)') &
           "error -- initial triangle not found for particle ", &
-          particle%ipart, " in cell ", ic ! kluge
+          particle%irpt, " in cell ", ic ! kluge
         write (69, '(A,I0,A,I0)') &
           "error -- initial triangle not found for particle ", &
-          particle%ipart, " in cell ", ic
+          particle%irpt, " in cell ", ic
         ! pause
         stop
       else
