@@ -1,0 +1,101 @@
+name: MODFLOW 6 PRT dev build
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - ci-diagnose*
+      - PRT
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+  pull_request:
+    branches:
+      - master
+      - develop
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+  schedule:
+    - cron: '0 2 * * *'
+env:
+  LABEL: prt
+jobs:
+  make_dist:
+    name: Make distribution
+    # don't make distribution if triggering event is pull request
+    # if: github.event_name == 'push' || github.event_name == 'schedule'
+    uses: MODFLOW-USGS/modflow6/.github/workflows/release.yml@develop
+    with:
+      approve: false
+      branch: PRT
+      developmode: true
+      full: false
+      linux_version: ubuntu-20.04
+      run_tests: false
+      version: 6.4.2prt
+
+  release:
+    name: Create release
+    needs: make_dist
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        shell: bash
+    # don't create a release post if triggering event is pull request
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    steps:
+
+      - name: Delete Older Releases
+        uses: dev-drprasad/delete-older-releases@v0.2.1
+        with:
+          keep_latest: 10
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: nightly
+
+      - name: List artifacts
+        working-directory: nightly
+        run: |
+          echo "artifacts include:"
+          ls -lR .
+
+      - name: Prune artifacts
+        working-directory: nightly
+        run: |
+          echo "pruning artifacts"
+          for f in mf*/mf*; do mv -- "$f" "$(basename $f)"; done
+          for f in *.zip; do mv -- "$f" "${f##mf*${{ env.LABEL }}_}"; done
+          find mf* -type d -delete
+          rm -rf bin-*
+          rm -rf release_notes
+          echo "release assets include:"
+          ls -lR .
+
+      - name: Get date
+        uses: josStorer/get-current-time@v2
+        id: current-time
+        with:
+          format: YYYYMMDD
+
+      - name: Show time
+        env:
+          TIME: "${{ steps.current-time.outputs.time }}"
+          F_TIME: "${{ steps.current-time.outputs.formattedTime }}"
+        run: echo $TIME $F_TIME
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.current-time.outputs.formattedTime }}
+          name: ${{ steps.current-time.outputs.formattedTime }} PRT development build
+          body: "MODFLOW 6 PRT development build, compiled with Intel Fortran."
+          draft: false
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          artifacts: "nightly/*.zip,nightly/doc/*.pdf"
