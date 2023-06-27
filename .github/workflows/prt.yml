@@ -7,17 +7,13 @@ concurrency:
 on:
   push:
     branches:
-      - master
-      - develop
-      - ci-diagnose*
       - PRT
     paths-ignore:
       - '**.md'
       - 'doc/**'
   pull_request:
     branches:
-      - master
-      - develop
+      - PRT
     paths-ignore:
       - '**.md'
       - 'doc/**'
