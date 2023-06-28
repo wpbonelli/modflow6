@@ -5,12 +5,14 @@ on:
       - master
       - develop
       - ci-diagnose*
+      - PRT
     paths-ignore:
       - '.github/workflows/release.yml'
   pull_request:
     branches:
       - master
       - develop
+      - PRT
     paths-ignore:
       - '.github/workflows/release.yml'
 jobs:
