@@ -1,7 +1,7 @@
 module ParticleModule
 
   use KindModule, only: DP, I4B, LGP
-  use ConstantsModule, only: DZERO, DONE
+  use ConstantsModule, only: DZERO, DONE, LENMEMPATH
   use GlobalDataModule
   use UtilMiscModule, only: transform_coords, modify_transf
   implicit none
@@ -10,6 +10,7 @@ module ParticleModule
   public :: ParticleType
   public :: ParticleListType
   public :: create_particle
+  public :: get_particle_id
 
   ! -- Define the particle type (ParticleType)
   type ParticleType
@@ -203,5 +204,16 @@ contains
     !
     return
   end subroutine get_model_coords
+
+  function get_particle_id(particle) result(id)
+    ! -- dummy
+    class(ParticleType), intent(in) :: particle
+    character(len=LENMEMPATH) :: id
+    !
+    write (id, '(I0,"-",I0,"-",F0.0)') &
+      particle%iprp, particle%irpt, particle%trelease
+    !
+    return
+  end function get_particle_id
 
 end module ParticleModule

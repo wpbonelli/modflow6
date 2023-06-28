@@ -7,6 +7,7 @@ tests = [
   'prt_UtilMisc',
   'prt_CellUtil',
   'prt_MethodSubcellPollock',
+  'prt_Particle',
   'prt_TernaryUtil',
   'prt_TernarySolveTrack'
 ]
