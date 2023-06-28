@@ -7,11 +7,12 @@ program tester
   use test_Sim, only : collect_Sim
   use test_InputOutput, only : collect_InputOutput
   use test_GenericUtils, only : collect_GenericUtils
-  use test_prt_UtilMisc, only : collect_prt_UtilMisc
   use test_prt_CellUtil, only: collect_prt_CellUtil
   use test_prt_MethodSubcellPollock, only : collect_prt_MethodSubcellPollock
+  use test_prt_particle, only : collect_prt_Particle
   use test_prt_TernaryUtil, only : collect_prt_TernaryUtil
   use test_prt_TernarySolveTrack, only : collect_prt_TernarySolveTrack
+  use test_prt_UtilMisc, only : collect_prt_UtilMisc
   implicit none
   integer :: stat, is
   character(len=:), allocatable :: suite_name, test_name
@@ -23,13 +24,14 @@ program tester
     new_testsuite("Demo", collect_Demo), &
     new_testsuite("List", collect_List), &
     new_testsuite("Sim", collect_Sim), &
-    new_testsuite("InputOutput", collect_InputOutput), &
     new_testsuite("GenericUtils", collect_GenericUtils), &
-    new_testsuite("prt_UtilMisc", collect_prt_UtilMisc), &
+    new_testsuite("InputOutput", collect_InputOutput), &
     new_testsuite("prt_CellUtil", collect_prt_CellUtil), &
     new_testsuite("prt_MethodSubcellPollock", collect_prt_MethodSubcellPollock), &
+    new_testsuite("prt_Particle", collect_prt_Particle), &
     new_testsuite("prt_TernaryUtil", collect_prt_TernaryUtil), &
-    new_testsuite("prt_TernarySolveTrack", collect_prt_TernarySolveTrack) &
+    new_testsuite("prt_TernarySolveTrack", collect_prt_TernarySolveTrack), &
+    new_testsuite("prt_UtilMisc", collect_prt_UtilMisc) &
   ]
 
   call get_argument(1, suite_name)

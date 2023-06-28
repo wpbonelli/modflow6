@@ -1226,6 +1226,7 @@ contains
     ! -- Allocate arrays in TrackingModelType
     call this%TrackingModelType%allocate_arrays()
     !
+
     ntrackmx = 1000000 ! kluge hardwire (todo dynamically resize)
 
     call mem_allocate(this%itrack, this%nprp + 1, &
