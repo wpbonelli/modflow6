@@ -40,6 +40,7 @@ from typing import Optional
 
 import pytest
 from filelock import FileLock
+from modflow_devtools.misc import get_ostag
 import yaml
 
 from utils import get_modified_time
@@ -157,7 +158,7 @@ def update_meson_build(version: Version):
 def update_version_tex(version: Version, timestamp: datetime):
     path = project_root_path / "doc" / "version.tex"
     with open(path, "w") as f:
-        line = "\\newcommand{\\modflowversion}{mf" + f"{str(version)}" + "}"
+        line = "\\newcommand{\\modflowversion}{mf" + str(version) + "\\_" + get_ostag() + "}"
         f.write(f"{line}\n")
         line = (
             "\\newcommand{\\modflowdate}{" + f"{timestamp.strftime('%B %d, %Y')}" + "}"
