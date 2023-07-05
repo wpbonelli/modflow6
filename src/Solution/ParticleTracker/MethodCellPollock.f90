@@ -162,6 +162,7 @@ contains
   !> @brief Apply Pollock's method to a rectangular cell
   subroutine apply_mCP(this, particle, tmax)
     use UtilMiscModule
+    use TdisModule, only: kper, kstp
     ! -- dummy
     class(MethodCellPollockType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
@@ -196,7 +197,8 @@ contains
       if (particle%z > this%cellRect%cellDefn%top) then
         particle%z = this%cellRect%cellDefn%top
         ! -- Store track data
-        call this%trackdata%add_track_data(particle, reason=1)
+        call this%trackdata%add_track_data(particle, kper=kper, &
+                                           kstp=kstp, reason=1)
       end if
       !
       ! -- Transform particle location into local cell coordinates.
