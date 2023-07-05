@@ -72,7 +72,7 @@ contains
     integer(I4B), intent(in) :: nt
     character(len=*), intent(in) :: mempath
     !
-    print *, 'allocating ', nt, ' slots for track data arrays'
+    ! print *, 'allocating ', nt, ' slots for track data arrays'
     allocate (character(len=len(mempath)) :: this%mempath)
     ! call mem_allocate(this%mempath, size(mempath), 'TRACKMEMPATH', mempath)
     this%mempath = mempath ! kluge!!!
