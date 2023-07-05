@@ -30,7 +30,7 @@ module PrtModule
   use ParticleModule ! kluge
   use MethodModule
   use GlobalDataModule
-  use TrackDataModule, only: TrackDataType ! kluge?
+  use TrackDataModule, only: TrackDataType, INITIAL_TRACK_SIZE ! kluge?
   use SimModule, only: count_errors, store_error, store_error_filename
 
   implicit none
@@ -1129,19 +1129,7 @@ contains
     call mem_deallocate(this%massstoold)
     call mem_deallocate(this%ratesto)
     call mem_deallocate(this%itrack)
-    call mem_deallocate(this%trackdata%kper)
-    call mem_deallocate(this%trackdata%kstp)
-    call mem_deallocate(this%trackdata%iprp)
-    call mem_deallocate(this%trackdata%irpt)
-    call mem_deallocate(this%trackdata%icell)
-    call mem_deallocate(this%trackdata%izone)
-    call mem_deallocate(this%trackdata%istatus)
-    call mem_deallocate(this%trackdata%ireason)
-    call mem_deallocate(this%trackdata%trelease)
-    call mem_deallocate(this%trackdata%t)
-    call mem_deallocate(this%trackdata%x)
-    call mem_deallocate(this%trackdata%y)
-    call mem_deallocate(this%trackdata%z)
+    call this%trackdata%deallocate_arrays(this%memoryPath)
     !
     ! -- Track data object
     deallocate (this%trackdata)
@@ -1220,52 +1208,30 @@ contains
     ! use ConstantsModule, only: DZERO
     use MemoryManagerModule, only: mem_allocate
     class(PrtModelType) :: this
-    integer(I4B) :: n
-    integer(I4B) :: ntrackmx
+    integer(I4B) :: n, ntrackmx
     !
     ! -- Allocate arrays in TrackingModelType
     call this%TrackingModelType%allocate_arrays()
     !
-
-    ntrackmx = 1000000 ! kluge hardwire (todo dynamically resize)
-
+    ! -- allocate track index
     call mem_allocate(this%itrack, this%nprp + 1, &
-                      'ITRACK', this%memorypath)
-    call mem_allocate(this%trackdata%kper, ntrackmx, &
-                      'TRACKKPER', this%memorypath)
-    call mem_allocate(this%trackdata%kstp, ntrackmx, &
-                      'TRACKKSTP', this%memorypath)
-    call mem_allocate(this%trackdata%iprp, ntrackmx, &
-                      'TRACKIPRP', this%memorypath)
-    call mem_allocate(this%trackdata%irpt, ntrackmx, &
-                      'TRACKIRPT', this%memorypath)
-    call mem_allocate(this%trackdata%icell, ntrackmx, &
-                      'TRACKICELL', this%memorypath)
-    call mem_allocate(this%trackdata%izone, ntrackmx, &
-                      'TRACKIZONE', this%memorypath)
-    call mem_allocate(this%trackdata%istatus, ntrackmx, &
-                      'TRACKISTATUS', this%memorypath)
-    call mem_allocate(this%trackdata%ireason, ntrackmx, &
-                      'TRACKIREASON', this%memorypath)
-    call mem_allocate(this%trackdata%trelease, ntrackmx, &
-                      'TRACKTRELEASE', this%memorypath)
-    call mem_allocate(this%trackdata%t, ntrackmx, &
-                      'TRACKT', this%memorypath)
-    call mem_allocate(this%trackdata%x, ntrackmx, &
-                      'TRACKX', this%memorypath)
-    call mem_allocate(this%trackdata%y, ntrackmx, &
-                      'TRACKY', this%memorypath)
-    call mem_allocate(this%trackdata%z, ntrackmx, &
-                      'TRACKZ', this%memorypath)
+                      'ITRACK', this%memoryPath)
     !
+    ! -- Allocate some initial breathing room for track data.
+    ! -- Depending how many particles the model has, and how
+    ! -- quickly they move, this may be a huge underestimate,
+    ! -- but we expand by a factor of 10 each time we run out
+    ! -- of space, so resizing should be needed infrequently.
+    ntrackmx = INITIAL_TRACK_SIZE
+    call this%trackdata%allocate_arrays(ntrackmx, this%memoryPath)
+    !
+    ! -- allocate and initialize arrays for mass storage
     call mem_allocate(this%masssto, this%dis%nodes, &
                       'MASSSTO', this%memoryPath)
     call mem_allocate(this%massstoold, this%dis%nodes, &
                       'MASSSTOOLD', this%memoryPath)
     call mem_allocate(this%ratesto, this%dis%nodes, &
                       'RATESTO', this%memoryPath)
-    !
-    ! -- initialize
     do n = 1, this%dis%nodes
       this%masssto(n) = DZERO
       this%massstoold(n) = DZERO
@@ -1428,10 +1394,31 @@ contains
     logical(LGP) :: limited
     integer(I4B) :: iprp
     logical(LGP) :: save_inactive = .false.
+    integer(I4B) :: ntracksize, resizefactor, resizethresh, shrinksize
+    real(DP) :: resizefraction
     !
     call create_particle(particle) ! kluge note: elsewhere???
     !
     call this%trackdata%reset_track_data()
+    !
+    ! -- Shrink track arrays by a factor of resizefactor
+    ! -- if less than (resizefraction * 100)% is in use.
+    ! -- Never shrink below the intial trackdata size
+    ! -- purpose of resizethresh is to prevent shrinking
+    ! -- when the track array size is small. Also, never
+    ! -- shrink below minimum size (particle count) * 2.
+    resizefactor = 10
+    resizethresh = INITIAL_TRACK_SIZE
+    resizefraction = 0.01
+    ntracksize = size(this%trackdata%irpt)
+    if (this%trackdata%ntrack < (ntracksize * resizefraction) .and. &
+        ntracksize > resizethresh) then
+      shrinksize = ntracksize / resizefactor
+      if (shrinksize < resizethresh) shrinksize = resizethresh
+      ! print *, 'Shrinking track arrays from ', ntracksize, &
+      !   ' to ', shrinksize
+      call this%trackdata%reallocate_arrays(shrinksize, this%memoryPath)
+    end if
     !
     ! -- Loop over PRP packages
     iprp = 0
@@ -1446,36 +1433,18 @@ contains
         ! -- Loop over particles in package
         do np = 1, packobj%npart
           !
-          ! -- Skip particle if inactive
-          ! if (packobj%partlist%istatus(np).ne.1) cycle
-          ! -- If particle inactive, record (unchanged) location in track data
-          ! -- and skip tracking
+          ! -- If particle inactive, record (unchanged) location in track data and skip tracking
           ! kluge note: temporarily commented out recording of inactive particle data; want it, maybe as an option???
           if (packobj%partlist%istatus(np) .ne. 1 .and. save_inactive) then
-            call this%trackdata%add_track_data(particle, reason=3) ! reason=4 is inactive
+            call this%trackdata%add_track_data(particle, reason=4) ! reason=4 is inactive
             cycle
           end if
           !
+          ! -- Reset the particle's coordinate transformation
           call particle%reset_transf()
 
-          ! kluge note: make subroutine to set particle props?
-          particle%iprp = iprp
-          particle%irpt = np ! kluge note: necessary to reset this here?
-          particle%istopweaksink = packobj%partlist%istopweaksink(np)
-          particle%istopzone = packobj%partlist%istopzone(np)
-          particle%iTrackingDomain(levelMin:levelMax) = &
-            packobj%partlist%iTrackingDomain(np, levelMin:levelMax)
-          particle%iTrackingDomain(1) = this%id ! kluge note: set this elsewhere???
-          particle%iTrackingDomainBoundary(levelMin:levelMax) = &
-            packobj%partlist%iTrackingDomainBoundary(np, levelMin:levelMax)
-          particle%izone = 1 ! particles start in zone 1 (active domain)
-          particle%istatus = -1
-          particle%x = packobj%partlist%x(np)
-          particle%y = packobj%partlist%y(np)
-          particle%z = packobj%partlist%z(np)
-          particle%trelease = packobj%partlist%trelease(np)
-          particle%tstop = packobj%partlist%tstop(np)
-          particle%ttrack = packobj%partlist%ttrack(np)
+          ! -- Update particle properties from particle list
+          call particle%update_from_list(packobj%partlist, this%id, iprp, np)
 
           ! if (particle%iTrackingDomain(2).eq.0) then
           ! if (particle%iTrackingDomain(2).lt.0) then
@@ -1513,21 +1482,8 @@ contains
           ! -- Apply the tracking method
           call method%apply(particle, tmax)
           !
-          packobj%partlist%irpt(np) = particle%irpt ! kluge note: necessary to (re)set this here?
-          packobj%partlist%iTrackingDomain( &
-            np, &
-            levelMin:levelMax) = &
-            particle%iTrackingDomain(levelMin:levelMax)
-          packobj%partlist%iTrackingDomainBoundary( &
-            np, &
-            levelMin:levelMax) = &
-            particle%iTrackingDomainBoundary(levelMin:levelMax)
-          packobj%partlist%izone(np) = particle%izone
-          packobj%partlist%istatus(np) = particle%istatus
-          packobj%partlist%x(np) = particle%x ! kluge note: make subroutine to update particle in list???
-          packobj%partlist%y(np) = particle%y
-          packobj%partlist%z(np) = particle%z
-          packobj%partlist%ttrack(np) = particle%ttrack
+          ! -- Update particle in list
+          call packobj%partlist%update_from_particle(particle, np)
           !
         end do
       end select
