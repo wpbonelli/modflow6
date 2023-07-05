@@ -49,10 +49,11 @@ module ParticleModule
 
   contains
     procedure, public :: destroy => destroy_particle ! destructor for the particle
-    procedure, public :: set_transf
-    procedure, public :: reset_transf
-    procedure, public :: transf_coords
     procedure, public :: get_model_coords
+    procedure, public :: reset_transf
+    procedure, public :: set_transf
+    procedure, public :: transf_coords
+    procedure, public :: update_from_list
   end type ParticleType
 
   ! -- Define the particle list type (ParticleListType)  ! kluge note: use separate module???
@@ -60,30 +61,41 @@ module ParticleModule
 
     ! provenance/metadata
     ! integer, public :: imodel ! index of model to which the particle currently belongs
-    integer(I4B), allocatable, public :: irpt(:) !< release point number
-    integer(I4B), allocatable, public :: iprp(:) ! particle release point number (index)
+    integer(I4B), dimension(:), pointer, contiguous :: irpt !< release point number
+    integer(I4B), dimension(:), pointer, contiguous :: iprp ! particle release point number (index)
 
     ! stopping criteria
-    integer(I4B), allocatable, public :: istopweaksink(:) !< weak sink option: 0 = do not stop, 1 = stop
-    integer(I4B), allocatable, public :: istopzone(:) !< stop zone number
+    integer(I4B), dimension(:), pointer, contiguous :: istopweaksink !< weak sink option: 0 = do not stop, 1 = stop
+    integer(I4B), dimension(:), pointer, contiguous :: istopzone !< stop zone number
 
     ! tracking domain
-    integer(I4B), allocatable, public :: iTrackingDomain(:, :) ! array of indices for domains in the tracking domain hierarchy
-    integer(I4B), allocatable, public :: iTrackingDomainBoundary(:, :) ! array of indices for tracking domain boundaries
+    integer(I4B), dimension(:, :), allocatable :: iTrackingDomain ! array of indices for domains in the tracking domain hierarchy
+    integer(I4B), dimension(:, :), allocatable :: iTrackingDomainBoundary ! array of indices for tracking domain boundaries
 
     ! track data
-    integer(I4B), allocatable, public :: izone(:) !< current zone number
-    integer(I4B), allocatable, public :: istatus(:) !< particle status
-    real(DP), allocatable, public :: x(:) ! model x coord of particle
-    real(DP), allocatable, public :: y(:) ! model y coord of particle
-    real(DP), allocatable, public :: z(:) ! model z coord of particle
-    real(DP), allocatable, public :: trelease(:) ! particle release time
-    real(DP), allocatable, public :: tstop(:) ! particle stop time
-    real(DP), allocatable, public :: ttrack(:) ! time to which particle has been tracked
+    integer(I4B), dimension(:), pointer, contiguous :: izone !< current zone number
+    integer(I4B), dimension(:), pointer, contiguous :: istatus !< particle status
+    real(DP), dimension(:), pointer, contiguous :: x ! model x coord of particle
+    real(DP), dimension(:), pointer, contiguous :: y ! model y coord of particle
+    real(DP), dimension(:), pointer, contiguous :: z ! model z coord of particle
+    real(DP), dimension(:), pointer, contiguous :: trelease ! particle release time
+    real(DP), dimension(:), pointer, contiguous :: tstop ! particle stop time
+    real(DP), dimension(:), pointer, contiguous :: ttrack ! time to which particle has been tracked
 
+  contains
+    procedure, public :: Count
+    procedure, public :: allocate_arrays
+    procedure, public :: deallocate_arrays
+    procedure, public :: reallocate_arrays
+    procedure, public :: update_from_particle
   end type ParticleListType
 
 contains
+
+  pure integer(I4B) function Count(this) result(c)
+    class(ParticleListType), intent(in) :: this
+    c = size(this%irpt)
+  end function
 
   !> @brief Create a new particle
   subroutine create_particle(particle)
@@ -105,6 +117,155 @@ contains
     deallocate (this%iTrackingDomainBoundary)
     return
   end subroutine destroy_particle
+
+  subroutine allocate_arrays(this, np, lmin, lmax, mempath)
+    ! -- modules
+    use MemoryManagerModule, only: mem_allocate
+    ! -- dummy
+    class(ParticleListType), intent(inout) :: this
+    integer(I4B), intent(in) :: np ! number of particles
+    integer(I4B), intent(in) :: lmin ! minimum level in the tracking domain hierarchy
+    integer(I4B), intent(in) :: lmax ! maximum level in the tracking domain hierarchy
+    character(*), intent(in) :: mempath ! path to memory
+    !
+    call mem_allocate(this%irpt, np, 'PLIRPT', mempath)
+    call mem_allocate(this%iprp, np, 'PLIPRP', mempath)
+    ! -- kluge todo: update mem_allocate to allow custom range of indices?
+    !    e.g. here we want to allocate 0-4 for trackdomain levels, not 1-5
+    ! call mem_allocate(this%iTrackingDomain, np, lmax - lmin + 1, 'PLITD', mempath) ! kluge note: ditch crazy dims
+    ! call mem_allocate(this%iTrackingDomainBoundary, np, &
+    !                   lmax - lmin + 1, 'PLITDB', mempath) ! kluge note: ditch crazy dims
+    allocate (this%iTrackingDomain(np, lmin:lmax))
+    allocate (this%iTrackingDomainBoundary(np, lmin:lmax))
+    call mem_allocate(this%izone, np, 'PLIZONE', mempath)
+    call mem_allocate(this%istatus, np, 'PLISTATUS', mempath)
+    call mem_allocate(this%x, np, 'PLX', mempath)
+    call mem_allocate(this%y, np, 'PLY', mempath)
+    call mem_allocate(this%z, np, 'PLZ', mempath)
+    call mem_allocate(this%trelease, np, 'PLTRELEASE', mempath)
+    call mem_allocate(this%tstop, np, 'PLTSTOP', mempath)
+    call mem_allocate(this%ttrack, np, 'PLTTRACK', mempath)
+    call mem_allocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
+    call mem_allocate(this%istopzone, np, 'PLISTOPZONE', mempath)
+    !
+    return
+  end subroutine allocate_arrays
+
+  subroutine deallocate_arrays(this, mempath)
+    ! -- modules
+    use MemoryManagerModule, only: mem_deallocate
+    ! -- dummy
+    class(ParticleListType), intent(inout) :: this
+    character(*), intent(in) :: mempath ! path to memory
+    !
+    call mem_deallocate(this%irpt, 'PLIRPT', mempath)
+    call mem_deallocate(this%iprp, 'PLIPRP', mempath)
+    ! call mem_deallocate(this%iTrackingDomain, 'PLITD', mempath)
+    ! call mem_deallocate(this%iTrackingDomainBoundary, 'PLITDB', mempath)
+    deallocate (this%iTrackingDomain)
+    deallocate (this%iTrackingDomainBoundary)
+    call mem_deallocate(this%izone, 'PLIZONE', mempath)
+    call mem_deallocate(this%istatus, 'PLISTATUS', mempath)
+    call mem_deallocate(this%x, 'PLX', mempath)
+    call mem_deallocate(this%y, 'PLY', mempath)
+    call mem_deallocate(this%z, 'PLZ', mempath)
+    call mem_deallocate(this%trelease, 'PLTRELEASE', mempath)
+    call mem_deallocate(this%tstop, 'PLTSTOP', mempath)
+    call mem_deallocate(this%ttrack, 'PLTTRACK', mempath)
+    call mem_deallocate(this%istopweaksink, 'PLISTOPWEAKSINK', mempath)
+    call mem_deallocate(this%istopzone, 'PLISTOPZONE', mempath)
+    !
+    return
+  end subroutine deallocate_arrays
+
+  subroutine reallocate_arrays(this, np, mempath)
+    ! -- modules
+    use MemoryManagerModule, only: mem_reallocate
+    use ArrayHandlersModule, only: ExpandArray2D
+    ! -- dummy
+    class(ParticleListType), intent(inout) :: this
+    integer(I4B), intent(in) :: np ! number of particles
+    character(*), intent(in) :: mempath ! path to memory
+    !
+    ! resize 1D arrays
+    call mem_reallocate(this%irpt, np, 'PLIRPT', mempath)
+    call mem_reallocate(this%iprp, np, 'PLIPRP', mempath)
+    call mem_reallocate(this%izone, np, 'PLIZONE', mempath)
+    call mem_reallocate(this%istatus, np, 'PLISTATUS', mempath)
+    call mem_reallocate(this%x, np, 'PLX', mempath)
+    call mem_reallocate(this%y, np, 'PLY', mempath)
+    call mem_reallocate(this%z, np, 'PLZ', mempath)
+    call mem_reallocate(this%trelease, np, 'PLTRELEASE', mempath)
+    call mem_reallocate(this%tstop, np, 'PLTSTOP', mempath)
+    call mem_reallocate(this%ttrack, np, 'PLTTRACK', mempath)
+    call mem_reallocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
+    call mem_reallocate(this%istopzone, np, 'PLISTOPZONE', mempath)
+    !
+    ! resize first dimension of 2D arrays
+    call ExpandArray2D( &
+      this%iTrackingDomain, &
+      size(this%iTrackingDomain(:, 1) - np), &
+      0)
+    call ExpandArray2D( &
+      this%iTrackingDomainBoundary, &
+      size(this%iTrackingDomainBoundary(:, 1) - np), &
+      0)
+    !
+    return
+  end subroutine reallocate_arrays
+
+  subroutine update_from_list(this, partlist, im, iprp, irpt)
+    ! -- dummy
+    class(ParticleType), intent(inout) :: this
+    type(ParticleListType), intent(in) :: partlist
+    integer(I4B), intent(in) :: im ! model ID
+    integer(I4B), intent(in) :: iprp ! particle release package ID
+    integer(I4B), intent(in) :: irpt ! particle release point ID
+    !
+    this%iprp = iprp
+    this%irpt = irpt ! kluge note: necessary to reset this here?
+    this%istopweaksink = partlist%istopweaksink(irpt)
+    this%istopzone = partlist%istopzone(irpt)
+    this%iTrackingDomain(levelMin:levelMax) = &
+      partlist%iTrackingDomain(irpt, levelMin:levelMax)
+    this%iTrackingDomain(1) = im
+    this%iTrackingDomainBoundary(levelMin:levelMax) = &
+      partlist%iTrackingDomainBoundary(irpt, levelMin:levelMax)
+    this%istatus = -1 ! need to reset this to -1 every timestep (for solution to proceed)
+    this%x = partlist%x(irpt)
+    this%y = partlist%y(irpt)
+    this%z = partlist%z(irpt)
+    this%trelease = partlist%trelease(irpt)
+    this%tstop = partlist%tstop(irpt)
+    this%ttrack = partlist%ttrack(irpt)
+    !
+    return
+  end subroutine update_from_list
+
+  !> @brief Update particle list from particle
+  subroutine update_from_particle(this, particle, np)
+    ! -- dummy
+    class(ParticleListType), intent(inout) :: this
+    type(ParticleType), intent(in) :: particle
+    integer(I4B), intent(in) :: np
+    !
+    this%iTrackingDomain( &
+      np, &
+      levelMin:levelMax) = &
+      particle%iTrackingDomain(levelMin:levelMax)
+    this%iTrackingDomainBoundary( &
+      np, &
+      levelMin:levelMax) = &
+      particle%iTrackingDomainBoundary(levelMin:levelMax)
+    this%izone(np) = particle%izone
+    this%istatus(np) = particle%istatus
+    this%x(np) = particle%x
+    this%y(np) = particle%y
+    this%z(np) = particle%z
+    this%ttrack(np) = particle%ttrack
+    !
+    return
+  end subroutine update_from_particle
 
   !> @brief Directly set transformation from model coordinates
   !! to particle's local coordinates

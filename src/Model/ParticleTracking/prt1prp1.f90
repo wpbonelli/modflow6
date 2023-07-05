@@ -190,25 +190,12 @@ contains
     ! call mem_deallocate(this%retfactor)
     ! call mem_deallocate(this%izone)
     !
-    deallocate (this%partlist%irpt)
-    deallocate (this%partlist%iprp)
-    deallocate (this%partlist%istopweaksink)
-    deallocate (this%partlist%istopzone)
-    deallocate (this%partlist%iTrackingDomain)
-    deallocate (this%partlist%iTrackingDomainBoundary)
-    deallocate (this%partlist%izone)
-    deallocate (this%partlist%istatus)
-    deallocate (this%partlist%x) ! kluge note: use mem_deallocate for these arrays
-    deallocate (this%partlist%y)
-    deallocate (this%partlist%z)
-    deallocate (this%partlist%trelease)
-    deallocate (this%partlist%tstop)
-    deallocate (this%partlist%ttrack)
-    !
+    ! -- deallocate particle list
+    call this%partlist%deallocate_arrays(this%memoryPath)
     deallocate (this%partlist) ! kluge note: structure of arrays
     call mem_deallocate(this%massrls)
     !
-    ! -- allocatable array (not pointer)
+    ! -- deallocate step release array
     if (allocated(this%kstp_list_rls)) deallocate (this%kstp_list_rls)
     !
     ! -- return
@@ -268,26 +255,14 @@ contains
     ! call mem_allocate(this%retfactor, this%dis%nodes, 'RETFACTOR',            &
     !                   this%memoryPath)
     ! call mem_allocate(this%izone, this%dis%nodes, 'IZONE', this%memoryPath)
-    allocate (this%partlist) ! kluge note: structure of arrays
-    allocate (this%partlist%irpt(this%npartmax))
-    allocate (this%partlist%iprp(this%npartmax))
-    ! kluge note: ditch crazy dims
-    allocate (this%partlist%iTrackingDomain(this%npartmax, &
-                                            levelMin:levelMax))
-    ! kluge note: ditch crazy dims
-    allocate (this%partlist%iTrackingDomainBoundary(this%npartmax, &
-                                                    levelMin:levelMax))
-    allocate (this%partlist%izone(this%npartmax))
-    allocate (this%partlist%istatus(this%npartmax))
-    allocate (this%partlist%x(this%npartmax)) ! kluge note: nprtmax is the initial max dimension
-    allocate (this%partlist%y(this%npartmax)) ! kluge note: use mem_allocate for these arrays
-    allocate (this%partlist%z(this%npartmax))
-    allocate (this%partlist%trelease(this%npartmax))
-    allocate (this%partlist%tstop(this%npartmax))
-    allocate (this%partlist%ttrack(this%npartmax))
-    allocate (this%partlist%istopweaksink(this%npartmax))
-    allocate (this%partlist%istopzone(this%npartmax))
 
+    ! -- Allocate particle list
+    allocate (this%partlist) ! kluge note: structure of arrays
+    call this%partlist%allocate_arrays(this%npartmax, &
+                                       levelMin, levelMax, &
+                                       this%memoryPath)
+    !
+    ! -- Allocate mass release array
     call mem_allocate(this%massrls, this%nreleasepts, 'MASSRLS', this%memoryPath)
     !
     ! -- Intialize
@@ -445,6 +420,13 @@ contains
     !
     ! -- Do the release, if there is one
     if (isRelease) then
+
+      ! resize particle arrays if needed
+      if ((this%npart + this%nreleasepts) > this%npartmax) then
+        this%npartmax = this%npartmax + this%nreleasepts
+        call this%partlist%reallocate_arrays(this%npartmax, this%memoryPath)
+      end if
+
       do nps = 1, this%nreleasepts
         ic = this%noder(nps) ! reduced node number (cell ID)
         ! -- If drape option activated, release particle in highest active
@@ -455,7 +437,9 @@ contains
             ! -- Search for highest active cell
             call this%dis%highest_active(ic, this%ibound)
             ! -- If returned cell is inactive, do not release particle
-            if (this%ibound(ic) == 0) cycle ! kluge note: somehow record for the user that a particle was scheduled but not released?
+            ! kluge note: somehow record for the user that a particle was scheduled but not released?
+            ! another ireason code? record single datum for release into inactive cell?
+            if (this%ibound(ic) == 0) cycle
           end if
         end if
         np = this%npart + 1 ! particle index
@@ -478,6 +462,7 @@ contains
         this%partlist%ttrack(np) = trelease
         this%partlist%istopweaksink(np) = this%istopweaksink
         this%partlist%istopzone(np) = this%istopzone
+        this%partlist%izone = 1 ! particles start in zone 1 (active domain)
         this%partlist%istatus(np) = 1
         this%partlist%irpt(np) = nps
         this%partlist%iTrackingDomain(np, 0) = 0 ! kluge???
