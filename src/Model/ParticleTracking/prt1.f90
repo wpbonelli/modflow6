@@ -1379,9 +1379,7 @@ contains
   subroutine prt_solve(this)
     ! -- modules
     ! kluge note: kper for plotting only; is delt needed?
-    use TdisModule, only: kper, totimc, totim
-    ! -- modules
-    use TdisModule, only: nper, nstp
+    use TdisModule, only: kper, kstp, totimc, totim, nper, nstp
     use PrtPrpModule, only: PrtPrpType
     ! -- dummy variables
     class(PrtModelType) :: this
@@ -1403,10 +1401,7 @@ contains
     !
     ! -- Shrink track arrays by a factor of resizefactor
     ! -- if less than (resizefraction * 100)% is in use.
-    ! -- Never shrink below the intial trackdata size
-    ! -- purpose of resizethresh is to prevent shrinking
-    ! -- when the track array size is small. Also, never
-    ! -- shrink below minimum size (particle count) * 2.
+    ! -- Never shrink below the initial trackdata size.
     resizefactor = 10
     resizethresh = INITIAL_TRACK_SIZE
     resizefraction = 0.01
@@ -1436,7 +1431,8 @@ contains
           ! -- If particle inactive, record (unchanged) location in track data and skip tracking
           ! kluge note: temporarily commented out recording of inactive particle data; want it, maybe as an option???
           if (packobj%partlist%istatus(np) .ne. 1 .and. save_inactive) then
-            call this%trackdata%add_track_data(particle, reason=4) ! reason=4 is inactive
+            call this%trackdata%add_track_data(particle, kper=kper, &
+                                               kstp=kstp, reason=4)
             cycle
           end if
           !
@@ -1444,7 +1440,7 @@ contains
           call particle%reset_transf()
 
           ! -- Update particle properties from particle list
-          call particle%update_from_list(packobj%partlist, this%id, iprp, np)
+          call particle%init_from_list(packobj%partlist, this%id, iprp, np)
 
           ! if (particle%iTrackingDomain(2).eq.0) then
           ! if (particle%iTrackingDomain(2).lt.0) then
@@ -1476,7 +1472,8 @@ contains
           ! -- If particle released during this time step, record its
           ! -- initial location in track data
           if (particle%trelease .ge. totimc) then
-            call this%trackdata%add_track_data(particle, reason=0) ! reason=0 is release
+            call this%trackdata%add_track_data(particle, kper=kper, &
+                                               kstp=kstp, reason=0)
           end if
           !
           ! -- Apply the tracking method

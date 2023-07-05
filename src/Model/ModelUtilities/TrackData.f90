@@ -28,8 +28,12 @@ module TrackDataModule
   !   - irpt: particle release location ID
   !   - trelease: particle release time (retrieved from partlist)
   type :: TrackDataType
-    ! integer arrays
+
+    ! kluge??? if mem_reallocate was called from the PRT module
+    ! instead of within this module, this wouldn't be necessary
     character(len=:), pointer :: mempath => null() ! memory path of track data
+
+    ! integer arrays
     integer(I4B), pointer :: ntrack => null() ! total count of track data
     integer(I4B), dimension(:), pointer, contiguous :: kper ! stress period
     integer(I4B), dimension(:), pointer, contiguous :: kstp ! time step
@@ -71,7 +75,10 @@ contains
     class(TrackDataType), intent(inout) :: this
     integer(I4B), intent(in) :: nt
     character(len=*), intent(in) :: mempath
-    !
+
+    ! -- this routine only accepts a mempath parameter because
+    ! -- the memory manager mem_reallocate routine requires it
+
     ! print *, 'allocating ', nt, ' slots for track data arrays'
     allocate (character(len=len(mempath)) :: this%mempath)
     ! call mem_allocate(this%mempath, size(mempath), 'TRACKMEMPATH', mempath)
@@ -145,12 +152,11 @@ contains
   end subroutine reallocate_arrays
 
   !> @brief Add track data from a particle
-  subroutine add_track_data(this, particle, reason, level)
-    ! -- modules
-    use TdisModule, only: kper, kstp
+  subroutine add_track_data(this, particle, kper, kstp, reason, level)
     ! -- dummy
     class(TrackDataType), intent(inout) :: this
     type(ParticleType), pointer, intent(in) :: particle
+    integer(I4B), intent(in) :: kper, kstp
     integer(I4B), intent(in) :: reason
     integer(I4B), intent(in), optional :: level
     ! -- local
@@ -227,8 +233,6 @@ contains
   !!
   !<
   subroutine save_track_data(this, itrkun, csv, itrack1, itrack2)
-    ! -- modules
-    use ParticleModule, only: ParticleListType
     ! -- dummy
     class(TrackDataType), intent(inout) :: this
     integer(I4B), intent(in) :: itrkun

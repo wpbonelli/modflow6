@@ -100,6 +100,7 @@ contains
   subroutine apply_mCVP(this, particle, tmax)
     ! -- modules
     use UtilMiscModule
+    use TdisModule, only: kper, kstp
     ! -- dummy
     class(MethodCellPassToBotType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
@@ -133,7 +134,8 @@ contains
     end if
     !
     ! -- Store track data
-    call this%trackdata%add_track_data(particle, reason=1)
+    call this%trackdata%add_track_data(particle, kper=kper, &
+                                       kstp=kstp, reason=1)
     !
     return
     !

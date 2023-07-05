@@ -53,7 +53,7 @@ module ParticleModule
     procedure, public :: reset_transf
     procedure, public :: set_transf
     procedure, public :: transf_coords
-    procedure, public :: update_from_list
+    procedure, public :: init_from_list
   end type ParticleType
 
   ! -- Define the particle list type (ParticleListType)  ! kluge note: use separate module???
@@ -83,7 +83,6 @@ module ParticleModule
     real(DP), dimension(:), pointer, contiguous :: ttrack ! time to which particle has been tracked
 
   contains
-    procedure, public :: Count
     procedure, public :: allocate_arrays
     procedure, public :: deallocate_arrays
     procedure, public :: reallocate_arrays
@@ -91,11 +90,6 @@ module ParticleModule
   end type ParticleListType
 
 contains
-
-  pure integer(I4B) function Count(this) result(c)
-    class(ParticleListType), intent(in) :: this
-    c = size(this%irpt)
-  end function
 
   !> @brief Create a new particle
   subroutine create_particle(particle)
@@ -118,6 +112,7 @@ contains
     return
   end subroutine destroy_particle
 
+  !> @brief Allocate particle arrays
   subroutine allocate_arrays(this, np, lmin, lmax, mempath)
     ! -- modules
     use MemoryManagerModule, only: mem_allocate
@@ -151,6 +146,7 @@ contains
     return
   end subroutine allocate_arrays
 
+  !> @brief Deallocate particle arrays
   subroutine deallocate_arrays(this, mempath)
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
@@ -178,6 +174,7 @@ contains
     return
   end subroutine deallocate_arrays
 
+  !> @brief Reallocate particle arrays
   subroutine reallocate_arrays(this, np, mempath)
     ! -- modules
     use MemoryManagerModule, only: mem_reallocate
@@ -214,7 +211,8 @@ contains
     return
   end subroutine reallocate_arrays
 
-  subroutine update_from_list(this, partlist, im, iprp, irpt)
+  !> @brief Initialize particle from particle list
+  subroutine init_from_list(this, partlist, im, iprp, irpt)
     ! -- dummy
     class(ParticleType), intent(inout) :: this
     type(ParticleListType), intent(in) :: partlist
@@ -240,7 +238,7 @@ contains
     this%ttrack = partlist%ttrack(irpt)
     !
     return
-  end subroutine update_from_list
+  end subroutine init_from_list
 
   !> @brief Update particle list from particle
   subroutine update_from_particle(this, particle, np)
