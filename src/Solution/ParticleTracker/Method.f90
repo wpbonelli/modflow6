@@ -44,6 +44,8 @@ contains
 
   !> @brief Track particle across subdomains
   recursive subroutine subtrack(this, particle, level, tmax)
+    ! modules
+    use TdisModule, only: kper, kstp
     ! dummy
     class(MethodType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
@@ -72,7 +74,9 @@ contains
       call submethod%apply(particle, tmax)
       !
       ! -- Store particle trackdata as appropriate
-      call submethod%trackdata%add_track_data(particle, reason=1, level=levelNext)
+      call submethod%trackdata%add_track_data(particle, &
+                                              kper=kper, kstp=kstp, &
+                                              reason=1, level=levelNext)
       !
       ! -- Advance particle
       call advance(this, particle, levelNext, submethod, isStillAdvancing)

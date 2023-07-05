@@ -177,6 +177,7 @@ contains
   !> @brief Apply the ternary method to a polygonal cell
   subroutine apply_mCT(this, particle, tmax)
     use ConstantsModule, only: DZERO, DONE, DHALF ! kluge???
+    use TdisModule, only: kper, kstp
     ! dummy
     class(MethodCellTernaryType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
@@ -216,7 +217,8 @@ contains
       if (particle%z > this%cellPoly%cellDefn%top) then
         particle%z = this%cellPoly%cellDefn%top
         ! -- Store track data
-        call this%trackdata%add_track_data(particle, reason=1)
+        call this%trackdata%add_track_data(particle, kper=kper, &
+                                           kstp=kstp, reason=1)
       end if
       !
       npolyverts = this%cellPoly%cellDefn%npolyverts
