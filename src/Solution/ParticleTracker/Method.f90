@@ -64,23 +64,26 @@ contains
     ! -- where each domain is a grid cell (or subcell)
     isStillAdvancing = .true.
     do while (isStillAdvancing)
-      !
       ! -- Load subdomain tracking method (submethod)
       call this%loadsub(particle, levelNext, submethod)
-      !
+
       ! -- Delegate tracking to the submethod, which either does the tracking
       ! -- calculations or calls this subroutine (subtrack) recursively to
       ! -- continue delegating
       call submethod%apply(particle, tmax)
-      !
+
+      ! -- Store particle trackdata as appropriate
+      ! call submethod%trackdata%add_track_data(particle, &
+      !                                         kper=kper, kstp=kstp, &
+      !                                         reason=1, level=levelNext)
+
+      ! -- Advance particle
+      call advance(this, particle, levelNext, submethod, isStillAdvancing)
+
       ! -- Store particle trackdata as appropriate
       call submethod%trackdata%add_track_data(particle, &
                                               kper=kper, kstp=kstp, &
                                               reason=1, level=levelNext)
-      !
-      ! -- Advance particle
-      call advance(this, particle, levelNext, submethod, isStillAdvancing)
-      !
     end do
     !
     return

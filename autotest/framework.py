@@ -21,7 +21,16 @@ class TestFramework:
         exdir : str
             path to regression model files
         """
-        base, regression = build_function(idx, exdir)
+        if build_function is None:
+            print("No build function defined")
+            return
+
+        sims = build_function(idx, exdir)
+        if isinstance(sims, tuple):
+            base, regression = sims
+        else:
+            base, regression = sims, None
+
         base.write_simulation()
         if regression is not None:
             if isinstance(regression, flopy.mf6.MFSimulation):
