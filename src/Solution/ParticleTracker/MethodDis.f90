@@ -17,16 +17,15 @@ module MethodDisModule
   public :: MethodDisType
   public :: create_methodDis
 
-  ! -- Extend MethodType to the DIS-grid method type (MethodDisType)
   type, extends(MethodType) :: MethodDisType
     private
-    type(PrtFmiType), pointer :: fmi => null() !< flow model interface
-    ! type(CellDefnType), pointer :: cellDefn ! cellDefn object injected into cell method
-    real(DP), dimension(:), pointer, contiguous :: flowja => null() !< intercell flows
-    type(CellRectType), pointer :: cellRect ! rectangular cell
-    real(DP), dimension(:), pointer, contiguous :: porosity => null() !< pointer to aquifer porosity
-    real(DP), dimension(:), pointer, contiguous :: retfactor => null() !< pointer to retardation factor
-    integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< pointer to zone number
+    type(PrtFmiType), pointer :: fmi => null() !< pointer to flow model interface
+    ! type(CellDefnType), pointer :: cellDefn ! pointer to cellDefn object injected into cell method
+    real(DP), dimension(:), pointer, contiguous :: flowja => null() !< pointer to intercell flows
+    type(CellRectType), pointer :: cellRect ! pointer to rectangular cell
+    real(DP), dimension(:), pointer, contiguous :: porosity => null() !< pointer to aquifer porosity array
+    real(DP), dimension(:), pointer, contiguous :: retfactor => null() !< pointer to retardation factor array
+    integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< pointer to zone number array
   contains
     procedure, public :: destroy ! destructor for the method
     procedure, public :: init ! initializes the method
@@ -173,11 +172,14 @@ contains
 
   !> @brief Pass a particle to the next cell, if there is one
   subroutine pass_mGD(this, particle)
+    ! -- modules
+    use InputOutputModule, only: get_ijk
+    use GwfDisModule, only: GwfDisType
     ! -- dummy
     class(MethodDisType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     ! -- local
-    integer :: inface, ipos, ic, inbr, idiag
+    integer :: inface, ipos, ic, icu, inbr, idiag, ilay, irow, icol
     real(DP) :: z, zrel, topfrom, botfrom, top, bot, sat
     !
     inface = particle%iTrackingDomainBoundary(2)
@@ -197,6 +199,16 @@ contains
       ipos = idiag + inbr
       ic = this%fmi%dis%con%ja(ipos) ! kluge note: use PRT model's DIS instead of fmi's???
       particle%iTrackingDomain(2) = ic
+
+      ! compute and set user node number and layer on particle
+      select type (dis => this%fmi%dis)
+      type is (GwfDisType)
+        icu = dis%get_nodeuser(ic)
+        call get_ijk(icu, dis%nrow, dis%ncol, dis%nlay, irow, icol, ilay)
+        particle%icu = icu
+        particle%ilay = ilay
+      end select
+
       ! call this%mapToNbrCell(this%cellRect%cellDefn,inface,z)
       if (inface .eq. 1) then
         inface = 3

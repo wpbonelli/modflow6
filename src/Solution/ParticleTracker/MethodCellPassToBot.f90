@@ -106,7 +106,6 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
     !
-    ! -- Update particle zone
     particle%izone = this%cellDefn%izone
     !
     if (this%cellDefn%izone .ne. 0) then

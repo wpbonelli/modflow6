@@ -45,6 +45,7 @@ module PrtPrpModule
     integer(I4B), pointer :: ioutinactive => null() !< output for inactive particles: 0 = no output, 1 = output
     integer(I4B), pointer :: idrape => null() !< drape option: 0 = do not drape, 1 = drape to topmost active cell
     integer(I4B), dimension(:), pointer, contiguous :: noder => null() !< reduced node number of release point
+    integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< zone number
     real(DP), dimension(:), pointer, contiguous :: x => null() !< x coordinate of particle release point
     real(DP), dimension(:), pointer, contiguous :: y => null() !< y coordinate of particle release point
     real(DP), dimension(:), pointer, contiguous :: z => null() !< z coordinate of particle release point
@@ -204,16 +205,20 @@ contains
 
   !> @ brief Set pointers to model variables
   !<
-  subroutine prp_set_pointers(this, ibound, itrack1, itrack2, trackdata)
+  subroutine prp_set_pointers(this, ibound, izone, itrack1, itrack2, trackdata)
     ! -- dummy variables
     class(PrtPrpType) :: this !< PrtPrpType object
     integer(I4B), dimension(:), pointer, contiguous :: ibound
+    integer(I4B), dimension(:), pointer, contiguous :: izone
     integer(I4B), pointer :: itrack1
     integer(I4B), pointer :: itrack2
     type(TrackDataType), pointer :: trackdata
     !
     ! -- Set pointer to PRT model ibound
     this%ibound => ibound
+    !
+    ! -- Set pointer to PRT model izone
+    this%izone => izone
     !
     ! -- Set pointers to track data
     this%itrack1 => itrack1
@@ -374,10 +379,13 @@ contains
   subroutine prp_ad(this)
     ! -- modules
     use TdisModule, only: kstp, totimc
+    use InputOutputModule, only: get_ijk, get_jk
+    use GwfDisModule, only: GwfDisType
+    use GwfDisvModule, only: GwfDisvType
     ! -- dummy
     class(PrtPrpType) :: this
     ! -- local
-    integer(I4B) :: i, n, ic
+    integer(I4B) :: i, n, ic, icu, icpl, irow, icol, ilay
     integer(I4B) :: nps, np
     real(DP) :: trelease, tstop ! kluge?
     ! real(DP) :: top, bot, sat
@@ -454,7 +462,19 @@ contains
           if (this%stoptime < tstop) tstop = this%stoptime
         end if
 
-        this%partlist%x(np) = this%x(nps) ! kluge note: need check that specified coords are within the cell
+        ! -- Compute starting location's (user) node number and layer number
+        icu = this%dis%get_nodeuser(ic)
+        select type (dis => this%dis) ! kluge???
+        type is (GwfDisType)
+          call get_ijk(icu, dis%nrow, dis%ncol, dis%nlay, irow, icol, ilay)
+        type is (GwfDisvType)
+          call get_jk(icu, dis%ncpl, dis%nlay, icpl, ilay)
+        end select
+
+        ! -- Todo: check that location is within the specified cell
+
+        ! -- Update particle list (todo: factor out a routine?)
+        this%partlist%x(np) = this%x(nps)
         this%partlist%y(np) = this%y(nps)
         this%partlist%z(np) = this%z(nps)
         this%partlist%trelease(np) = trelease ! kluge
@@ -462,9 +482,11 @@ contains
         this%partlist%ttrack(np) = trelease
         this%partlist%istopweaksink(np) = this%istopweaksink
         this%partlist%istopzone(np) = this%istopzone
-        this%partlist%izone = 1 ! particles start in zone 1 (active domain)
-        this%partlist%istatus(np) = 1
         this%partlist%irpt(np) = nps
+        this%partlist%icu = icu
+        this%partlist%ilay = ilay
+        this%partlist%izone = this%izone(ic)
+        this%partlist%istatus(np) = 1
         this%partlist%iTrackingDomain(np, 0) = 0 ! kluge???
         this%partlist%iTrackingDomainBoundary(np, 0) = 0 ! kluge???
         this%partlist%iTrackingDomain(np, 1) = 0 ! kluge???
