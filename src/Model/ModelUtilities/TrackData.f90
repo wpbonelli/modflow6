@@ -13,21 +13,48 @@ module TrackDataModule
   integer(I4B), parameter, public :: INITIAL_TRACK_SIZE = 1000
 
   character(len=*), parameter, public :: TRACKHEADERS = &
-                'kper,kstp,iprp,irpt,icell,izone,istatus,ireason,&
+                'kper,kstp,iprp,irpt,ilay,icell,izone,istatus,ireason,&
                 &trelease,t,x,y,z'
 
   character(len=*), parameter, public :: TRACKTYPES = &
-                             '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
+                             '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
                              &<f8,<f8,<f8,<f8,<f8'
 
-  ! Structure of arrays to hold particle tracks. Arrays are in long format.
-  ! Each particle's track across the simulation domain consists of 1+ rows.
-  ! Particles can be uniquely identified by a combination of column values:
-  !   - todo imdl: originating model ID
-  !   - iprp: originating PRP ID
-  !   - irpt: particle release location ID
-  !   - trelease: particle release time (retrieved from partlist)
   type :: TrackDataType
+
+    ! Notes
+    ! -----
+    !
+    ! Structure of arrays to hold particle tracks.
+    ! Each particle's track across the simulation domain consists of 1+ rows.
+    !
+    ! There is no particle ID column. Particles can be uniquely identified by
+    ! "composite key", i.e. combination of column values:
+    !   - imdl: originating model ID (todo)
+    !   - iprp: originating PRP ID
+    !   - irpt: particle release location ID
+    !   - trelease: particle release time
+    !
+    ! Enumerations:
+    !   istatus (like MODPATH 7's status):
+    !     0: pending release (kluge: is this necessary?)
+    !     1: active
+    !     2: terminated at boundary face
+    !     3: terminated in weak sink cell
+    !     4: terminated in weak source cell
+    !     5: terminated in cell with no exit face
+    !     6: terminated in cell with specified zone number
+    !     7: terminated in inactive cell
+    !     8: permanently unreleased (e.g. released into an inactive cell, into a cell in a termination
+    !                                zone, into a cell with no exit face, into a stop zone cell, etc)
+    !     9: terminated for unknown reason (kluge: is this necessary?)
+    !
+    !   ireason
+    !     0: release
+    !     1: cross spatial boundary (cell? subcell? or generic feature? worth distinguishing?)
+    !     2: cross temporal boundary (time step end)
+    !     3: termination
+    !     4: inactive
 
     ! kluge??? if mem_reallocate was called from the PRT module
     ! instead of within this module, this wouldn't be necessary
@@ -39,16 +66,11 @@ module TrackDataModule
     integer(I4B), dimension(:), pointer, contiguous :: kstp ! time step
     integer(I4B), dimension(:), pointer, contiguous :: irpt ! particle ID
     integer(I4B), dimension(:), pointer, contiguous :: iprp ! originating PRP ID
-    integer(I4B), dimension(:), pointer, contiguous :: icell ! cell ID
+    integer(I4B), dimension(:), pointer, contiguous :: ilay ! layer
+    integer(I4B), dimension(:), pointer, contiguous :: icell ! cell number (user, not reduced)
     integer(I4B), dimension(:), pointer, contiguous :: izone ! todo zone number
     integer(I4B), dimension(:), pointer, contiguous :: istatus ! particle status
     integer(I4B), dimension(:), pointer, contiguous :: ireason ! reason for datum
-    ! ireason can take values:
-    !   0: release
-    !   1: cross spatial boundary (cell? subcell? or generic feature? worth distinguishing?)
-    !   2: cross temporal boundary (time step end)
-    !   3: termination
-    !   4: inactive
 
     ! double arrays
     real(DP), dimension(:), pointer, contiguous :: trelease ! particle's release time
@@ -68,6 +90,9 @@ module TrackDataModule
 
 contains
 
+  !> @brief Allocate track data arrays
+  !! This routine only accepts a mempath parameter because
+  !! the memory manager mem_reallocate routine requires it.
   subroutine allocate_arrays(this, nt, mempath)
     ! -- modules
     use MemoryManagerModule, only: mem_allocate
@@ -88,6 +113,7 @@ contains
     call mem_allocate(this%kstp, nt, 'TRACKKSTP', mempath)
     call mem_allocate(this%iprp, nt, 'TRACKIPRP', mempath)
     call mem_allocate(this%irpt, nt, 'TRACKIRPT', mempath)
+    call mem_allocate(this%ilay, nt, 'TRACKILAY', mempath)
     call mem_allocate(this%icell, nt, 'TRACKICELL', mempath)
     call mem_allocate(this%izone, nt, 'TRACKIZONE', mempath)
     call mem_allocate(this%istatus, nt, 'TRACKISTATUS', mempath)
@@ -101,6 +127,7 @@ contains
     return
   end subroutine allocate_arrays
 
+  !> @brief Deallocate track data arrays
   subroutine deallocate_arrays(this, mempath)
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
@@ -113,6 +140,7 @@ contains
     call mem_deallocate(this%kstp)
     call mem_deallocate(this%iprp)
     call mem_deallocate(this%irpt)
+    call mem_deallocate(this%ilay)
     call mem_deallocate(this%icell)
     call mem_deallocate(this%izone)
     call mem_deallocate(this%istatus)
@@ -126,6 +154,7 @@ contains
     return
   end subroutine deallocate_arrays
 
+  !> @brief Resize track data arrays
   subroutine reallocate_arrays(this, nt, mempath)
     ! -- modules
     use MemoryManagerModule, only: mem_reallocate
@@ -138,6 +167,7 @@ contains
     call mem_reallocate(this%kstp, nt, 'TRACKKSTP', mempath)
     call mem_reallocate(this%iprp, nt, 'TRACKIPRP', mempath)
     call mem_reallocate(this%irpt, nt, 'TRACKIRPT', mempath)
+    call mem_reallocate(this%ilay, nt, 'TRACKILAY', mempath)
     call mem_reallocate(this%icell, nt, 'TRACKICELL', mempath)
     call mem_reallocate(this%izone, nt, 'TRACKIZONE', mempath)
     call mem_reallocate(this%istatus, nt, 'TRACKISTATUS', mempath)
@@ -160,7 +190,7 @@ contains
     integer(I4B), intent(in) :: reason
     integer(I4B), intent(in), optional :: level
     ! -- local
-    integer(I4B) :: ntrack, ntracksize
+    integer(I4B) :: itrack, ntracksize
     integer(I4B) :: resizefactor, resizethresh
     real(DP) :: resizefraction
     logical(LGP) :: ladd
@@ -194,21 +224,26 @@ contains
       call particle%get_model_coords(xmodel, ymodel, zmodel)
       !
       ! -- Add track data
-      ntrack = this%ntrack + 1
-      this%ntrack = ntrack
-      this%kper = kper
-      this%kstp = kstp
-      this%irpt(ntrack) = particle%irpt
-      this%iprp = particle%iprp
-      this%icell(ntrack) = particle%iTrackingDomain(2)
-      this%izone = particle%izone
-      this%istatus = particle%istatus
-      this%ireason = reason
-      this%trelease(ntrack) = particle%trelease
-      this%t(ntrack) = particle%ttrack
-      this%x(ntrack) = xmodel
-      this%y(ntrack) = ymodel
-      this%z(ntrack) = zmodel
+      itrack = this%ntrack + 1
+      this%ntrack = itrack
+      this%kper(itrack) = kper
+      this%kstp(itrack) = kstp
+      this%irpt(itrack) = particle%irpt
+      this%iprp(itrack) = particle%iprp
+      this%ilay(itrack) = particle%ilay
+      this%icell(itrack) = particle%icu
+      this%izone(itrack) = particle%izone
+      if (particle%istatus .lt. 0) then
+        this%istatus(itrack) = 1
+      else
+        this%istatus(itrack) = particle%istatus
+      end if
+      this%ireason(itrack) = reason
+      this%trelease(itrack) = particle%trelease
+      this%t(itrack) = particle%ttrack
+      this%x(itrack) = xmodel
+      this%y(itrack) = ymodel
+      this%z(itrack) = zmodel
 
     end if
     !
@@ -230,8 +265,6 @@ contains
   !! Arguments itrack1 and itrack2 may be provided to select a subset of
   !! track data to write to file. This can be used to write data for one
   !! or multiple contiguous PRPs, instead of all particles in the model.
-  !!
-  !<
   subroutine save_track_data(this, itrkun, csv, itrack1, itrack2)
     ! -- dummy
     class(TrackDataType), intent(inout) :: this
@@ -241,7 +274,7 @@ contains
     ! -- local
     integer(I4B) :: itrack, itrackmin, itrackmax
     integer(I4B) :: kper, kstp
-    integer(I4B) :: iprp, irpt, icell, izone, istatus, ireason
+    integer(I4B) :: iprp, irpt, ilay, icell, izone, istatus, ireason
     real(DP) :: trelease, t, x, y, z
 
     ! -- select subset of track data between itrack1 and itrack2
@@ -263,6 +296,7 @@ contains
       kstp = this%kstp(itrack)
       iprp = this%iprp(itrack)
       irpt = this%irpt(itrack)
+      ilay = this%ilay(itrack)
       icell = this%icell(itrack)
       izone = this%izone(itrack)
       istatus = this%istatus(itrack)
@@ -275,11 +309,11 @@ contains
 
       if (csv) then
         write (itrkun, '(*(G0,:,","))') &
-          kper, kstp, iprp, irpt, icell, izone, istatus, ireason, &
+          kper, kstp, iprp, irpt, ilay, icell, izone, istatus, ireason, &
           trelease, t, x, y, z
       else
         write (itrkun) &
-          kper, kstp, iprp, irpt, icell, izone, istatus, ireason, &
+          kper, kstp, iprp, irpt, ilay, icell, izone, istatus, ireason, &
           trelease, t, x, y, z
       end if
     end do

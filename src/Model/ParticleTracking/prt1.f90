@@ -366,6 +366,7 @@ contains
         itrack1 => this%itrack(iprp)
         itrack2 => this%itrack(iprp + 1)
         call packobj%prp_set_pointers(this%ibound, &
+                                      this%mip%izone, &
                                       itrack1, &
                                       itrack2, &
                                       this%trackdata) ! kluge
@@ -1440,7 +1441,7 @@ contains
           call particle%reset_transf()
 
           ! -- Update particle properties from particle list
-          call particle%init_from_list(packobj%partlist, this%id, iprp, np)
+          call particle%load_from_list(packobj%partlist, this%id, iprp, np)
 
           ! if (particle%iTrackingDomain(2).eq.0) then
           ! if (particle%iTrackingDomain(2).lt.0) then

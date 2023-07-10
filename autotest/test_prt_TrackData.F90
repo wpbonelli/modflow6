@@ -12,7 +12,7 @@ contains
     type(unittest_type), allocatable, intent(out) :: testsuite(:)
     testsuite = [ &
                 new_unittest("reallocate", test_reallocate), &
-                new_unittest("add_track_data", test_add_track_data) &
+                new_unittest("add_track_datum", test_add_track_datum) &
                 ]
   end subroutine collect_prt_TrackData
 
@@ -33,12 +33,14 @@ contains
 
     ! allocate and initialize particle
     call create_particle(particle)
-    particle%irpt = 0
     particle%iprp = 0
+    particle%irpt = 0
     particle%istopzone = 0
     particle%istopweaksink = 0
     particle%iTrackingDomain(levelMin:levelMax) = 0
     particle%iTrackingDomainBoundary(levelMin:levelMax) = 0
+    particle%icu = 0
+    particle%ilay = 0
     particle%izone = 0
     particle%istatus = 0
     particle%x = 0
@@ -59,10 +61,11 @@ contains
     call trackdata%allocate_arrays(nt1, mempath)
 
     ! check initial array sizes
+    call check(error, size(trackdata%iprp) == nt1)
+    call check(error, size(trackdata%irpt) == nt1)
     call check(error, size(trackdata%kper) == nt1)
     call check(error, size(trackdata%kstp) == nt1)
-    call check(error, size(trackdata%irpt) == nt1)
-    call check(error, size(trackdata%iprp) == nt1)
+    call check(error, size(trackdata%ilay) == nt1)
     call check(error, size(trackdata%icell) == nt1)
     call check(error, size(trackdata%izone) == nt1)
     call check(error, size(trackdata%istatus) == nt1)
@@ -78,10 +81,11 @@ contains
     call trackdata%reallocate_arrays(nt2, mempath)
 
     ! check that arrays have been resized
+    call check(error, size(trackdata%iprp) == nt2)
+    call check(error, size(trackdata%irpt) == nt2)
     call check(error, size(trackdata%kper) == nt2)
     call check(error, size(trackdata%kstp) == nt2)
-    call check(error, size(trackdata%irpt) == nt2)
-    call check(error, size(trackdata%iprp) == nt2)
+    call check(error, size(trackdata%ilay) == nt2)
     call check(error, size(trackdata%icell) == nt2)
     call check(error, size(trackdata%izone) == nt2)
     call check(error, size(trackdata%istatus) == nt2)
@@ -95,7 +99,7 @@ contains
 
   end subroutine test_reallocate
 
-  subroutine test_add_track_data(error)
+  subroutine test_add_track_datum(error)
     ! -- modules
     use GlobalDataModule, only: levelMin, levelMax
     use ConstantsModule, only: LENMEMPATH, I4B
@@ -109,17 +113,19 @@ contains
     integer(I4B) :: nt1 = 1
     integer(I4B) :: nt2
     integer(I4B) :: kper = 1, kstp = 1
-    character(len=LENMEMPATH) :: mempath = "test_add_track_data"
+    character(len=LENMEMPATH) :: mempath = "test_add_track_datum"
 
     ! allocate and initialize particle
     print *, "allocating particle"
     call create_particle(particle)
-    particle%irpt = 0
     particle%iprp = 0
+    particle%irpt = 0
     particle%istopzone = 0
     particle%istopweaksink = 0
     particle%iTrackingDomain(levelMin:levelMax) = 0
     particle%iTrackingDomainBoundary(levelMin:levelMax) = 0
+    particle%icu = 0
+    particle%ilay = 0
     particle%izone = 0
     particle%istatus = 0
     particle%x = 0
@@ -144,10 +150,11 @@ contains
 
     ! check initial array sizes
     print *, "checking initial trackdata size"
+    call check(error, size(trackdata%iprp) == nt1)
+    call check(error, size(trackdata%irpt) == nt1)
     call check(error, size(trackdata%kper) == nt1)
     call check(error, size(trackdata%kstp) == nt1)
-    call check(error, size(trackdata%irpt) == nt1)
-    call check(error, size(trackdata%iprp) == nt1)
+    call check(error, size(trackdata%ilay) == nt1)
     call check(error, size(trackdata%icell) == nt1)
     call check(error, size(trackdata%izone) == nt1)
     call check(error, size(trackdata%istatus) == nt1)
@@ -166,10 +173,11 @@ contains
 
     ! check track data values
     print *, "checking initial track data values"
+    call check(error, trackdata%iprp(1) == 0)
+    call check(error, trackdata%irpt(1) == 0)
     call check(error, trackdata%kper(1) == 1)
     call check(error, trackdata%kstp(1) == 1)
-    call check(error, trackdata%irpt(1) == 0)
-    call check(error, trackdata%iprp(1) == 0)
+    call check(error, trackdata%ilay(1) == 0)
     call check(error, trackdata%icell(1) == 0)
     call check(error, trackdata%izone(1) == 0)
     call check(error, trackdata%istatus(1) == 0)
@@ -189,10 +197,11 @@ contains
     ! check that arrays were automatically expanded by factor of 10
     print *, "checking arrays were expanded by factor of 10"
     nt2 = nt1 * 10
+    call check(error, size(trackdata%iprp) == nt2)
+    call check(error, size(trackdata%irpt) == nt2)
     call check(error, size(trackdata%kper) == nt2)
     call check(error, size(trackdata%kstp) == nt2)
-    call check(error, size(trackdata%irpt) == nt2)
-    call check(error, size(trackdata%iprp) == nt2)
+    call check(error, size(trackdata%ilay) == nt2)
     call check(error, size(trackdata%icell) == nt2)
     call check(error, size(trackdata%izone) == nt2)
     call check(error, size(trackdata%istatus) == nt2)
@@ -204,6 +213,6 @@ contains
     call check(error, size(trackdata%z) == nt2)
     if (allocated(error)) return
 
-  end subroutine test_add_track_data
+  end subroutine test_add_track_datum
 
 end module test_prt_trackdata

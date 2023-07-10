@@ -17,16 +17,15 @@ module MethodDisvModule
   public :: MethodDisvType
   public :: create_methodDisv
 
-  ! -- Extend MethodType to the DISV-grid method type (MethodDisvType)
   type, extends(MethodType) :: MethodDisvType
     private
-    type(PrtFmiType), pointer :: fmi => null() !< flow model interface
+    type(PrtFmiType), pointer :: fmi => null() !< ptr to flow model interface
     ! type(CellDefnType), pointer :: cellDefn ! cellDefn object injected into cell method
-    real(DP), dimension(:), pointer, contiguous :: flowja => null() !< intercell flows
-    type(CellPolyType), pointer :: cellPoly ! polygonal cell
-    real(DP), dimension(:), pointer, contiguous :: porosity => null() !< ptr to aquifer porosity
-    real(DP), dimension(:), pointer, contiguous :: retfactor => null() !< ptr to retardation factor
-    integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< pointer to zone number
+    real(DP), dimension(:), pointer, contiguous :: flowja => null() !< ptr to intercell flows
+    type(CellPolyType), pointer :: cellPoly ! ptr to polygonal cell
+    real(DP), dimension(:), pointer, contiguous :: porosity => null() !< ptr to aquifer porosity array
+    real(DP), dimension(:), pointer, contiguous :: retfactor => null() !< ptr to retardation factor array
+    integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< pointer to zone number array
   contains
     ! kluge note: must procedures like this be denoted as public (as and throughout)???
     procedure, public :: destroy ! destructor for the method
@@ -160,11 +159,14 @@ contains
 
   !> @brief Pass a particle to the next cell, if there is one
   subroutine pass_mGDv(this, particle)
+    ! -- modules
+    use InputOutputModule, only: get_jk
+    use GwfDisvModule, only: GwfDisvType
     ! -- dummy
     class(MethodDisvType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     ! -- local
-    integer :: inface, ipos, ic, inbr, idiag
+    integer :: inface, ipos, ic, icu, inbr, idiag, icpl, ilay
     double precision :: z
     !
     inface = particle%iTrackingDomainBoundary(2)
@@ -184,6 +186,16 @@ contains
       ipos = idiag + inbr
       ic = this%fmi%dis%con%ja(ipos) ! kluge note: use PRT model's DIS instead of fmi's??
       particle%iTrackingDomain(2) = ic
+
+      ! compute and set user node number and layer on particle
+      select type (dis => this%fmi%dis)
+      type is (GwfDisvType)
+        icu = dis%get_nodeuser(ic)
+        call get_jk(icu, dis%ncpl, dis%nlay, icpl, ilay)
+        particle%icu = icu
+        particle%ilay = ilay
+      end select
+
       call this%mapToNbrCell(this%cellPoly%cellDefn, inface, z)
       particle%iTrackingDomainBoundary(2) = inface
       particle%iTrackingDomain(3:) = 0
