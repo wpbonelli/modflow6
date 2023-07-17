@@ -310,7 +310,7 @@ def test_mf6model(name, function_tmpdir, targets):
         str(ws),
     )
 
-        # extract model objects
+    # extract model objects
     gwf = sim.get_model(gwfname)
     prt = sim.get_model(prtname)
 

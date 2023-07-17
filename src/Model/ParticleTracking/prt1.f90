@@ -382,8 +382,6 @@ contains
                               this%mip%retfactor, this%mip%izone, &
                               this%trackdata)
     !
-
-    !
     ! -- return
     return
   end subroutine prt_ar
