@@ -323,7 +323,7 @@ def test_prt_fmi01(function_tmpdir, targets):
     mp7_pldata = pd.DataFrame(
         plf.get_destination_pathline_data(range(mg.nnodes), to_recarray=True)
     )
-    # convert zero-based to one-based
+    # convert zero-based to one-based indexing in mp7 results
     mp7_pldata["particleid"] = mp7_pldata["particleid"] + 1
     mp7_pldata["particlegroup"] = mp7_pldata["particlegroup"] + 1
     mp7_pldata["node"] = mp7_pldata["node"] + 1
@@ -331,6 +331,14 @@ def test_prt_fmi01(function_tmpdir, targets):
 
     # load mf6 pathline results
     mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
+
+    # make sure all mf6 pathline data have correct model and PRP index (1)
+    def all_equal(col, val):
+        a = col.to_numpy()
+        return a[0] == val and (a[0] == a).all()
+
+    assert all_equal(mf6_pldata["imdl"], 1)
+    assert all_equal(mf6_pldata["iprp"], 1)
 
     # check mf6 cell budget file
     check_budget_data(ws / f"{name}_prt.lst", ws / prt_budget_file)

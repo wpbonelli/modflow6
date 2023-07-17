@@ -13,11 +13,11 @@ module TrackDataModule
   integer(I4B), parameter, public :: INITIAL_TRACK_SIZE = 1000
 
   character(len=*), parameter, public :: TRACKHEADERS = &
-                'kper,kstp,iprp,irpt,ilay,icell,izone,istatus,ireason,&
+                'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,istatus,ireason,&
                 &trelease,t,x,y,z'
 
   character(len=*), parameter, public :: TRACKTYPES = &
-                             '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
+                             '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
                              &<f8,<f8,<f8,<f8,<f8'
 
   type :: TrackDataType
@@ -30,7 +30,7 @@ module TrackDataModule
     !
     ! There is no particle ID column. Particles can be uniquely identified by
     ! "composite key", i.e. combination of column values:
-    !   - imdl: originating model ID (todo)
+    !   - imdl: originating model ID
     !   - iprp: originating PRP ID
     !   - irpt: particle release location ID
     !   - trelease: particle release time
@@ -64,8 +64,9 @@ module TrackDataModule
     integer(I4B), pointer :: ntrack => null() ! total count of track data
     integer(I4B), dimension(:), pointer, contiguous :: kper ! stress period
     integer(I4B), dimension(:), pointer, contiguous :: kstp ! time step
-    integer(I4B), dimension(:), pointer, contiguous :: irpt ! particle ID
-    integer(I4B), dimension(:), pointer, contiguous :: iprp ! originating PRP ID
+    integer(I4B), dimension(:), pointer, contiguous :: imdl ! originating model index
+    integer(I4B), dimension(:), pointer, contiguous :: iprp ! originating PRP index
+    integer(I4B), dimension(:), pointer, contiguous :: irpt ! release point index
     integer(I4B), dimension(:), pointer, contiguous :: ilay ! layer
     integer(I4B), dimension(:), pointer, contiguous :: icell ! cell number (user, not reduced)
     integer(I4B), dimension(:), pointer, contiguous :: izone ! todo zone number
@@ -111,6 +112,7 @@ contains
     ! call mem_setptr(mempath, 'TRACKMEMPATH', mempath)
     call mem_allocate(this%kper, nt, 'TRACKKPER', mempath)
     call mem_allocate(this%kstp, nt, 'TRACKKSTP', mempath)
+    call mem_allocate(this%imdl, nt, 'TRACKIMDL', mempath)
     call mem_allocate(this%iprp, nt, 'TRACKIPRP', mempath)
     call mem_allocate(this%irpt, nt, 'TRACKIRPT', mempath)
     call mem_allocate(this%ilay, nt, 'TRACKILAY', mempath)
@@ -138,6 +140,7 @@ contains
     deallocate (this%mempath) ! kluge!!!
     call mem_deallocate(this%kper)
     call mem_deallocate(this%kstp)
+    call mem_deallocate(this%imdl)
     call mem_deallocate(this%iprp)
     call mem_deallocate(this%irpt)
     call mem_deallocate(this%ilay)
@@ -165,6 +168,7 @@ contains
     !
     call mem_reallocate(this%kper, nt, 'TRACKKPER', mempath)
     call mem_reallocate(this%kstp, nt, 'TRACKKSTP', mempath)
+    call mem_reallocate(this%imdl, nt, 'TRACKIMDL', mempath)
     call mem_reallocate(this%iprp, nt, 'TRACKIPRP', mempath)
     call mem_reallocate(this%irpt, nt, 'TRACKIRPT', mempath)
     call mem_reallocate(this%ilay, nt, 'TRACKILAY', mempath)
@@ -191,8 +195,7 @@ contains
     integer(I4B), intent(in), optional :: level
     ! -- local
     integer(I4B) :: itrack, ntracksize
-    integer(I4B) :: resizefactor, resizethresh
-    real(DP) :: resizefraction
+    integer(I4B) :: resizefactor
     logical(LGP) :: ladd
     real(DP) :: xmodel, ymodel, zmodel
     !
@@ -211,8 +214,6 @@ contains
       !
       ! -- Expand track arrays by factor of 10 if at capacity.
       resizefactor = 10
-      resizethresh = 100
-      resizefraction = 0.01
       ntracksize = size(this%irpt)
       if ((ntracksize - this%ntrack) < 1) then
         ! print *, 'Expanding track arrays from ', ntracksize, &
@@ -228,8 +229,9 @@ contains
       this%ntrack = itrack
       this%kper(itrack) = kper
       this%kstp(itrack) = kstp
-      this%irpt(itrack) = particle%irpt
+      this%imdl(itrack) = particle%imdl
       this%iprp(itrack) = particle%iprp
+      this%irpt(itrack) = particle%irpt
       this%ilay(itrack) = particle%ilay
       this%icell(itrack) = particle%icu
       this%izone(itrack) = particle%izone
@@ -274,7 +276,7 @@ contains
     ! -- local
     integer(I4B) :: itrack, itrackmin, itrackmax
     integer(I4B) :: kper, kstp
-    integer(I4B) :: iprp, irpt, ilay, icell, izone, istatus, ireason
+    integer(I4B) :: imdl, iprp, irpt, ilay, icell, izone, istatus, ireason
     real(DP) :: trelease, t, x, y, z
 
     ! -- select subset of track data between itrack1 and itrack2
@@ -294,6 +296,7 @@ contains
     do itrack = itrackmin, itrackmax
       kper = this%kper(itrack)
       kstp = this%kstp(itrack)
+      imdl = this%imdl(itrack)
       iprp = this%iprp(itrack)
       irpt = this%irpt(itrack)
       ilay = this%ilay(itrack)
@@ -309,11 +312,11 @@ contains
 
       if (csv) then
         write (itrkun, '(*(G0,:,","))') &
-          kper, kstp, iprp, irpt, ilay, icell, izone, istatus, ireason, &
+          kper, kstp, imdl, iprp, irpt, ilay, icell, izone, istatus, ireason, &
           trelease, t, x, y, z
       else
         write (itrkun) &
-          kper, kstp, iprp, irpt, ilay, icell, izone, istatus, ireason, &
+          kper, kstp, imdl, iprp, irpt, ilay, icell, izone, istatus, ireason, &
           trelease, t, x, y, z
       end if
     end do

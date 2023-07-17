@@ -393,6 +393,21 @@ def test_prt_fmi02(function_tmpdir, targets):
     # load mf6 pathline results
     mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
 
+    # make sure mf7 pathline data have correct
+    #   - model index (1)
+    #   - PRP index (1 or 2, depending on release point index)
+    def all_equal(col, val):
+        a = col.to_numpy()
+        return a[0] == val and (a[0] == a).all()
+
+    assert all_equal(mf6_pldata["imdl"], 1)
+    assert set(mf6_pldata[mf6_pldata["iprp"] == 1]["irpt"].unique()) == set(
+        range(1, 5)
+    )
+    assert set(mf6_pldata[mf6_pldata["iprp"] == 2]["irpt"].unique()) == set(
+        range(1, 6)
+    )
+
     # check mf6 cell budget file
     check_budget_data(ws / f"{name}_prt.lst", ws / prt_budget_file)
 
