@@ -16,22 +16,22 @@ module ParticleModule
     private
 
     ! identity
-    ! integer, public :: imdl ! index of model particle currently belongs to
-    integer(I4B), public :: iprp ! particle release package index
-    integer(I4B), public :: irpt !< release point index
-    integer(I4B), public :: ip !< particle index in the particle list
+    integer(I4B), public :: imdl ! index of model the particle originated in
+    integer(I4B), public :: iprp ! index of release package the particle originated in
+    integer(I4B), public :: irpt ! index of release point in the particle release package the particle originated in
+    integer(I4B), public :: ip ! index of particle in the particle list
 
     ! stop criteria
-    integer(I4B), public :: istopweaksink !< weak sink option: 0 = do not stop, 1 = stop
-    integer(I4B), public :: istopzone !< stop zone number
+    integer(I4B), public :: istopweaksink ! weak sink option: 0 = do not stop, 1 = stop
+    integer(I4B), public :: istopzone ! stop zone number
 
     ! state
     integer(I4B), allocatable, public :: iTrackingDomain(:) ! array of indices for domains in the tracking domain hierarchy
     integer(I4B), allocatable, public :: iTrackingDomainBoundary(:) ! array of indices for tracking domain boundaries
-    integer(I4B), public :: icu !< user cell (node) number
-    integer(I4B), public :: ilay !< layer
-    integer(I4B), public :: izone !< current zone number
-    integer(I4B), public :: istatus !< particle status
+    integer(I4B), public :: icu ! user cell (node) number
+    integer(I4B), public :: ilay ! layer
+    integer(I4B), public :: izone ! current zone number
+    integer(I4B), public :: istatus ! particle status
     real(DP), public :: x ! model x coord of particle
     real(DP), public :: y ! model y coord of particle
     real(DP), public :: z ! model z coord of particle
@@ -40,12 +40,12 @@ module ParticleModule
     real(DP), public :: ttrack ! time to which particle has been tracked
 
     ! coord transform
-    logical(LGP), public :: isTransformed !< indicates whether coordinates have been transformed from model to local coordinates
-    real(DP), public :: xOrigin !< x origin for coordinate transformation from model to local
-    real(DP), public :: yOrigin !< y origin for coordinate transformation from model to local
-    real(DP), public :: zOrigin !< z origin for coordinate transformation from model to local
-    real(DP), public :: sinrot !< sine of rotation angle for coordinate transformation from model to local
-    real(DP), public :: cosrot !< cosine of rotation angle for coordinate transformation from model to local
+    logical(LGP), public :: isTransformed ! indicates whether coordinates have been transformed from model to local coordinates
+    real(DP), public :: xOrigin ! x origin for coordinate transformation from model to local
+    real(DP), public :: yOrigin ! y origin for coordinate transformation from model to local
+    real(DP), public :: zOrigin ! z origin for coordinate transformation from model to local
+    real(DP), public :: sinrot ! sine of rotation angle for coordinate transformation from model to local
+    real(DP), public :: cosrot ! cosine of rotation angle for coordinate transformation from model to local
 
   contains
     procedure, public :: destroy => destroy_particle ! destructor for the particle
@@ -58,22 +58,24 @@ module ParticleModule
 
   type ParticleListType
 
+    ! Stores particles belonging to a model.
+
     ! identity
-    ! integer, public :: imdl ! index of model to which the particle currently belongs
-    integer(I4B), dimension(:), pointer, contiguous :: iprp ! particle release package index
-    integer(I4B), dimension(:), pointer, contiguous :: irpt !< release point index
+    integer(I4B), dimension(:), pointer, contiguous :: imdl ! index of model particle originated in
+    integer(I4B), dimension(:), pointer, contiguous :: iprp ! index of release package the particle originated in
+    integer(I4B), dimension(:), pointer, contiguous :: irpt ! index of release point in the particle release package the particle originated in
 
     ! stopping criteria
-    integer(I4B), dimension(:), pointer, contiguous :: istopweaksink !< weak sink option: 0 = do not stop, 1 = stop
-    integer(I4B), dimension(:), pointer, contiguous :: istopzone !< stop zone number
+    integer(I4B), dimension(:), pointer, contiguous :: istopweaksink ! weak sink option: 0 = do not stop, 1 = stop
+    integer(I4B), dimension(:), pointer, contiguous :: istopzone ! stop zone number
 
     ! state
     integer(I4B), dimension(:, :), allocatable :: iTrackingDomain ! array of indices for domains in the tracking domain hierarchy
     integer(I4B), dimension(:, :), allocatable :: iTrackingDomainBoundary ! array of indices for tracking domain boundaries
-    integer(I4B), dimension(:), pointer, contiguous :: icu !< cell number (user, not reduced)
-    integer(I4B), dimension(:), pointer, contiguous :: ilay !< layer
-    integer(I4B), dimension(:), pointer, contiguous :: izone !< current zone number
-    integer(I4B), dimension(:), pointer, contiguous :: istatus !< particle status
+    integer(I4B), dimension(:), pointer, contiguous :: icu ! cell number (user, not reduced)
+    integer(I4B), dimension(:), pointer, contiguous :: ilay ! layer
+    integer(I4B), dimension(:), pointer, contiguous :: izone ! current zone number
+    integer(I4B), dimension(:), pointer, contiguous :: istatus ! particle status
     real(DP), dimension(:), pointer, contiguous :: x ! model x coord of particle
     real(DP), dimension(:), pointer, contiguous :: y ! model y coord of particle
     real(DP), dimension(:), pointer, contiguous :: z ! model z coord of particle
@@ -122,6 +124,7 @@ contains
     integer(I4B), intent(in) :: lmax ! maximum level in the tracking domain hierarchy
     character(*), intent(in) :: mempath ! path to memory
     !
+    call mem_allocate(this%imdl, np, 'PLIMDL', mempath)
     call mem_allocate(this%irpt, np, 'PLIRPT', mempath)
     call mem_allocate(this%iprp, np, 'PLIPRP', mempath)
     ! -- kluge todo: update mem_allocate to allow custom range of indices?
@@ -155,7 +158,7 @@ contains
     class(ParticleListType), intent(inout) :: this
     character(*), intent(in) :: mempath ! path to memory
     !
-
+    call mem_deallocate(this%imdl, 'PLIMDL', mempath)
     call mem_deallocate(this%iprp, 'PLIPRP', mempath)
     call mem_deallocate(this%irpt, 'PLIRPT', mempath)
     ! call mem_deallocate(this%iTrackingDomain, 'PLITD', mempath)
@@ -189,6 +192,7 @@ contains
     character(*), intent(in) :: mempath ! path to memory
     !
     ! resize 1D arrays
+    call mem_reallocate(this%imdl, np, 'PLIMDL', mempath)
     call mem_reallocate(this%iprp, np, 'PLIPRP', mempath)
     call mem_reallocate(this%irpt, np, 'PLIRPT', mempath)
     call mem_reallocate(this%icu, np, 'PLICU', mempath)
@@ -217,17 +221,19 @@ contains
     return
   end subroutine reallocate_arrays
 
-  !> @brief Load particle from particle list
-  !! kluge todo: move im to particle/list, remove im and iprp params here
+  !> @brief Initialize particle from particle list.
+  !!
+  !! This routine is used to initialize a particle from the list
+  !! so it can be tracked by prt_solve. The particle
   subroutine load_from_list(this, partlist, imdl, iprp, ip)
     ! -- dummy
     class(ParticleType), intent(inout) :: this
     type(ParticleListType), intent(in) :: partlist
-    integer(I4B), intent(in) :: imdl ! model ID
-    integer(I4B), intent(in) :: iprp ! particle release package ID
-    integer(I4B), intent(in) :: ip ! particle index
+    integer(I4B), intent(in) :: imdl ! index of model particle originated in
+    integer(I4B), intent(in) :: iprp ! index of particle release package particle originated in
+    integer(I4B), intent(in) :: ip ! index into the particle list
     !
-    ! this%imdl = imdl
+    this%imdl = imdl
     this%iprp = iprp
     this%irpt = partlist%irpt(ip) ! kluge note: necessary to reset this here?
     this%ip = ip
@@ -324,6 +330,7 @@ contains
                        this%sinrot, this%cosrot, &
                        xOrigin_opt, yOrigin_opt, zOrigin_opt, &
                        sinrot_opt, cosrot_opt, invert_opt)
+    !
     ! -- Set isTransformed flag to true. Note that there is no check
     ! -- to see whether the modification brings the coordinates back
     ! -- to model coordinates (in which case the origin would be very
@@ -382,8 +389,8 @@ contains
     class(ParticleType), intent(in) :: particle
     character(len=LENMEMPATH) :: id
     !
-    write (id, '(I0,"-",I0,"-",F0.0)') &
-      particle%iprp, particle%irpt, particle%trelease
+    write (id, '(I0,"-",I0,"-",I0,"-",F0.0)') &
+      particle%imdl, particle%iprp, particle%irpt, particle%trelease
     !
     return
   end function get_particle_id

@@ -20,11 +20,12 @@ contains
     type(ParticleType), pointer :: p
 
     call create_particle(p)
-    p%iprp = 0
-    p%irpt = 0
+    p%imdl = 1
+    p%iprp = 1
+    p%irpt = 1
     p%trelease = 0.0
     print *, "Particle ID: ", get_particle_id(p)
-    call check(error, get_particle_id(p) == "0-0-0.")
+    call check(error, get_particle_id(p) == "1-1-1-0.")
 
   end subroutine test_get_particle_id
 
@@ -48,6 +49,7 @@ contains
     call partlist%allocate_arrays(npartmax1, levelMin, levelMax, mempath)
 
     ! check initial array sizes
+    call check(error, size(partlist%imdl) == npartmax1)
     call check(error, size(partlist%iprp) == npartmax1)
     call check(error, size(partlist%irpt) == npartmax1)
     call check(error, size(partlist%istopweaksink) == npartmax1)
@@ -72,6 +74,7 @@ contains
     call partlist%reallocate_arrays(npartmax2, mempath)
 
     ! check that arrays have been resized
+    call check(error, size(partlist%imdl) == npartmax2)
     call check(error, size(partlist%iprp) == npartmax2)
     call check(error, size(partlist%irpt) == npartmax2)
     call check(error, size(partlist%istopweaksink) == npartmax2)

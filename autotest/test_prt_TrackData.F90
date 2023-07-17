@@ -33,6 +33,7 @@ contains
 
     ! allocate and initialize particle
     call create_particle(particle)
+    particle%imdl = 0
     particle%iprp = 0
     particle%irpt = 0
     particle%istopzone = 0
@@ -61,6 +62,7 @@ contains
     call trackdata%allocate_arrays(nt1, mempath)
 
     ! check initial array sizes
+    call check(error, size(trackdata%imdl) == nt1)
     call check(error, size(trackdata%iprp) == nt1)
     call check(error, size(trackdata%irpt) == nt1)
     call check(error, size(trackdata%kper) == nt1)
@@ -81,6 +83,7 @@ contains
     call trackdata%reallocate_arrays(nt2, mempath)
 
     ! check that arrays have been resized
+    call check(error, size(trackdata%imdl) == nt2)
     call check(error, size(trackdata%iprp) == nt2)
     call check(error, size(trackdata%irpt) == nt2)
     call check(error, size(trackdata%kper) == nt2)
@@ -118,6 +121,7 @@ contains
     ! allocate and initialize particle
     print *, "allocating particle"
     call create_particle(particle)
+    particle%imdl = 0
     particle%iprp = 0
     particle%irpt = 0
     particle%istopzone = 0
@@ -150,6 +154,7 @@ contains
 
     ! check initial array sizes
     print *, "checking initial trackdata size"
+    call check(error, size(trackdata%imdl) == nt1)
     call check(error, size(trackdata%iprp) == nt1)
     call check(error, size(trackdata%irpt) == nt1)
     call check(error, size(trackdata%kper) == nt1)
@@ -173,6 +178,7 @@ contains
 
     ! check track data values
     print *, "checking initial track data values"
+    call check(error, trackdata%imdl(1) == 0)
     call check(error, trackdata%iprp(1) == 0)
     call check(error, trackdata%irpt(1) == 0)
     call check(error, trackdata%kper(1) == 1)
@@ -197,6 +203,7 @@ contains
     ! check that arrays were automatically expanded by factor of 10
     print *, "checking arrays were expanded by factor of 10"
     nt2 = nt1 * 10
+    call check(error, size(trackdata%imdl) == nt2)
     call check(error, size(trackdata%iprp) == nt2)
     call check(error, size(trackdata%irpt) == nt2)
     call check(error, size(trackdata%kper) == nt2)

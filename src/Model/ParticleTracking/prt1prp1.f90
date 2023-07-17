@@ -473,7 +473,14 @@ contains
 
         ! -- Todo: check that location is within the specified cell
 
-        ! -- Update particle list (todo: factor out a routine?)
+        ! -- Add particle to particle list (todo: factor out a routine?)
+        !    The routine should branch based on whether this is an exchange
+        !    PRP or a normal PRP. If exchange PRP, particle identity info
+        !    should have been injected into the PRP object by the exchange
+        !    (e.g. this%imdl, this%iprp, this%irpt, this%trelease arrays).
+        !    If normal PRP, imdl and iprp should be set from the pointers
+        !    set on this PRP from the PRT model, and irpt and trelease set
+        !    as below.
         this%partlist%x(np) = this%x(nps)
         this%partlist%y(np) = this%y(nps)
         this%partlist%z(np) = this%z(nps)
