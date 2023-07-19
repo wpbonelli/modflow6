@@ -7,6 +7,8 @@ channels:
 dependencies:
   - appdirs
   - filelock
+  - flaky
+  - fortls
   - fprettify
   - jupytext
   - matplotlib
@@ -25,4 +27,4 @@ dependencies:
   - pytest-dotenv
   - pytest-order
   - pytest-xdist
-  - flaky
+  
