@@ -1428,10 +1428,12 @@ contains
         do np = 1, packobj%npart
           !
           ! -- If particle inactive, record (unchanged) location in track data and skip tracking
-          ! kluge note: temporarily commented out recording of inactive particle data; want it, maybe as an option???
-          if (packobj%partlist%istatus(np) .ne. 1 .and. save_inactive) then
-            call this%trackdata%add_track_data(particle, kper=kper, &
-                                               kstp=kstp, reason=4)
+          ! kluge note: temporarily disabled recording of inactive particle data; want it, maybe as an option???
+          if (packobj%partlist%istatus(np) .ne. 1) then
+            if (save_inactive) then
+              call this%trackdata%add_track_data(particle, kper=kper, &
+                                                 kstp=kstp, reason=4)
+            end if
             cycle
           end if
           !

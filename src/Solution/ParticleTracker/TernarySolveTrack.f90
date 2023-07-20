@@ -1134,6 +1134,7 @@ contains
     ! the algol 60 procedure  zero  given in  richard brent, algorithms for
     ! minimization without derivatives, prentice-hall, inc. (1973).
     double precision a, b, c, d, e, eps, fa, fb, fc, tol1, xm, p, q, r, s
+    eps = epsilon(ax)
     tol1 = eps + 1.0d0
 
     a = ax
