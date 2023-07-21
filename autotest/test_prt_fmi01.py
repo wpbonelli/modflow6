@@ -21,7 +21,8 @@ import numpy as np
 import pandas as pd
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
-from prt_track_utils import check_track_data, to_mp7_format
+
+from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
 # model names
 name = "prtfmi01"
@@ -34,7 +35,6 @@ gwf_budget_file = f"{gwfname}.bud"
 gwf_head_file = f"{gwfname}.hds"
 prp_track_file = f"{prtname}.prp.trk"
 prp_track_csv_file = f"{prtname}.prp.trk.csv"
-prt_budget_file = f"{prtname}.cbb"
 prt_track_file = f"{prtname}.trk"
 prt_track_csv_file = f"{prtname}.trk.csv"
 mp7_pathline_file = f"{mp7name}.mppth"
@@ -183,17 +183,18 @@ def build_prt_sim(ws, mf6):
     flopy.mf6.ModflowPrtoc(
         prt,
         pname="oc",
-        budget_filerecord=[prt_budget_file],
         track_filerecord=[prt_track_file],
         trackcsv_filerecord=[prt_track_csv_file],
-        saverecord=[("BUDGET", "ALL")],
     )
 
     # create the flow model interface
-    flopy.mf6.ModflowPrtfmi(prt, packagedata=[
-        ("GWFHEAD", gwf_head_file),
-        ("GWFBUDGET", gwf_budget_file),
-    ])
+    flopy.mf6.ModflowPrtfmi(
+        prt,
+        packagedata=[
+            ("GWFHEAD", gwf_head_file),
+            ("GWFBUDGET", gwf_budget_file),
+        ],
+    )
 
     # add explicit model solution
     ems = flopy.mf6.ModflowEms(
@@ -242,39 +243,6 @@ def build_mp7_sim(ws, mp7, gwf):
     return mp
 
 
-def check_budget_data(lst: os.PathLike, cbb: os.PathLike):
-    # load PRT model's list file
-    mflist = flopy.utils.mflistfile.ListBudget(
-        lst, budgetkey="MASS BUDGET FOR ENTIRE MODEL"
-    )
-    names = mflist.get_record_names()
-    entries = mflist.entries
-
-    # check timesteps
-    inc = mflist.get_incremental()
-    v = inc["totim"][-1]
-    assert v == perlen * nper, f"Last time should be {perlen}.  Found {v}"
-
-    # entries should be a subset of names
-    assert all(e in names for e in entries)
-
-    # todo what other record names should we expect?
-    expected_entries = [
-        "PRP_IN",
-        "PRP_OUT",
-    ]
-    assert all(en in names for en in expected_entries)
-
-    # load and check cell budget file
-    mfbud = flopy.utils.binaryfile.CellBudgetFile(cbb)
-    assert mfbud.nlay == nlay
-    assert mfbud.nrow == nrow
-    assert mfbud.ncol == ncol
-    assert len(mfbud.times) == 1
-    assert mfbud.times[0] == perlen
-    # todo check particle mass?
-
-
 def test_prt_fmi01(function_tmpdir, targets):
     ws = function_tmpdir
 
@@ -306,7 +274,6 @@ def test_prt_fmi01(function_tmpdir, targets):
     # check mf6 output files exist
     assert (ws / gwf_budget_file).is_file()
     assert (ws / gwf_head_file).is_file()
-    assert (ws / prt_budget_file).is_file()
     assert (ws / prt_track_file).is_file()
     assert (ws / prt_track_csv_file).is_file()
     assert (ws / prp_track_file).is_file()
@@ -338,7 +305,7 @@ def test_prt_fmi01(function_tmpdir, targets):
     assert all_equal(mf6_pldata["iprp"], 1)
 
     # check mf6 cell budget file
-    check_budget_data(ws / f"{name}_prt.lst", ws / prt_budget_file)
+    check_budget_data(ws / f"{name}_prt.lst", perlen, nper)
 
     # check mf6 track data written to different formats are equal
     check_track_data(
