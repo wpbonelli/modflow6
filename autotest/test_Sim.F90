@@ -31,8 +31,7 @@ module test_Sim
         return
       end if
 
-      ! if in develop mode check subroutine
-      ! doesn't terminate (else test fails)
+      ! if in develop mode, shouldn't fail
       call dev_feature(errmsg)
 
     end subroutine test_dev_feature

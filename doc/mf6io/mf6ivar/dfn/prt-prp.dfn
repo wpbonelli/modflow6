@@ -113,19 +113,11 @@ description is a text keyword to indicate that a particle is to terminate when i
 
 block options
 name istopzone
-type double precision
+type integer
 reader urword
 optional true
 longname stop zone number
 description integer value defining the stop zone number.  If cells have been assigned IZONE values in the GRIDDATA block, a particle terminates if it enters a cell whose IZONE value matches ISTOPZONE.  An ISTOPZONE value of zero indicates that there is no stop zone.  The default value is zero.
-
-block options
-name output_for_inactive
-type keyword
-reader urword
-optional true
-longname output for inactive particles
-description is a text keyword to indicate that output is to be written for inactive particles.  By default, output is not written for inactive particles.
 
 block options
 name drape

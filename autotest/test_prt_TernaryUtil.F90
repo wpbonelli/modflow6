@@ -16,6 +16,7 @@ module test_prt_ternaryutil
 
     subroutine test_rotate(error)
         type(error_type), allocatable, intent(out) :: error
+        ! todo
         call check(error, 1 - 1 == 0)
         if (allocated(error)) return
     end subroutine test_rotate

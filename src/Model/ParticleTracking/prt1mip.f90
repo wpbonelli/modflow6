@@ -234,9 +234,6 @@ contains
           call this%dis%read_grid_array(line, lloc, istart, istop, this%iout, &
                                         this%parser%iuactive, this%izone, &
                                         'IZONE')
-          print *, "IZONE is read in but is not programmed to be used yet" ! kluge
-            !!pause
-          stop
         case default
           write (errmsg, '(4x,a,a)') 'ERROR. UNKNOWN GRIDDATA TAG: ', &
             trim(keyword)

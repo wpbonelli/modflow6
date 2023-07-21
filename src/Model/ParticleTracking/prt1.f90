@@ -1390,7 +1390,6 @@ contains
     real(DP) :: tmax
     logical(LGP) :: limited
     integer(I4B) :: iprp
-    logical(LGP) :: save_inactive = .false.
     integer(I4B) :: ntracksize, resizefactor, resizethresh, shrinksize
     real(DP) :: resizefraction
     !
@@ -1427,15 +1426,8 @@ contains
         ! -- Loop over particles in package
         do np = 1, packobj%npart
           !
-          ! -- If particle inactive, record (unchanged) location in track data and skip tracking
-          ! kluge note: temporarily disabled recording of inactive particle data; want it, maybe as an option???
-          if (packobj%partlist%istatus(np) .ne. 1) then
-            if (save_inactive) then
-              call this%trackdata%add_track_data(particle, kper=kper, &
-                                                 kstp=kstp, reason=4)
-            end if
-            cycle
-          end if
+          ! -- If particle inactive, skip
+          if (packobj%partlist%istatus(np) .ne. 1) cycle
           !
           ! -- Reset the particle's coordinate transformation
           call particle%reset_transf()
@@ -1452,6 +1444,7 @@ contains
           !   ! -- Particle released before or during this time step,
           !   ! -- so begin or continue tracking it
           !   if (particle%trelease.ge.totimc) particle%ttrack = particle%trelease
+
           ! -- Unless in last stress period and it has only one time step,
           ! -- limit max time to no later than end of time step
           tmax = particle%tstop
@@ -1472,15 +1465,14 @@ contains
           !
           ! -- If particle released during this time step, record its
           ! -- initial location in track data
-          if (particle%trelease .ge. totimc) then
+          if (particle%trelease .ge. totimc) &
             call this%trackdata%add_track_data(particle, kper=kper, &
                                                kstp=kstp, reason=0)
-          end if
           !
           ! -- Apply the tracking method
           call method%apply(particle, tmax)
           !
-          ! -- Update particle in list
+          ! -- Update particle in PRP package
           call packobj%partlist%update_from_particle(particle, np)
           !
         end do
