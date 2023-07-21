@@ -16,6 +16,7 @@ module test_prt_ternarysolvetrack
 
     subroutine test_zeroin(error)
         type(error_type), allocatable, intent(out) :: error
+        ! todo
         call check(error, 1 - 1 == 0)
         if (allocated(error)) return
     end subroutine test_zeroin
