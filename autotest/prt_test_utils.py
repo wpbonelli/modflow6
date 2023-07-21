@@ -100,3 +100,27 @@ def to_mp7_format(data: Union[pd.DataFrame, np.recarray]) -> pd.DataFrame:
             dtype=mp7_dtypes,
         )
     )
+
+
+def check_budget_data(lst: os.PathLike, perlen, nper):
+    # load PRT model's list file
+    mflist = flopy.utils.mflistfile.ListBudget(
+        lst, budgetkey="MASS BUDGET FOR ENTIRE MODEL"
+    )
+    names = mflist.get_record_names()
+    entries = mflist.entries
+
+    # check timesteps
+    inc = mflist.get_incremental()
+    v = inc["totim"][-1]
+    assert v == perlen * nper, f"Last time should be {perlen}.  Found {v}"
+
+    # entries should be a subset of names
+    assert all(e in names for e in entries)
+
+    # todo what other record names should we expect?
+    expected_entries = [
+        "PRP_IN",
+        "PRP_OUT",
+    ]
+    assert all(en in names for en in expected_entries)

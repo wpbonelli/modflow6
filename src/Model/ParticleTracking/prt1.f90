@@ -858,16 +858,6 @@ contains
     !   call this%mvt%mvt_ot_saveflow(icbcfl, ibudfl)
     ! end if
 
-    ! -- kluge: save particle information from PRP packages
-    ! -- todo: remove now that dedicated track output files are implemented
-    do ip = 1, this%bndlist%Count()
-      packobj => GetBndFromList(this%bndlist, ip)
-      select type (packobj)
-      type is (PrtPrpType)
-        call packobj%sav_particles(icbcun)
-      end select
-    end do
-
     ! -- Print GWF flows
     ! no need to print flowja
     call this%prt_ot_printflow(ibudfl, this%flowja)
