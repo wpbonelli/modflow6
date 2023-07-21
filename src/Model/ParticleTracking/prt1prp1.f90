@@ -42,7 +42,6 @@ module PrtPrpModule
     !< extend final steady state option: 0 = do not extend, 1 = extend
     ! integer(I4B), pointer :: iextendfinalss => null()
     integer(I4B), pointer :: istopzone => null() !< optional stop zone number; 0 = no stop zone
-    integer(I4B), pointer :: ioutinactive => null() !< output for inactive particles: 0 = no output, 1 = output
     integer(I4B), pointer :: idrape => null() !< drape option: 0 = do not drape, 1 = drape to topmost active cell
     integer(I4B), dimension(:), pointer, contiguous :: noder => null() !< reduced node number of release point
     integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< zone number
@@ -163,7 +162,6 @@ contains
     call mem_deallocate(this%istopweaksink)
     ! call mem_deallocate(this%iextendfinalss)
     call mem_deallocate(this%istopzone)
-    call mem_deallocate(this%ioutinactive)
     call mem_deallocate(this%idrape)
     call mem_deallocate(this%nreleasepts)
     call mem_deallocate(this%ifreq_rls)
@@ -299,7 +297,6 @@ contains
     call mem_allocate(this%istopweaksink, 'ISTOPWEAKSINK', this%memoryPath)
     ! call mem_allocate(this%iextendfinalss, 'IEXTENDFINALSS', this%memoryPath)
     call mem_allocate(this%istopzone, 'ISTOPZONE', this%memoryPath)
-    call mem_allocate(this%ioutinactive, 'IOUTINACTIVE', this%memoryPath)
     call mem_allocate(this%idrape, 'IDRAPE', this%memoryPath)
     call mem_allocate(this%nreleasepts, 'NRELEASEPTS', this%memoryPath)
     call mem_allocate(this%ifreq_rls, 'IFREQ_RLS', this%memoryPath)
@@ -319,7 +316,6 @@ contains
     this%istopweaksink = 0
     ! this%iextendfinalss = 0
     this%istopzone = 0
-    this%ioutinactive = 0
     this%idrape = 0
     this%nreleasepts = 0
     this%ifreq_rls = 0
@@ -844,12 +840,6 @@ contains
     case ('ISTOPZONE')
       this%istopzone = this%parser%GetInteger()
       found = .true.
-    case ('OUTPUT_FOR_INACTIVE')
-      this%ioutinactive = 1
-      found = .true.
-      print *, "OUTPUT_FOR_INACTIVE option read in but not programmed yet" ! kluge
-      ! pause
-      stop
     case ('DRAPE')
       this%idrape = 1
       found = .true.

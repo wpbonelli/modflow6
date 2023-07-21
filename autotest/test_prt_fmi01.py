@@ -77,13 +77,12 @@ def build_gwf_sim(ws, mf6):
     )
 
     # create tdis package
-    pd = (perlen, nstp, tsmult)
     flopy.mf6.modflow.mftdis.ModflowTdis(
         sim,
         pname="tdis",
         time_units="DAYS",
         nper=nper,
-        perioddata=[pd],
+        perioddata=[(perlen, nstp, tsmult)],
     )
 
     # create gwf model
@@ -145,13 +144,12 @@ def build_prt_sim(ws, mf6):
     )
 
     # create tdis package
-    pd = (perlen, nstp, tsmult)
     flopy.mf6.modflow.mftdis.ModflowTdis(
         sim,
         pname="tdis",
         time_units="DAYS",
         nper=nper,
-        perioddata=[pd],
+        perioddata=[(perlen, nstp, tsmult)],
     )
 
     # create prt model
@@ -192,11 +190,10 @@ def build_prt_sim(ws, mf6):
     )
 
     # create the flow model interface
-    pd = [
+    flopy.mf6.ModflowPrtfmi(prt, packagedata=[
         ("GWFHEAD", gwf_head_file),
         ("GWFBUDGET", gwf_budget_file),
-    ]
-    flopy.mf6.ModflowPrtfmi(prt, packagedata=pd)
+    ])
 
     # add explicit model solution
     ems = flopy.mf6.ModflowEms(

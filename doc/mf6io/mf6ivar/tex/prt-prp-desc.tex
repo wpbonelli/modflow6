@@ -23,8 +23,6 @@
 
 \item \texttt{istopzone}---integer value defining the stop zone number.  If cells have been assigned IZONE values in the GRIDDATA block, a particle terminates if it enters a cell whose IZONE value matches ISTOPZONE.  An ISTOPZONE value of zero indicates that there is no stop zone.  The default value is zero.
 
-\item \texttt{OUTPUT\_FOR\_INACTIVE}---is a text keyword to indicate that output is to be written for inactive particles.  By default, output is not written for inactive particles.
-
 \item \texttt{DRAPE}---is a text keyword to indicate that a particle is to be moved to the topmost active cell prior to release if its release point is in a cell that is dry at the scheduled time of release.  By default, a particle does not get released into the simulation if its release point is in a cell that is dry at the scheduled time of release.  ??? Move to what elevation within topmost active cell ???
 
 \end{description}
