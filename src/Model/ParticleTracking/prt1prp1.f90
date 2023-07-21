@@ -92,7 +92,6 @@ module PrtPrpModule
     procedure :: read_dimensions => prp_read_dimensions
     procedure :: prp_read_packagedata
     ! procedure :: read_data
-    procedure :: sav_particles
     ! -- methods for observations
     procedure, public :: bnd_obs_supported => prp_obs_supported
     procedure, public :: bnd_df_obs => prp_df_obs
@@ -1175,70 +1174,5 @@ contains
     !
     return
   end subroutine prp_ot_trk
-
-  !> @brief Save particle information in binary format to icbcun
-  !! todo: remove now that dedicated track output files are implemented
-  !<
-  subroutine sav_particles(this, icbcun)
-    ! -- dummy
-    class(PrtPrpType), intent(inout) :: this
-    integer(I4B), intent(in) :: icbcun
-    ! -- local
-    character(len=16) :: text
-    character(len=16), dimension(13) :: auxtxt
-    real(DP), dimension(13) :: aux
-    integer(I4B) :: nlist
-    integer(I4B) :: itrack, irpt, icell
-    integer(I4B) :: naux
-    !
-    if (icbcun /= 0) then
-      !
-      ! -- Write the header
-      text = '      DATA-PRTCL'
-      naux = 13
-      auxtxt(:) = ['            kper', '            kstp', &
-                   '            iprp', '            irpt', &
-                   '           icell', '           izone', &
-                   '         istatus', '         ireason', &
-                   '        trelease', '               t', &
-                   '               x', '               y', '               z']
-      nlist = this%itrack2 - this%itrack1
-      call this%dis%record_srcdst_list_header(text, &
-                                              this%name_model, &
-                                              this%packName, &
-                                              this%name_model, &
-                                              this%packName, &
-                                              naux, &
-                                              auxtxt, &
-                                              icbcun, &
-                                              nlist, &
-                                              this%iout)
-      !
-      ! -- Write a zero for Q and particle data as aux variables
-      do itrack = this%itrack1 + 1, this%itrack2
-        irpt = this%trackdata%irpt(itrack)
-        icell = this%trackdata%icell(itrack)
-        aux(1) = this%trackdata%kper(itrack)
-        aux(2) = this%trackdata%kstp(itrack)
-        aux(3) = this%trackdata%iprp(itrack) ! todo: as above
-        aux(4) = irpt
-        aux(5) = icell
-        aux(6) = this%trackdata%izone(itrack)
-        aux(7) = this%trackdata%istatus(itrack)
-        aux(8) = this%trackdata%ireason(itrack)
-        aux(9) = this%trackdata%trelease(itrack)
-        aux(10) = this%trackdata%t(itrack)
-        aux(11) = this%trackdata%x(itrack)
-        aux(12) = this%trackdata%y(itrack)
-        aux(13) = this%trackdata%z(itrack)
-        call this%dis%record_mf6_list_entry(icbcun, irpt, icell, DZERO, &
-                                            naux, aux)
-      end do
-      !
-    end if
-    !
-    ! -- return
-    return
-  end subroutine sav_particles
 
 end module PrtPrpModule
