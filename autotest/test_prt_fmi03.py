@@ -7,8 +7,10 @@ terminated when they enter the appropriate zone.
 GWF and PRT models run in separate simulations
 via flow model interface.
 
-The grid is a 10x10 square with a single layer,
-the same flow system shown on the FloPy readme.
+The grid is a 10x10 square, based on the flow
+system from the FloPy readme. Two test cases
+are defined with 1 and 2 layers respectively
+(to test zone data can be read as 2D or 3D).
 
 There are two stop zones in the top right and
 bottom left of the grid.
@@ -29,36 +31,20 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 from matplotlib.collections import LineCollection
-
 from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
 # model names
 name = "prtfmi02"
-gwfname = f"{name}"
-prtname = f"{name}_prt"
-mp7name = f"{name}_mp7"
+ex = [f"{name}_1l", f"{name}_2l"]
 
-# output file names
-gwf_budget_file = f"{gwfname}.bud"
-gwf_head_file = f"{gwfname}.hds"
-prt_track_file = f"{prtname}.trk"
-prt_track_csv_file = f"{prtname}.trk.csv"
-mp7_pathline_file = f"{mp7name}.mppth"
 
-# problem info
-nlay = 1
-nrow = 10
-ncol = 10
-top = 1.0
-botm = [0.0]
-nper = 1
-perlen = 1.0
-nstp = 1
-tsmult = 1.0
-porosity = 0.1
+def get_model_name(idx, mdl):
+    return f"{ex[idx]}_{mdl}"
+
 
 # release points
 # todo: define for mp7 first, then use flopy utils to convert to global coords for mf6 prt
@@ -75,17 +61,30 @@ releasepts_mp7 = [
     for i in range(9)
 ]
 
-# stop zones
+
+# problem info
+nlay = 1
+nrow = 10
+ncol = 10
+top = 1.0
+
+nper = 1
+perlen = 1.0
+nstp = 1
+tsmult = 1.0
+porosity = 0.1
+
+# zone array and stop zone cell ids
+stopzone_cells = [(0, 1, 8), (0, 8, 1)]
 izone = np.zeros((nlay, nrow, ncol), dtype=int)
-izones = [(0, 1, 8), (0, 8, 1)]
-for iz in izones:
+for iz in stopzone_cells:
     izone[iz] = 1
 
 
-def build_gwf_sim(ws, mf6):
+def build_gwf_sim(idx, ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name,
+        sim_name=ex[idx],
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -101,15 +100,19 @@ def build_gwf_sim(ws, mf6):
     )
 
     # create gwf model
+    gwfname = get_model_name(idx, "gwf")
     gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
 
     # create gwf discretization
+    botm = [top - (k + 1) for k in range(nlay + idx)]
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
         gwf,
         pname="dis",
-        nlay=nlay,
+        nlay=nlay + idx,
         nrow=nrow,
         ncol=ncol,
+        top=top,
+        botm=botm,
     )
 
     # create gwf initial conditions package
@@ -136,6 +139,8 @@ def build_gwf_sim(ws, mf6):
     )
 
     # create gwf output control package
+    gwf_budget_file = f"{gwfname}.bud"
+    gwf_head_file = f"{gwfname}.hds"
     oc = flopy.mf6.ModflowGwfoc(
         gwf,
         budget_filerecord=gwf_budget_file,
@@ -149,10 +154,10 @@ def build_gwf_sim(ws, mf6):
     return sim
 
 
-def build_prt_sim(ws, mf6):
+def build_prt_sim(idx, ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name,
+        sim_name=ex[idx],
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -168,15 +173,19 @@ def build_prt_sim(ws, mf6):
     )
 
     # create prt model
+    prtname = get_model_name(idx, "prt")
     prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
 
     # create prt discretization
+    botm = [top - (k + 1) for k in range(nlay + idx)]
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
         prt,
         pname="dis",
-        nlay=nlay,
+        nlay=nlay + idx,
         nrow=nrow,
         ncol=ncol,
+        top=top,
+        botm=botm,
     )
 
     # create mip package
@@ -184,7 +193,7 @@ def build_prt_sim(ws, mf6):
         prt,
         pname="mip",
         porosity=porosity,
-        izone=izone,  # todo reinstate when izone implemented
+        izone=izone if idx == 0 else np.array([izone, izone]),
     )
 
     # create prp package
@@ -199,6 +208,8 @@ def build_prt_sim(ws, mf6):
     )
 
     # create output control package
+    prt_track_file = f"{prtname}.trk"
+    prt_track_csv_file = f"{prtname}.trk.csv"
     flopy.mf6.ModflowPrtoc(
         prt,
         pname="oc",
@@ -207,6 +218,9 @@ def build_prt_sim(ws, mf6):
     )
 
     # create the flow model interface
+    gwfname = get_model_name(idx, "gwf")
+    gwf_budget_file = f"{gwfname}.bud"
+    gwf_head_file = f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -226,7 +240,7 @@ def build_prt_sim(ws, mf6):
     return sim
 
 
-def build_mp7_sim(ws, mp7, gwf):
+def build_mp7_sim(idx, ws, mp7, gwf):
     partdata = flopy.modpath.ParticleData(
         partlocs=[p[0] for p in releasepts_mp7],
         localx=[p[1] for p in releasepts_mp7],
@@ -235,6 +249,7 @@ def build_mp7_sim(ws, mp7, gwf):
         timeoffset=0,
         drape=0,
     )
+    mp7name = get_model_name(idx, "mp7")
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
         particledata=partdata,
@@ -257,7 +272,7 @@ def build_mp7_sim(ws, mp7, gwf):
         budgetoutputoption="summary",
         stoptimeoption="extend",
         stopzone=1,
-        zones=izone,
+        zones=izone if idx == 0 else np.array([izone, izone]),
         zonedataoption="on",
         particlegroups=[pg],
     )
@@ -265,12 +280,13 @@ def build_mp7_sim(ws, mp7, gwf):
     return mp
 
 
-def test_prt_fmi03(function_tmpdir, targets):
+@pytest.mark.parametrize("idx, name", list(enumerate(ex)))
+def test_mf6model(idx, name, function_tmpdir, targets):
     ws = function_tmpdir
 
     # build mf6 simulations
-    gwfsim = build_gwf_sim(ws, targets.mf6)
-    prtsim = build_prt_sim(ws, targets.mf6)
+    gwfsim = build_gwf_sim(idx, ws, targets.mf6)
+    prtsim = build_prt_sim(idx, ws, targets.mf6)
 
     # run mf6 simulations
     for sim in [gwfsim, prtsim]:
@@ -278,7 +294,12 @@ def test_prt_fmi03(function_tmpdir, targets):
         success, _ = sim.run_simulation()
         assert success
 
-    # extract models
+    # define model names
+    gwfname = get_model_name(idx, "gwf")
+    prtname = get_model_name(idx, "prt")
+    mp7name = get_model_name(idx, "mp7")
+
+    # extract mf6 models
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
 
@@ -286,7 +307,7 @@ def test_prt_fmi03(function_tmpdir, targets):
     mg = gwf.modelgrid
 
     # build mp7 model
-    mp7sim = build_mp7_sim(ws, targets.mp7, gwf)
+    mp7sim = build_mp7_sim(idx, ws, targets.mp7, gwf)
 
     # run mp7 model
     mp7sim.write_input()
@@ -294,12 +315,17 @@ def test_prt_fmi03(function_tmpdir, targets):
     assert success
 
     # check mf6 output files exist
+    gwf_budget_file = f"{gwfname}.bud"
+    gwf_head_file = f"{gwfname}.hds"
+    prt_track_file = f"{prtname}.trk"
+    prt_track_csv_file = f"{prtname}.trk.csv"
     assert (ws / gwf_budget_file).is_file()
     assert (ws / gwf_head_file).is_file()
     assert (ws / prt_track_file).is_file()
     assert (ws / prt_track_csv_file).is_file()
 
     # check mp7 output files exist
+    mp7_pathline_file = f"{mp7name}.mppth"
     assert (ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
@@ -332,7 +358,7 @@ def test_prt_fmi03(function_tmpdir, targets):
     spdis = bud.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
-    # setup plot
+    # setup map view plot
     fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(13, 13))
     for a in ax:
         a.set_aspect("equal")
@@ -409,13 +435,13 @@ def test_prt_fmi03(function_tmpdir, targets):
         ax.add_collection(lc)
 
     # plot stop zones
-    for iz in izones:
+    for iz in stopzone_cells:
         for a in ax:
             plot_stop_zone(mg.get_node([iz])[0], a)
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{name}.png")
+    plt.savefig(ws / f"test_{name}_map.png")
 
     # convert mf6 pathlines to mp7 format
     mf6_pldata_mp7 = to_mp7_format(mf6_pldata)
@@ -464,4 +490,3 @@ def test_prt_fmi03(function_tmpdir, targets):
         assert np.isclose(nn, icell, atol=1) or any(
             (nn - 1) == n for n in neighbors
         )
-        assert ilay == (k + 1) == 1
