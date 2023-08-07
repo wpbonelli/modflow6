@@ -293,11 +293,18 @@ jobs:
       matrix:
         include:
           ### ifx
+          ## 2023.x autotests disabled for same reasons as below
+          - {os: ubuntu-22.04, compiler: intel, version: 2023.2, test: false}
+          ## 2023.[0,1] fail with internal compiler error
+          # - {os: ubuntu-22.04, compiler: intel, version: 2023.1, test: false}
+          # - {os: ubuntu-22.04, compiler: intel, version: "2023.0", test: false}
           ## 2022.2.x autotests disabled
           #  - mf5to6 test_evt: failure to converge
           #  - mf6 Keating_[disu_]dev: bad head comparison
-          - {os: ubuntu-22.04, compiler: intel, version: 2022.2.1, test: false}
-          - {os: ubuntu-22.04, compiler: intel, version: 2022.2, test: false}
+          ## 2022.2.x fails to compile testdrive.F90 due to...
+          # https://community.intel.com/t5/Intel-Fortran-Compiler/ifx-error-5533-in-simple-subroutine-call/m-p/1420685
+          # - {os: ubuntu-22.04, compiler: intel, version: 2022.2.1, test: false}
+          # - {os: ubuntu-22.04, compiler: intel, version: 2022.2, test: false}
           ## 2021.1 segfault in meson serial sim test
           # - {os: ubuntu-22.04, compiler: intel, version: 2022.1, test: false}
           ## 2022.0 & 2021.[1,2,4] segfault at compile time
@@ -310,7 +317,8 @@ jobs:
           ## 2023.[0,1] fail to compile
           # - {os: windows-2022, compiler: intel, version: 2023.1, test: false}
           # - {os: windows-2022, compiler: intel, version: "2023.0", test: false}
-          - {os: windows-2022, compiler: intel, version: 2022.2, test: false}
+          ## 2022.2 fails to compile testdrive.F90 for same reason as above
+          # - {os: windows-2022, compiler: intel, version: 2022.2, test: false}
           ## 2022.1 fail to link
           # - {os: windows-2022, compiler: intel, version: 2022.1, test: false}
 
