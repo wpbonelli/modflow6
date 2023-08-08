@@ -15,12 +15,12 @@ dependencies:
   - numpy
   - pip
   - pip:
-      - git+https://github.com/modflowpy/flopy.git
+      - https://github.com/w-bonelli/flopy/archive/prt-utils.zip
       - git+https://github.com/modflowpy/pymake.git
       - git+https://github.com/Deltares/xmipy.git
       - git+https://github.com/MODFLOW-USGS/modflowapi.git
       - modflow-devtools
-      - flopy[optional]
+      - flopy[test,optional]
       - fortls
   - pytest
   - pytest-cases
