@@ -54,6 +54,9 @@ def test_scenario(function_tmpdir, example_scenario, targets):
     name, namefiles = example_scenario
     exdirs = [nf.parent for nf in namefiles]
 
+    if "prt" in name:
+        pytest.skip(f"Excluding mf6 prt model (tested separately): {name}")
+
     if name in excluded_models:
         pytest.skip(f"Excluding mf6 model: {name}")
 
