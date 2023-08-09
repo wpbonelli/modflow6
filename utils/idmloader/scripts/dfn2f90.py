@@ -889,6 +889,10 @@ if __name__ == "__main__":
             Path("../../../doc/mf6io/mf6ivar/dfn", "sim-nam.dfn"),
             Path("../../../src", "simnamidm.f90"),
         ],
+        [
+            Path("../../../doc/mf6io/mf6ivar/dfn", "prt-mip.dfn"),
+            Path("../../../src/Model/ParticleTracking", "prt1mip1idm.f90"),
+        ]
     ]
 
     dfn_d = {}

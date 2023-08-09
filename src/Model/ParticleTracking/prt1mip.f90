@@ -1,7 +1,7 @@
 module PrtMipModule
   !
-  use KindModule, only: DP, I4B
-  use ConstantsModule, only: DZERO, DONE
+  use KindModule, only: DP, I4B, LGP
+  use ConstantsModule, only: DZERO, DONE, LINELENGTH
   use NumericalPackageModule, only: NumericalPackageType
   use BlockParserModule, only: BlockParserType
   use BaseDisModule, only: DisBaseType
@@ -19,26 +19,27 @@ module PrtMipModule
     procedure :: mip_ar
     procedure :: mip_da
     procedure, private :: allocate_arrays
-    procedure, private :: read_options
-    procedure :: read_data
   end type PrtMipType
 
 contains
 
-  subroutine mip_cr(mip, name_model, inunit, iout, dis)
-! ******************************************************************************
-! mip_cr -- Create a model input object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
+  !> @brief Create a model input object
+  subroutine mip_cr(mip, name_model, input_mempath, inunit, iout, dis)
+    ! -- modules
+    use MemoryManagerExtModule, only: mem_set_value
     ! -- dummy
     type(PrtMipType), pointer :: mip
     character(len=*), intent(in) :: name_model
+    character(len=*), intent(in) :: input_mempath
     integer(I4B), intent(in) :: inunit
     integer(I4B), intent(in) :: iout
     class(DisBaseType), pointer, intent(in) :: dis
-! ------------------------------------------------------------------------------
+    ! -- locals
+    logical(LGP) :: found_fname
+    ! -- formats
+    character(len=*), parameter :: fmtheader = &
+      "(1x, /1x, 'NPF -- MODEL INPUT PACKAGE, VERSION 1, 08/08/2023', &
+       &' INPUT READ FROM MEMPATH: ', A, /)"
     !
     ! -- Create the object
     allocate (mip)
@@ -49,31 +50,43 @@ contains
     ! -- Allocate scalars
     call mip%allocate_scalars()
     !
+    ! -- Set variables
+    mip%input_mempath = input_mempath
     mip%inunit = inunit
     mip%iout = iout
     !
     ! -- Set pointers
     mip%dis => dis
     !
+    ! -- set name of input file
+    call mem_set_value(mip%input_fname, 'INPUT_FNAME', mip%input_mempath, &
+                       found_fname)
+    !
+    ! -- check if mip is enabled
+    if (inunit > 0) then
+      !
+      ! -- Print a message identifying the model input package.
+      write (iout, fmtheader) input_mempath
+    end if
+    !
     ! -- Initialize block parser
-    call mip%parser%Initialize(mip%inunit, mip%iout)
+    ! call mip%parser%Initialize(mip%inunit, mip%iout)
     !
     ! -- Return
     return
   end subroutine mip_cr
 
+  !> @brief deallocate
   subroutine mip_da(this)
-! ******************************************************************************
-! mip_da -- deallocate
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
+    use MemoryManagerExtModule, only: memorylist_remove
+    use SimVariablesModule, only: idm_context
     use MemoryManagerModule, only: mem_deallocate
     ! -- dummy
     class(PrtMipType) :: this
-! ------------------------------------------------------------------------------
+    !
+    ! -- Deallocate input memory
+    call memorylist_remove(this%name_model, 'MIP', idm_context)
     !
     ! -- Deallocate parent package
     call this%NumericalPackageType%da()
@@ -89,13 +102,8 @@ contains
     return
   end subroutine mip_da
 
+  !> @brief Allocate arrays
   subroutine allocate_arrays(this, nodes)
-! ******************************************************************************
-! allocate_arrays
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_allocate
     ! -- dummy
@@ -103,7 +111,6 @@ contains
     integer(I4B), intent(in) :: nodes
     ! -- local
     integer(I4B) :: i
-! ------------------------------------------------------------------------------
     !
     ! -- Allocate
     call mem_allocate(this%porosity, nodes, 'POROSITY', this%memoryPath)
@@ -121,134 +128,40 @@ contains
   end subroutine allocate_arrays
 
   !> @ brief Allocate and read model input
-  !!
-  !!  Method to allocate and read model input for the MIP package.
-  !!
-  !<
   subroutine mip_ar(this)
+    ! -- modules
+    use SimModule, only: store_error
+    use MemoryManagerExtModule, only: mem_set_value
+    use PrtMipInputModule, only: PrtMipParamFoundType
     ! -- dummy variables
     class(PrtMipType), intent(inout) :: this !< PrtMipType object
     ! -- local variables
+    character(len=LINELENGTH) :: errmsg
+    type(PrtMipParamFoundType) :: found
+    integer(I4B), dimension(:), pointer, contiguous :: map => null()
     !
-    ! -- Print a message identifying the model input package.
-    write (this%iout, 1) this%inunit
-1   format(1x, /1x, 'MIP -- MODEL INPUT PACKAGE, VERSION X, X/XX/XXXX', & ! kluge update
-           ' INPUT READ FROM UNIT ', i0)
+    ! -- set map to convert user input data into reduced data
+    if (this%dis%nodes < this%dis%nodesuser) map => this%dis%nodeuser
     !
     ! -- Allocate arrays
     call this%allocate_arrays(this%dis%nodes)
     !
-    ! -- Read options
-    call this%read_options()
+    ! -- Source array inputs from IDM
+    call mem_set_value(this%porosity, 'POROSITY', this%input_mempath, &
+                       map, found%porosity)
+    call mem_set_value(this%retfactor, 'RETFACTOR', this%input_mempath, &
+                       map, found%retfactor)
+    call mem_set_value(this%izone, 'IZONE', this%input_mempath, map, &
+                       found%izone)
     !
-    ! -- Read data
-    call this%read_data()
+    ! -- Ensure POROSITY was found
+    if (.not. found%porosity) then
+      write (errmsg, '(a)') 'Error in GRIDDATA block: POROSITY not found'
+      call store_error(errmsg)
+    end if
     !
     ! -- return
     return
   end subroutine mip_ar
-
-  subroutine read_options(this)
-! ******************************************************************************
-! read_options
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-    ! -- modules
-    use ConstantsModule, only: LINELENGTH
-    use SimModule, only: store_error
-    ! -- dummy
-    class(PrtMipType) :: this
-    ! -- local
-    character(len=LINELENGTH) :: errmsg, keyword
-    integer(I4B) :: ierr
-    logical :: isfound, endOfBlock
-    ! -- formats
-! ------------------------------------------------------------------------------
-    !
-    ! -- get options block
-    call this%parser%GetBlock('OPTIONS', isfound, ierr, &
-                              supportOpenClose=.true., blockRequired=.false.)
-    !
-    ! -- parse options block if detected
-    if (isfound) then
-      write (this%iout, '(1x,a)') 'PROCESSING IC OPTIONS'
-      do
-        call this%parser%GetNextLine(endOfBlock)
-        if (endOfBlock) exit
-        call this%parser%GetStringCaps(keyword)
-        select case (keyword)
-        case default
-          write (errmsg, '(4x,a,a)') 'Unknown IC option: ', trim(keyword)
-          call store_error(errmsg)
-          call this%parser%StoreErrorUnit()
-        end select
-      end do
-      write (this%iout, '(1x,a)') 'END OF IC OPTIONS'
-    end if
-    !
-    ! -- Return
-    return
-  end subroutine read_options
-
-  subroutine read_data(this)
-! ******************************************************************************
-! read_data
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-    ! -- modules
-    use ConstantsModule, only: LINELENGTH
-    use SimModule, only: store_error
-    ! -- dummy
-    class(PrtMipType), intent(inout) :: this
-    ! -- local
-    character(len=LINELENGTH) :: errmsg, keyword
-    character(len=:), allocatable :: line
-    integer(I4B) :: istart, istop, lloc, ierr
-    logical :: isfound, endOfBlock
-! ------------------------------------------------------------------------------
-    !
-    ! -- get griddata block
-    call this%parser%GetBlock('GRIDDATA', isfound, ierr)
-    if (isfound) then
-      write (this%iout, '(1x,a)') 'PROCESSING GRIDDATA'
-      do
-        call this%parser%GetNextLine(endOfBlock)
-        if (endOfBlock) exit
-        call this%parser%GetStringCaps(keyword)
-        call this%parser%GetRemainingLine(line)
-        lloc = 1
-        select case (keyword)
-        case ('POROSITY')
-          call this%dis%read_grid_array(line, lloc, istart, istop, this%iout, &
-                                        this%parser%iuactive, this%porosity, &
-                                        'POROSITY')
-        case ('RETFACTOR')
-          call this%dis%read_grid_array(line, lloc, istart, istop, this%iout, &
-                                        this%parser%iuactive, this%retfactor, &
-                                        'RETFACTOR')
-        case ('IZONE')
-          call this%dis%read_grid_array(line, lloc, istart, istop, this%iout, &
-                                        this%parser%iuactive, this%izone, &
-                                        'IZONE')
-        case default
-          write (errmsg, '(4x,a,a)') 'ERROR. UNKNOWN GRIDDATA TAG: ', &
-            trim(keyword)
-          call store_error(errmsg)
-          call this%parser%StoreErrorUnit()
-        end select
-      end do
-      write (this%iout, '(1x,a)') 'END PROCESSING GRIDDATA'
-    else
-      call store_error('ERROR.  REQUIRED GRIDDATA BLOCK NOT FOUND.')
-      call this%parser%StoreErrorUnit()
-    end if
-    !
-    ! -- Return
-    return
-  end subroutine read_data
 
 end module PrtMipModule
