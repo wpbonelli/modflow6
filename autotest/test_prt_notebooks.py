@@ -1,12 +1,13 @@
 import re
 from os import environ
 from pathlib import Path
+from platform import system
 from pprint import pprint
 
 import pytest
 from flaky import flaky
-from modflow_devtools.misc import run_cmd, set_env
 from modflow_devtools.markers import excludes_platform
+from modflow_devtools.misc import run_cmd, set_env
 
 from conftest import project_root_path
 
@@ -31,19 +32,21 @@ def get_notebook_scripts(pattern=None, exclude=None):
 
 
 # @flaky(max_runs=3)
-@excludes_platform("Windows")
+# @excludes_platform("Windows", ci_only=True)
 @pytest.mark.slow
 @pytest.mark.parametrize(
     "notebook",
     get_notebook_scripts(pattern="ex-prt", exclude=["ex-prt-mp7-p03"]),
 )
 def test_notebooks(notebook, function_tmpdir, targets):
-    with set_env(
-        PATH=environ.get("PATH", "")
-        + f":{targets.mf6.parent}"
-        + f":{targets.mf6.parent / 'downloaded'}"
-        + f":{targets.mf6.parent / 'rebuilt'}"
-    ):
+    delim = ";" if system() == "Windows" else ":"
+    path = (
+        environ.get("PATH", "")
+        + f"{delim}{targets.mf6.parent}"
+        + f"{delim}{targets.mf6.parent / 'downloaded'}"
+        + f"{delim}{targets.mf6.parent / 'rebuilt'}"
+    )
+    with set_env(PATH=path):
         args = [
             "jupytext",
             "--from",
