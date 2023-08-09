@@ -1612,7 +1612,7 @@ contains
     integer(I4B), dimension(:), allocatable :: bndpkgs
     integer(I4B) :: n
     integer(I4B) :: indis = 0 ! DIS enabled flag
-    ! character(len=LENMEMPATH) :: mempathdsp = ''
+    character(len=LENMEMPATH) :: mempathmip = ''
     !
     ! -- set input memory paths, input/model and input/model/namfile
     model_mempath = create_mem_path(component=this%name, context=idm_context)
@@ -1645,7 +1645,8 @@ contains
         ! case ('PIN6')
         !   this%inpin = inunit
       case ('MIP6')
-        this%inmip = inunit
+        this%inmip = 1
+        mempathmip = mempath
       case ('FMI6')
         this%infmi = inunit
         ! case ('MVT6')
@@ -1680,7 +1681,7 @@ contains
     !
     ! -- Create packages that are tied directly to model
     ! call pin_cr(this%pin, this%name, this%inpin, this%iout, this%dis)
-    call mip_cr(this%mip, this%name, this%inmip, this%iout, this%dis)
+    call mip_cr(this%mip, this%name, mempathmip, this%inmip, this%iout, this%dis)
     call prtfmi_cr(this%fmi, this%name, this%infmi, this%iout)
     ! call mst_cr(this%mst, this%name, this%inmst, this%iout, this%fmi)
     ! call adv_cr(this%adv, this%name, this%inadv, this%iout, this%fmi)

@@ -16,6 +16,10 @@ module IdmPrtDfnSelectorModule
                                prt_nam_aggregate_definitions, &
                                prt_nam_block_definitions, &
                                prt_nam_multi_package
+  use PrtMipInputModule, only: prt_mip_param_definitions, &
+                               prt_mip_aggregate_definitions, &
+                               prt_mip_block_definitions, &
+                               prt_mip_multi_package
 
   implicit none
   private
@@ -50,6 +54,8 @@ contains
       call set_param_pointer(input_definition, prt_disv_param_definitions)
     case ('NAM')
       call set_param_pointer(input_definition, prt_nam_param_definitions)
+    case ('MIP')
+      call set_param_pointer(input_definition, prt_mip_param_definitions)
     case default
     end select
     return
@@ -66,6 +72,8 @@ contains
       call set_param_pointer(input_definition, prt_disv_aggregate_definitions)
     case ('NAM')
       call set_param_pointer(input_definition, prt_nam_aggregate_definitions)
+    case ('MIP')
+      call set_param_pointer(input_definition, prt_mip_aggregate_definitions)
     case default
     end select
     return
@@ -82,6 +90,8 @@ contains
       call set_block_pointer(input_definition, prt_disv_block_definitions)
     case ('NAM')
       call set_block_pointer(input_definition, prt_nam_block_definitions)
+    case ('MIP')
+      call set_block_pointer(input_definition, prt_mip_block_definitions)
     case default
     end select
     return
@@ -97,6 +107,8 @@ contains
       multi_package = prt_disv_multi_package
     case ('NAM')
       multi_package = prt_nam_multi_package
+    case ('MIP')
+      multi_package = prt_mip_multi_package
     case default
       call store_error('Idm selector subcomponent not found; '//&
                        &'component="PRT"'//&
@@ -115,6 +127,8 @@ contains
     case ('DISV')
       integrated = .true.
     case ('NAM')
+      integrated = .true.
+    case ('MIP')
       integrated = .true.
     case default
     end select

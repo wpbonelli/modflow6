@@ -114,6 +114,7 @@ modflow_sources = files(
     'Model' / 'ParticleTracking' / 'prt1dis1idm.f90',
     # 'Model' / 'ParticleTracking' / 'prt1disu1idm.f90',
     'Model' / 'ParticleTracking' / 'prt1disv1idm.f90',
+    'Model' / 'ParticleTracking' / 'prt1mip1idm.f90',
     'Model' / 'ModelUtilities' / 'BoundaryPackage.f90',
     'Model' / 'ModelUtilities' / 'Connections.f90',
     'Model' / 'ModelUtilities' / 'DiscretizationBase.f90',

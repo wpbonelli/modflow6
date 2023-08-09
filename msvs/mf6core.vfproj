@@ -220,7 +220,9 @@
 		<File RelativePath="..\src\Model\ParticleTracking\prt1oc1.f90"/>
 		<File RelativePath="..\src\Model\ParticleTracking\prt1prp1.f90"/>
 		<File RelativePath="..\src\Model\ParticleTracking\prt1dis1idm.f90"/>
-		<File RelativePath="..\src\Model\ParticleTracking\prt1disv1idm.f90"/></Filter>
+		<File RelativePath="..\src\Model\ParticleTracking\prt1disv1idm.f90"/>
+		<File RelativePath="..\src\Model\ParticleTracking\prt1mip1idm.f90"/>
+		</Filter>
 		<Filter Name="Solution">
 		<Filter Name="LinearMethods">
 		<File RelativePath="..\src\Solution\LinearMethods\ims8base.f90"/>

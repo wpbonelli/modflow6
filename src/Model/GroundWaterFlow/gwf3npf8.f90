@@ -1080,19 +1080,13 @@ contains
     return
   end subroutine npf_print_model_flows
 
+  !> @brief Deallocate variables
   subroutine npf_da(this)
-! ******************************************************************************
-! npf_da -- Deallocate variables
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerExtModule, only: memorylist_remove
     use SimVariablesModule, only: idm_context
     ! -- dummy
     class(GwfNpftype) :: this
-! ------------------------------------------------------------------------------
     !
     ! -- Deallocate input memory
     call memorylist_remove(this%name_model, 'NPF', idm_context)
