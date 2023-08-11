@@ -26,15 +26,13 @@ from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
 # model names
 name = "prtfmi01"
-gwfname = f"{name}"
+gwfname = f"{name}_gwf"
 prtname = f"{name}_prt"
 mp7name = f"{name}_mp7"
 
 # output file names
 gwf_budget_file = f"{gwfname}.bud"
 gwf_head_file = f"{gwfname}.hds"
-prp_track_file = f"{prtname}.prp.trk"
-prp_track_csv_file = f"{prtname}.prp.trk.csv"
 prt_track_file = f"{prtname}.trk"
 prt_track_csv_file = f"{prtname}.trk.csv"
 mp7_pathline_file = f"{mp7name}.mppth"
@@ -174,8 +172,6 @@ def build_prt_sim(ws, mf6):
         filename=f"{prtname}_1.prp",
         nreleasepts=len(releasepts),
         packagedata=releasepts,
-        track_filerecord=[prp_track_file],
-        trackcsv_filerecord=[prp_track_csv_file],
         perioddata={0: ["FIRST"]},
     )
 
@@ -276,8 +272,6 @@ def test_prt_fmi01(function_tmpdir, targets):
     assert (ws / gwf_head_file).is_file()
     assert (ws / prt_track_file).is_file()
     assert (ws / prt_track_csv_file).is_file()
-    assert (ws / prp_track_file).is_file()
-    assert (ws / prp_track_csv_file).is_file()
 
     # check mp7 output files exist
     assert (ws / mp7_pathline_file).is_file()
