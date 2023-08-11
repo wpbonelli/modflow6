@@ -66,12 +66,6 @@ module PrtPrpModule
     logical(LGP), pointer :: rls_all => null() !< flag for release on all time steps in period
     logical(LGP), pointer :: rls_any => null() !< flag that indicates whether any release in period
     logical(LGP), pointer :: noperiodblocks => null() !< flag indicating if there are no period blocks in sim
-    integer(I4B), pointer :: itrack1 => null() ! pointer to start of prp track data
-    integer(I4B), pointer :: itrack2 => null() ! pointer to end of prp track data
-    type(TrackDataType), pointer :: trackdata => null() ! pointer to model track data
-    integer(I4B), pointer :: itrkout => null()
-    integer(I4B), pointer :: itrkhdr => null()
-    integer(I4B), pointer :: itrkcsv => null()
 
   contains
 
@@ -86,7 +80,6 @@ module PrtPrpModule
     procedure :: bnd_cq_simrate => prp_cq_simrate
     procedure :: bnd_da => prp_da
     procedure :: define_listlabel
-    procedure :: prp_ot_trk
     procedure :: prp_set_pointers ! kluge?
     procedure :: bnd_options => prp_options
     procedure :: read_dimensions => prp_read_dimensions
@@ -170,9 +163,6 @@ contains
     call mem_deallocate(this%noperiodblocks)
     call mem_deallocate(this%npart)
     call mem_deallocate(this%npartmax)
-    call mem_deallocate(this%itrkout)
-    call mem_deallocate(this%itrkhdr)
-    call mem_deallocate(this%itrkcsv)
     !
     ! -- arrays
     call mem_deallocate(this%noder)
@@ -202,25 +192,17 @@ contains
 
   !> @ brief Set pointers to model variables
   !<
-  subroutine prp_set_pointers(this, ibound, izone, itrack1, itrack2, trackdata)
+  subroutine prp_set_pointers(this, ibound, izone)
     ! -- dummy variables
     class(PrtPrpType) :: this !< PrtPrpType object
     integer(I4B), dimension(:), pointer, contiguous :: ibound
     integer(I4B), dimension(:), pointer, contiguous :: izone
-    integer(I4B), pointer :: itrack1
-    integer(I4B), pointer :: itrack2
-    type(TrackDataType), pointer :: trackdata
     !
     ! -- Set pointer to PRT model ibound
     this%ibound => ibound
     !
     ! -- Set pointer to PRT model izone
     this%izone => izone
-    !
-    ! -- Set pointers to track data
-    this%itrack1 => itrack1
-    this%itrack2 => itrack2
-    this%trackdata => trackdata
     !
     ! -- return
     return
@@ -305,9 +287,6 @@ contains
     call mem_allocate(this%noperiodblocks, 'NOPERIODBLOCKS', this%memoryPath)
     call mem_allocate(this%npart, 'NPART', this%memoryPath)
     call mem_allocate(this%npartmax, 'NPARTMAX', this%memoryPath)
-    call mem_allocate(this%itrkout, 'ITRKOUT', this%memoryPath)
-    call mem_allocate(this%itrkhdr, 'ITRKHDR', this%memoryPath)
-    call mem_allocate(this%itrkcsv, 'ITRKCSV', this%memoryPath)
     !
     ! -- Set values
     this%stoptime = huge(1d0) ! kluge???
@@ -324,9 +303,6 @@ contains
     this%noperiodblocks = .false.
     this%npart = 0
     this%npartmax = 0
-    this%itrkout = 0
-    this%itrkhdr = 0
-    this%itrkcsv = 0
     !
     ! -- return
     return
@@ -797,7 +773,6 @@ contains
   !> @brief Set options specific to PrtPrpType (overrides BndType%bnd_options)
   !<
   subroutine prp_options(this, option, found)
-    use OpenSpecModule, only: access, form
     use ConstantsModule, only: MAXCHARLEN, DZERO
     use InputOutputModule, only: urword, getunit, openfile
     use TrackDataModule, only: TRACKHEADERS, TRACKTYPES
@@ -805,9 +780,6 @@ contains
     class(PrtPrpType), intent(inout) :: this
     character(len=*), intent(inout) :: option
     logical, intent(inout) :: found
-    ! -- locals
-    character(len=MAXCHARLEN) :: fname
-    character(len=MAXCHARLEN) :: keyword
     ! -- formats
     character(len=*), parameter :: fmttrkbin = &
       "(4x, 'PARTICLE TRACKS WILL BE SAVED TO BINARY FILE: ', a, /4x, &
@@ -841,44 +813,6 @@ contains
       found = .true.
     case ('DRAPE')
       this%idrape = 1
-      found = .true.
-    case ('TRACK')
-      call this%parser%GetStringCaps(keyword)
-      if (keyword == 'FILEOUT') then
-        ! parse filename
-        call this%parser%GetString(fname)
-        ! open binary output file
-        this%itrkout = getunit()
-        call openfile(this%itrkout, this%iout, fname, 'DATA(BINARY)', &
-                      form, access, filstat_opt='REPLACE', &
-                      mode_opt=MNORMAL)
-        write (this%iout, fmttrkbin) trim(adjustl(fname)), this%itrkout
-        ! open and write ascii header spec file
-        this%itrkhdr = getunit()
-        fname = trim(fname)//'.hdr'
-        call openfile(this%itrkhdr, this%iout, fname, 'CSV', &
-                      filstat_opt='REPLACE', mode_opt=MNORMAL)
-        write (this%itrkhdr, '(a,/,a)') TRACKHEADERS, TRACKTYPES
-      else
-        call store_error('OPTIONAL TRACK KEYWORD MUST BE '// &
-                         'FOLLOWED BY FILEOUT')
-      end if
-      found = .true.
-    case ('TRACKCSV')
-      call this%parser%GetStringCaps(keyword)
-      if (keyword == 'FILEOUT') then
-        ! parse filename
-        call this%parser%GetString(fname)
-        ! open CSV output file and write headers
-        this%itrkcsv = getunit()
-        call openfile(this%itrkcsv, this%iout, fname, 'CSV', &
-                      filstat_opt='REPLACE')
-        write (this%iout, fmttrkcsv) trim(adjustl(fname)), this%itrkcsv
-        write (this%itrkcsv, '(a)') TRACKHEADERS
-      else
-        call store_error('OPTIONAL TRACKCSV KEYWORD MUST BE &
-          &FOLLOWED BY FILEOUT')
-      end if
       found = .true.
     case default
       found = .false.
@@ -1154,25 +1088,5 @@ contains
     ! -- return
     return
   end subroutine prp_read_dimensions
-
-  !> @brief Save particle track data to an output file
-  subroutine prp_ot_trk(this)
-    ! -- dummy variables
-    class(PrtPrpType), intent(inout) :: this
-    !
-    ! -- write particle track data to binary output file
-    if (this%itrkout /= 0) &
-      call this%trackdata%save_track_data(this%itrkout, csv=.false., &
-                                          itrack1=this%itrack1 + 1, &
-                                          itrack2=this%itrack2)
-    !
-    ! -- write particle track data to CSV output file
-    if (this%itrkcsv /= 0) &
-      call this%trackdata%save_track_data(this%itrkcsv, csv=.true., &
-                                          itrack1=this%itrack1 + 1, &
-                                          itrack2=this%itrack2)
-    !
-    return
-  end subroutine prp_ot_trk
 
 end module PrtPrpModule

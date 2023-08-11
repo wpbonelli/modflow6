@@ -7,9 +7,6 @@ been converted from reduced to user node numbers.
 This is verified by using FloPy to intersect path
 points with the grid, then compute node numbers.
 
-Track output is persisted to PRP-specific files
-as well as the combined full-model track file.
-
 GWF and PRT models run in separate simulations
 via flow model interface.
 
@@ -39,17 +36,13 @@ from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
 # model names
 name = "prtfmi02"
-gwfname = f"{name}"
+gwfname = f"{name}_gwf"
 prtname = f"{name}_prt"
 mp7name = f"{name}_mp7"
 
 # output file names
 gwf_budget_file = f"{gwfname}.bud"
 gwf_head_file = f"{gwfname}.hds"
-prp_track_file_a = f"{prtname}_a.prp.trk"
-prp_track_csv_file_a = f"{prtname}_a.prp.trk.csv"
-prp_track_file_b = f"{prtname}_b.prp.trk"
-prp_track_csv_file_b = f"{prtname}_b.prp.trk.csv"
 prt_track_file = f"{prtname}.trk"
 prt_track_csv_file = f"{prtname}.trk.csv"
 mp7_pathline_file = f"{mp7name}.mppth"
@@ -209,8 +202,6 @@ def build_prt_sim(ws, mf6):
         filename=f"{prtname}_a.prp",
         nreleasepts=len(releasepts_a),
         packagedata=releasepts_a,
-        track_filerecord=[prp_track_file_a],
-        trackcsv_filerecord=[prp_track_csv_file_a],
         perioddata={0: ["FIRST"]},
     )
     flopy.mf6.ModflowPrtprp(
@@ -219,8 +210,6 @@ def build_prt_sim(ws, mf6):
         filename=f"{prtname}_b.prp",
         nreleasepts=len(releasepts_b),
         packagedata=releasepts_b,
-        track_filerecord=[prp_track_file_b],
-        trackcsv_filerecord=[prp_track_csv_file_b],
         perioddata={0: ["FIRST"]},
     )
 
@@ -334,10 +323,6 @@ def test_prt_fmi02(function_tmpdir, targets):
     assert (ws / gwf_head_file).is_file()
     assert (ws / prt_track_file).is_file()
     assert (ws / prt_track_csv_file).is_file()
-    assert (ws / prp_track_file_a).is_file()
-    assert (ws / prp_track_csv_file_a).is_file()
-    assert (ws / prp_track_file_b).is_file()
-    assert (ws / prp_track_csv_file_b).is_file()
 
     # check mp7 output files exist
     assert (ws / mp7_pathline_file).is_file()

@@ -14,7 +14,6 @@ program tester
   use test_prt_TernaryUtil, only: collect_prt_TernaryUtil
   use test_prt_TernarySolveTrack, only: collect_prt_TernarySolveTrack
   use test_prt_UtilMisc, only: collect_prt_UtilMisc
-  use test_prt_TrackData, only: collect_prt_TrackData
   implicit none
   integer :: stat, is
   character(len=:), allocatable :: suite_name, test_name
@@ -36,8 +35,7 @@ program tester
                new_testsuite("prt_TernaryUtil", collect_prt_TernaryUtil), &
                new_testsuite("prt_TernarySolveTrack", &
                              collect_prt_TernarySolveTrack), &
-               new_testsuite("prt_UtilMisc", collect_prt_UtilMisc), &
-               new_testsuite("prt_TrackData", collect_prt_TrackData) &
+               new_testsuite("prt_UtilMisc", collect_prt_UtilMisc) &
                ]
 
   call get_argument(1, suite_name)

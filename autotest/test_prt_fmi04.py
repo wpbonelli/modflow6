@@ -29,7 +29,7 @@ from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
 # model names
 name = "prtfmi04"
-gwfname = f"{name}"
+gwfname = f"{name}_gwf"
 prtname = f"{name}_prt"
 mp7name = f"{name}_mp7"
 

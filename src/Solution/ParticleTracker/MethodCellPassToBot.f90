@@ -133,8 +133,8 @@ contains
     end if
     !
     ! -- Store track data
-    call this%trackdata%add_track_data(particle, kper=kper, &
-                                       kstp=kstp, reason=1)
+    call this%trackdata%save_record(particle, kper=kper, &
+                                    kstp=kstp, reason=1)
     !
     return
     !

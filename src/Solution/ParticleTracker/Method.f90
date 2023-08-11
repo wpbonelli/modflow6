@@ -73,7 +73,7 @@ contains
       call submethod%apply(particle, tmax)
 
       ! -- Store particle trackdata as appropriate
-      ! call submethod%trackdata%add_track_data(particle, &
+      ! call submethod%trackdata%save_record(particle, &
       !                                         kper=kper, kstp=kstp, &
       !                                         reason=1, level=levelNext)
 
@@ -81,9 +81,9 @@ contains
       call advance(this, particle, levelNext, submethod, isStillAdvancing)
 
       ! -- Store particle trackdata as appropriate
-      call submethod%trackdata%add_track_data(particle, &
-                                              kper=kper, kstp=kstp, &
-                                              reason=1, level=levelNext)
+      call submethod%trackdata%save_record(particle, &
+                                           kper=kper, kstp=kstp, &
+                                           reason=1, level=levelNext)
     end do
     !
     return

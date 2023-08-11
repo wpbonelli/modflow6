@@ -94,15 +94,12 @@ contains
     real(DP), dimension(:), pointer, contiguous :: retfactor
     integer(I4B), dimension(:), pointer, contiguous :: izone
     type(TrackDataType), pointer :: trackdata
-    ! -- local
     !
     this%fmi => fmi
     this%flowja => flowja
     this%porosity => porosity
     this%retfactor => retfactor
     this%izone => izone
-    !
-    ! -- Set pointer to model track data
     this%trackdata => trackdata
     !
     return

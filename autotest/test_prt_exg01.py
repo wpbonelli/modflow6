@@ -28,7 +28,7 @@ from simulation import TestSimulation
 
 # model names
 name = "prtexg1"
-gwfname = f"{name}"
+gwfname = f"{name}_gwf"
 prtname = f"{name}_prt"
 mp7name = f"{name}_mp7"
 
@@ -319,7 +319,7 @@ def test_mf6model(name, function_tmpdir, targets):
     )
 
     # extract head, budget, and specific discharge results from GWF model
-    gwf = sim.get_model(name)
+    gwf = sim.get_model(gwfname)
     hds = HeadFile(ws / gwf_head_file).get_data()
     bud = gwf.output.budget()
     spdis = bud.get_data(text="DATA-SPDIS")[0]

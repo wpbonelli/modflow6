@@ -10,8 +10,7 @@ tests = [
   'prt_MethodSubcellPollock',
   'prt_Particle',
   'prt_TernaryUtil',
-  'prt_TernarySolveTrack',
-  'prt_TrackData'
+  'prt_TernarySolveTrack'
 ]
 
 test_srcs = files(
