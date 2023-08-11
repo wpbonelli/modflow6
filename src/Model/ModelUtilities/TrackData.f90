@@ -10,26 +10,48 @@ module TrackDataModule
   private
   public :: TrackDataType
 
+  !> @brief Handles saving pathlines to binary and/or CSV output files.
+  type :: TrackDataType
+    integer(I4B), pointer :: ibinun => null()
+    integer(I4B), pointer :: icsvun => null()
+  contains
+    procedure, public :: save_record
+  end type TrackDataType
+
+  ! Data model
+
+  character(len=*), parameter, public :: TRACKHEADERS = &
+                'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,istatus,ireason,&
+                &trelease,t,x,y,z'
+
+  character(len=*), parameter, public :: TRACKTYPES = &
+                             '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
+                             &<f8,<f8,<f8,<f8,<f8'
+
   ! Notes
   ! -----
   !
-  ! Each particle's track (or pathline) consists of 1+ records reported
-  ! over the model domain while the particle is active.
+  ! Each particle's pathline consists of 1+ records reported as the particle
+  ! is tracked over the model domain. Each record represents the particle's
+  ! state (e.g. tracking status, position) at a particular moment in time.
   !
-  ! Each record's istatus attribute indicates whether the particle is
-  ! pending release, active, or terminated.
-  !
-  ! The record's ireason attribute indicates why it was reported. The user
-  ! selects 1+ reporting conditions.
-  !
-  ! Identical particle states may be duplicated if multiple reporting
-  ! conditions apply at a given time.
-  !
+  ! Each record has an istatus property indicating the particle status, e.g.
+  ! awaiting release, active, or terminated. A particle may terminate for
+  ! several reasons. Any istatus value greater than 1 implies termination.
   ! The particle's lifecycle is a strictly increasing step function over
-  ! istatus, starting at 0.
+  ! istatus, starting at 0. For easier porting of models, PRT employs the
+  ! same status enumeration as MODPATH 7 endpoint files. Some categories
+  ! are not applicable to PRT, however, and will not appear in PRT output:
+  ! for instance, MODPATH 7 distinguishes between forwards and backwards
+  ! tracking, while PRT does not, so istatus value 4 is not used by PRT.
   !
-  ! There is no particle ID column. Particles can be uniquely identified by
-  ! composite key, i.e. combination of column values:
+  ! Each record has an ireason property identifying the reporting condition
+  ! responsible for the record. The user selects 1+ reporting conditions.
+  ! Identical records (excepting ireason) may be duplicated if multiple
+  ! reporting conditions apply to particles at the same moment in time.
+  !
+  ! Particles have no ID property. Particles can be uniquely identified by
+  ! composite key, i.e. combination of properties:
   !
   !   - imdl: originating model ID
   !   - iprp: originating PRP ID
@@ -52,9 +74,9 @@ module TrackDataModule
   !     8: permanently unreleased***
   !     9: terminated for unknown reason*
   !
-  !   *is this necessary?
-  !   **unnecessary since PRT makes no distinction between forwards/backwards tracking
-  !   ***e.g., released into an inactive cell, a stop zone cell, or a termination zone
+  !   * is this necessary?
+  !   ** unnecessary since PRT makes no distinction between forwards/backwards tracking
+  !   *** e.g., released into an inactive cell, a stop zone cell, or a termination zone
   !
   !   ireason: the reason the record was reported
   !   -------
@@ -64,28 +86,12 @@ module TrackDataModule
   !     3: exited weak sink
   !     ...
 
-  character(len=*), parameter, public :: TRACKHEADERS = &
-                'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,istatus,ireason,&
-                &trelease,t,x,y,z'
-
-  character(len=*), parameter, public :: TRACKTYPES = &
-                             '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
-                             &<f8,<f8,<f8,<f8,<f8'
-
-  type :: TrackDataType
-    integer(I4B), pointer :: ibinun => null()
-    integer(I4B), pointer :: icsvun => null()
-  contains
-    procedure, public :: save_record
-  end type TrackDataType
-
 contains
 
-  !> @brief Save pathline datum from a particle to a binary or CSV output file.
+  !> @brief Save particle pathline record to a binary or CSV file.
   subroutine save_record(this, particle, kper, kstp, reason, level)
     ! -- dummy
     class(TrackDataType), intent(inout) :: this
-
     type(ParticleType), pointer, intent(in) :: particle
     integer(I4B), intent(in) :: kper, kstp
     integer(I4B), intent(in) :: reason
