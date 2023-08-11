@@ -90,8 +90,6 @@ contains
     this%porosity => porosity
     this%retfactor => retfactor
     this%izone => izone
-    !
-    ! -- Set pointer to model track data
     this%trackdata => trackdata
     !
     return
