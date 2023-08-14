@@ -21,7 +21,6 @@ import numpy as np
 import pandas as pd
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
-
 from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
 # model names
@@ -49,20 +48,34 @@ nstp = 1
 tsmult = 1.0
 porosity = 0.1
 
-# release points
-# todo: define for mp7 first, then use flopy utils to convert to global coords for mf6 prt
-releasepts = [
-    # particle index, k, i, j, x, y, z
-    # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5)
-    for i in range(9)
-]
+# release points in mp7 format (using local coordinates)
 releasepts_mp7 = [
     # node number, localx, localy, localz
     # (0-based indexing converted to 1-based for mp7 by flopy)
     (0, float(f"0.{i + 1}"), float(f"0.{i + 1}"), 0.5)
     for i in range(9)
 ]
+
+# expected release points in PRT format; below we will use flopy
+# to convert from mp7 to prt format and make sure they are equal
+releasepts_prt = [
+    # particle index, k, i, j, x, y, z
+    # (0-based indexing converted to 1-based for mf6 by flopy)
+    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5)
+    for i in range(9)
+]
+
+
+def get_partdata(grid):
+    return flopy.modpath.ParticleData(
+        partlocs=[grid.get_lrc(p[0])[0] for p in releasepts_mp7],
+        structured=True,
+        localx=[p[1] for p in releasepts_mp7],
+        localy=[p[2] for p in releasepts_mp7],
+        localz=[p[3] for p in releasepts_mp7],
+        timeoffset=0,
+        drape=0,
+    )
 
 
 def build_gwf_sim(ws, mf6):
@@ -165,6 +178,14 @@ def build_prt_sim(ws, mf6):
     # create mip package
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
 
+    # convert mp7 particledata to prt release points
+    partdata = get_partdata(prt.modelgrid)
+    coords = partdata.to_coords(prt.modelgrid)
+    releasepts = [(i, 0, 0, 0, c[0], c[1], c[2]) for i, c in enumerate(coords)]
+
+    # check release points match expectation
+    assert np.allclose(releasepts_prt, releasepts)
+
     # create prp package
     flopy.mf6.ModflowPrtprp(
         prt,
@@ -204,14 +225,10 @@ def build_prt_sim(ws, mf6):
 
 
 def build_mp7_sim(ws, mp7, gwf):
-    partdata = flopy.modpath.ParticleData(
-        partlocs=[p[0] for p in releasepts_mp7],
-        localx=[p[1] for p in releasepts_mp7],
-        localy=[p[2] for p in releasepts_mp7],
-        localz=[p[3] for p in releasepts_mp7],
-        timeoffset=0,
-        drape=0,
-    )
+    # convert mp7 particledata to prt release points
+    partdata = get_partdata(gwf.modelgrid)
+
+    # create modpath 7 simulation
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
         particledata=partdata,
