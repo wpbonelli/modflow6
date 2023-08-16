@@ -67,7 +67,6 @@ nlay = 1
 nrow = 10
 ncol = 10
 top = 1.0
-
 nper = 1
 perlen = 1.0
 nstp = 1
