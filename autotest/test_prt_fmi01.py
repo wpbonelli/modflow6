@@ -23,20 +23,8 @@ from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
-# model names
-name = "prtfmi01"
-gwfname = f"{name}_gwf"
-prtname = f"{name}_prt"
-mp7name = f"{name}_mp7"
 
-# output file names
-gwf_budget_file = f"{gwfname}.bud"
-gwf_head_file = f"{gwfname}.hds"
-prt_track_file = f"{prtname}.trk"
-prt_track_csv_file = f"{prtname}.trk.csv"
-mp7_pathline_file = f"{mp7name}.mppth"
-
-# model info
+simname = "prtfmi01"
 nlay = 1
 nrow = 10
 ncol = 10
@@ -78,7 +66,7 @@ def get_partdata(grid):
     )
 
 
-def build_gwf_sim(ws, mf6):
+def build_gwf_sim(name, ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
@@ -97,6 +85,7 @@ def build_gwf_sim(ws, mf6):
     )
 
     # create gwf model
+    gwfname = f"{name}_gwf"
     gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
 
     # create gwf discretization
@@ -132,6 +121,9 @@ def build_gwf_sim(ws, mf6):
     )
 
     # create gwf output control package
+    # output file names
+    gwf_budget_file = f"{gwfname}.bud"
+    gwf_head_file = f"{gwfname}.hds"
     oc = flopy.mf6.ModflowGwfoc(
         gwf,
         budget_filerecord=gwf_budget_file,
@@ -145,7 +137,7 @@ def build_gwf_sim(ws, mf6):
     return sim
 
 
-def build_prt_sim(ws, mf6):
+def build_prt_sim(name, ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
@@ -164,6 +156,7 @@ def build_prt_sim(ws, mf6):
     )
 
     # create prt model
+    prtname = f"{name}_prt"
     prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
 
     # create prt discretization
@@ -197,6 +190,8 @@ def build_prt_sim(ws, mf6):
     )
 
     # create output control package
+    prt_track_file = f"{prtname}.trk"
+    prt_track_csv_file = f"{prtname}.trk.csv"
     flopy.mf6.ModflowPrtoc(
         prt,
         pname="oc",
@@ -205,6 +200,9 @@ def build_prt_sim(ws, mf6):
     )
 
     # create the flow model interface
+    gwfname = f"{name}_gwf"
+    gwf_budget_file = f"{gwfname}.bud"
+    gwf_head_file = f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -229,6 +227,7 @@ def build_mp7_sim(ws, mp7, gwf):
     partdata = get_partdata(gwf.modelgrid)
 
     # create modpath 7 simulation
+    mp7name = f"{simname}_mp7"
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
         particledata=partdata,
@@ -257,11 +256,17 @@ def build_mp7_sim(ws, mp7, gwf):
 
 
 def test_prt_fmi01(function_tmpdir, targets):
+    # workspace
     ws = function_tmpdir
 
+    # model names
+    gwfname = f"{simname}_gwf"
+    prtname = f"{simname}_prt"
+    mp7name = f"{simname}_mp7"
+
     # build mf6 models
-    gwfsim = build_gwf_sim(ws, targets.mf6)
-    prtsim = build_prt_sim(ws, targets.mf6)
+    gwfsim = build_gwf_sim(simname, ws, targets.mf6)
+    prtsim = build_prt_sim(simname, ws, targets.mf6)
 
     # run mf6 models
     for sim in [gwfsim, prtsim]:
@@ -270,6 +275,7 @@ def test_prt_fmi01(function_tmpdir, targets):
         assert success
 
     # extract model objects
+
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
 
@@ -285,12 +291,17 @@ def test_prt_fmi01(function_tmpdir, targets):
     assert success
 
     # check mf6 output files exist
+    gwf_budget_file = f"{gwfname}.bud"
+    gwf_head_file = f"{gwfname}.hds"
+    prt_track_file = f"{prtname}.trk"
+    prt_track_csv_file = f"{prtname}.trk.csv"
     assert (ws / gwf_budget_file).is_file()
     assert (ws / gwf_head_file).is_file()
     assert (ws / prt_track_file).is_file()
     assert (ws / prt_track_csv_file).is_file()
 
     # check mp7 output files exist
+    mp7_pathline_file = f"{mp7name}.mppth"
     assert (ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
@@ -316,7 +327,7 @@ def test_prt_fmi01(function_tmpdir, targets):
     assert all_equal(mf6_pldata["iprp"], 1)
 
     # check mf6 cell budget file
-    check_budget_data(ws / f"{name}_prt.lst", perlen, nper)
+    check_budget_data(ws / f"{simname}_prt.lst", perlen, nper)
 
     # check mf6 track data written to different formats are equal
     check_track_data(
@@ -372,7 +383,7 @@ def test_prt_fmi01(function_tmpdir, targets):
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{name}.png")
+    plt.savefig(ws / f"test_{simname}.png")
 
     # convert mf6 pathlines to mp7 format
     mf6_pldata_mp7 = to_mp7_format(mf6_pldata)

@@ -50,6 +50,8 @@ perlen = 1.0
 nstp = 1
 tsmult = 1.0
 porosity = 0.1
+
+# release points
 releasepts = [
     # index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
@@ -67,70 +69,11 @@ releasepts_mp7 = [
 ex = [name]
 
 
-def build_sim(ws, mf6):
+def build_sim(name, ws, mf6):
+    from test_prt_fmi01 import build_gwf_sim
+
     # create simulation
-    sim = flopy.mf6.MFSimulation(
-        sim_name=name,
-        exe_name=mf6,
-        version="mf6",
-        sim_ws=ws,
-    )
-
-    # create tdis package
-    perioddata = (perlen, nstp, tsmult)
-    flopy.mf6.modflow.mftdis.ModflowTdis(
-        sim,
-        pname="tdis",
-        time_units="DAYS",
-        nper=nper,
-        perioddata=[perioddata],
-    )
-
-    # create gwf model
-    gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
-
-    # create gwf discretization
-    flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
-        gwf,
-        pname="dis",
-        nlay=nlay,
-        nrow=nrow,
-        ncol=ncol,
-    )
-
-    # create gwf initial conditions package
-    flopy.mf6.modflow.mfgwfic.ModflowGwfic(gwf, pname="ic")
-
-    # create gwf node property flow package
-    flopy.mf6.modflow.mfgwfnpf.ModflowGwfnpf(
-        gwf,
-        pname="npf",
-        save_saturation=True,
-        save_specific_discharge=True,
-    )
-
-    # create gwf chd package
-    spd = {
-        0: [[(0, 0, 0), 1.0, 1.0], [(0, 9, 9), 0.0, 0.0]],
-        1: [[(0, 0, 0), 0.0, 0.0], [(0, 9, 9), 1.0, 2.0]],
-    }
-    chd = flopy.mf6.ModflowGwfchd(
-        gwf,
-        pname="CHD-1",
-        stress_period_data=spd,
-        auxiliary=["concentration"],
-    )
-
-    # create gwf output control package
-    oc = flopy.mf6.ModflowGwfoc(
-        gwf,
-        budget_filerecord=gwf_budget_file,
-        head_filerecord=gwf_head_file,
-        saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
-    )
-
-    # create iterative model solution for gwf model
-    ims = flopy.mf6.ModflowIms(sim)
+    sim = build_gwf_sim(name, ws, mf6)
 
     # create prt model
     prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
@@ -255,7 +198,7 @@ def eval_results(sim):
 @pytest.mark.parametrize("name", ex)
 def test_mf6model(name, function_tmpdir, targets):
     ws = function_tmpdir
-    sim = build_sim(str(ws), targets.mf6)
+    sim = build_sim(name, str(ws), targets.mf6)
     sim.write_simulation()
 
     test = TestFramework()
