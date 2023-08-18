@@ -6,7 +6,6 @@ module SubcellRectModule
   public :: SubcellRectType
   public :: create_subcellRect
 
-  ! -- Define the rectangular subcell type (SubcellRectType)
   type SubcellRectType
     private
     character(len=40), pointer, public :: type ! character string that names the tracking domain type
@@ -47,7 +46,6 @@ contains
   end subroutine destroy_subcellRect
 
   !> @brief Initialize a rectangular subcell
-  !! kluge note: needed???
   subroutine init_subcellRect(this)
     ! -- dummy
     class(SubcellRectType), intent(inout) :: this

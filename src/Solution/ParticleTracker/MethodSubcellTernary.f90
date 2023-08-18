@@ -40,7 +40,6 @@ contains
     !
     ! -- Create tracking domain for this method and set trackingDomain pointer
     call create_subcellTri(methodSubcellTernary%subcellTri)
-    ! methodSubcellTernary%trackingDomain => methodSubcellTernary%subcellTri
     methodSubcellTernary%trackingDomainType => &
       methodSubcellTernary%subcellTri%type
     !
@@ -82,12 +81,7 @@ contains
     class(MethodSubcellTernaryType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-    ! doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
-    ! local
     !
-    ! initialTime = 0d0         ! kluge test
-    ! maximumTime = 9d99        ! kluge test
-    ! call track_sub(this%subcellTri,particle,initialTime,maximumTime,t)
     call track_sub(this%subcellTri, particle, tmax)
     !
     return
@@ -100,7 +94,6 @@ contains
     class(SubcellTriType), intent(in) :: subcellTri
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-    ! doubleprecision :: initialTime,maximumTime,t
     ! local
     integer :: exitFace
     logical :: lbary ! kluge

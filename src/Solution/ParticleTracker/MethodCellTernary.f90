@@ -7,7 +7,7 @@ module MethodCellTernaryModule
   use CellDefnModule
   use SubcellTriModule
   use ParticleModule
-  use Ternary ! kluge
+  use Ternary
   use TrackDataModule, only: TrackDataType
   implicit none
 
@@ -15,7 +15,6 @@ module MethodCellTernaryModule
   public :: MethodCellTernaryType
   public :: create_methodCellTernary
 
-  ! -- Extend MethodType to the ternary cell-method type (MethodCellTernaryType)
   type, extends(MethodType) :: MethodCellTernaryType
     private
     type(CellPolyType), pointer :: cellPoly => null() ! tracking domain for the method
@@ -45,7 +44,6 @@ contains
   subroutine create_methodCellTernary(methodCellTernary)
     ! -- dummy
     type(MethodCellTernaryType), pointer :: methodCellTernary
-    ! -- local
     !
     allocate (methodCellTernary)
     !
@@ -54,7 +52,6 @@ contains
     !
     ! -- Create tracking domain for this method and set trackingDomain pointer
     call create_cellPoly(methodCellTernary%cellPoly)
-    ! methodCellTernary%trackingDomain => methodCellTernary%cellPoly
     methodCellTernary%trackingDomainType => methodCellTernary%cellPoly%type
     !
     ! -- Create subdomain to be loaded and injected into the submethod
@@ -68,7 +65,6 @@ contains
   subroutine destroy(this)
     ! -- dummy
     class(MethodCellTernaryType), intent(inout) :: this
-    ! -- local
     !
     deallocate (this%trackingDomainType)
     !
@@ -129,9 +125,7 @@ contains
       inface = -1
     case (1)
       ! -- Subcell face 1 (cell face)
-      ! inface = npolyverts - isc        ! kluge note: is this general???
       inface = isc
-      ! if (inface.eq.0) inface = 4
       if (inface .eq. 0) inface = npolyverts
     case (2)
       ! -- Subcell face --> next subcell in "cycle" (cell interior)
@@ -154,21 +148,13 @@ contains
       ! -- Subcell top (cell top)
       inface = npolyverts + 3
     end select
-    ! particle%iTrackingDomainBoundary(2) = inface
-    ! if (inface.ne.0) particle%iTrackingDomain(3) = 0
     if (inface .eq. -1) then
-      ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
-      ! particle%iTrackingDomainBoundary(2) = 0
-      ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
       particle%iTrackingDomainBoundary(2) = 0
     else if (inface .eq. 0) then
       particle%iTrackingDomainBoundary(2) = 0
     else
-      ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
       particle%iTrackingDomainBoundary(2) = inface
-      ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
     end if
-    ! if (inface.ne.0) particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))
     !
     return
     !
@@ -176,14 +162,13 @@ contains
 
   !> @brief Apply the ternary method to a polygonal cell
   subroutine apply_mCT(this, particle, tmax)
-    use ConstantsModule, only: DZERO, DONE, DHALF ! kluge???
+    use ConstantsModule, only: DZERO, DONE, DHALF
     use TdisModule, only: kper, kstp
     ! dummy
     class(MethodCellTernaryType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
     ! local
-    ! double precision :: velmult    ! kluge???
     double precision :: retfactor
     integer :: npolyverts, iv, ivp1, ivm1
     double precision :: x0, y0, x1, y1, x2, y2, xsum, ysum
@@ -196,17 +181,14 @@ contains
     if (this%cellPoly%cellDefn%izone .ne. 0) then
       if (particle%istopzone .eq. this%cellPoly%cellDefn%izone) then
         ! -- Stop zone
-        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 6
       end if
     else if (this%cellPoly%cellDefn%inoexitface .ne. 0) then
       ! -- No exit face
-      ! particle%iTrackingDomainBoundary(3) = 0
       particle%istatus = 5
     else if (particle%istopweaksink .ne. 0) then
       if (this%cellPoly%cellDefn%iweaksink .ne. 0) then
         ! -- Weak sink
-        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 3
       end if
     else
@@ -242,9 +224,6 @@ contains
         y2 = this%cellPoly%cellDefn%polyvert(ivp1)%y
         x1 = this%cellPoly%cellDefn%polyvert(ivm1)%x
         y1 = this%cellPoly%cellDefn%polyvert(ivm1)%y
-        ! kluge note: assuming porosity=1. for now
-        ! flow0 = this%cellPoly%cellDefn%faceflow(iv)/this%dz
-        ! flow1 = this%cellPoly%cellDefn%faceflow(ivm1)/this%dz
         term = DONE / (this%cellPoly%cellDefn%porosity * this%dz)
         flow0 = this%cellPoly%cellDefn%faceflow(iv) * term
         flow1 = this%cellPoly%cellDefn%faceflow(ivm1) * term
@@ -278,13 +257,7 @@ contains
         this%y_vert(iv) = y0
         area = area + x0 * y1 - x1 * y0
       end do
-      ! kluge note: from get_cell2d_area
-      !   a = 1/2 *[(x1*y2 + x2*y3 + x3*y4 + ... + xn*y1) -
-      !             (x2*y1 + x3*y2 + x4*y3 + ... + x1*yn)]
       area = area * DHALF
-      ! this%vzbot = velmult*this%cellPoly%cellDefn%faceflow(npolyverts+2)/area
-      ! this%vztop = -velmult*this%cellPoly%cellDefn%faceflow(npolyverts+3)/area
-      ! term = velfactor/(this%cellPoly%cellDefn%porosity*area)
       term = DONE / (retfactor * this%cellPoly%cellDefn%porosity * area)
       this%vzbot = this%cellPoly%cellDefn%faceflow(npolyverts + 2) * term
       this%vztop = -this%cellPoly%cellDefn%faceflow(npolyverts + 3) * term
@@ -310,15 +283,12 @@ contains
     integer, intent(in) :: levelNext
     class(SubcellTriType), intent(inout) :: subcellTri
     ! -- local
-    ! kluge note: maybe (in general) do tracking calc without velmult
-    ! and divide exit time by velmult at the end???
-    ! double precision :: velmult
     integer :: ic, isc, npolyverts
     integer :: iv0, iv1, ipv0, ipv1
     integer :: iv
     double precision :: x0, y0, x1, y1, x2, y2, x1rel, y1rel, x2rel, y2rel, xi, yi
     double precision :: di2, d02, d12, di1, d01, alphai, betai
-    double precision :: betatol ! kluge
+    double precision :: betatol
     !
     ic = this%cellPoly%cellDefn%icell
     subcellTri%icell = ic
@@ -333,9 +303,7 @@ contains
         iv0 = iv
         iv1 = iv + 1
         if (iv1 .gt. npolyverts) iv1 = 1
-        ! ipv0 = ivert_polygon(icell,iv0)
-        ! ipv1 = ivert_polygon(icell,iv1)
-        ipv0 = iv0 ! kluge???
+        ipv0 = iv0
         ipv1 = iv1
         x0 = this%x_vert(ipv0)
         y0 = this%y_vert(ipv0)
@@ -387,9 +355,7 @@ contains
     iv0 = isc
     iv1 = isc + 1
     if (iv1 .gt. npolyverts) iv1 = 1
-    ! ipv0 = ivert_polygon(ic,iv0)
-    ! ipv1 = ivert_polygon(ic,iv1)
-    ipv0 = iv0 ! kluge???
+    ipv0 = iv0
     ipv1 = iv1
     subcellTri%x0 = this%x_vert(ipv0)
     subcellTri%y0 = this%y_vert(ipv0)

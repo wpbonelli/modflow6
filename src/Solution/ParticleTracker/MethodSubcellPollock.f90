@@ -36,7 +36,6 @@ contains
     !
     ! -- Create tracking domain for this method and set trackingDomain pointer
     call create_subcellRect(methodSubcellPollock%subcellRect)
-    ! methodSubcellPollock%trackingDomain => methodSubcellPollock%subcellRect
     methodSubcellPollock%trackingDomainType => &
       methodSubcellPollock%subcellRect%type
     !
@@ -79,9 +78,6 @@ contains
     ! -- local
     double precision :: xOrigin, yOrigin, zOrigin, sinrot, cosrot
     !
-    ! initialTime = 0d0         ! kluge test
-    ! maximumTime = 9d99        ! kluge test
-    ! !
     ! -- Transform particle location into local subcell coordinates
     xOrigin = this%subcellRect%xOrigin
     yOrigin = this%subcellRect%yOrigin
@@ -232,7 +228,6 @@ contains
         if (exitFace .eq. 6) z = 1.0d0
       else
         print *, "something went wrong in track_sub" ! kluge
-        !!pause                                                      ! kluge
         stop ! kluge
       end if
     end if

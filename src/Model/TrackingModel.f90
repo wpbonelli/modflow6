@@ -7,7 +7,7 @@ module TrackingModelModule
   use SparseModule, only: sparsematrix
   use TimeArraySeriesManagerModule, only: TimeArraySeriesManagerType
   use ListModule, only: ListType
-  use ParticleModule ! kluge???
+  use ParticleModule
   use MethodModule, only: MethodType
   use GlobalDataModule
 
@@ -22,8 +22,6 @@ module TrackingModelModule
     integer(I4B), pointer :: nja => null() !number of connections
     integer(I4B), pointer :: moffset => null() !offset of this model in the solution
     integer(I4B), pointer :: icnvg => null() !convergence flag
-    ! integer(I4B), pointer :: npart => null() !number of particles in the model
-    ! integer(I4B), pointer :: npartmax => null() !maximum number of particles in the model
     integer(I4B), dimension(:), pointer, contiguous :: ia => null() !csr row pointer
     integer(I4B), dimension(:), pointer, contiguous :: ja => null() !csr columns
     real(DP), dimension(:), pointer, contiguous :: x => null() !dependent variable (head, conc, etc)
@@ -35,7 +33,6 @@ module TrackingModelModule
     integer(I4B), dimension(:), pointer, contiguous :: ibound => null() !ibound array
     !
     ! -- Derived types
-    ! type(ParticleListType), dimension(:), pointer   :: partlist => null()   !list of particle data
     type(ParticleListType), pointer :: partlist => null() !list of particle data
 
   contains
@@ -47,10 +44,7 @@ module TrackingModelModule
     procedure :: model_da
     !
     ! -- Methods specific to a tracking model
-    ! procedure :: model_ac    ! kluge note: not needed???
-    ! procedure :: model_mc    ! kluge note: not needed???
     procedure :: model_rp
-    ! procedure :: model_ad
     procedure :: model_cf
     procedure :: model_fc
     procedure :: model_ptcchk
@@ -58,13 +52,10 @@ module TrackingModelModule
     procedure :: model_nr
     procedure :: model_cc
     procedure :: model_nur
-    ! procedure :: model_cq
-    ! procedure :: model_bd
     procedure :: model_bdcalc
     procedure :: model_bdsave
     procedure :: model_ot
     procedure :: model_bdentry
-    ! procedure :: model_solve
     !
     ! -- Utility methods
     procedure :: allocate_scalars
@@ -89,17 +80,6 @@ contains
     class(TrackingModelType) :: this
   end subroutine model_df
 
-  ! subroutine model_ac(this, sparse)             ! kluge note: not needed???
-  !   class(TrackingModelType) :: this
-  !   type(sparsematrix), intent(inout) :: sparse
-  ! end subroutine model_ac
-  !
-  ! subroutine model_mc(this, iasln, jasln)       ! kluge note: not needed???
-  !   class(TrackingModelType) :: this
-  !   integer(I4B), dimension(:), intent(in) :: iasln
-  !   integer(I4B), dimension(:), intent(in) :: jasln
-  ! end subroutine model_mc
-  !
   subroutine model_ar(this)
     class(TrackingModelType) :: this
   end subroutine model_ar
@@ -107,10 +87,6 @@ contains
   subroutine model_rp(this)
     class(TrackingModelType) :: this
   end subroutine model_rp
-
-  ! subroutine model_ad(this)
-  !   class(TrackingModelType) :: this
-  ! end subroutine model_ad
 
   subroutine model_cf(this, kiter)
     class(TrackingModelType) :: this
@@ -176,18 +152,6 @@ contains
     integer(I4B), intent(inout) :: locmax
   end subroutine model_nur
 
-  ! subroutine model_cq(this, icnvg, isuppress_output)
-  !   class(TrackingModelType) :: this
-  !   integer(I4B),intent(in) :: icnvg
-  !   integer(I4B), intent(in) :: isuppress_output
-  ! end subroutine model_cq
-  !
-  ! subroutine model_bd(this, icnvg, isuppress_output)
-  !   class(TrackingModelType) :: this
-  !   integer(I4B),intent(in) :: icnvg
-  !   integer(I4B), intent(in) :: isuppress_output
-  ! end subroutine model_bd
-
   subroutine model_bdcalc(this, icnvg)
     class(TrackingModelType) :: this
     integer(I4B), intent(in) :: icnvg
@@ -224,50 +188,23 @@ contains
     call mem_deallocate(this%icnvg)
     call mem_deallocate(this%moffset)
     deallocate (this%filename)
-    ! call mem_deallocate(this%npart)
-    ! call mem_deallocate(this%npartmax)
     !
     ! -- Arrays
     call mem_deallocate(this%xold)
     call mem_deallocate(this%flowja)
     call mem_deallocate(this%idxglo)
-    ! deallocate(this%partlist)        ! kluge
-    ! deallocate(this%partlist%velmult)
-    ! deallocate(this%partlist%x)   ! kluge note: use mem_deallocate for these arrays
-    ! deallocate(this%partlist%y)
-    ! deallocate(this%partlist%z)
-    ! deallocate(this%partlist%xlocal)
-    ! deallocate(this%partlist%ylocal)
-    ! deallocate(this%partlist%zlocal)
-    ! deallocate(this%partlist%iTrackingDomain)
-    ! deallocate(this%partlist%iTrackingDomainBoundary)
-    ! deallocate(this%partlist%trelease)
-    ! deallocate(this%partlist%tstop)
-    ! deallocate(this%partlist%ttrack)
-    ! deallocate(this%partlist%istopweaksink)
-    ! deallocate(this%partlist%istopzone)
-    ! deallocate(this%partlist%istatus)
-    ! kluge note: structure of arrays - deallocate pointer elsewhere???
-    ! deallocate(this%partlist)
     call mem_deallocate(this%ibound)
     !
     ! -- nullify pointers
-    ! call mem_deallocate(this%x, 'X', this%memoryPath)
-    ! call mem_deallocate(this%rhs, 'RHS', this%memoryPath)
     if (associated(this%ibound)) &
       call mem_deallocate(this%ibound, 'IBOUND', this%memoryPath)
     !
     ! -- ExplicitModelType
     call this%ExplicitModelType%model_da()
     !
-    !
     ! -- Return
     return
   end subroutine model_da
-
-  ! subroutine model_solve(this)
-  !   class(TrackingModelType), intent(inout) :: this
-  ! end subroutine model_solve
 
   subroutine set_moffset(this, moffset)
     class(TrackingModelType) :: this
@@ -303,16 +240,12 @@ contains
     call mem_allocate(this%icnvg, 'ICNVG', this%memoryPath)
     call mem_allocate(this%moffset, 'MOFFSET', this%memoryPath)
     allocate (this%filename)
-    ! call mem_allocate(this%npart, 'NPART', this%memoryPath)
-    ! call mem_allocate(this%npartmax, 'NPARTMAX', this%memoryPath)
     !
     this%filename = ''
     this%neq = 0
     this%nja = 0
     this%icnvg = 0
     this%moffset = 0
-    ! this%npart = 0
-    ! this%npartmax = 0
     !
     ! -- return
     return
@@ -323,35 +256,10 @@ contains
     use MemoryManagerModule, only: mem_allocate
     class(TrackingModelType) :: this
     integer(I4B) :: i
-    ! integer(I4B) :: np
     !
     call mem_allocate(this%xold, this%neq, 'XOLD', this%memoryPath)
     call mem_allocate(this%flowja, this%nja, 'FLOWJA', this%memoryPath)
     call mem_allocate(this%idxglo, this%nja, 'IDXGLO', this%memoryPath)
-    ! kluge note: update memory manager for this derived type???
-    ! call mem_allocate(this%partlist, this%npartmax, 'PARTLIST', this%memoryPath)
-    ! allocate(this%partlist(this%npartmax))                                    ! kluge
-    ! do np=1,this%npartmax
-    !   call create_particle(this%partlist(np)%particle)
-    ! end do
-    ! allocate(this%partlist)         ! kluge note: structure of arrays
-    ! allocate(this%partlist%velmult(this%npartmax))
-    ! allocate(this%partlist%x(this%npartmax))   ! kluge note: nprtmax is the initial max dimension
-    ! allocate(this%partlist%y(this%npartmax))     ! kluge note: use mem_allocate for these arrays
-    ! allocate(this%partlist%z(this%npartmax))
-    ! allocate(this%partlist%xlocal(this%npartmax))
-    ! allocate(this%partlist%ylocal(this%npartmax))
-    ! allocate(this%partlist%zlocal(this%nreleasepts))
-    ! kluge note: ditch crazy dims
-    ! allocate(this%partlist%iTrackingDomain(this%npartmax,levelMin:levelMax))
-    ! kluge note: ditch crazy dims
-    ! allocate(this%partlist%iTrackingDomainBoundary(this%npartmax,levelMin:levelMax))
-    ! allocate(this%partlist%trelease(this%npartmax))
-    ! allocate(this%partlist%tstop(this%npartmax))
-    ! allocate(this%partlist%ttrack(this%npartmax))
-    ! allocate(this%partlist%istopweaksink(this%npartmax))
-    ! allocate(this%partlist%istopzone(this%npartmax))
-    ! allocate(this%partlist%istatus(this%npartmax))
     call mem_allocate(this%ibound, this%neq, 'IBOUND', this%memoryPath)
     !
     ! -- initialize

@@ -100,8 +100,7 @@ contains
   subroutine loadsub_mGD(this, particle, levelNext, submethod)
     use ConstantsModule, only: DZERO, DONE
     use InputOutputModule
-    use GwfDisModule, only: GwfDisType ! kluge???
-    ! use CellRectModule ! kluge???
+    use GwfDisModule, only: GwfDisType
     ! -- dummy
     class(MethodDisType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
@@ -114,7 +113,6 @@ contains
     double precision :: areax, areay, areaz
     double precision :: dx, dy, dz
     double precision :: factor, term
-    ! double precision :: top, bot
     !
     ic = particle%iTrackingDomain(levelNext) ! kluge note: is cell number always known coming in?
     ! -- load cellDefn
@@ -254,7 +252,6 @@ contains
     class(MethodDisType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-    ! doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
     ! -- local
     !
     ! -- Track across cells
@@ -266,7 +263,7 @@ contains
 
   !> @brief Return the number of polygon vertices for a cell in the grid
   function get_npolyverts(this, ic) result(npolyverts)
-    use GwfDisModule ! kluge???
+    use GwfDisModule
     implicit none
     ! -- dummy
     class(MethodDisType), intent(inout) :: this
@@ -282,7 +279,7 @@ contains
 
   !> @brief Get the index used to locate top elevation of a cell in the grid
   function get_iatop(this, ic) result(iatop)
-    use GwfDisModule ! kluge???
+    use GwfDisModule
     implicit none
     ! -- dummy
     class(MethodDisType), intent(inout) :: this
@@ -292,15 +289,6 @@ contains
     ! -- local
     integer :: ncpl, icu
     !
-    ! select type (dis => this%fmi%dis) ! kluge??? ...
-    ! type is (GwfDisType)
-    !   ncpl = dis%get_ncpl()
-    ! end select ! ... kluge???
-    ! if (ic.le.ncpl) then
-    !   iatop = -ic
-    ! else
-    !   iatop = ic - ncpl
-    ! end if
     ncpl = this%fmi%dis%get_ncpl()
     icu = this%fmi%dis%get_nodeuser(ic)
     if (icu .le. ncpl) then
@@ -313,7 +301,7 @@ contains
   end function get_iatop
 
   !> @brief Returns a top elevation based on index iatop
-  function get_top(this, iatop) result(top) ! kluge note: not needed???
+  function get_top(this, iatop) result(top)
     implicit none
     ! -- dummy
     class(MethodDisType), intent(inout) :: this
@@ -366,16 +354,11 @@ contains
     integer, intent(in) :: ic
     type(CellDefnType), pointer, intent(inout) :: cellDefn
     ! -- local
-    ! integer :: iatop,nnbrs
     integer :: iatop
     real(DP) :: top, bot, sat
     !
     cellDefn%icell = ic
     !
-    ! ! -- Load nnbrs
-    ! nnbrs = this%fmi%dis%con%ia(ic+1) - this%fmi%dis%con%ia(ic) - 1
-    ! cellDefn%nnbrs = nnbrs          ! kluge note: is this actually needed anywhere???
-    ! !
     ! -- Load npolyverts
     cellDefn%npolyverts = this%get_npolyverts(ic)
     !
@@ -463,9 +446,8 @@ contains
 
   !> @brief Loads face neighbors to cell definition from the grid
   subroutine load_cellDefn_facenbr(this, cellDefn)
-    use InputOutputModule ! kluge
-    ! use DisvGeom             ! kluge
-    use GwfDisModule ! kluge
+    use InputOutputModule
+    use GwfDisModule
     implicit none
     ! -- dummy
     class(MethodDisType), intent(inout) :: this
@@ -531,44 +513,6 @@ contains
     return
     !
   end subroutine load_cellDefn_facenbr
-
-  ! !> @brief Find the shared edge face of two cells.
-  ! !!
-  ! !! Find the shared edge face of cell1 shared by cell1 and cell2.
-  ! !! isharedface will return with 0 if there is no shared edge
-  ! !! face.  Proceed forward through ivlist1 and backward through
-  ! !! ivlist2 as a clockwise face in cell1 must correspond to a
-  ! !! counter clockwise face in cell2
-  ! !!
-  ! !! kluge note: based on DisvGeom shared_edge
-  ! !!
-  ! !<
-  ! subroutine shared_edgeface(ivlist1, ivlist2, iedgeface)
-  !   integer(I4B), dimension(:) :: ivlist1
-  !   integer(I4B), dimension(:) :: ivlist2
-  !   integer(I4B), intent(out) :: iedgeface
-  !   integer(I4B) :: nv1
-  !   integer(I4B) :: nv2
-  !   integer(I4B) :: il1
-  !   integer(I4B) :: il2
-  !   logical :: found
-  !   !
-  !   found = .false.
-  !   nv1 = size(ivlist1)
-  !   nv2 = size(ivlist2)
-  !   iedgeface = 0
-  !   outerloop: do il1 = 1, nv1 - 1
-  !     do il2 = nv2, 2, -1
-  !       if (ivlist1(il1) == ivlist2(il2) .and. &
-  !           ivlist1(il1 + 1) == ivlist2(il2 - 1)) then
-  !         found = .true.
-  !         iedgeface = il1
-  !         exit outerloop
-  !       end if
-  !     end do
-  !     if (found) exit
-  !   end do outerloop
-  ! end subroutine shared_edgeface
 
   !> @brief Load flows into the cell definition
   !!
@@ -641,14 +585,7 @@ contains
     ic = cellDefn%icell
     npolyverts = cellDefn%npolyverts
     !
-    ! kluge note - assignment of BoundaryFlows to faceflow below assumes vertex 1
-    !  is at upper left of a rectangular cell
-    ! ioffset = (ic - 1)*6
     ioffset = (ic - 1) * 10
-    ! cellDefn%faceflow(1) = cellDefn%faceflow(1) + this%fmi%BoundaryFlows(ioffset+4)  ! kluge note: should these be additive (seems so)???
-    ! cellDefn%faceflow(2) = cellDefn%faceflow(2) + this%fmi%BoundaryFlows(ioffset+2)
-    ! cellDefn%faceflow(3) = cellDefn%faceflow(3) + this%fmi%BoundaryFlows(ioffset+3)
-    ! cellDefn%faceflow(4) = cellDefn%faceflow(4) + this%fmi%BoundaryFlows(ioffset+1)
     cellDefn%faceflow(1) = cellDefn%faceflow(1) + &
                            this%fmi%BoundaryFlows(ioffset + 1) ! kluge note: should these be additive (seems so)???
     cellDefn%faceflow(2) = cellDefn%faceflow(2) + &
@@ -658,8 +595,6 @@ contains
     cellDefn%faceflow(4) = cellDefn%faceflow(4) + &
                            this%fmi%BoundaryFlows(ioffset + 4)
     cellDefn%faceflow(5) = cellDefn%faceflow(1)
-    ! cellDefn%faceflow(6) = cellDefn%faceflow(6) + this%fmi%BoundaryFlows(ioffset+5)
-    ! cellDefn%faceflow(7) = cellDefn%faceflow(7) + this%fmi%BoundaryFlows(ioffset+6)
     cellDefn%faceflow(6) = cellDefn%faceflow(6) + &
                            this%fmi%BoundaryFlows(ioffset + 9)
     cellDefn%faceflow(7) = cellDefn%faceflow(7) + &
@@ -673,10 +608,10 @@ contains
   !!
   !! Loads 180-degree vertex indicator array to cell
   !! definition and sets flags that indicate how cell
-  !! can be represented
+  !! can be represented. Todo: rename?
   !!
   !<
-  subroutine load_cellDefn_ispv180(this, cellDefn) ! kluge note: rename???
+  subroutine load_cellDefn_ispv180(this, cellDefn)
     implicit none
     ! -- dummy
     class(MethodDisType), intent(inout) :: this

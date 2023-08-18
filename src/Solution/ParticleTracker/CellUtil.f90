@@ -14,7 +14,7 @@ contains
     use ConstantsModule, only: DONE
     use CellRectModule, only: CellRectType, create_cellRect
     use CellPolyModule, only: CellPolyType
-    use CellDefnModule, only: CellDefnType ! kluge???
+    use CellDefnModule, only: CellDefnType
     ! -- dummy
     type(CellPolyType), pointer :: cellPoly
     type(CellRectType), pointer :: cellRect
@@ -82,10 +82,10 @@ contains
     dy4 = y4 - yOrigin
     dx = dsqrt(dx4 * dx4 + dy4 * dy4)
     dy = dsqrt(dx2 * dx2 + dy2 * dy2)
-    dz = cellDefn%top - zOrigin ! kluge note: need to account for partial saturation
+    dz = cellDefn%top - zOrigin ! todo: need to account for partial saturation
     sinrot = dy4 / dx
     cosrot = dx4 / dx
-    cellRect%cellDefn = cellPoly%cellDefn ! kluge???
+    cellRect%cellDefn = cellPoly%cellDefn
     cellRect%dx = dx
     cellRect%dy = dy
     cellRect%dz = dz
@@ -100,13 +100,6 @@ contains
     areax = dx * dz
     areay = dy * dz
     areaz = dx * dy
-    ! cellRect%vx1 = cellDefn%faceflow(ipv1)/areax     ! kluge note: assuming porosity=1. and velmult=1. for now
-    ! cellRect%vx2 = -cellDefn%faceflow(ipv3)/areax
-    ! cellRect%vy1 = cellDefn%faceflow(ipv4)/areay
-    ! cellRect%vy2 = -cellDefn%faceflow(ipv2)/areay
-    ! cellRect%vz1 = cellDefn%faceflow(6)/areaz
-    ! cellRect%vz2 = -cellDefn%faceflow(7)/areaz
-    ! factor = cellDefn%velfactor/cellDefn%porosity
     factor = DONE / (cellDefn%retfactor * cellDefn%porosity)
     term = factor / areax
     cellRect%vx1 = cellDefn%faceflow(ipv1) * term
@@ -205,7 +198,7 @@ contains
     double precision :: xa, ya, xb, yb, valueiv
     !
     npolyverts = cellDefn%npolyverts
-    value = huge(1d0) ! kluge
+    value = huge(1d0)
     do iv = 1, npolyverts
       iva = iv
       ivb = iv + 1

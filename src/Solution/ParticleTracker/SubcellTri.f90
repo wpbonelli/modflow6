@@ -6,7 +6,6 @@ module SubcellTriModule
   public :: SubcellTriType
   public :: create_subcellTri
 
-  ! -- Define the triangular subcell type (SubcellTriType)
   type SubcellTriType
     private
     character(len=40), pointer, public :: type ! character string that names the tracking domain type
@@ -24,16 +23,10 @@ module SubcellTriModule
 
 contains
 
+  !> @brief Create a new triangular subcell
   subroutine create_subcellTri(subcellTri)
-! ******************************************************************************
-! create_subcellTri -- Create a new triangular subcell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     type(SubcellTriType), pointer :: subcellTri
-! ------------------------------------------------------------------------------
     !
     allocate (subcellTri)
     allocate (subcellTri%type)
@@ -42,34 +35,20 @@ contains
     return
   end subroutine create_subcellTri
 
+  !> @brief Destructor for a triangular subcell
   subroutine destroy_subcellTri(this)
-! ******************************************************************************
-! destroy_subcellTri -- Destructor for a triangular subcell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(SubcellTriType), intent(inout) :: this
-! ------------------------------------------------------------------------------
     !
     deallocate (this%type)
     !
     return
   end subroutine destroy_subcellTri
 
+  !> @brief Initialize a triangular subcell
   subroutine init_subcellTri(this)
-! ******************************************************************************
-! init_subcellTri -- Initialize a triangular subcell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(SubcellTriType), intent(inout) :: this
-! ------------------------------------------------------------------------------
-    !
-    ! kluge note: needed???
     !
     return
   end subroutine init_subcellTri

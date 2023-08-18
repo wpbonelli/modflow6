@@ -129,9 +129,6 @@ contains
     call mem_allocate(this%iprp, np, 'PLIPRP', mempath)
     ! -- kluge todo: update mem_allocate to allow custom range of indices?
     !    e.g. here we want to allocate 0-4 for trackdomain levels, not 1-5
-    ! call mem_allocate(this%iTrackingDomain, np, lmax - lmin + 1, 'PLITD', mempath) ! kluge note: ditch crazy dims
-    ! call mem_allocate(this%iTrackingDomainBoundary, np, &
-    !                   lmax - lmin + 1, 'PLITDB', mempath) ! kluge note: ditch crazy dims
     allocate (this%iTrackingDomain(np, lmin:lmax))
     allocate (this%iTrackingDomainBoundary(np, lmin:lmax))
     call mem_allocate(this%icu, np, 'PLICU', mempath)
@@ -161,8 +158,6 @@ contains
     call mem_deallocate(this%imdl, 'PLIMDL', mempath)
     call mem_deallocate(this%iprp, 'PLIPRP', mempath)
     call mem_deallocate(this%irpt, 'PLIRPT', mempath)
-    ! call mem_deallocate(this%iTrackingDomain, 'PLITD', mempath)
-    ! call mem_deallocate(this%iTrackingDomainBoundary, 'PLITDB', mempath)
     deallocate (this%iTrackingDomain)
     deallocate (this%iTrackingDomainBoundary)
     call mem_deallocate(this%icu, 'PLICU', mempath)
@@ -295,7 +290,6 @@ contains
     real(DP), intent(in) :: zOrigin
     real(DP), intent(in) :: sinrot
     real(DP), intent(in) :: cosrot
-    ! -- local
     !
     this%xOrigin = xOrigin
     this%yOrigin = yOrigin
@@ -346,7 +340,6 @@ contains
   subroutine reset_transf(this)
     ! -- dummy
     class(ParticleType), intent(inout) :: this
-    ! -- local
     !
     this%xOrigin = DZERO
     this%yOrigin = DZERO
@@ -367,7 +360,6 @@ contains
     real(DP) :: xmodel
     real(DP) :: ymodel
     real(DP) :: zmodel
-    ! -- local
     !
     if (this%isTransformed) then
       ! -- Transform back from local to model coordinates
