@@ -1,21 +1,5 @@
 # --------------------- prt fmi options ---------------------
 
-block options
-name save_flows
-type keyword
-reader urword
-optional true
-longname save calculated flow imbalance correction to budget file
-description REPLACE save_flows {'{#1}': 'FMI'}
-
-block options
-name flow_imbalance_correction
-type keyword
-reader urword
-optional true
-longname correct for flow imbalance
-description correct for an imbalance in flows by assuming that any residual flow error comes in or leaves at the concentration of the cell.  When this option is activated, the PRT Model budget written to the listing file will contain two additional entries: FLOW-ERROR and FLOW-CORRECTION.  These two entries will be equal but opposite in sign.  The FLOW-CORRECTION term is a mass flow that is added to offset the error caused by an imprecise flow balance.  If these terms are not relatively small, the flow model should be rerun with stricter convergence tolerances.
-
 # --------------------- prt fmi packagedata ---------------------
 
 block packagedata

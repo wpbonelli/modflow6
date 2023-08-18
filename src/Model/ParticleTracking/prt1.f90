@@ -11,20 +11,14 @@ module PrtModule
   use ExplicitModelModule, only: ExplicitModelType
   use BaseModelModule, only: BaseModelType
   use BndModule, only: BndType, AddBndToList, GetBndFromList
-  ! use PrtPinModule, only: PrtPinType
   use PrtPrpModule, only: PrtPrpType
   use PrtFmiModule, only: PrtFmiType
   use PrtMipModule, only: PrtMipType
-  ! use PrtAdvModule, only: PrtAdvType
-  ! use PrtDspModule, only: PrtDspType
-  ! use PrtSsmModule, only: PrtSsmType
-  ! use PrtMvtModule, only: PrtMvtType
-  ! use PrtMstModule, only: PrtMstType
   use PrtOcModule, only: PrtOcType
   use PrtObsModule, only: PrtObsType
   use BudgetModule, only: BudgetType
-  use ListModule, only: ListType ! kluge???
-  use MethodDisModule, only: MethodDisType ! kluge?
+  use ListModule, only: ListType
+  use MethodDisModule, only: MethodDisType
   use MethodDisvModule, only: MethodDisvType
   ! use MethodDisuModule, only: MethodDisuType
   use ParticleModule ! kluge
@@ -46,21 +40,14 @@ module PrtModule
 
   type, extends(TrackingModelType) :: PrtModelType
 
-    ! type(PrtPinType), pointer :: pin => null() ! particle input package
     type(PrtFmiType), pointer :: fmi => null() ! flow model interface
     type(PrtMipType), pointer :: mip => null() ! model input package
-    ! type(PrtMstType), pointer :: mst => null() ! mass storage and transfer package
-    ! type(PrtAdvType), pointer :: adv => null() ! advection package
-    ! type(PrtDspType), pointer :: dsp => null() ! dispersion package
-    ! type(PrtSsmType), pointer :: ssm => null() ! source sink mixing package
-    ! type(PrtMvtType), pointer :: mvt => null() ! mover transport package
     type(PrtOcType), pointer :: oc => null() ! output control package
     type(PrtObsType), pointer :: obs => null() ! observation package
     type(BudgetType), pointer :: budget => null() ! budget object
     type(MethodDisType), pointer :: methodDis => null() ! method for dis grid        ! kluge?
     type(MethodDisvType), pointer :: methodDisv => null() ! method for disv grid
     ! type(MethodDisuType), pointer :: methodDisu => null() ! method for disu grid
-    ! integer(I4B), pointer :: inpin => null() ! unit number PIN
     integer(I4B), pointer :: infmi => null() ! unit number FMI
     integer(I4B), pointer :: inmip => null() ! unit number MIP
     integer(I4B), pointer :: inmvt => null() ! unit number MVT
@@ -79,8 +66,6 @@ module PrtModule
   contains
 
     procedure :: model_df => prt_df
-    ! procedure :: model_ac => prt_ac ! kluge note: not needed???
-    ! procedure :: model_mc => prt_mc ! kluge note: not needed???
     procedure :: model_ar => prt_ar
     procedure :: model_rp => prt_rp
     procedure :: model_ad => prt_ad
@@ -109,7 +94,6 @@ module PrtModule
     procedure, private :: create_lstfile
     procedure, private :: log_namfile_options
     procedure :: get_method => prt_get_method
-    ! procedure :: solve => prt_solve
 
   end type PrtModelType
 
@@ -206,17 +190,9 @@ contains
     !
     ! -- Define packages and utility objects
     call this%dis%dis_df()
-    call this%fmi%prtfmi_df(this%dis)
-    ! if (this%inpin  > 0) call this%pin%pin_df()
-    ! if (this%inmvt > 0) call this%mvt%mvt_df(this%dis)
-    ! if (this%indsp > 0) call this%dsp%dsp_df(this%dis)
-    ! if (this%inssm > 0) call this%ssm%ssm_df()
+    call this%fmi%fmi_df(this%dis)
     call this%oc%oc_df()
     call this%budget%budget_df(NIUNIT_PRT, 'MASS', 'M')
-    ! call this%methodDis%init(this%fmi, this%mip%porosity, this%mip%retfactor,  &
-    !                          this%mip%izone)
-    ! call this%methodDisv%init(this%fmi, this%mip%porosity, this%mip%retfactor, &
-    !                          this%mip%izone)
     !
     ! -- Assign or point model members to dis members
     this%neq = this%dis%nodes
@@ -232,13 +208,7 @@ contains
       call packobj%bnd_df(this%neq, this%dis)
       packobj%TsManager%iout = this%iout
       packobj%TasManager%iout = this%iout
-      ! select type(packobj)
-      ! type is (PrtPrpType)    ! kluge
-      !   this%npartmax = this%npartmax + packobj%maxpartrelsd
-      !   this%npartmax = this%npartmax + packobj%nreleasepts   ! kluge note: does not account for repeating releases
-      ! end select
     end do
-    ! this%npartmax = this%npartmax * 100      ! kluge hardwire for some breathing space intially
     !
     ! -- Allocate model arrays
     call this%allocate_arrays()
@@ -249,70 +219,6 @@ contains
     ! -- return
     return
   end subroutine prt_df
-
-!!  subroutine prt_ac(this, sparse)       ! kluge note: not needed???
-!!! ******************************************************************************
-!!! prt_ac -- Add the internal connections of this model to the sparse matrix
-!!! ******************************************************************************
-!!!
-!!!    SPECIFICATIONS:
-!!! ------------------------------------------------------------------------------
-!!    ! -- modules
-!!    use SparseModule, only: sparsematrix
-!!    ! -- dummy
-!!    class(PrtModelType) :: this
-!!    type(sparsematrix), intent(inout) :: sparse
-!!    ! -- local
-!!    class(BndType), pointer :: packobj
-!!    integer(I4B) :: ip
-!!! ------------------------------------------------------------------------------
-!!    !
-!!    ! -- Add the internal connections of this model to sparse
-!!    call this%dis%dis_ac(this%moffset, sparse)
-!!    if (this%indsp > 0) &
-!!      call this%dsp%dsp_ac(this%moffset, sparse)
-!!    !
-!!    ! -- Add any package connections
-!!    do ip = 1, this%bndlist%Count()
-!!      packobj => GetBndFromList(this%bndlist, ip)
-!!      call packobj%bnd_ac(this%moffset, sparse)
-!!    enddo
-!!    !
-!!    ! -- return
-!!    return
-!!  end subroutine prt_ac
-!!
-!!  subroutine prt_mc(this, iasln, jasln)       ! kluge note: not needed???
-!!! ******************************************************************************
-!!! prt_mc -- Map the positions of this models connections in the
-!!! particle-tracking solution connection matrix.
-!!! ******************************************************************************
-!!!
-!!!    SPECIFICATIONS:
-!!! ------------------------------------------------------------------------------
-!!    ! -- dummy
-!!    class(PrtModelType) :: this
-!!    integer(I4B), dimension(:), intent(in) :: iasln
-!!    integer(I4B), dimension(:), intent(in) :: jasln
-!!    ! -- local
-!!    class(BndType), pointer :: packobj
-!!    integer(I4B) :: ip
-!!! ------------------------------------------------------------------------------
-!!    !
-!!    ! -- Find the position of each connection in the global ia, ja structure
-!!    !    and store them in idxglo.
-!!    call this%dis%dis_mc(this%moffset, this%idxglo, iasln, jasln)
-!!!!    if (this%indsp > 0) call this%dsp%dsp_mc(this%moffset, iasln, jasln)
-!!    !
-!!    ! -- Map any package connections
-!!    do ip=1,this%bndlist%Count()
-!!      packobj => GetBndFromList(this%bndlist, ip)
-!!      call packobj%bnd_mc(this%moffset, iasln, jasln)
-!!    enddo
-!!    !
-!!    ! -- return
-!!    return
-!!  end subroutine prt_mc
 
   !> @brief Allocate and read
   !
@@ -333,18 +239,7 @@ contains
     !
     ! -- Allocate and read modules attached to model
     call this%fmi%fmi_ar(this%ibound)
-    if (this%inmip > 0) call this%mip%mip_ar() ! kluge note: there has to be a mip package
-    ! if (this%inmvt > 0) call this%mvt%mvt_ar()
-    ! if (this%inpin  > 0) call this%pin%pin_ar(this%npart, this%npartmax,       &
-    !                                           this%partlist)
-    ! if (this%inmst > 0) call this%mst%mst_ar(this%dis, this%ibound)
-    ! if (this%inadv > 0) call this%adv%adv_ar(this%dis, this%ibound)
-    ! if (this%indsp > 0) call this%dsp%dsp_ar(this%ibound, this%mst%porosity)
-    ! if (this%inssm > 0) call this%ssm%ssm_ar(this%dis, this%ibound, this%x)
-    ! if (this%inobs > 0) call this%obs%prt_obs_ar(this%pin, this%x, this%flowja)
-    !
-    ! -- Call dis_ar to write binary grid file
-    !call this%dis%dis_ar(this%npf%icellidtype)
+    if (this%inmip > 0) call this%mip%mip_ar()
     !
     ! -- set up output control
     call this%oc%oc_ar(this%x, this%dis, DHNOFLO)
@@ -353,8 +248,6 @@ contains
     ! -- Package input files now open, so allocate and read
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
-      ! call packobj%set_pointers(this%dis%nodes, this%ibound, this%x,           &
-      !                           this%xold, this%flowja)
       select type (packobj)
       type is (PrtPrpType)
         call packobj%prp_set_pointers(this%ibound, this%mip%izone)
@@ -394,17 +287,11 @@ contains
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
     !
-    ! -- In fmi, check for mvt and mvrbudobj consistency
-    ! call this%fmi%fmi_rp(this%inmvt)
-    ! if (this%inmvt > 0) call this%mvt%mvt_rp()
-    !
     ! -- Check with TDIS on whether or not it is time to RP
     if (.not. readnewdata) return
     !
     ! -- Read and prepare
     if (this%inoc > 0) call this%oc%oc_rp()
-    ! if(this%inssm > 0) call this%ssm%ssm_rp()
-    ! if(this%inpin > 0) call this%pin%pin_rp()
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_rp()
@@ -429,36 +316,16 @@ contains
     ! -- Reset state variable
     irestore = 0
     if (iFailedStepRetry > 0) irestore = 1
-    ! if (irestore == 0) then
-    !   !
-    !   ! -- copy x into xold
-    !   do n = 1, this%dis%nodes
-    !     if (this%ibound(n) == 0) then
-    !       this%xold(n) = DZERO
-    !     else
-    !       this%xold(n) = this%x(n)
-    !     end if
-    !   enddo
-    ! else
-    !   !
-    !   ! -- copy xold into x if this time step is a redo
-    !   do n = 1, this%dis%nodes
-    !     this%x(n) = this%xold(n)
-    !   enddo
-    ! end if
+    !
     ! -- Copy masssto into massstoold
     do n = 1, this%dis%nodes
       this%massstoold(n) = this%masssto(n)
     end do
     !
     ! -- Advance fmi
-    call this%fmi%prtfmi_ad()
+    call this%fmi%fmi_ad()
     !
     ! -- Advance
-    ! !if(this%inmst > 0) call this%mst%mst_ad()
-    ! if(this%indsp > 0) call this%dsp%dsp_ad()
-    ! if(this%inssm > 0) call this%ssm%ssm_ad()
-    ! if(this%inpin > 0) call this%pin%pin_ad()
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_ad()
@@ -490,17 +357,7 @@ contains
     ! -- dummy
     class(PrtModelType) :: this
     integer(I4B), intent(in) :: kiter
-    ! -- local
-    ! class(BndType), pointer :: packobj
-    ! integer(I4B) :: ip
-    !
-    ! -- Call package cf routines
-    ! do ip = 1, this%bndlist%Count()
-    !   packobj => GetBndFromList(this%bndlist, ip)
-    !   call packobj%bnd_cf()
-    ! enddo
-    !
-    ! -- return
+    ! nothing to do
     return
   end subroutine prt_cf
 
@@ -513,40 +370,7 @@ contains
     integer(I4B), intent(in) :: njasln
     real(DP), dimension(njasln), intent(inout) :: amatsln
     integer(I4B), intent(in) :: inwtflag
-    ! ! -- local
-    ! class(BndType), pointer :: packobj
-    ! integer(I4B) :: ip
-    ! ------------------------------------------------------------------------------
-    ! ! -- call fc routines
-    ! call this%fmi%fmi_fc(this%dis%nodes, this%xold, this%nja, njasln,          &
-    !                      amatsln, this%idxglo, this%rhs)
-    ! if (this%inmvt > 0) then
-    !   call this%mvt%mvt_fc(this%dis%nodes, this%xold, this%nja, njasln,          &
-    !                        amatsln, this%idxglo, this%x, this%rhs)
-    ! end if
-    ! if(this%inmst > 0) then
-    !   call this%mst%mst_fc(this%dis%nodes, this%xold, this%nja, njasln,        &
-    !                        amatsln, this%idxglo, this%x, this%rhs, kiter)
-    ! endif
-    ! if(this%inadv > 0) then
-    !   call this%adv%adv_fc(this%dis%nodes, amatsln, this%idxglo, this%x,       &
-    !                        this%rhs)
-    ! endif
-    ! if(this%indsp > 0) then
-    !   call this%dsp%dsp_fc(kiter, this%dis%nodes, this%nja, njasln, amatsln,   &
-    !                        this%idxglo, this%rhs, this%x)
-    ! endif
-    ! if(this%inssm > 0) then
-    !   call this%ssm%ssm_fc(amatsln, this%idxglo, this%rhs)
-    ! endif
-    ! !
-    ! ! -- packages
-    ! do ip = 1, this%bndlist%Count()
-    !   packobj => GetBndFromList(this%bndlist, ip)
-    !   call packobj%bnd_fc(this%rhs, this%ia, this%idxglo, amatsln)
-    ! enddo
-    ! !
-    ! -- return
+    ! nothing to do
     return
   end subroutine prt_fc
 
@@ -561,20 +385,7 @@ contains
     character(len=LENPAKLOC), intent(inout) :: cpak
     integer(I4B), intent(inout) :: ipak
     real(DP), intent(inout) :: dpak
-    ! -- local
-    ! class(BndType), pointer :: packobj
-    ! integer(I4B) :: ip
-    !
-    ! -- If mover is on, then at least 2 outers required
-    ! if (this%inmvt > 0) call this%mvt%mvt_cc(kiter, iend, icnvgmod, cpak, dpak)
-    !
-    ! -- Call package cc routines
-    ! do ip = 1, this%bndlist%Count()
-    !   packobj => GetBndFromList(this%bndlist, ip)
-    !   call packobj%bnd_cc(innertot, kiter, iend, icnvgmod, cpak, ipak, dpak)
-    ! end do
-    !
-    ! -- return
+    ! nothing to do
     return
   end subroutine prt_cc
 
@@ -608,20 +419,6 @@ contains
     do i = 1, this%nja
       this%flowja(i) = this%flowja(i) * tled
     end do
-    !
-    ! -- Finish constructing the flowja array.  After the routines below are
-    !    called, the diagonal position of the flowja array will contain the
-    !    flow residual, so each package is responsible for adding its flow to
-    !    this diagonal position.
-    ! do i = 1, this%nja
-    !   this%flowja(i) = DZERO
-    ! enddo
-    ! if(this%inadv > 0) call this%adv%adv_cq(this%x, this%flowja)
-    ! if(this%indsp > 0) call this%dsp%dsp_cq(this%x, this%flowja)
-    ! if(this%inmst > 0) call this%mst%mst_cq(this%dis%nodes, this%x, this%xold, &
-    !                                         this%flowja)
-    ! if(this%inssm > 0) call this%ssm%ssm_cq(this%flowja)
-    ! if(this%infmi > 0) call this%fmi%fmi_cq(this%x, this%flowja)
     !
     ! -- Particle mass storage
     call this%prt_cq_sto()
@@ -726,15 +523,10 @@ contains
     call rate_accumulator(this%ratesto, rin, rout)
     call this%budget%addentry(rin, rout, delt, budtxt(1), &
                               isuppress_output, '             PRT')
-    ! if(this%inmst > 0) call this%mst%mst_bd(isuppress_output, this%budget)
-    ! if(this%inssm > 0) call this%ssm%ssm_bd(isuppress_output, this%budget)
-    ! if(this%infmi > 0) call this%fmi%prtfmi_bd(isuppress_output, this%budget)
-    ! if(this%inmvt > 0) call this%mvt%mvt_bd(this%x)
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_bd(this%budget)
     end do
-
     !
     ! -- Return
     return
@@ -830,9 +622,6 @@ contains
 
     ! -- Save PRT flows
     call this%prt_ot_saveflow(this%nja, this%flowja, icbcfl, icbcun)
-    ! if(this%inmst > 0) call this%mst%mst_ot_flow(icbcfl, icbcun)
-    ! if(this%infmi > 0) call this%fmi%fmi_ot_flow(icbcfl, icbcun)
-    ! if(this%inssm > 0) call this%ssm%ssm_ot_flow(icbcfl=icbcfl, ibudfl=0, icbcun=icbcun)
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_ot_model_flows(icbcfl=icbcfl, ibudfl=0, icbcun=icbcun)
@@ -843,16 +632,10 @@ contains
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_ot_package_flows(icbcfl=icbcfl, ibudfl=0)
     end do
-    ! if(this%inmvt > 0) then
-    !   call this%mvt%mvt_ot_saveflow(icbcfl, ibudfl)
-    ! end if
 
     ! -- Print GWF flows
     ! no need to print flowja
     call this%prt_ot_printflow(ibudfl, this%flowja)
-    ! no need to print mst
-    ! no need to print fmi
-    ! if(this%inssm > 0) call this%ssm%ssm_ot_flow(icbcfl=icbcfl, ibudfl=ibudfl, icbcun=0)
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_ot_model_flows(icbcfl=icbcfl, ibudfl=ibudfl, icbcun=0)
@@ -863,9 +646,6 @@ contains
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_ot_package_flows(icbcfl=0, ibudfl=ibudfl)
     end do
-    ! if(this%inmvt > 0) then
-    !   call this%mvt%mvt_ot_printflow(icbcfl, ibudfl)
-    ! end if
 
   end subroutine prt_ot_flow
 
@@ -982,10 +762,6 @@ contains
       call packobj%bnd_ot_bdsummary(kstp, kper, this%iout, ibudfl)
     end do
     !
-    ! -- mover budget summary
-    ! if(this%inmvt > 0) then
-    !   call this%mvt%mvt_ot_bdsummary(ibudfl)
-    ! end if
     ! -- model budget summary
     if (ibudfl /= 0) then
       ipflag = 1
@@ -1018,28 +794,16 @@ contains
     !
     ! -- Internal flow packages deallocate
     call this%dis%dis_da()
-    ! call this%pin%pin_da()
     call this%fmi%fmi_da()
     call this%mip%mip_da()
-    ! call this%adv%adv_da()
-    ! call this%dsp%dsp_da()
-    ! call this%ssm%ssm_da()
-    ! call this%mst%mst_da()
-    ! call this%mvt%mvt_da()
     call this%budget%budget_da()
     call this%oc%oc_da()
     call this%obs%obs_da()
     !
     ! -- Internal package objects
     deallocate (this%dis)
-    ! deallocate(this%pin)
     deallocate (this%fmi)
     deallocate (this%mip)
-    ! deallocate(this%adv)
-    ! deallocate(this%dsp)
-    ! deallocate(this%ssm)
-    ! deallocate(this%mst)
-    ! deallocate(this%mvt)
     deallocate (this%budget)
     deallocate (this%oc)
     deallocate (this%obs)
@@ -1047,8 +811,6 @@ contains
     call this%methodDis%destroy
     call this%methodDisv%destroy
     ! call this%methodDisu%destroy
-    ! call destroy_methodCellPool()     ! kluge   ! kluge note: temp commented out to avoid crash (maybe due to it being a singleton?)
-    ! call destroy_methodSubcellPool()  ! kluge   ! kluge note: temp commented out along with line above
     !
     deallocate (this%methodDis)
     deallocate (this%methodDisv)
@@ -1062,7 +824,6 @@ contains
     end do
     !
     ! -- Scalars
-    ! call mem_deallocate(this%inpin)
     call mem_deallocate(this%infmi)
     call mem_deallocate(this%inmip)
     call mem_deallocate(this%inadv)
@@ -1101,11 +862,6 @@ contains
     ! -- Start by setting iasym to zero
     iasym = 0
     !
-    ! -- ADV
-    ! if (this%inadv > 0) then
-    !   if (this%adv%iasym /= 0) iasym = 1
-    ! endif
-    !
     ! -- return
     return
   end function prt_get_iasym
@@ -1122,7 +878,6 @@ contains
     call this%TrackingModelType%allocate_scalars(modelname)
     !
     ! -- allocate members that are part of model class
-    ! call mem_allocate(this%inpin, 'INPIN',  this%memoryPath)
     call mem_allocate(this%infmi, 'INFMI', this%memoryPath)
     call mem_allocate(this%inmip, 'INMIP', this%memoryPath)
     call mem_allocate(this%inmvt, 'INMVT', this%memoryPath)
@@ -1136,7 +891,6 @@ contains
     call mem_allocate(this%trackdata%ibinun, 'ITRKBIN', this%memoryPath)
     call mem_allocate(this%trackdata%icsvun, 'ITRKCSV', this%memoryPath)
     !
-    ! this%inpin  = 0
     this%infmi = 0
     this%inmip = 0
     this%inmvt = 0
@@ -1184,13 +938,7 @@ contains
                             iout)
     ! -- modules
     use ConstantsModule, only: LINELENGTH
-    ! use PrtCncModule, only: cnc_create
     use PrtPrpModule, only: prp_create
-    ! use PrtIstModule, only: ist_create
-    ! use PrtLktModule, only: lkt_create
-    ! use PrtSftModule, only: sft_create
-    ! use PrtMwtModule, only: mwt_create
-    ! use PrtUztModule, only: uzt_create
     use ApiModule, only: api_create
     ! -- dummy
     class(PrtModelType) :: this
@@ -1208,27 +956,10 @@ contains
     !
     ! -- This part creates the package object
     select case (filtyp)
-      ! case('CNC6')
-      ! call cnc_create(packobj, ipakid, ipaknum, inunit, iout, this%name, pakname)
     case ('PRP6')
       this%nprp = this%nprp + 1 ! kluge?
       call prp_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
                       pakname, this%fmi)
-      ! case('LKT6')
-      !   call lkt_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-      !                   pakname, this%fmi)
-      ! case('SFT6')
-      !   call sft_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-      !                   pakname, this%fmi)
-      ! case('MWT6')
-      !   call mwt_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-      !                   pakname, this%fmi)
-      ! case('UZT6')
-      !   call uzt_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-      !                   pakname, this%fmi)
-      ! case('IST6')
-      !   call ist_create(packobj, ipakid, ipaknum, inunit, iout, this%name, &
-      !                   pakname, this%fmi, this%mst)
     case ('API6')
       call api_create(packobj, ipakid, ipaknum, inunit, iout, this%name, pakname)
     case default
@@ -1264,11 +995,6 @@ contains
     character(len=LINELENGTH) :: errmsg
     !
     ! -- Check for DIS(u) and MIP. Stop if not present.
-    ! -- Check for PIN6, DIS(u), and MST. Stop if not present.
-    ! if(this%inpin == 0) then
-    !   write(errmsg, '(1x,a)') 'ERROR. PARTICLE INPUT (PIN6) PACKAGE NOT SPECIFIED.'
-    !   call store_error(errmsg)
-    ! endif
     if (indis == 0) then
       write (errmsg, '(1x,a)') &
         'Discretization (DIS6, DISV6, or DISU6) package not specified.'
@@ -1279,11 +1005,6 @@ contains
         'Model input (MIP6) package not specified.'
       call store_error(errmsg)
     end if
-    ! if(this%inmst == 0) then
-    !   write(errmsg, '(1x,a)') 'ERROR. MASS STORAGE AND TRANSFER (MST6) &
-    !     &PACKAGE NOT SPECIFIED.'
-    !   call store_error(errmsg)
-    ! endif
     !
     if (count_errors() > 0) then
       write (errmsg, '(1x,a)') 'One or more required package(s) not specified.'
@@ -1488,19 +1209,13 @@ contains
     use GwfDisvModule, only: disv_cr
     use GwfDisuModule, only: disu_cr
     use BudgetModule, only: budget_cr
-    use MethodDisModule, only: create_methodDis ! kluge?
+    use MethodDisModule, only: create_methodDis
     use MethodDisvModule, only: create_methodDisv
     ! use MethodDisuModule, only: create_methodDisu
-    use MethodCellPoolModule, only: create_methodCellPool ! kluge
-    use MethodSubcellPoolModule, only: create_methodSubcellPool ! kluge
-    ! use PrtPinModule, only: pin_cr
+    use MethodCellPoolModule, only: create_methodCellPool
+    use MethodSubcellPoolModule, only: create_methodSubcellPool
     use PrtMipModule, only: mip_cr
-    use PrtFmiModule, only: prtfmi_cr
-    ! use PrtMstModule, only: mst_cr
-    ! use PrtAdvModule, only: adv_cr
-    ! use PrtDspModule, only: dsp_cr
-    ! use PrtSsmModule, only: ssm_cr
-    ! use PrtMvtModule, only: mvt_cr
+    use PrtFmiModule, only: fmi_cr
     use PrtOcModule, only: oc_cr
     use PrtObsModule, only: prt_obs_cr
     ! -- dummy
@@ -1552,23 +1267,11 @@ contains
       case ('DISU6')
         indis = 1
         call disu_cr(this%dis, this%name, mempath, indis, this%iout)
-        ! case ('PIN6')
-        !   this%inpin = inunit
       case ('MIP6')
         this%inmip = 1
         mempathmip = mempath
       case ('FMI6')
         this%infmi = inunit
-        ! case ('MVT6')
-        !   this%inmvt = inunit
-        ! case ('MST6')
-        !   this%inmst = inunit
-        ! case ('ADV6')
-        !   this%inadv = inunit
-        ! case ('DSP6')
-        !   this%indsp = inunit
-        ! case ('SSM6')
-        !   this%inssm = inunit
       case ('OC6')
         this%inoc = inunit
       case ('OBS6')
@@ -1590,14 +1293,8 @@ contains
     call create_methodSubcellPool() ! kluge
     !
     ! -- Create packages that are tied directly to model
-    ! call pin_cr(this%pin, this%name, this%inpin, this%iout, this%dis)
     call mip_cr(this%mip, this%name, mempathmip, this%inmip, this%iout, this%dis)
-    call prtfmi_cr(this%fmi, this%name, this%infmi, this%iout)
-    ! call mst_cr(this%mst, this%name, this%inmst, this%iout, this%fmi)
-    ! call adv_cr(this%adv, this%name, this%inadv, this%iout, this%fmi)
-    ! call dsp_cr(this%dsp, this%name, this%indsp, this%iout, this%fmi)
-    ! call ssm_cr(this%ssm, this%name, this%inssm, this%iout, this%fmi)
-    ! call mvt_cr(this%mvt, this%name, this%inmvt, this%iout, this%fmi)
+    call fmi_cr(this%fmi, this%name, this%infmi, this%iout)
     call oc_cr(this%oc, this%name, this%inoc, this%iout)
     call prt_obs_cr(this%obs, this%inobs)
     !
