@@ -1,4 +1,4 @@
-module MethodCellPoolModule ! kluge
+module MethodCellPoolModule
 
   use MethodCellPollockModule
   use MethodCellPollockQuadModule

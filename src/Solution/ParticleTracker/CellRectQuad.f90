@@ -1,17 +1,12 @@
 module CellRectQuadModule
 
-!!  use CellModule
   use CellDefnModule, only: CellDefnType
   implicit none
 
   private
-!!  public :: CellType
   public :: CellRectQuadType
   public :: create_cellRectQuad
 
-!!  ! -- Extend CellType to the rectangular-quad cell type (CellRectQuadType)
-!!  type, extends(CellType) :: CellRectQuadType
-  ! -- Define the rectangular-quad cell type (CellRectQuadType)
   type :: CellRectQuadType
     private
     character(len=40), pointer, public :: type ! character string that names the tracking domain type
@@ -41,16 +36,10 @@ module CellRectQuadModule
 
 contains
 
+  !> @brief Create a new rectangular-quad cell
   subroutine create_cellRectQuad(cellRectQuad)
-! ******************************************************************************
-! create_cellRectQuad -- Create a new rectangular-quad cell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     type(CellRectQuadType), pointer :: cellRectQuad
-! ------------------------------------------------------------------------------
     !
     allocate (cellRectQuad)
     allocate (cellRectQuad%cellDefn)
@@ -63,16 +52,10 @@ contains
     return
   end subroutine create_cellRectQuad
 
+  !> @brief Destructor for a rectangular-quad cell
   subroutine destroy_cellRectQuad(this)
-! ******************************************************************************
-! destroy_cellRectQuad -- Destructor for a rectangular-quad cell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(CellRectQuadType), intent(inout) :: this
-! ------------------------------------------------------------------------------
     !
     deallocate (this%cellDefn)
     deallocate (this%irectvert)
@@ -81,17 +64,11 @@ contains
     return
   end subroutine destroy_cellRectQuad
 
+  !> @brief Initialize a rectangular-quad cell
   subroutine init_cellRectQuad(this, cellDefn)
-! ******************************************************************************
-! init_cellRectQuad -- Initialize a rectangular-quad cell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(CellRectQuadType), intent(inout) :: this
     type(CellDefnType), pointer :: cellDefn
-! ------------------------------------------------------------------------------
     !
     ! -- Set pointer to cell definition
     this%cellDefn => cellDefn
@@ -102,20 +79,18 @@ contains
     return
   end subroutine init_cellRectQuad
 
-  subroutine load_irectvert(this) ! kluge note: clean up and rename
-! ******************************************************************************
-! load_irectvert -- Loads local polygon vertex indices of the four rectangle
-!                   vertices of a rectangular-quad cell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
+  !> @brief Load local polygon vertex indices
+  !!
+  !! Loads local polygon vertex indices of the four rectangle
+  !! vertices of a rectangular-quad cell. Todo: rename?
+  !!
+  !<
+  subroutine load_irectvert(this)
     implicit none
     ! -- dummy
     class(CellRectQuadType), intent(inout) :: this
     ! -- local
     integer :: npolyverts, n, m
-! ------------------------------------------------------------------------------
     !
     npolyverts = this%cellDefn%get_npolyverts()
     !
@@ -141,14 +116,13 @@ contains
     return
   end subroutine load_irectvert
 
+  !> @brief Get index of SW rectangle vertex
+  !!
+  !! Return the index (1, 2, 3, or 4) of the southwest
+  !! rectangle vertex of a rectangular-quad cell
+  !!
+  !<
   function get_irectvertSW(this) result(irv1)
-! ******************************************************************************
-! get_irectvertSW -- Return the index (1, 2, 3, or 4) of the southwest
-!                    rectangle vertex of a rectangular-quad cell
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(CellRectQuadType), intent(inout) :: this
     integer :: irv1
@@ -156,7 +130,6 @@ contains
     integer :: irv, irv2, irv4, ipv1, ipv2, ipv4
     integer, dimension(4) :: irvnxt = (/2, 3, 4, 1/) ! kluge???
     double precision :: x1, y1, x2, y2, x4, y4
-! ------------------------------------------------------------------------------
     !
     ! -- Find the "southwest" rectangle vertex by finding the vertex formed
     ! -- either by (1) a rectangle edge over which x decreases (going
@@ -191,16 +164,15 @@ contains
     !
   end function get_irectvertSW
 
+  !> @brief Get rectangular cell dimensions and rotation
+  !!
+  !! Compute rectangular dimensions and rotation of
+  !! the cell using the specified rectangle vertex
+  !! as the origin
+  !!
+  !<
   subroutine get_rectDimensionsRotation(this, irv1, xOrigin, yOrigin, zOrigin, &
                                         dx, dy, dz, sinrot, cosrot)
-! ******************************************************************************
-! get_rectDimensionsRotation -- Compute rectangular dimensions and rotation of
-!                               the cell using the specified rectangle vertex
-!                               as the origin
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(CellRectQuadType), intent(inout) :: this
     integer :: irv1
@@ -209,7 +181,6 @@ contains
     integer :: irv2, irv4, ipv1, ipv2, ipv4
     integer, dimension(4) :: irvnxt = (/2, 3, 4, 1/) ! kluge???
     double precision :: x1, y1, x2, y2, x4, y4, dx2, dy2, dx4, dy4
-! ------------------------------------------------------------------------------
     !
     ! -- Get rectangle vertex neighbors irv2 and irv4
     irv2 = irvnxt(irv1)
@@ -247,36 +218,24 @@ contains
     !
   end subroutine get_rectDimensionsRotation
 
+  !> @brief Return a rectangle face flow
   function get_rectflow(this, iq, irv) result(rectflow)
-! ******************************************************************************
-! get_rectflow -- Return a rectangle face flow
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(CellRectQuadType), intent(inout) :: this
     integer :: iq, irv
     double precision :: rectflow
-! ------------------------------------------------------------------------------
     !
     rectflow = this%rectflow(iq, irv)
     !
     return
   end function get_rectflow
 
+  !> @brief Return whether a rectangle face is refined
   function isRefinedFace(this, irv)
-! ******************************************************************************
-! isRefinedFace -- Return whether a rectangle face is refined
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(CellRectQuadType), intent(inout) :: this
     integer :: irv
     logical :: isRefinedFace
-! ------------------------------------------------------------------------------
     !
     if (this%ipv4irv(2, irv) .ne. 0) then
       isRefinedFace = .true.

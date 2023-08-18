@@ -31,7 +31,6 @@ module PrtPrpModule
 
   type, extends(BndType) :: PrtPrpType
     type(PrtFmiType), pointer :: fmi => null() !< flow model interface
-    ! type(ParticleListType), dimension(:), pointer :: partlist       => null()  !< list of particle data
     type(ParticleListType), pointer :: partlist => null() !< list of particle data for the package
     integer(I4B), pointer :: nreleasepts => null() !< number of particle release points
     integer(I4B), pointer :: npart => null() !< number of particles in the particle data list
@@ -39,8 +38,6 @@ module PrtPrpModule
     real(DP), pointer :: stoptime => null() !< stop time for all particles
     real(DP), pointer :: stoptraveltime => null() !< stop travel time for all particles
     integer(I4B), pointer :: istopweaksink => null() !< weak sink option: 0 = do not stop, 1 = stop
-    !< extend final steady state option: 0 = do not extend, 1 = extend
-    ! integer(I4B), pointer :: iextendfinalss => null()
     integer(I4B), pointer :: istopzone => null() !< optional stop zone number; 0 = no stop zone
     integer(I4B), pointer :: idrape => null() !< drape option: 0 = do not drape, 1 = drape to topmost active cell
     integer(I4B), dimension(:), pointer, contiguous :: noder => null() !< reduced node number of release point
@@ -48,18 +45,12 @@ module PrtPrpModule
     real(DP), dimension(:), pointer, contiguous :: x => null() !< x coordinate of particle release point
     real(DP), dimension(:), pointer, contiguous :: y => null() !< y coordinate of particle release point
     real(DP), dimension(:), pointer, contiguous :: z => null() !< z coordinate of particle release point
-    ! real(DP), dimension(:), pointer, contiguous :: tbegin => null() !< begin time of particle release point
-    ! real(DP), dimension(:), pointer, contiguous :: trepeat => null() !< repeat time interval of release point
-    ! real(DP), dimension(:), pointer, contiguous :: tend => null() !< end time of particle release point
     !< stop time of particles released by particle release point
     ! kluge note: don't need this array if going with "global" stoptime value
     real(DP), dimension(:), pointer, contiguous :: tstop => null()
     character(len=LENBOUNDNAME), dimension(:), pointer, contiguous :: rptname &
                                                                       => null() !< release point name
     real(DP), dimension(:), pointer, contiguous :: massrls => null() !< mass released during time step
-    ! real(DP), dimension(:), pointer, contiguous :: porosity => null() !< aquifer porosity
-    ! real(DP), dimension(:), pointer, contiguous :: retfactor => null() !< retardation factor
-    ! integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< zone number
     integer(I4B), allocatable, dimension(:) :: kstp_list_rls !< allocatable time steps for releases in period
     integer(I4B), pointer :: ifreq_rls => null() !< release frequency (time steps) in period
     logical(LGP), pointer :: rls_first => null() !< flag for release on first time step in period
@@ -74,22 +65,15 @@ module PrtPrpModule
     procedure :: bnd_ar => prp_ar
     procedure :: bnd_ad => prp_ad
     procedure :: bnd_rp => prp_rp
-    ! procedure :: bnd_cf => prp_cf
-    ! procedure :: bnd_df => prp_df
-    ! procedure :: bnd_fc => prp_fc
     procedure :: bnd_cq_simrate => prp_cq_simrate
     procedure :: bnd_da => prp_da
     procedure :: define_listlabel
-    procedure :: prp_set_pointers ! kluge?
+    procedure :: prp_set_pointers
     procedure :: bnd_options => prp_options
     procedure :: read_dimensions => prp_read_dimensions
     procedure :: prp_read_packagedata
-    ! procedure :: read_data
-    ! -- methods for observations
     procedure, public :: bnd_obs_supported => prp_obs_supported
     procedure, public :: bnd_df_obs => prp_df_obs
-    ! ! -- methods for time series
-    ! procedure, public :: bnd_rp_ts => prp_rp_ts
   end type PrtPrpType
 
 contains
@@ -152,7 +136,6 @@ contains
     call mem_deallocate(this%stoptime)
     call mem_deallocate(this%stoptraveltime)
     call mem_deallocate(this%istopweaksink)
-    ! call mem_deallocate(this%iextendfinalss)
     call mem_deallocate(this%istopzone)
     call mem_deallocate(this%idrape)
     call mem_deallocate(this%nreleasepts)
@@ -169,18 +152,12 @@ contains
     call mem_deallocate(this%x)
     call mem_deallocate(this%y)
     call mem_deallocate(this%z)
-    ! call mem_deallocate(this%tbegin)
-    ! call mem_deallocate(this%trepeat)
-    ! call mem_deallocate(this%tend)
     call mem_deallocate(this%tstop)
     call mem_deallocate(this%rptname, 'RPTNAME', this%memoryPath)
-    ! call mem_deallocate(this%porosity)
-    ! call mem_deallocate(this%retfactor)
-    ! call mem_deallocate(this%izone)
     !
     ! -- deallocate particle list
     call this%partlist%deallocate_arrays(this%memoryPath)
-    deallocate (this%partlist) ! kluge note: structure of arrays
+    deallocate (this%partlist)
     call mem_deallocate(this%massrls)
     !
     ! -- deallocate step release array
@@ -194,7 +171,7 @@ contains
   !<
   subroutine prp_set_pointers(this, ibound, izone)
     ! -- dummy variables
-    class(PrtPrpType) :: this !< PrtPrpType object
+    class(PrtPrpType) :: this
     integer(I4B), dimension(:), pointer, contiguous :: ibound
     integer(I4B), dimension(:), pointer, contiguous :: izone
     !
@@ -228,20 +205,12 @@ contains
     call mem_allocate(this%x, this%nreleasepts, 'X', this%memoryPath)
     call mem_allocate(this%y, this%nreleasepts, 'Y', this%memoryPath)
     call mem_allocate(this%z, this%nreleasepts, 'Z', this%memoryPath)
-    ! call mem_allocate(this%tbegin, this%nreleasepts, 'TBEGIN', this%memoryPath)
-    ! call mem_allocate(this%trepeat, this%nreleasepts, 'TREPEAT', this%memoryPath)
-    ! call mem_allocate(this%tend, this%nreleasepts, 'TEND', this%memoryPath)
     call mem_allocate(this%tstop, this%nreleasepts, 'TSTOP', this%memoryPath)
     call mem_allocate(this%rptname, LENBOUNDNAME, this%nreleasepts, &
                       'RPTNAME', this%memoryPath)
-    ! call mem_allocate(this%porosity, this%dis%nodes, 'POROSITY',              &
-    !                   this%memoryPath)
-    ! call mem_allocate(this%retfactor, this%dis%nodes, 'RETFACTOR',            &
-    !                   this%memoryPath)
-    ! call mem_allocate(this%izone, this%dis%nodes, 'IZONE', this%memoryPath)
 
     ! -- Allocate particle list
-    allocate (this%partlist) ! kluge note: structure of arrays
+    allocate (this%partlist)
     call this%partlist%allocate_arrays(this%npartmax, &
                                        levelMin, levelMax, &
                                        this%memoryPath)
@@ -276,7 +245,6 @@ contains
     call mem_allocate(this%stoptime, 'STOPTIME', this%memoryPath)
     call mem_allocate(this%stoptraveltime, 'STOPTRAVELTIME', this%memoryPath)
     call mem_allocate(this%istopweaksink, 'ISTOPWEAKSINK', this%memoryPath)
-    ! call mem_allocate(this%iextendfinalss, 'IEXTENDFINALSS', this%memoryPath)
     call mem_allocate(this%istopzone, 'ISTOPZONE', this%memoryPath)
     call mem_allocate(this%idrape, 'IDRAPE', this%memoryPath)
     call mem_allocate(this%nreleasepts, 'NRELEASEPTS', this%memoryPath)
@@ -289,10 +257,9 @@ contains
     call mem_allocate(this%npartmax, 'NPARTMAX', this%memoryPath)
     !
     ! -- Set values
-    this%stoptime = huge(1d0) ! kluge???
-    this%stoptraveltime = huge(1d0) ! kluge???
+    this%stoptime = huge(1d0)
+    this%stoptraveltime = huge(1d0)
     this%istopweaksink = 0
-    ! this%iextendfinalss = 0
     this%istopzone = 0
     this%idrape = 0
     this%nreleasepts = 0
@@ -312,7 +279,7 @@ contains
   !<
   subroutine prp_ar(this)
     ! -- dummy variables
-    class(PrtPrpType), intent(inout) :: this !< PrtPrpType object
+    class(PrtPrpType), intent(inout) :: this
     ! -- local variables
     integer(I4B) :: n
     !
@@ -358,8 +325,7 @@ contains
     ! -- local
     integer(I4B) :: i, n, ic, icu, icpl, irow, icol, ilay
     integer(I4B) :: nps, np
-    real(DP) :: trelease, tstop ! kluge?
-    ! real(DP) :: top, bot, sat
+    real(DP) :: trelease, tstop
     logical(LGP) :: isRelease
     !
     ! -- Reset particle mass released for time step
@@ -387,11 +353,11 @@ contains
         if ((kstp / this%ifreq_rls) * this%ifreq_rls == kstp) & ! kluge note: use modulo?
           isRelease = .true.
       end if
-      ! -- ???
+      !
       n = size(this%kstp_list_rls)
       if (n > 0) then
         do i = 1, n
-          ! kluge note: store advancing counter to avoid re-searching entire array each time?
+          ! todo: store advancing counter to avoid re-searching entire array each time?
           if (this%kstp_list_rls(i) == kstp) isRelease = .true.
         end do
       end if
@@ -422,11 +388,11 @@ contains
           end if
         end if
         np = this%npart + 1 ! particle index
-        this%npart = np ! ???
+        this%npart = np
         trelease = totimc ! release time
 
         ! -- Set stopping time to earlier of times specified by STOPTIME and STOPTRAVELTIME
-        if (this%stoptraveltime == huge(1d0)) then ! kluge huge?
+        if (this%stoptraveltime == huge(1d0)) then
           tstop = this%stoptime
         else
           tstop = trelease + this%stoptraveltime
@@ -455,7 +421,7 @@ contains
         this%partlist%x(np) = this%x(nps)
         this%partlist%y(np) = this%y(nps)
         this%partlist%z(np) = this%z(nps)
-        this%partlist%trelease(np) = trelease ! kluge
+        this%partlist%trelease(np) = trelease
         this%partlist%tstop(np) = tstop
         this%partlist%ttrack(np) = trelease
         this%partlist%istopweaksink(np) = this%istopweaksink
@@ -465,9 +431,9 @@ contains
         this%partlist%ilay = ilay
         this%partlist%izone = this%izone(ic)
         this%partlist%istatus(np) = 1
-        this%partlist%iTrackingDomain(np, 0) = 0 ! kluge???
-        this%partlist%iTrackingDomainBoundary(np, 0) = 0 ! kluge???
-        this%partlist%iTrackingDomain(np, 1) = 0 ! kluge???
+        this%partlist%iTrackingDomain(np, 0) = 0
+        this%partlist%iTrackingDomainBoundary(np, 0) = 0
+        this%partlist%iTrackingDomain(np, 1) = 0
         this%partlist%iTrackingDomainBoundary(np, 1) = 0
         this%partlist%iTrackingDomain(np, 2) = ic
         this%partlist%iTrackingDomainBoundary(np, 2) = 0
@@ -490,7 +456,7 @@ contains
     use TdisModule, only: kper, nper
     use InputOutputModule, only: urword
     ! -- dummy variables
-    class(PrtPrpType), intent(inout) :: this !< PrtPrpType object
+    class(PrtPrpType), intent(inout) :: this
     ! -- local variables
     integer(I4B) :: ierr
     integer(I4B) :: n
@@ -545,18 +511,6 @@ contains
       end if
     end if
     !
-    ! ! -- clear period data
-    ! kluge note: releases occur only when explcitly specified for a
-    ! period (consider a default exception for period 1)
-    !
-    ! if(allocated(this%kstp_list_rls)) deallocate(this%kstp_list_rls)
-    ! allocate(this%kstp_list_rls(0))
-    ! this%ifreq_rls = 0
-    ! this%rls_first = .false.
-    ! this%rls_all = .false.
-    ! this%rls_any = .false.
-    ! rls_lsp = .false.
-    ! !
     ! -- if no period data for simulation, single release at beginning
     if (this%noperiodblocks) then
       if (kper == 1) then
@@ -611,7 +565,7 @@ contains
           end do listsearch
           this%rls_any = .true.
         case ('FREQUENCY')
-          ival = this%parser%GetInteger() ! kluge note: check for nonnegative
+          ival = this%parser%GetInteger() ! todo: check for nonnegative?
           this%ifreq_rls = ival
           this%rls_any = .true.
         case ('FIRST')
@@ -664,8 +618,8 @@ contains
     ! -- modules
     use TdisModule, only: delt
     ! -- dummy variables
-    class(PrtPrpType) :: this !< PrtPrpType object
-    real(DP), dimension(:), intent(in) :: hnew ! kluge note: not needed but part of interface
+    class(PrtPrpType) :: this
+    real(DP), dimension(:), intent(in) :: hnew ! note: not needed but part of interface
     real(DP), dimension(:), intent(inout) :: flowja !< flow between package and model
     integer(I4B), intent(in) :: imover !< flag indicating if the mover package is active
     ! -- local variables
@@ -688,14 +642,12 @@ contains
         !
         ! -- If cell is no-flow or constant-head, then ignore it.
         rrate = DZERO
-        ! kluge note: think about condition(s) under which to ignore cell
+        ! todo: think about condition(s) under which to ignore cell
         if (node > 0) then
           idiag = this%dis%con%ia(node)
-          ! kluge note: think about condition(s) under which to ignore cell
-          ! if(this%ibound(node) > 0) then
+          ! todo: think about condition(s) under which to ignore cell
           ! -- Calculate the flow rate into the cell.
           rrate = this%massrls(i) * tled
-          ! end if
           flowja(idiag) = flowja(idiag) + rrate
         end if
         !
@@ -740,7 +692,7 @@ contains
   !! Return true because PRP package supports observations.
   !! Overrides BndType%bnd_obs_supported().
   !<
-  logical function prp_obs_supported(this) ! kluge note: want this???
+  logical function prp_obs_supported(this)
     implicit none
     class(PrtPrpType) :: this
     prp_obs_supported = .true.
@@ -788,10 +740,6 @@ contains
       "(4x, 'PARTICLE TRACKS WILL BE SAVED TO CSV FILE: ', a, /4x, &
     &'OPENED ON UNIT: ', I0)"
     !
-    ! ! -- reinitialize stoptime and stoptraveltime to huge    ! kluge?
-    ! this%stoptime = huge(1d0)
-    ! this%stoptraveltime = huge(1d0)
-    ! !
     select case (option)
     case ('STOPTIME')
       this%stoptime = this%parser%GetDouble()
@@ -802,12 +750,6 @@ contains
     case ('STOP_AT_WEAK_SINK')
       this%istopweaksink = 1
       found = .true.
-      ! case ('EXTEND_FINAL_SS')
-      !   this%iextendfinalss = 1
-      !   found = .true.
-      !   print *, "EXTEND_FINAL_SS option read in but not programmed yet"  ! kluge
-      !   !!pause
-      !   stop
     case ('ISTOPZONE')
       this%istopzone = this%parser%GetInteger()
       found = .true.
@@ -831,31 +773,18 @@ contains
     ! -- local
     character(len=LINELENGTH) :: cellid
     character(len=LENBOUNDNAME) :: bndName
-    ! character(len=LENBOUNDNAME) :: bndNameTemp
     character(len=9) :: cno
     logical :: isfound
     logical :: endOfBlock
     integer(I4B) :: ival
     integer(I4B) :: n
-    ! integer(I4B) :: j
-    ! integer(I4B) :: ii
-    ! integer(I4B) :: jj
-    ! integer(I4B) :: ieqn
-    ! integer(I4B) :: itmp
     integer(I4B) :: ierr
-    ! integer(I4B) :: idx
-    ! real(DP), pointer :: bndElem => null()
-    ! -- local allocatable arrays
     character(len=LENBOUNDNAME), dimension(:), allocatable :: nametxt
-    ! character(len=50), dimension(:, :), allocatable :: caux
     integer(I4B), dimension(:), allocatable :: nboundchk
     integer(I4B), dimension(:), allocatable :: noder
     real(DP), dimension(:), allocatable :: x
     real(DP), dimension(:), allocatable :: y
     real(DP), dimension(:), allocatable :: z
-    ! real(DP), dimension(:), allocatable :: tbegin
-    ! real(DP), dimension(:), allocatable :: trepeat
-    ! real(DP), dimension(:), allocatable :: tend
     real(DP), dimension(:), allocatable :: tstop
     ! -- format
     character(len=*), parameter :: fmttend = &
@@ -863,18 +792,12 @@ contains
      &begin time (', G0, ').')"
     !
     ! -- allocate and initialize temporary variables
-    allocate (noder(this%nreleasepts)) ! kluge ?
+    allocate (noder(this%nreleasepts))
     allocate (x(this%nreleasepts))
     allocate (y(this%nreleasepts))
     allocate (z(this%nreleasepts))
-    ! allocate(tbegin(this%nreleasepts))
-    ! allocate(trepeat(this%nreleasepts))
-    ! allocate(tend(this%nreleasepts))
     allocate (tstop(this%nreleasepts))
     allocate (nametxt(this%nreleasepts))
-    !  if (this%naux > 0) then
-    !    allocate(caux(this%naux, this%nreleasepts))    ! kluge !
-    !  end if
     allocate (nboundchk(this%nreleasepts))
     !
     ! -- initialize temporary variables
@@ -889,8 +812,6 @@ contains
     !
     ! -- parse block if detected
     if (isfound) then
-      ! write(this%iout,'(/1x,a)')                                                &
-      !   'PROCESSING ' // trim(adjustl(this%text)) // ' PACKAGEDATA'
       write (this%iout, '(/1x,a)') 'PROCESSING '//trim(adjustl(this%packName)) &
         //' PACKAGEDATA'
       do
@@ -919,39 +840,21 @@ contains
         y(n) = this%parser%GetDouble()
         z(n) = this%parser%GetDouble()
         !
-        ! ! -- begin time for release point
-        ! tbegin(n) = this%parser%GetDouble()
-        ! !
-        ! ! -- repeat time interval for release point
-        ! trepeat(n) = this%parser%GetDouble()
-        ! !
-        ! ! -- end time for release point
-        ! tend(n) = this%parser%GetDouble()
-        ! !
-        ! ! -- stop time for particles released by release point
-        ! tstop(n) = this%parser%GetDouble()
-        ! !
-        ! ! -- get aux data
-        ! do jj = 1, this%naux
-        !   call this%parser%GetString(caux(jj, n))   ! kluge !
-        ! end do
-        !
         ! -- set default bndName
         write (cno, '(i9.9)') n
         bndName = 'PRP'//cno
         !
-        ! ! -- read particle release point name
+        ! ! -- todo read particle release point name from file
         ! if (this%inamedbound /= 0) then
         !   call this%parser%GetStringCaps(bndNameTemp)
         !   if (bndNameTemp /= '') then
-        !     bndName = bndNameTemp        ! kluge !
+        !     bndName = bndNameTemp
         !   end if
         ! end if
+        !
         nametxt(n) = bndName
       end do
 
-      ! write(this%iout,'(1x,a)')                                                  &
-      !   'END OF ' // trim(adjustl(this%text)) // ' PACKAGEDATA'
       write (this%iout, '(1x,a)') &
         'END OF '//trim(adjustl(this%packName))//' PACKAGEDATA'
       !
@@ -977,9 +880,6 @@ contains
       call this%parser%StoreErrorUnit()
     end if
     !
-    !   ! -- allocate particle release point data          ! kluge !
-    !   call this%prp_allocate_release point_arrays()
-    !
     ! -- fill particle release point data with data stored in temporary local
     ! -- arrays
     do n = 1, this%nreleasepts
@@ -987,29 +887,7 @@ contains
       this%x(n) = x(n)
       this%y(n) = y(n)
       this%z(n) = z(n)
-      ! this%tbegin(n) = tbegin(n)
-      ! this%trepeat(n) = trepeat(n)
-      ! this%tend(n) = tend(n)
-      ! this%tstop(n) = tstop(n)
       this%rptname(n) = nametxt(n)
-      !
-      ! -- check for error condition
-      ! if (this%tend(n) <= this%tbegin(n)) then
-      !   write(cstr, fmttend) this%tend(n), this%tbegin(n)  ! kluge !
-      !   write(*,'(A)') cstr    ! kluge
-      !   !!pause
-      !   stop
-      ! end if
-      !
-      ! ! -- fill aux data
-      ! do jj = 1, this%naux
-      !   text = caux(jj, n)             ! kluge !
-      !   ii = n
-      !   bndElem => this%mauxvar(jj, ii)
-      !   call read_value_or_time_series_adv(text, ii, jj, bndElem, this%packName,     &
-      !                                      'AUX', this%tsManager, this%iprpak,   &
-      !                                      this%auxname(jj))
-      ! end do
     end do
     !
     ! -- deallocate local storage
@@ -1017,13 +895,7 @@ contains
     deallocate (x)
     deallocate (y)
     deallocate (z)
-    ! deallocate(tbegin)
-    ! deallocate(trepeat)
-    ! deallocate(tend)
     deallocate (tstop)
-    ! if (this%naux > 0) then     ! kluge !
-    !   deallocate(caux)
-    ! end if
     deallocate (nboundchk)
     !
     ! -- return
@@ -1079,9 +951,6 @@ contains
     ! -- allocate arrays for prp package
     call this%prp_allocate_arrays()
     !
-    ! ! -- read porosity, retfactor, and izone data
-    ! call this%read_data()
-    ! !
     ! -- read packagedata
     call this%prp_read_packagedata()
     !

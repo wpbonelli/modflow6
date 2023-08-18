@@ -104,7 +104,6 @@ contains
     ! -- Determine whether to add track data
     if (.not. present(level)) then
       ! -- If optional argument level is not present, track data will be added
-      ! -- by default
       ladd = .true.
     else
       ! If optional argument level is present, check criteria

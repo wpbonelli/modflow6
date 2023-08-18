@@ -69,9 +69,6 @@ contains
       write (iout, fmtheader) input_mempath
     end if
     !
-    ! -- Initialize block parser
-    ! call mip%parser%Initialize(mip%inunit, mip%iout)
-    !
     ! -- Return
     return
   end subroutine mip_cr

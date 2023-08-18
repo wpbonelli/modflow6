@@ -1,11 +1,9 @@
 module CellRectModule
 
-  ! use CellModule
   use CellDefnModule, only: CellDefnType
   implicit none
 
   private
-  ! public :: CellType
   public :: CellRectType
   public :: create_cellRect
 
@@ -58,7 +56,6 @@ contains
   end subroutine destroy_cellRect
 
   !> @brief Initialize a rectangular cell
-  !! kluge note: needed???
   subroutine init_cellRect(this)
     ! -- dummy
     class(CellRectType), intent(inout) :: this

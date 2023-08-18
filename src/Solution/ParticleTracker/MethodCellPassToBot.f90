@@ -11,8 +11,6 @@ module MethodCellPassToBotModule
   public :: MethodCellPassToBotType
   public :: create_methodCellPassToBot
 
-  ! -- Extend MethodType to the pass-to-bottom cell-method type
-  ! -- (MethodCellPassToBot)
   type, extends(MethodType) :: MethodCellPassToBotType
     private
     type(CellDefnType), pointer, public :: cellDefn => null() ! tracking domain for the method
@@ -20,24 +18,15 @@ module MethodCellPassToBotModule
     procedure, public :: destroy ! destructor for the method
     procedure, public :: init ! initializes the method
     procedure, public :: apply => apply_mCVP ! applies pass-to-bottom cell method
-!!    procedure, public :: pass => pass_mCVP                     ! passes the particle to the cell face
-!!    procedure, public :: loadsub => loadsub_mCVP               ! loads the subcell method
-!!    procedure, public :: load_subcell                          ! loads the lone subcell (subcell = cell)
   end type MethodCellPassToBotType
 
 contains
 
+  !> @brief Create a new pass-to-bottom cell-method object
   subroutine create_methodCellPassToBot(methodCellPassToBot)
-! ******************************************************************************
-! create_methodCellPassToBot -- Create a new pass-to-bottom cell-method object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     type(MethodCellPassToBotType), pointer :: methodCellPassToBot
     ! -- local
-! ------------------------------------------------------------------------------
     !
     allocate (methodCellPassToBot)
     allocate (methodCellPassToBot%trackingDomainType)
@@ -47,24 +36,17 @@ contains
     !
     ! -- Create tracking domain for this method and set trackingDomain pointer
     call create_cellDefn(methodCellPassToBot%cellDefn)
-!!    methodCellPassToBot%trackingDomain => methodCellPassToBot%cellDefn
     methodCellPassToBot%trackingDomainType = "CellDefn" ! kluge???
     !
     return
     !
   end subroutine create_methodCellPassToBot
 
+  !> @brief Destructor for a pass-to-bottom cell-method object
   subroutine destroy(this)
-! ******************************************************************************
-! destroy -- Destructor for a pass-to-bottom cell-method object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(MethodCellPassToBotType), intent(inout) :: this
     ! -- local
-! ------------------------------------------------------------------------------
     !
     deallocate (this%trackingDomainType)
     !
@@ -72,19 +54,13 @@ contains
     !
   end subroutine destroy
 
+  !> @brief Initialize a pass-to-bottom cell-method object
   subroutine init(this, particle, cellDefn, trackdata)
-! ******************************************************************************
-! init -- Initialize a pass-to-bottom cell-method object
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(MethodCellPassToBotType), intent(inout) :: this
-    type(ParticleType), pointer, intent(inout) :: particle ! kluge note: is particle needed???
+    type(ParticleType), pointer, intent(inout) :: particle
     type(cellDefnType), pointer, intent(in) :: cellDefn
     type(TrackDataType), pointer :: trackdata
-! ------------------------------------------------------------------------------
     !
     ! -- Set pointer to cell definition
     this%cellDefn => cellDefn
@@ -111,17 +87,14 @@ contains
     if (this%cellDefn%izone .ne. 0) then
       if (particle%istopzone .eq. this%cellDefn%izone) then
         ! -- Stop zone
-        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 6
       end if
     else if (this%cellDefn%inoexitface .ne. 0) then
       ! -- No exit face
-      ! particle%iTrackingDomainBoundary(3) = 0
       particle%istatus = 5
     else if (particle%istopweaksink .ne. 0) then
       if (this%cellDefn%iweaksink .ne. 0) then
         ! -- Weak sink
-        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 3
       end if
     else

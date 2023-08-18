@@ -4,9 +4,7 @@ module MethodCellPollockModule
   use ConstantsModule, only: DONE
   use MethodModule
   use MethodSubcellPoolModule
-  ! use CellModule
   use CellRectModule
-  ! use CellDefnModule
   use SubcellRectModule
   use ParticleModule
   use TrackDataModule, only: TrackDataType
@@ -16,7 +14,6 @@ module MethodCellPollockModule
   public :: MethodCellPollockType
   public :: create_methodCellPollock
 
-  ! -- Extend MethodType to the Pollock's cell-method type (MethodCellPollockType)
   type, extends(MethodType) :: MethodCellPollockType
     private
     type(CellRectType), pointer, public :: cellRect => null() ! tracking domain for the method
@@ -45,8 +42,8 @@ contains
     !
     ! -- Create tracking domain for this method and set trackingDomain pointer
     call create_cellRect(methodCellPollock%cellRect)
-    ! methodCellPollock%trackingDomain => methodCellPollock%cellRect
-    methodCellPollock%trackingDomainType => methodCellPollock%cellRect%type ! kluge note: "lazy" allocation here and in similar places
+    ! kluge note: "lazy" allocation here and in similar places
+    methodCellPollock%trackingDomainType => methodCellPollock%cellRect%type
     !
     ! -- Create subdomain to be loaded and injected into the submethod
     call create_subcellRect(methodCellPollock%subcellRect)
@@ -113,7 +110,6 @@ contains
     ! -- local
     integer :: exitFace, inface
     !
-    ! particle%iTrackingDomain(3) = 0            ! kluge for recursive  ! kluge note: set a "has_exited" attribute instead???
     exitFace = particle%iTrackingDomainBoundary(3)
     ! -- Map subcell exit face to cell face
     select case (exitFace) ! kluge note: exitFace uses Dave's iface convention
@@ -132,16 +128,7 @@ contains
     case (6)
       inface = 7
     end select
-    ! if ((inface.ge.1).and.(inface.le.4)) then
-    !   ! -- Account for local cell rotation
-    !   inface = inface + this%cellRect%ipvOrigin - 1
-    !   if (inface.gt.4) inface = inface - 4
-    ! end if
-    ! particle%iTrackingDomainBoundary(2) = inface
     if (inface .eq. -1) then
-      ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
-      ! particle%iTrackingDomainBoundary(2) = 0
-      ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
       particle%iTrackingDomainBoundary(2) = 0
     else
       if ((inface .ge. 1) .and. (inface .le. 4)) then
@@ -149,11 +136,8 @@ contains
         inface = inface + this%cellRect%ipvOrigin - 1
         if (inface .gt. 4) inface = inface - 4
       end if
-      ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
       particle%iTrackingDomainBoundary(2) = inface
-      ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
     end if
-    ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
     !
     return
     !
@@ -176,17 +160,14 @@ contains
     if (this%cellRect%cellDefn%izone .ne. 0) then
       if (particle%istopzone .eq. this%cellRect%cellDefn%izone) then
         ! -- Stop zone
-        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 6
       end if
     else if (this%cellRect%cellDefn%inoexitface .ne. 0) then
       ! -- No exit face
-      ! particle%iTrackingDomainBoundary(3) = 0
       particle%istatus = 5
     else if (particle%istopweaksink .ne. 0) then
       if (this%cellRect%cellDefn%iweaksink .ne. 0) then
         ! -- Weak sink
-        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 3
       end if
     else
@@ -214,8 +195,6 @@ contains
       ! -- Track across lone subcell
       call this%subtrack(particle, 2, tmax) ! kluge, hardwired to level 2
       !
-      ! particle%iTrackingDomainBoundary(2) = 0
-      ! !
       ! -- Transform particle location back to model coordinates
       call particle%transf_coords(xOrigin, yOrigin, zOrigin, &
                                   sinrot, cosrot, .true.)
@@ -237,8 +216,6 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     integer, intent(in) :: levelNext
     type(SubcellRectType), pointer, intent(inout) :: subcellRect
-    ! -- local
-    ! double precision :: velmult
     !
     ! -- Set subcell number to 1
     subcellRect%isubcell = 1
@@ -255,13 +232,6 @@ contains
     subcellRect%zOrigin = 0d0
     !
     ! -- Set subcell edge velocities
-    ! velmult = particle%velmult                      ! kluge note: apply velmult later, in subcell method???
-    ! subcellRect%vx1 = velmult*this%cellRect%vx1     ! kluge note: assuming porosity=1. for now
-    ! subcellRect%vx2 = velmult*this%cellRect%vx2
-    ! subcellRect%vy1 = velmult*this%cellRect%vy1
-    ! subcellRect%vy2 = velmult*this%cellRect%vy2
-    ! subcellRect%vz1 = velmult*this%cellRect%vz1
-    ! subcellRect%vz2 = velmult*this%cellRect%vz2
     subcellRect%vx1 = this%cellRect%vx1 ! kluge note: cell velocities now already account for retfactor and porosity
     subcellRect%vx2 = this%cellRect%vx2
     subcellRect%vy1 = this%cellRect%vy1

@@ -1,11 +1,8 @@
 module TernarySolveTrack
 
   use TernaryUtil, only: rotate, skew
-  ! implicit none
   private
   public :: traverse_triangle
-  ! public :: find_init_cell
-  ! public :: find_init_triangle
   public :: canonical
   public :: get_w
   public :: solve_coefs
@@ -23,7 +20,6 @@ module TernarySolveTrack
   public :: zeroch
   public :: zeroin
   public :: zerotest
-  ! public :: point_in_polygon
 
 contains
 

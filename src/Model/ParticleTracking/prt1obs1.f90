@@ -3,7 +3,6 @@ module PrtObsModule
   use KindModule, only: DP, I4B
   use ConstantsModule, only: LINELENGTH, MAXOBSTYPES
   use BaseDisModule, only: DisBaseType
-!!  use PrtPinModule,     only: PrtPinType
   use ObserveModule, only: ObserveType
   use ObsModule, only: ObsType
   use SimModule, only: count_errors, store_error, &
@@ -15,7 +14,6 @@ module PrtObsModule
 
   type, extends(ObsType) :: PrtObsType
     ! -- Private members
-!!    type(PrtPinType), pointer, private                   :: pin => null()        ! particle input
     real(DP), dimension(:), pointer, contiguous, private :: x => null() ! concentration
     real(DP), dimension(:), pointer, contiguous, private :: flowja => null() ! intercell flows
   contains
@@ -31,20 +29,11 @@ module PrtObsModule
 
 contains
 
+  !> @brief Create a new PrtObsType object
   subroutine prt_obs_cr(obs, inobs)
-! ******************************************************************************
-! prt_obs_cr -- Create a new PrtObsType object
-! Subroutine: (1) creates object
-!             (2) allocates pointers
-!             (3) initializes values
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     type(PrtObsType), pointer, intent(out) :: obs
     integer(I4B), pointer, intent(in) :: inobs
-! ------------------------------------------------------------------------------
     !
     allocate (obs)
     call obs%allocate_scalars()
@@ -55,38 +44,24 @@ contains
     return
   end subroutine prt_obs_cr
 
-!!  subroutine prt_obs_ar(this, pin, x, flowja)
+  !> @brief Allocate and read
   subroutine prt_obs_ar(this, x, flowja)
-! ******************************************************************************
-! prt_obs_ar -- allocate and read
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(PrtObsType), intent(inout) :: this
-!!    type(PrtPinType),  pointer,              intent(in) :: pin
     real(DP), dimension(:), pointer, contiguous, intent(in) :: x
     real(DP), dimension(:), pointer, contiguous, intent(in) :: flowja
-! ------------------------------------------------------------------------------
     !
     ! Call ar method of parent class
     call this%obs_ar()
     !
     ! set pointers
-!!    call this%set_pointers(pin, x, flowja)
     call this%set_pointers(x, flowja)
     !
     return
   end subroutine prt_obs_ar
 
+  !> @brief Define package
   subroutine prt_obs_df(this, iout, pkgname, filtyp, dis)
-! ******************************************************************************
-! prt_obs_df -- define
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(PrtObsType), intent(inout) :: this
     integer(I4B), intent(in) :: iout
@@ -95,7 +70,6 @@ contains
     class(DisBaseType), pointer :: dis
     ! -- local
     integer(I4B) :: indx
-! ------------------------------------------------------------------------------
     !
     ! Call overridden method of parent class
     call this%ObsType%obs_df(iout, pkgname, filtyp, dis)
@@ -114,20 +88,14 @@ contains
     return
   end subroutine prt_obs_df
 
+  !> @brief Save observations
   subroutine prt_obs_bd(this)
-! ******************************************************************************
-! prt_obs_bd -- save obs
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(PrtObsType), intent(inout) :: this
     ! -- local
     integer(I4B) :: i, jaindex, nodenumber
     character(len=100) :: msg
     class(ObserveType), pointer :: obsrv => null()
-! ------------------------------------------------------------------------------
     !
     call this%obs_bd_clear()
     !
@@ -153,32 +121,19 @@ contains
     return
   end subroutine prt_obs_bd
 
+  !> @brief Read and prepare
   subroutine prt_obs_rp(this)
-! ******************************************************************************
-! prt_obs_rp
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     class(PrtObsType), intent(inout) :: this
-! ------------------------------------------------------------------------------
     !
     ! Do PRT observations need any checking? If so, add checks here
     return
   end subroutine prt_obs_rp
 
+  !> @brief Deallocate
   subroutine prt_obs_da(this)
-! ******************************************************************************
-! prt_obs_da
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(PrtObsType), intent(inout) :: this
-! ------------------------------------------------------------------------------
     !
-!!    nullify(this%pin)
     nullify (this%x)
     nullify (this%flowja)
     call this%ObsType%obs_da()
@@ -186,22 +141,13 @@ contains
     return
   end subroutine prt_obs_da
 
-!!  subroutine set_pointers(this, pin, x, flowja)
+  !> @brief Set pointers
   subroutine set_pointers(this, x, flowja)
-! ******************************************************************************
-! set_pointers
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(PrtObsType), intent(inout) :: this
-!!    type(PrtPinType), pointer, intent(in) :: pin
     real(DP), dimension(:), pointer, contiguous, intent(in) :: x
     real(DP), dimension(:), pointer, contiguous, intent(in) :: flowja
-! ------------------------------------------------------------------------------
     !
-!!    this%pin => pin
     this%x => x
     this%flowja => flowja
     !
@@ -211,12 +157,6 @@ contains
   ! -- Procedures related to GWF observations (NOT type-bound)
 
   subroutine prt_process_concentration_obs_id(obsrv, dis, inunitobs, iout)
-! ******************************************************************************
-! prt_process_concentration_obs_id
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     type(ObserveType), intent(inout) :: obsrv
     class(DisBaseType), intent(in) :: dis
@@ -226,7 +166,6 @@ contains
     integer(I4B) :: nn1
     integer(I4B) :: icol, istart, istop
     character(len=LINELENGTH) :: ermsg, strng
-! ------------------------------------------------------------------------------
     !
     ! -- Initialize variables
     strng = obsrv%IDstring
@@ -249,12 +188,6 @@ contains
   end subroutine prt_process_concentration_obs_id
 
   subroutine prt_process_intercell_obs_id(obsrv, dis, inunitobs, iout)
-! ******************************************************************************
-! prt_process_intercell_obs_id
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     type(ObserveType), intent(inout) :: obsrv
     class(DisBaseType), intent(in) :: dis
@@ -266,7 +199,6 @@ contains
     character(len=LINELENGTH) :: ermsg, strng
     ! formats
 70  format('Error: No connection exists between cells identified in text: ', a)
-! ------------------------------------------------------------------------------
     !
     ! -- Initialize variables
     strng = obsrv%IDstring

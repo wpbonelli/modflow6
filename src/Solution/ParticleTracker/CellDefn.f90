@@ -4,17 +4,15 @@ module CellDefnModule
 
   private
   public :: CellDefnType
-  public :: VertexType ! kluge public???
+  public :: VertexType
   public :: create_cellDefn
 
-  ! -- Define the vertex type (VertexType)
   type VertexType
     integer :: ivert ! vertex number (index)
     double precision :: x ! x coord of vertex
     double precision :: y ! y coord of vertex
   end type VertexType
 
-  ! -- Define the modflow cell definition type (CellDefnType)
   type CellDefnType
     private
     integer, public :: icell ! index of cell in source grid
@@ -26,7 +24,7 @@ module CellDefnModule
     integer, public :: izone ! cell zone number
     integer, public :: iweaksink ! weak sink indicator
     integer, public :: inoexitface ! no exit face indicator
-    integer, public :: iatop ! kluge???               ! index of cell top in grid's top/bot arrays (<0 => top array)
+    integer, public :: iatop ! index of cell top in grid's top/bot arrays (<0 => top array)
     double precision, public :: top, bot ! top and bottom elevations of cell
     double precision, public :: sat ! cell saturation
     class(VertexType), allocatable, public :: polyvert(:) ! vertices for cell polygon
@@ -65,7 +63,6 @@ contains
   end subroutine destroy_cellDefn
 
   !> @brief Initialize a cell definition object
-  !! kluge note: needed???
   subroutine init_cellDefn(this)
     ! -- dummy
     class(CellDefnType), intent(inout) :: this

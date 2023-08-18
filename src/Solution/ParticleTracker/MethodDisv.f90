@@ -4,7 +4,6 @@ module MethodDisvModule
   use ConstantsModule, only: DONE
   use MethodModule
   use MethodCellPoolModule
-  ! use CellModule
   use CellDefnModule
   use CellPolyModule
   use ParticleModule
@@ -20,7 +19,6 @@ module MethodDisvModule
   type, extends(MethodType) :: MethodDisvType
     private
     type(PrtFmiType), pointer :: fmi => null() !< ptr to flow model interface
-    ! type(CellDefnType), pointer :: cellDefn ! cellDefn object injected into cell method
     real(DP), dimension(:), pointer, contiguous :: flowja => null() !< ptr to intercell flows
     type(CellPolyType), pointer :: cellPoly ! ptr to polygonal cell
     real(DP), dimension(:), pointer, contiguous :: porosity => null() !< ptr to aquifer porosity array
@@ -65,9 +63,8 @@ contains
     ! -- This method delegates tracking to a submethod
     methodDisv%delegatesTracking = .TRUE.
     !
-    methodDisv%trackingDomainType = "Disv" ! kluge???
+    methodDisv%trackingDomainType = "Disv"
     !
-    ! call create_cellDefn(methodDisv%cellDefn)
     call create_cellPoly(methodDisv%cellPoly)
     !
     return
@@ -110,7 +107,6 @@ contains
   subroutine loadsub_mGDv(this, particle, levelNext, submethod)
     use CellRectModule
     use CellRectQuadModule
-    ! use CellModule
     use CellUtilModule
     ! -- dummy
     class(MethodDisvType), intent(inout) :: this
@@ -122,7 +118,6 @@ contains
     integer :: istatus
     type(CellRectType), pointer :: cellRect
     type(CellRectQuadType), pointer :: cellRectQuad
-    ! class(CellType), pointer :: cell
     !
     ! load cell definition
     ic = particle%iTrackingDomain(levelNext) ! kluge note: is cell number always known coming in?
@@ -215,14 +210,14 @@ contains
   subroutine mapToNbrCell(this, cellDefnin, inface, z)
     ! dummy
     class(MethodDisvType), intent(inout) :: this
-    type(CellDefnType), pointer, intent(inout) :: cellDefnin ! kluge???
+    type(CellDefnType), pointer, intent(inout) :: cellDefnin
     integer, intent(inout) :: inface
     double precision, intent(inout) :: z
     ! local
     integer :: icin, npolyvertsin
     integer :: ic, npolyverts, inbr, inbrnbr, j, m
     real(DP) :: zrel, topfrom, botfrom, top, bot, sat
-    type(CellDefnType), pointer :: cellDefn ! kluge???
+    type(CellDefnType), pointer :: cellDefn
     !
     ! -- Map to shared cell face of neighbor
     inbr = cellDefnin%facenbr(inface)
@@ -282,8 +277,6 @@ contains
     class(MethodDisvType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-    ! doubleprecision :: initialTime,maximumTime,t  ! kluge not in arg list yet
-    ! -- local
     !
     ! -- Track across cells
     call this%subtrack(particle, 1, tmax) ! kluge, hardwired to level 1
@@ -329,15 +322,6 @@ contains
     ! -- local
     integer :: ncpl, icu
     !
-    ! select type (dis => this%fmi%dis)                     ! kluge??? ...
-    ! type is (GwfDisvType)
-    !   ncpl = dis%get_ncpl()
-    ! end select                                           ! ... kluge???
-    ! if (ic.le.ncpl) then
-    !   iatop = -ic
-    ! else
-    !   iatop = ic - ncpl
-    ! end if
     ncpl = this%fmi%dis%get_ncpl()
     icu = this%fmi%dis%get_nodeuser(ic)
     if (icu .le. ncpl) then
@@ -410,17 +394,12 @@ contains
     !
     cellDefn%icell = ic
     !
-    ! ! -- Load nnbrs
-    ! nnbrs = this%fmi%dis%con%ia(ic+1) - this%fmi%dis%con%ia(ic) - 1
-    ! cellDefn%nnbrs = nnbrs   ! kluge note: is this actually needed anywhere???
-    ! !
     ! -- Load npolyverts
     cellDefn%npolyverts = this%get_npolyverts(ic)
     !
     ! -- Load iatop, top, and bot
     iatop = this%get_iatop(ic)
     cellDefn%iatop = iatop
-    ! cellDefn%top = this%get_top(iatop)
     top = this%fmi%dis%top(ic)
     bot = this%fmi%dis%bot(ic)
     sat = this%fmi%gwfsat(ic)
@@ -440,7 +419,7 @@ contains
 
   !> @brief Loads polygon vertices to cell definition from the grid
   subroutine load_cellDefn_polyverts(this, cellDefn)
-    use GwfDisvModule ! kluge???
+    use GwfDisvModule
     implicit none
     ! -- dummy
     class(MethodDisvType), intent(inout) :: this
@@ -484,9 +463,8 @@ contains
 
   !> @brief Loads face neighbors to cell definition from the grid
   subroutine load_cellDefn_facenbr(this, cellDefn)
-    use InputOutputModule ! kluge
-    ! use DisvGeom             ! kluge
-    use GwfDisvModule ! kluge
+    use InputOutputModule
+    use GwfDisvModule
     implicit none
     ! -- dummy
     class(MethodDisvType), intent(inout) :: this
@@ -619,7 +597,6 @@ contains
       n = cellDefn%facenbr(m)
       if (n > 0) &
         cellDefn%faceflow(m) = this%fmi%gwfflowja(this%fmi%dis%con%ia(ic) + n)
-      ! if (cellDefn%faceflow(m) < 0d0) cellDefn%inoexitface = 0
     end do
     call this%addBoundaryFlows_cellPoly(cellDefn)
     ! -- Set inoexitface flag
@@ -670,8 +647,6 @@ contains
     cellDefn%faceflow(4) = cellDefn%faceflow(4) + &
                            this%fmi%BoundaryFlows(ioffset + 1)
     cellDefn%faceflow(5) = cellDefn%faceflow(1)
-    ! cellDefn%faceflow(6) = cellDefn%faceflow(6) + this%fmi%BoundaryFlows(ioffset+5)
-    ! cellDefn%faceflow(7) = cellDefn%faceflow(7) + this%fmi%BoundaryFlows(ioffset+6)
     cellDefn%faceflow(6) = cellDefn%faceflow(6) + &
                            this%fmi%BoundaryFlows(ioffset + 9)
     cellDefn%faceflow(7) = cellDefn%faceflow(7) + &
@@ -710,7 +685,6 @@ contains
         nbf = n
       end if
       qbf = this%fmi%BoundaryFlows(ioffset + nbf)
-      ! call cellDefn%set_irectvert()    ! kluge
       nn = 0 ! kluge ...
       do m = 1, npolyverts
         if (.not. cellDefn%ispv180(m)) then
@@ -738,12 +712,10 @@ contains
     cellDefn%faceflow(m) = cellDefn%faceflow(1)
     ! -- Bottom in position npolyverts+2
     m = m + 1
-    ! cellDefn%faceflow(m) = cellDefn%faceflow(m) + this%fmi%BoundaryFlows(ioffset+5)
     cellDefn%faceflow(m) = cellDefn%faceflow(m) + &
                            this%fmi%BoundaryFlows(ioffset + 9)
     ! -- Top in position npolyverts+3
     m = m + 1
-    ! cellDefn%faceflow(m) = cellDefn%faceflow(m) + this%fmi%BoundaryFlows(ioffset+6)
     cellDefn%faceflow(m) = cellDefn%faceflow(m) + &
                            this%fmi%BoundaryFlows(ioffset + 10)
     !
@@ -773,8 +745,6 @@ contains
         this%fmi%BoundaryFlows(ioffset + iv)
     end do
     cellDefn%faceflow(npolyverts + 1) = cellDefn%faceflow(1)
-    ! cellDefn%faceflow(npolyverts+2) = cellDefn%faceflow(npolyverts+2) + this%fmi%BoundaryFlows(ioffset+npolyverts+1)
-    ! cellDefn%faceflow(npolyverts+3) = cellDefn%faceflow(npolyverts+3) + this%fmi%BoundaryFlows(ioffset+npolyverts+2)
     cellDefn%faceflow(npolyverts + 2) = &
       cellDefn%faceflow(npolyverts + 2) + &
       this%fmi%BoundaryFlows(ioffset + 9)

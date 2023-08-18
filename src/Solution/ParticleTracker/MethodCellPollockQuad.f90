@@ -15,7 +15,6 @@ module MethodCellPollockQuadModule
   public :: MethodCellPollockQuadType
   public :: create_methodCellPollockQuad
 
-  ! -- Extend MethodType to the Pollock's cell-quad-method type (MethodCellPollockQuadType)
   type, extends(MethodType) :: MethodCellPollockQuadType
     private
     type(CellRectQuadType), pointer :: cellRectQuad => null() ! tracking domain for the method
@@ -35,7 +34,6 @@ contains
   subroutine create_methodCellPollockQuad(methodCellPollockQuad)
     ! -- dummy
     type(MethodCellPollockQuadType), pointer :: methodCellPollockQuad
-    ! -- local
     !
     allocate (methodCellPollockQuad)
     !
@@ -58,7 +56,6 @@ contains
   subroutine destroy(this)
     ! -- dummy
     class(MethodCellPollockQuadType), intent(inout) :: this
-    ! -- local
     !
     deallocate (this%trackingDomainType)
     !
@@ -209,19 +206,7 @@ contains
       ! -- Subcell top (cell top)
       inface = npolyverts + 3 ! kluge note: want Domain(2) = -Domain(2); Boundary(2) = inface
     end select
-    ! if ((inface.ge.1).and.(inface.le.4)) then
-    !   ! -- Account for local cell rotation
-    !   inface = inface + this%cellRectQuad%irvOrigin - 1
-    !   if (inface.gt.4) inface = inface - 4
-    !   inface = this%cellRectQuad%irectvert(inface) + infaceoff
-    !   if (inface.lt.1) inface = inface + npolyverts
-    ! end if
-    ! particle%iTrackingDomainBoundary(2) = inface
-    ! if (inface.ne.0) particle%iTrackingDomain(3) = 0
     if (inface .eq. -1) then
-      ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))  ! kluge???
-      ! particle%iTrackingDomainBoundary(2) = 0
-      ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))  ! kluge???
       particle%iTrackingDomainBoundary(2) = 0
     else if (inface .eq. 0) then
       particle%iTrackingDomainBoundary(2) = 0
@@ -233,11 +218,8 @@ contains
         inface = this%cellRectQuad%irectvert(inface) + infaceoff
         if (inface .lt. 1) inface = inface + npolyverts
       end if
-      ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
       particle%iTrackingDomainBoundary(2) = inface
-      ! particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3))   ! kluge???
     end if
-    ! if (inface.ne.0) particle%iTrackingDomain(3) = -abs(particle%iTrackingDomain(3)) ! kluge???
     !
     return
     !
@@ -260,17 +242,14 @@ contains
     if (this%cellRectQuad%cellDefn%izone .ne. 0) then
       if (particle%istopzone .eq. this%cellRectQuad%cellDefn%izone) then
         ! -- Stop zone
-        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 6
       end if
     else if (this%cellRectQuad%cellDefn%inoexitface .ne. 0) then
       ! -- No exit face
-      ! particle%iTrackingDomainBoundary(3) = 0
       particle%istatus = 5
     else if (particle%istopweaksink .ne. 0) then
       if (this%cellRectQuad%cellDefn%iweaksink .ne. 0) then
         ! -- Weak sink
-        ! particle%iTrackingDomainBoundary(3) = 0
         particle%istatus = 3
       end if
     else
@@ -321,17 +300,12 @@ contains
     integer, intent(in) :: levelNext
     class(SubcellRectType), intent(inout) :: subcellRect
     ! -- local
-    ! kluge note: (in general) do tracking calc without velmult and divide exit
-    ! time by velmult at the end???
-    ! double precision :: velmult
     double precision :: dx, dy, dz, areax, areay, areaz
     double precision :: dxprel, dyprel
     integer :: isc, npolyverts, m1, m2
     double precision :: qextl1, qextl2, qintl1, qintl2
     double precision :: factor, term
     !
-    ! velmult = particle%velmult
-    ! factor = this%cellRectQuad%cellDefn%velfactor
     factor = DONE / this%cellRectQuad%cellDefn%retfactor
     factor = factor / this%cellRectQuad%cellDefn%porosity
     npolyverts = this%cellRectQuad%cellDefn%npolyverts
@@ -398,16 +372,11 @@ contains
     subcellRect%dz = dz
     subcellRect%sinrot = 0d0
     subcellRect%cosrot = 1d0
-    ! subcellRect%zOrigin = this%cellRectQuad%cellDefn%bot
     subcellRect%zOrigin = 0d0
     select case (isc)
     case (1)
       subcellRect%xOrigin = dx
       subcellRect%yOrigin = dy
-      ! subcellRect%vx1 = velmult*qintl1/areax     ! kluge note: porosity not explicitly included yet
-      ! subcellRect%vx2 = -velmult*qextl2/areax
-      ! subcellRect%vy1 = -velmult*qintl2/areay
-      ! subcellRect%vy2 = -velmult*qextl1/areay
       term = factor / areax
       subcellRect%vx1 = qintl1 * term
       subcellRect%vx2 = -qextl2 * term
@@ -417,10 +386,6 @@ contains
     case (2)
       subcellRect%xOrigin = dx
       subcellRect%yOrigin = 0d0
-      ! subcellRect%vx1 = -velmult*qintl2/areax     ! kluge note: porosity not explicitly included yet
-      ! subcellRect%vx2 = -velmult*qextl1/areax
-      ! subcellRect%vy1 = velmult*qextl2/areay
-      ! subcellRect%vy2 = -velmult*qintl1/areay
       term = factor / areax
       subcellRect%vx1 = -qintl2 * term
       subcellRect%vx2 = -qextl1 * term
@@ -430,10 +395,6 @@ contains
     case (3)
       subcellRect%xOrigin = 0d0
       subcellRect%yOrigin = 0d0
-      ! subcellRect%vx1 = velmult*qextl2/areax   ! kluge note: porosity not explicitly included yet
-      ! subcellRect%vx2 = -velmult*qintl1/areax
-      ! subcellRect%vy1 = velmult*qextl1/areay
-      ! subcellRect%vy2 = velmult*qintl2/areay
       term = factor / areax
       subcellRect%vx1 = qextl2 * term
       subcellRect%vx2 = -qintl1 * term
@@ -443,10 +404,6 @@ contains
     case (4)
       subcellRect%xOrigin = 0d0
       subcellRect%yOrigin = dy
-      ! subcellRect%vx1 = velmult*qextl1/areax   ! kluge note: porosity not explicitly included yet
-      ! subcellRect%vx2 = velmult*qintl2/areax
-      ! subcellRect%vy1 = velmult*qintl1/areay
-      ! subcellRect%vy2 = -velmult*qextl2/areay
       term = factor / areax
       subcellRect%vx1 = qextl1 * term
       subcellRect%vx2 = qintl2 * term
@@ -456,9 +413,6 @@ contains
     end select
     m1 = npolyverts + 2
     m2 = m1 + 1
-    ! kluge note: porosity not explicitly included yet
-    ! subcellRect%vz1 = velmult*2.5d-1*this%cellRectQuad%cellDefn%faceflow(m1)/areaz
-    ! subcellRect%vz2 = -velmult*2.5d-1*this%cellRectQuad%cellDefn%faceflow(m2)/areaz
     term = factor / areaz
     subcellRect%vz1 = 2.5d-1 * this%cellRectQuad%cellDefn%faceflow(m1) * term
     subcellRect%vz2 = -2.5d-1 * this%cellRectQuad%cellDefn%faceflow(m2) * term

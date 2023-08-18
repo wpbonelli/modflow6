@@ -50,4 +50,5 @@ contains
   !   return
   !   !
   ! end function
+
 end module TernaryUtil

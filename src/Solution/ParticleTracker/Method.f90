@@ -21,8 +21,8 @@ module MethodModule
     procedure :: pass ! passes a particle to the next tracking subdomain
     procedure :: loadsub ! loads tracking submethod
     ! -- Implemented in this base class
-    procedure :: subtrack ! tracks the particle across subdomains    ! kluge, description, rename???
-    procedure :: advance ! advances the particle                    ! kluge, description, rename???
+    procedure :: subtrack ! tracks the particle across subdomains
+    procedure :: advance ! advances the particle
   end type MethodType
 
   abstract interface
@@ -33,9 +33,8 @@ module MethodModule
       import MethodType
       import ParticleType
       class(MethodType), intent(inout) :: this
-      type(ParticleType), pointer, intent(inout) :: particle ! kluge???
+      type(ParticleType), pointer, intent(inout) :: particle
       real(DP), intent(in) :: tmax
-      ! doubleprecision :: initialTime,maximumTime,t   ! kluge not in arg list yet
     end subroutine apply
 
   end interface
@@ -51,7 +50,6 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     integer :: level
     real(DP), intent(in) :: tmax
-    ! doubleprecision :: initialTime,maximumTime,t ! kluge
     ! local
     integer :: levelNext
     class(methodType), pointer :: submethod
@@ -71,11 +69,6 @@ contains
       ! -- calculations or calls this subroutine (subtrack) recursively to
       ! -- continue delegating
       call submethod%apply(particle, tmax)
-
-      ! -- Store particle trackdata as appropriate
-      ! call submethod%trackdata%save_record(particle, &
-      !                                         kper=kper, kstp=kstp, &
-      !                                         reason=1, level=levelNext)
 
       ! -- Advance particle
       call advance(this, particle, levelNext, submethod, isStillAdvancing)
@@ -100,7 +93,7 @@ contains
     logical :: isStillAdvancing
     !
     if (particle%istatus .ne. -1) then
-      particle%iTrackingDomainBoundary = 0 ! kluge???
+      particle%iTrackingDomainBoundary = 0
       isStillAdvancing = .false.
     else
       call this%pass(particle)
@@ -127,7 +120,6 @@ contains
     write (*, '(A)') "Type-bound procedure 'loadsub' is not implemented"
     write (*, '(A)') "in the 'Method' base class; it must be implemented by all"
     write (*, '(A)') "tracking methods that delegate tracking to a submethod"
-    !!pause                                             ! kluge
     stop
     !
     return
@@ -146,7 +138,6 @@ contains
     write (*, '(A)') "Type-bound procedure 'pass' is not implemented in"
     write (*, '(A)') "the 'Method' base class; it must be implemented by all"
     write (*, '(A)') "tracking methods that delegate tracking to a submethod"
-    !!pause                                             ! kluge
     stop
     !
     return
