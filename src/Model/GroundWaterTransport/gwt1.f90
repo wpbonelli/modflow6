@@ -109,7 +109,6 @@ contains
     character(len=LENMEMPATH) :: input_mempath
     character(len=LINELENGTH) :: lst_fname
     type(GwfNamParamFoundType) :: found
-! ------------------------------------------------------------------------------
     !
     ! -- Allocate a new GWT Model (this)
     allocate (this)
@@ -171,22 +170,31 @@ contains
   subroutine gwt_df(this)
     ! -- modules
     use ModelPackageInputsModule, only: NIUNIT_GWT
+    use SimModule, only: store_error
     ! -- dummy
     class(GwtModelType) :: this
     ! -- local
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Define packages and utility objects
     call this%dis%dis_df()
-    call this%fmi%fmi_df(this%dis, this%inssm)
+    call this%fmi%fmi_df(this%dis)
     if (this%inmvt > 0) call this%mvt%mvt_df(this%dis)
     if (this%inadv > 0) call this%adv%adv_df()
     if (this%indsp > 0) call this%dsp%dsp_df(this%dis)
     if (this%inssm > 0) call this%ssm%ssm_df()
     call this%oc%oc_df()
     call this%budget%budget_df(NIUNIT_GWT, 'MASS', 'M')
+    !
+    ! -- Check for SSM package
+    if (this%inssm == 0) then
+      if (this%fmi%nflowpack > 0) then
+        call store_error('Flow model has boundary packages, but there &
+          &is no SSM package.  The SSM package must be activated.', &
+          terminate=.TRUE.)
+      end if
+    end if
     !
     ! -- Assign or point model members to dis members
     this%neq = this%dis%nodes
@@ -223,7 +231,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- Add the internal connections of this model to sparse
     call this%dis%dis_ac(this%moffset, sparse)
@@ -248,7 +255,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- Find the position of each connection in the global ia, ja structure
     !    and store them in idxglo.
@@ -279,7 +285,6 @@ contains
     ! -- locals
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Allocate and read modules attached to model
     call this%fmi%fmi_ar(this%ibound)
@@ -321,7 +326,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- In fmi, check for mvt and mvrbudobj consistency
     call this%fmi%fmi_rp(this%inmvt)
@@ -354,7 +358,6 @@ contains
     ! -- local
     integer(I4B) :: irestore
     integer(I4B) :: ip, n
-! ------------------------------------------------------------------------------
     !
     ! -- Reset state variable
     irestore = 0
@@ -408,7 +411,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- Call package cf routines
     do ip = 1, this%bndlist%Count()
@@ -431,7 +433,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- call fc routines
     call this%fmi%fmi_fc(this%dis%nodes, this%xold, this%nja, matrix_sln, &
@@ -481,7 +482,6 @@ contains
     ! class(BndType), pointer :: packobj
     ! integer(I4B) :: ip
     ! -- formats
-! ------------------------------------------------------------------------------
     !
     ! -- If mover is on, then at least 2 outers required
     if (this%inmvt > 0) call this%mvt%mvt_cc(kiter, iend, icnvgmod, cpak, dpak)
@@ -509,7 +509,6 @@ contains
     integer(I4B) :: i
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Construct the flowja array.  Flowja is calculated each time, even if
     !    output is suppressed.  (flowja is positive into a cell.)  The diagonal
@@ -559,7 +558,6 @@ contains
     ! -- local
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Save the solution convergence flag
     this%icnvg = icnvg
@@ -601,7 +599,6 @@ contains
     character(len=*), parameter :: fmtnocnvg = &
       "(1X,/9X,'****FAILED TO MEET SOLVER CONVERGENCE CRITERIA IN TIME STEP ', &
       &I0,' OF STRESS PERIOD ',I0,'****')"
-! ------------------------------------------------------------------------------
     !
     ! -- Set write and print flags
     idvsave = 0
@@ -730,7 +727,6 @@ contains
     ! -- local
     integer(I4B) :: ibinun
     ! -- formats
-! ------------------------------------------------------------------------------
     !
     ! -- Set unit number for binary output
     if (this%ipakcb < 0) then
@@ -808,7 +804,6 @@ contains
   !> @brief Deallocate
   !<
   subroutine gwt_da(this)
-! ------------------------------------------------------------------------------
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
     use MemoryManagerExtModule, only: memorylist_remove
@@ -818,7 +813,6 @@ contains
     ! -- local
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Deallocate idm memory
     call memorylist_remove(this%name, 'NAM', idm_context)
@@ -892,7 +886,6 @@ contains
     real(DP), dimension(:, :), intent(in) :: budterm
     character(len=LENBUDTXT), dimension(:), intent(in) :: budtxt
     character(len=*), intent(in) :: rowlabel
-! ------------------------------------------------------------------------------
     !
     call this%budget%addentry(budterm, delt, budtxt, rowlabel=rowlabel)
     !
@@ -941,7 +934,6 @@ contains
     ! -- dummy
     class(GwtModelType) :: this
     character(len=*), intent(in) :: modelname
-! ------------------------------------------------------------------------------
     !
     ! -- allocate members from parent class
     call this%NumericalModelType%allocate_scalars(modelname)
@@ -975,7 +967,6 @@ contains
   !<
   subroutine package_create(this, filtyp, ipakid, ipaknum, pakname, inunit, &
                             iout)
-! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: LINELENGTH
     use SimModule, only: store_error
@@ -1000,7 +991,6 @@ contains
     class(BndType), pointer :: packobj
     class(BndType), pointer :: packobj2
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- This part creates the package object
     select case (filtyp)
@@ -1050,7 +1040,6 @@ contains
   !> @brief Make sure required input files have been specified
   !<
   subroutine ftype_check(this, indis)
-! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: LINELENGTH
     use SimModule, only: store_error, count_errors, store_error_filename
@@ -1059,7 +1048,6 @@ contains
     integer(I4B), intent(in) :: indis
     ! -- local
     character(len=LINELENGTH) :: errmsg
-! ------------------------------------------------------------------------------
     !
     ! -- Check for IC6, DIS(u), and MST. Stop if not present.
     if (this%inic == 0) then

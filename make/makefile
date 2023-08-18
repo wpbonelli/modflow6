@@ -131,9 +131,9 @@ $(OBJDIR)/PackageMover.o \
 $(OBJDIR)/Obs3.o \
 $(OBJDIR)/NumericalPackage.o \
 $(OBJDIR)/Budget.o \
+$(OBJDIR)/BudgetTerm.o \
 $(OBJDIR)/sort.o \
 $(OBJDIR)/SfrCrossSectionUtils.o \
-$(OBJDIR)/BudgetTerm.o \
 $(OBJDIR)/TernaryUtil.o \
 $(OBJDIR)/Ternary.o \
 $(OBJDIR)/TrackData.o \
@@ -142,9 +142,11 @@ $(OBJDIR)/STLVecInt.o \
 $(OBJDIR)/BoundaryPackage.o \
 $(OBJDIR)/BaseModel.o \
 $(OBJDIR)/InputDefinition.o \
+$(OBJDIR)/PackageBudget.o \
+$(OBJDIR)/HeadFileReader.o \
+$(OBJDIR)/BudgetObject.o \
 $(OBJDIR)/SfrCrossSectionManager.o \
 $(OBJDIR)/dag_module.o \
-$(OBJDIR)/BudgetObject.o \
 $(OBJDIR)/TernarySolveTrack.o \
 $(OBJDIR)/SubcellTri.o \
 $(OBJDIR)/Method.o \
@@ -168,8 +170,7 @@ $(OBJDIR)/gwf3idm.o \
 $(OBJDIR)/gwf3disv8idm.o \
 $(OBJDIR)/gwf3disu8idm.o \
 $(OBJDIR)/gwf3dis8idm.o \
-$(OBJDIR)/PackageBudget.o \
-$(OBJDIR)/HeadFileReader.o \
+$(OBJDIR)/FlowModelInterface.o \
 $(OBJDIR)/PrintSaveManager.o \
 $(OBJDIR)/Xt3dAlgorithm.o \
 $(OBJDIR)/gwf3tvbase8.o \
@@ -229,7 +230,6 @@ $(OBJDIR)/LinearSolverBase.o \
 $(OBJDIR)/ims8reordering.o \
 $(OBJDIR)/ArrayReaderBase.o \
 $(OBJDIR)/gwf3disv8.o \
-$(OBJDIR)/FlowModelInterface.o \
 $(OBJDIR)/MethodCellTernary.o \
 $(OBJDIR)/MethodCellPollockQuad.o \
 $(OBJDIR)/MethodCellPollock.o \

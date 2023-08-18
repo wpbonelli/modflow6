@@ -1,17 +1,17 @@
 module PrtFmiModule
 
   use KindModule, only: DP, I4B
-  use ConstantsModule, only: DZERO, LENPACKAGENAME
+  use ConstantsModule, only: DZERO, LENAUXNAME, LENPACKAGENAME
   use SimModule, only: store_error, store_error_unit
   use SimVariablesModule, only: errmsg
-  use FlowModelInterfaceModule, only: FlowModelInterfaceType, BudObjPtrArray
+  use FlowModelInterfaceModule, only: FlowModelInterfaceType
   use BaseDisModule, only: DisBaseType
   use BudgetObjectModule, only: BudgetObjectType
 
   implicit none
   private
   public :: PrtFmiType
-  public :: prtfmi_cr
+  public :: fmi_cr
 
   character(len=LENPACKAGENAME) :: text = '    PRTFMI'
 
@@ -24,8 +24,8 @@ module PrtFmiModule
 
   contains
 
-    procedure :: prtfmi_df
-    procedure :: prtfmi_ad
+    procedure :: fmi_ad
+    procedure :: fmi_df => prtfmi_df
     procedure, private :: accumulate_flows
 
   end type PrtFmiType
@@ -33,82 +33,36 @@ module PrtFmiModule
 contains
 
   !> @brief Create a new PrtFmi object
-  subroutine prtfmi_cr(prtfmiobj, name_model, inunit, iout)
+  subroutine fmi_cr(fmiobj, name_model, inunit, iout)
     ! -- dummy
-    type(PrtFmiType), pointer :: prtfmiobj
+    type(PrtFmiType), pointer :: fmiobj
     character(len=*), intent(in) :: name_model
     integer(I4B), intent(inout) :: inunit
     integer(I4B), intent(in) :: iout
     !
     ! -- Create the object
-    allocate (prtfmiobj)
+    allocate (fmiobj)
     !
     ! -- create name and memory path
-    call prtfmiobj%set_names(1, name_model, 'FMI', 'FMI')
-    prtfmiobj%text = text
+    call fmiobj%set_names(1, name_model, 'FMI', 'FMI')
+    fmiobj%text = text
     !
     ! -- Allocate scalars
-    call prtfmiobj%allocate_scalars()
-    !
-    ! -- if inunit == 0, then there is no file to read, but it still needs
-    !    to be active in order to manage pointers to gwf model
-    !if (inunit == 0) inunit = 1
+    call fmiobj%allocate_scalars()
     !
     ! -- Set variables
-    prtfmiobj%inunit = inunit
-    prtfmiobj%iout = iout
+    fmiobj%inunit = inunit
+    fmiobj%iout = iout
     !
     ! -- Initialize block parser
-    call prtfmiobj%parser%Initialize(prtfmiobj%inunit, prtfmiobj%iout)
+    call fmiobj%parser%Initialize(fmiobj%inunit, fmiobj%iout)
     !
     ! -- Return
     return
-  end subroutine prtfmi_cr
-
-  !> @brief Define the flow model interface
-  subroutine prtfmi_df(this, dis)
-    ! -- modules
-    use SimModule, only: store_error
-    ! -- dummy
-    class(PrtFmiType) :: this
-    class(DisBaseType), pointer, intent(in) :: dis
-    ! -- local
-    ! -- formats
-    character(len=*), parameter :: fmtfmi = &
-      "(1x,/1x,'PRTFMI -- PRT FLOW MODEL INTERFACE, VERSION 1, 8/29/2017',     &
-      &' INPUT READ FROM UNIT ', i0, //)" ! kluge note: update
-    character(len=*), parameter :: fmtfmi0 = &
-"(1x,/1x,'PRTFMI -- PRT FLOW MODEL INTERFACE, &
-&VERSION 1, 8/29/2017')" ! kluge note: update
-    !
-    ! --print a message identifying the FMI package.
-    if (this%inunit /= 0) then
-      write (this%iout, fmtfmi) this%inunit
-    else
-      write (this%iout, fmtfmi0)
-      if (this%flows_from_file) then
-        write (this%iout, '(a)') '  FLOWS ARE ASSUMED TO BE ZERO.'
-      else
-        write (this%iout, '(a)') '  FLOWS PROVIDED BY A GWF MODEL IN THIS &
-          &SIMULATION'
-      end if
-    end if
-    !
-    ! -- Call parent class define
-    call this%FlowModelInterfaceType%fmi_df(dis)
-    !
-    ! -- Allocate arrays
-    allocate (this%StorageFlows(this%dis%nodes)) ! kluge note: need allocate_arrays subroutine
-    allocate (this%SourceFlows(this%dis%nodes))
-    allocate (this%SinkFlows(this%dis%nodes))
-    allocate (this%BoundaryFlows(this%dis%nodes * 10)) ! kluge note: hardwired to max 8 polygon faces plus top and bottom for now
-    !
-    ! -- Return
-    return
-  end subroutine prtfmi_df
+  end subroutine fmi_cr
 
   !> @brief Time step advance
-  subroutine prtfmi_ad(this)
+  subroutine fmi_ad(this)
     ! -- modules
     use ConstantsModule, only: DHDRY
     ! -- dummy
@@ -121,16 +75,26 @@ contains
     character(len=*), parameter :: fmtrewet = &
      &"(/1X,'DRY CELL REACTIVATED AT ', a)"
     !
-    ! -- Call parent class advance
-    call this%FlowModelInterfaceType%fmi_ad()
+    ! -- Set flag to indicated that flows are being updated.  For the case where
+    !    flows may be reused (only when flows are read from a file) then set
+    !    the flag to zero to indicated that flows were not updated
+    this%iflowsupdated = 1
     !
-    ! ! -- If advanced package flows are being read from file, read the next set of records
-    ! if (this%flows_from_file .and. this%inunit /= 0) then
-    !   do n = 1, size(this%aptbudobj)
-    !     ! kluge note: need GWF advanced-package flows from separate files?
-    !     call this%aptbudobj(n)%ptr%bfr_advance(this%dis, this%iout)
-    !   end do
-    ! end if
+    ! -- If reading flows from a budget file, read the next set of records
+    if (this%iubud /= 0) then
+      call this%advance_bfr()
+    end if
+    !
+    ! -- If reading heads from a head file, read the next set of records
+    if (this%iuhds /= 0) then
+      call this%advance_hfr()
+    end if
+    !
+    ! -- If mover flows are being read from file, read the next set of records
+    if (this%iumvr /= 0) then
+      call this%mvrbudobj%bfr_advance(this%dis, this%iout)
+    end if
+    !
     ! -- Accumulate flows
     call this%accumulate_flows()
     !
@@ -168,12 +132,32 @@ contains
     !
     ! -- Return
     return
-  end subroutine prtfmi_ad
+  end subroutine fmi_ad
+
+  !> @brief Define the flow model interface
+  subroutine prtfmi_df(this, dis)
+    ! -- modules
+    use SimModule, only: store_error
+    ! -- dummy
+    class(PrtFmiType) :: this
+    class(DisBaseType), pointer, intent(in) :: dis
+    !
+    ! -- Call parent class define
+    call this%FlowModelInterfaceType%fmi_df(dis)
+    !
+    ! -- Allocate arrays
+    allocate (this%StorageFlows(this%dis%nodes)) ! kluge note: need allocate_arrays subroutine
+    allocate (this%SourceFlows(this%dis%nodes))
+    allocate (this%SinkFlows(this%dis%nodes))
+    allocate (this%BoundaryFlows(this%dis%nodes * 10)) ! kluge note: hardwired to max 8 polygon faces plus top and bottom for now
+    !
+    ! -- Return
+    return
+  end subroutine prtfmi_df
 
   !> @brief Accumulate flows
   subroutine accumulate_flows(this)
     use GwfDisvModule ! kluge???
-    use ConstantsModule, only: LENAUXNAME ! kluge???
     implicit none
     ! -- dummy
     class(PrtFmiType) :: this

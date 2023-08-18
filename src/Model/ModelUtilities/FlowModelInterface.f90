@@ -16,31 +16,13 @@ module FlowModelInterfaceModule
   implicit none
   private
   public :: FlowModelInterfaceType
-  public :: BudObjPtrArray
-  ! public :: fmi_cr
-  !
-  ! integer(I4B), parameter :: NBDITEMS = 2
-  ! character(len=LENBUDTXT), dimension(NBDITEMS) :: budtxt
-  ! data budtxt / '      FLOW-ERROR', ' FLOW-CORRECTION'  /
-  !
-  ! type :: DataAdvancedPackageType
-  !   real(DP), dimension(:), contiguous, pointer :: concpack => null()
-  !   real(DP), dimension(:), contiguous, pointer :: qmfrommvr => null()
-  ! end type
-  !
-  type :: BudObjPtrArray
-    type(BudgetObjectType), pointer :: ptr
-  end type BudObjPtrArray
 
   type, extends(NumericalPackageType) :: FlowModelInterfaceType
 
     character(len=LENPACKAGENAME) :: text = '' !< text string for package
     logical, pointer :: flows_from_file => null() !< if .false., then flows come from GWF through GWF-Model exg
-    ! integer(I4B), dimension(:), pointer, contiguous :: iatp => null() !< advanced transport package applied to gwfpackages
     type(ListType), pointer :: gwfbndlist => null() !< list of gwf stress packages
     integer(I4B), pointer :: iflowsupdated => null() !< flows were updated for this time step
-    ! integer(I4B), pointer :: iflowerr => null() !< add the flow error correction
-    ! real(DP), dimension(:), pointer, contiguous :: flowcorrect => null() !< mass flow correction
     integer(I4B), dimension(:), pointer, contiguous :: ibound => null() !< pointer to Model ibound
     real(DP), dimension(:), pointer, contiguous :: gwfflowja => null() !< pointer to the GWF flowja array
     real(DP), dimension(:, :), pointer, contiguous :: gwfspdis => null() !< pointer to npf specific discharge array
@@ -60,39 +42,27 @@ module FlowModelInterfaceModule
     type(HeadFileReaderType) :: hfr !< head file reader
     type(PackageBudgetType), dimension(:), allocatable :: gwfpackages !< used to get flows between a package and gwf
     type(BudgetObjectType), pointer :: mvrbudobj => null() !< pointer to the mover budget budget object
-    ! type(DataAdvancedPackageType), dimension(:), pointer, contiguous :: datp => null()
     character(len=16), dimension(:), allocatable :: flowpacknamearray !< array of boundary package names (e.g. LAK-1, SFR-3, etc.)
-    ! type(BudObjPtrArray), dimension(:), allocatable :: aptbudobj !< flow budget objects for the advanced packages
   contains
 
-    procedure :: fmi_df
-    procedure :: fmi_ar
-    procedure :: fmi_rp
-    procedure :: fmi_ad
-    ! procedure :: fmi_fc
-    ! procedure :: fmi_cq
-    ! procedure :: fmi_bd
-    ! procedure :: fmi_ot_flow
-    procedure :: fmi_da
-    procedure :: allocate_scalars
-    procedure :: allocate_arrays
-    ! procedure :: gwfsatold
-    procedure :: read_options
-    procedure :: fmi_options
-    procedure :: read_packagedata
-    procedure :: fmi_packagedata
-    procedure :: initialize_bfr
     procedure :: advance_bfr
-    procedure :: finalize_bfr
-    procedure :: initialize_hfr
     procedure :: advance_hfr
+    procedure :: allocate_arrays
+    procedure :: allocate_gwfpackages
+    procedure :: allocate_scalars
+    procedure :: deallocate_gwfpackages
+    procedure :: finalize_bfr
     procedure :: finalize_hfr
+    procedure :: fmi_ar
+    procedure :: fmi_da
+    procedure :: fmi_df
+    procedure :: get_package_index
+    procedure :: initialize_bfr
     procedure :: initialize_gwfterms_from_bfr
     procedure :: initialize_gwfterms_from_gwfbndlist
-    procedure :: allocate_gwfpackages
-    procedure :: deallocate_gwfpackages
-    procedure :: get_package_index
-    ! procedure :: set_aptbudobj_pointer
+    procedure :: initialize_hfr
+    procedure :: read_options
+    procedure :: read_packagedata
 
   end type FlowModelInterfaceType
 
@@ -105,29 +75,28 @@ contains
     ! -- dummy
     class(FlowModelInterfaceType) :: this
     class(DisBaseType), pointer, intent(in) :: dis
-    ! integer(I4B), intent(in) :: inssm
-    ! -- local
-    ! ! -- formats
-    ! character(len=*), parameter :: fmtfmi =                                    &
-    !   "(1x,/1x,'FMI -- FLOW MODEL INTERFACE, VERSION 1, 8/29/2017',            &
-    !   &' INPUT READ FROM UNIT ', i0, //)"
-    ! character(len=*), parameter :: fmtfmi0 =                                   &
-    !   "(1x,/1x,'FMI -- FLOW MODEL INTERFACE, VERSION 1, 8/29/2017')"
+    ! -- formats
+    character(len=*), parameter :: fmtfmi = &
+      "(1x,/1x,'FMI -- FLOW MODEL INTERFACE, VERSION 2, 8/17/2023',            &
+      &' INPUT READ FROM UNIT ', i0, //)"
+    character(len=*), parameter :: fmtfmi0 = &
+                    "(1x,/1x,'FMI -- FLOW MODEL INTERFACE,'&
+                    &' VERSION 2, 8/17/2023')"
+
+    ! --print a message identifying the FMI package.
+    if (this%inunit /= 0) then
+      write (this%iout, fmtfmi) this%inunit
+    else
+      write (this%iout, fmtfmi0)
+      if (this%flows_from_file) then
+        write (this%iout, '(a)') '  FLOWS ARE ASSUMED TO BE ZERO.'
+      else
+        write (this%iout, '(a)') '  FLOWS PROVIDED BY A GWF MODEL IN THIS &
+          &SIMULATION'
+      end if
+    end if
     !
-    ! ! --print a message identifying the FMI package.
-    ! if (this%inunit /= 0) then
-    !   write(this%iout, fmtfmi) this%inunit
-    ! else
-    !   write(this%iout, fmtfmi0)
-    !   if (this%flows_from_file) then
-    !     write(this%iout, '(a)') '  FLOWS ARE ASSUMED TO BE ZERO.'
-    !   else
-    !     write(this%iout, '(a)') '  FLOWS PROVIDED BY A GWF MODEL IN THIS &
-    !       &SIMULATION'
-    !   endif
-    ! endif
-    ! !
-    ! -- store pointers to arguments that were passed in
+    ! -- Store pointers
     this%dis => dis
     !
     ! -- Read fmi options
@@ -141,20 +110,11 @@ contains
       call this%initialize_gwfterms_from_bfr()
     end if
     !
-    ! -- If GWF-Model exchange is active, then setup gwfterms from bndlist
+    ! -- If GWF-Model exchange is active, setup flow terms
     if (.not. this%flows_from_file) then
       call this%initialize_gwfterms_from_gwfbndlist()
     end if
     !
-    ! ! -- Make sure that ssm is on if there are any boundary packages
-    ! if (inssm == 0) then
-    !   if (this%nflowpack > 0) then
-    !     call store_error('FLOW MODEL HAS BOUNDARY PACKAGES, BUT THERE &
-    !       &IS NO SSM PACKAGE.  THE SSM PACKAGE MUST BE ACTIVATED.', &
-    !       terminate=.TRUE.)
-    !   endif
-    ! endif
-    ! !
     ! -- Return
     return
   end subroutine fmi_df
@@ -166,8 +126,6 @@ contains
     ! -- dummy
     class(FlowModelInterfaceType) :: this
     integer(I4B), dimension(:), pointer, contiguous :: ibound
-    ! -- local
-    ! -- formats
     !
     ! -- store pointers to arguments that were passed in
     this%ibound => ibound
@@ -178,143 +136,6 @@ contains
     ! -- Return
     return
   end subroutine fmi_ar
-
-  !> @brief Read and prepare the package
-  !! kluge note: this subroutine needed?
-  subroutine fmi_rp(this)
-    ! ! -- modules
-    ! use TdisModule, only: kper, kstp
-    ! -- dummy
-    class(FlowModelInterfaceType) :: this
-    ! integer(I4B), intent(in) :: inmvr
-    ! -- local
-    ! -- formats
-    !
-    ! ! --Check to make sure MVT Package is active if mvr flows are available.
-    ! !   This cannot be checked until RP because exchange doesn't set a pointer
-    ! !   to mvrbudobj until exg_ar().
-    ! if (kper * kstp == 1) then
-    !   if (associated(this%mvrbudobj) .and. inmvr == 0) then
-    !     write(errmsg,'(4x,a)') 'GWF WATER MOVER IS ACTIVE BUT THE GWT MVT &
-    !       &PACKAGE HAS NOT BEEN SPECIFIED.  ACTIVATE GWT MVT PACKAGE.'
-    !     call store_error(errmsg, terminate=.TRUE.)
-    !   end if
-    !   if (.not. associated(this%mvrbudobj) .and. inmvr > 0) then
-    !     write(errmsg,'(4x,a)') 'GWF WATER MOVER TERMS ARE NOT AVAILABLE &
-    !       &BUT THE GWT MVT PACKAGE HAS BEEN ACTIVATED.  GWF-GWT EXCHANGE &
-    !       &OR SPECIFY GWFMOVER IN FMI PACKAGEDATA.'
-    !     call store_error(errmsg, terminate=.TRUE.)
-    !   end if
-    ! end if
-    ! !
-    ! -- Return
-    return
-  end subroutine fmi_rp
-
-  !> @brief Advance
-  subroutine fmi_ad(this)
-    ! -- modules
-    use ConstantsModule, only: DHDRY
-    ! -- dummy
-    class(FlowModelInterfaceType) :: this
-    ! real(DP), intent(inout), dimension(:) :: cnew
-    ! -- local
-    ! integer(I4B) :: n
-    ! integer(I4B) :: m
-    ! integer(I4B) :: ipos
-    ! real(DP) :: crewet, tflow, flownm
-    ! character (len=15) :: nodestr
-    ! character(len=*), parameter :: fmtdry = &
-    !  &"(/1X,'WARNING: DRY CELL ENCOUNTERED AT ',a,';  RESET AS INACTIVE &
-    !  &WITH DRY CONCENTRATION = ', G13.5)"
-    ! character(len=*), parameter :: fmtrewet = &
-    !  &"(/1X,'DRY CELL REACTIVATED AT ', a,&
-    !  &' WITH STARTING CONCENTRATION =',G13.5)"
-    !
-    ! -- Set flag to indicated that flows are being updated.  For the case where
-    !    flows may be reused (only when flows are read from a file) then set
-    !    the flag to zero to indicated that flows were not updated
-    this%iflowsupdated = 1
-    !
-    ! -- If reading flows from a budget file, read the next set of records
-    if (this%iubud /= 0) then
-      call this%advance_bfr()
-    end if
-    !
-    ! -- If reading heads from a head file, read the next set of records
-    if (this%iuhds /= 0) then
-      call this%advance_hfr()
-    end if
-    !
-    ! -- If mover flows are being read from file, read the next set of records
-    if (this%iumvr /= 0) then
-      call this%mvrbudobj%bfr_advance(this%dis, this%iout)
-    end if
-    !
-    ! ! -- If advanced package flows are being read from file, read the next set of records
-    ! if (this%flows_from_file .and. this%inunit /= 0) then
-    !   do n = 1, size(this%aptbudobj)
-    !     call this%aptbudobj(n)%ptr%bfr_advance(this%dis, this%iout)
-    !   end do
-    ! end if
-    ! !
-    ! ! -- if flow cell is dry, then set this%ibound = 0 and conc to dry
-    ! do n = 1, this%dis%nodes
-    !   !
-    !   ! -- Calculate the ibound-like array that has 0 if saturation
-    !   !    is zero and 1 otherwise
-    !   if (this%gwfsat(n) > DZERO) then
-    !     this%ibdgwfsat0(n) = 1
-    !   else
-    !     this%ibdgwfsat0(n) = 0
-    !   end if
-    !   !
-    !   ! -- Check if active transport cell is inactive for flow
-    !   if (this%ibound(n) > 0) then
-    !     if (this%gwfhead(n) == DHDRY) then
-    !       ! -- transport cell should be made inactive
-    !       this%ibound(n) = 0
-    !       cnew(n) = DHDRY
-    !       call this%dis%noder_to_string(n, nodestr)
-    !       write(this%iout, fmtdry) trim(nodestr), DHDRY
-    !     endif
-    !   endif
-    !   !
-    !   ! -- Convert dry transport cell to active if flow has rewet
-    !   if (cnew(n) == DHDRY) then
-    !     if (this%gwfhead(n) /= DHDRY) then
-    !       !
-    !       ! -- obtain weighted concentration
-    !       crewet = DZERO
-    !       tflow = DZERO
-    !       do ipos = this%dis%con%ia(n) + 1, this%dis%con%ia(n + 1) - 1
-    !         m = this%dis%con%ja(ipos)
-    !         flownm = this%gwfflowja(ipos)
-    !         if (flownm > 0) then
-    !           if (this%ibound(m) /= 0) then
-    !             crewet = crewet + cnew(m) * flownm
-    !             tflow = tflow + this%gwfflowja(ipos)
-    !           endif
-    !         endif
-    !       enddo
-    !       if (tflow > DZERO) then
-    !         crewet = crewet / tflow
-    !       else
-    !         crewet = DZERO
-    !       endif
-    !       !
-    !       ! -- cell is now wet
-    !       this%ibound(n) = 1
-    !       cnew(n) = crewet
-    !       call this%dis%noder_to_string(n, nodestr)
-    !       write(this%iout, fmtrewet) trim(nodestr), crewet
-    !     endif
-    !   endif
-    ! enddo
-    ! !
-    ! -- Return
-    return
-  end subroutine fmi_ad
 
   !> @brief Deallocate variables
   subroutine fmi_da(this)
@@ -328,12 +149,8 @@ contains
     call this%deallocate_gwfpackages()
     !
     ! -- deallocate fmi arrays
-    ! deallocate(this%datp)
     deallocate (this%gwfpackages)
     deallocate (this%flowpacknamearray)
-    ! deallocate(this%aptbudobj)
-    ! call mem_deallocate(this%flowcorrect)
-    ! call mem_deallocate(this%iatp)
     call mem_deallocate(this%igwfmvrterm)
     call mem_deallocate(this%ibdgwfsat0)
     !
@@ -351,7 +168,6 @@ contains
     ! -- deallocate scalars
     call mem_deallocate(this%flows_from_file)
     call mem_deallocate(this%iflowsupdated)
-    ! call mem_deallocate(this%iflowerr)
     call mem_deallocate(this%igwfstrgss)
     call mem_deallocate(this%igwfstrgsy)
     call mem_deallocate(this%iubud)
@@ -380,7 +196,6 @@ contains
     ! -- Allocate
     call mem_allocate(this%flows_from_file, 'FLOWS_FROM_FILE', this%memoryPath)
     call mem_allocate(this%iflowsupdated, 'IFLOWSUPDATED', this%memoryPath)
-    ! call mem_allocate(this%iflowerr, 'IFLOWERR', this%memoryPath)
     call mem_allocate(this%igwfstrgss, 'IGWFSTRGSS', this%memoryPath)
     call mem_allocate(this%igwfstrgsy, 'IGWFSTRGSY', this%memoryPath)
     call mem_allocate(this%iubud, 'IUBUD', this%memoryPath)
@@ -388,14 +203,10 @@ contains
     call mem_allocate(this%iumvr, 'IUMVR', this%memoryPath)
     call mem_allocate(this%nflowpack, 'NFLOWPACK', this%memoryPath)
     !
-    ! ! -- Although not a scalar, allocate the advanced package transport
-    ! !    budget object to zero so that it can be dynamically resized later
-    ! allocate(this%aptbudobj(0))
     ! !
     ! -- Initialize
     this%flows_from_file = .true.
     this%iflowsupdated = 1
-    ! this%iflowerr = 0
     this%igwfstrgss = 0
     this%igwfstrgsy = 0
     this%iubud = 0
@@ -418,16 +229,6 @@ contains
     ! -- local
     integer(I4B) :: n
     !
-    ! ! -- Allocate variables needed for all cases
-    ! if (this%iflowerr == 0) then
-    !   call mem_allocate(this%flowcorrect, 1, 'FLOWCORRECT', this%memoryPath)
-    ! else
-    !   call mem_allocate(this%flowcorrect, nodes, 'FLOWCORRECT', this%memoryPath)
-    ! end if
-    ! do n = 1, size(this%flowcorrect)
-    !   this%flowcorrect(n) = DZERO
-    ! enddo
-    ! !
     ! -- Allocate ibdgwfsat0, which is an indicator array marking cells with
     !    saturation greater than 0.0 with a value of 1
     call mem_allocate(this%ibdgwfsat0, nodes, 'IBDGWFSAT0', this%memoryPath)
@@ -491,17 +292,6 @@ contains
     character(len=LINELENGTH) :: keyword
     integer(I4B) :: ierr
     logical :: isfound, endOfBlock
-    logical(LGP) :: foundchildclassoption
-
-    ! kluge note: belongs in GWTFMI?
-    character(len=*), parameter :: fmtisvflow = &
-                                   "(4x,'CELL-BY-CELL FLOW INFORMATION "// &
-                                   "WILL BE SAVED TO BINARY FILE "// &
-                                   "WHENEVER ICBCFL IS NOT ZERO AND "// &
-                                   "FLOW IMBALANCE CORRECTION ACTIVE.')"
-    character(len=*), parameter :: fmtifc = &
-                                   "(4x,'MASS WILL BE ADDED OR REMOVED "// &
-                                   "TO COMPENSATE FOR FLOW IMBALANCE.')"
     !
     ! -- get options block
     call this%parser%GetBlock('OPTIONS', isfound, ierr, blockRequired=.false., &
@@ -515,26 +305,12 @@ contains
         if (endOfBlock) exit
         call this%parser%GetStringCaps(keyword)
         select case (keyword)
-        case ('SAVE_FLOWS') ! kluge note: belongs in GWTFMI?
-          this%ipakcb = -1
-          write (this%iout, fmtisvflow)
-          ! case ('FLOW_IMBALANCE_CORRECTION')
-          !   write(this%iout, fmtifc)
-          !   this%iflowerr = 1
+          ! no options to read
         case default
-          ! write(errmsg,'(4x,a,a)')'***ERROR. UNKNOWN FMI OPTION: ', &
-          !                          trim(keyword)
-          ! call store_error(errmsg)
-          ! call this%parser%StoreErrorUnit()
-          ! -- Check for child class options
-          call this%fmi_options(keyword, foundchildclassoption)
-          !
-          ! -- No child class options found, so print error message
-          if (.not. foundchildclassoption) then
-            write (errmsg, '(a,3(1x,a))') &
-              'UNKNOWN', trim(adjustl(this%text)), 'OPTION:', trim(keyword)
-            call store_error(errmsg)
-          end if
+          write (errmsg, '(a,a)') 'Unknown FMI option: ', &
+            trim(keyword)
+          call store_error(errmsg)
+          call this%parser%StoreErrorUnit()
         end select
       end do
       write (this%iout, '(1x,a)') 'END OF FMI OPTIONS'
@@ -544,27 +320,7 @@ contains
     return
   end subroutine read_options
 
-  !> @ brief Read additional options for fmi package
-    !!
-    !!  Read additional options for an fmi package. This method should
-    !!  be overridden when options in addition to the base options are
-    !!  implemented in an fmi package.
-    !!
-  !<
-  subroutine fmi_options(this, option, found)
-    ! -- dummy variables
-    class(FlowModelInterfaceType), intent(inout) :: this !< FlowModelInterfaceType object
-    character(len=*), intent(inout) :: option !< option keyword string
-    logical(LGP), intent(inout) :: found !< boolean indicating if the option was found
-    !
-    ! Return with found = .false.
-    found = .false.
-    !
-    ! -- return
-    return
-  end subroutine fmi_options
-
-  !> @brief Read PACKAGEDATA block from input file
+  !> @brief Read packagedata block from input file
   subroutine read_packagedata(this)
     ! -- modules
     use OpenSpecModule, only: ACCESS, FORM
@@ -574,18 +330,13 @@ contains
     ! -- dummy
     class(FlowModelInterfaceType) :: this
     ! -- local
-    ! type(BudgetObjectType), pointer :: budobjptr
     character(len=LINELENGTH) :: keyword, fname
-    ! character(len=LENPACKAGENAME) :: pname
-    ! integer(I4B) :: i
     integer(I4B) :: ierr
     integer(I4B) :: inunit
     integer(I4B) :: iapt
-    logical(LGP) :: foundchildclassdata
     logical :: isfound, endOfBlock
     logical :: blockrequired
     logical :: exist
-    ! type(BudObjPtrArray), dimension(:), allocatable :: tmpbudobj
     !
     ! -- initialize
     iapt = 0
@@ -656,45 +407,9 @@ contains
                                    this%iout)
           call this%mvrbudobj%fill_from_bfr(this%dis, this%iout)
         case default
-          !
-          ! ! --expand the size of aptbudobj, which stores a pointer to the budobj
-          ! allocate(tmpbudobj(iapt))
-          ! do i = 1, size(this%aptbudobj)
-          !   tmpbudobj(i)%ptr => this%aptbudobj(i)%ptr          ! kluge !!
-          ! end do
-          ! deallocate(this%aptbudobj)
-          ! allocate(this%aptbudobj(iapt + 1))
-          ! do i = 1, size(tmpbudobj)
-          !   this%aptbudobj(i)%ptr => tmpbudobj(i)%ptr
-          ! end do
-          ! deallocate(tmpbudobj)
-          ! !
-          ! ! -- Open the budget file and start filling it
-          ! iapt = iapt + 1
-          ! pname = keyword(1:LENPACKAGENAME)
-          ! call this%parser%GetStringCaps(keyword)
-          ! if(keyword /= 'FILEIN') then
-          !   call store_error('PACKAGE NAME MUST BE FOLLOWED BY ' //     &
-          !     '"FILEIN" then by filename.')
-          !   call this%parser%StoreErrorUnit()
-          ! endif
-          ! call this%parser%GetString(fname)
-          ! inunit = getunit()
-          ! call openfile(inunit, this%iout, fname, 'DATA(BINARY)', FORM,      &
-          !   ACCESS, 'UNKNOWN')
-          ! call budgetobject_cr_bfr(budobjptr, pname, inunit,    &
-          !                          this%iout, colconv2=['GWF             '])
-          ! call budobjptr%fill_from_bfr(this%dis, this%iout)
-          ! this%aptbudobj(iapt)%ptr => budobjptr  ! kluge note: GWTFMI would implement this commented-out code and set found=.true. in its fmi_packagedata
-          ! -- Check for child class options
-          call this%fmi_packagedata(keyword, foundchildclassdata)
-          !
-          ! -- No child class packagedata found, so print error message
-          if (.not. foundchildclassdata) then
-            write (errmsg, '(a,3(1x,a))') &
-              'UNKNOWN', trim(adjustl(this%text)), 'PACKAGEDATA:', trim(keyword)
-            call store_error(errmsg)
-          end if
+          write (errmsg, '(a,3(1x,a))') &
+            'UNKNOWN', trim(adjustl(this%text)), 'PACKAGEDATA:', trim(keyword)
+          call store_error(errmsg)
         end select
       end do
       write (this%iout, '(1x,a)') 'END OF FMI PACKAGEDATA'
@@ -703,26 +418,6 @@ contains
     ! -- return
     return
   end subroutine read_packagedata
-
-  !> @ brief Read additional packagedata for fmi package
-  !!
-  !!  Read additional packagedata for an fmi package. This method should
-  !!  be overridden when packagedata in addition to the base data are
-  !!  implemented in an fmi package.
-  !!
-  !<
-  subroutine fmi_packagedata(this, pkgdata, found)
-    ! -- dummy variables
-    class(FlowModelInterfaceType), intent(inout) :: this !< FlowModelInterfaceType object
-    character(len=*), intent(inout) :: pkgdata !< packagedata keyword string
-    logical(LGP), intent(inout) :: found !< boolean indicating if the packagedata was found
-    !
-    ! Return with found = .false.
-    found = .false.
-    !
-    ! -- return
-    return
-  end subroutine fmi_packagedata
 
   !> @brief Initialize the budget file reader
   subroutine initialize_bfr(this)
@@ -1067,7 +762,7 @@ contains
       end select
     end do
     !
-    ! -- allocate gwfpackage arrays (gwfpackages, iatp, datp, ...)
+    ! -- allocate gwfpackage arrays
     call this%allocate_gwfpackages(nflowpack)
     !
     ! -- Copy the package name and aux names from budget file reader
@@ -1203,16 +898,13 @@ contains
     ! -- direct allocate
     allocate (this%gwfpackages(ngwfterms))
     allocate (this%flowpacknamearray(ngwfterms))
-    ! allocate(this%datp(ngwfterms))
     !
     ! -- mem_allocate
-    ! call mem_allocate(this%iatp, ngwfterms, 'IATP', this%memoryPath)
     call mem_allocate(this%igwfmvrterm, ngwfterms, 'IGWFMVRTERM', this%memoryPath)
     !
     ! -- initialize
     this%nflowpack = ngwfterms
     do n = 1, this%nflowpack
-      ! this%iatp(n) = 0
       this%igwfmvrterm(n) = 0
       this%flowpacknamearray(n) = ''
       !
