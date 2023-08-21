@@ -11,6 +11,83 @@ longname
 description REPLACE boundnames {'{#1}': 'release-point'}
 
 block options
+name track_filerecord
+type record track fileout trackfile
+shape
+reader urword
+tagged true
+optional true
+longname
+description
+
+block options
+name track
+type keyword
+shape
+in_record true
+reader urword
+tagged true
+optional false
+longname track keyword
+description keyword to specify that record corresponds to track.
+
+block options
+name fileout
+type keyword
+shape
+in_record true
+reader urword
+tagged true
+optional false
+longname file keyword
+description keyword to specify that an output filename is expected next.
+
+block options
+name trackfile
+type string
+preserve_case true
+shape
+in_record true
+reader urword
+tagged false
+optional false
+longname file keyword
+description name of the output file to write tracking information.
+
+block options
+name trackcsv_filerecord
+type record trackcsv fileout trackcsvfile
+shape
+reader urword
+tagged true
+optional true
+longname
+description
+
+block options
+name trackcsv
+type keyword
+shape
+in_record true
+reader urword
+tagged true
+optional false
+longname track keyword
+description keyword to specify that record corresponds to the track CSV.
+
+block options
+name trackcsvfile
+type string
+preserve_case true
+shape
+in_record true
+reader urword
+tagged false
+optional false
+longname file keyword
+description name of the comma-separated value (CSV) file to write tracking information.
+
+block options
 name stoptime
 type double precision
 reader urword

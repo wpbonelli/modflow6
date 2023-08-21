@@ -1,5 +1,7 @@
 BEGIN OPTIONS
   [BOUNDNAMES]
+  [TRACK FILEOUT <trackfile>]
+  [TRACKCSV FILEOUT <trackcsvfile>]
   [STOPTIME <stoptime>]
   [STOPTRAVELTIME <stoptraveltime>]
   [STOP_AT_WEAK_SINK]

@@ -24,7 +24,7 @@ module PrtModule
   use ParticleModule ! kluge
   use MethodModule
   use GlobalDataModule
-  use TrackDataModule, only: TrackDataType
+  use TrackDataModule, only: TrackDataType, TrackFileType
   use SimModule, only: count_errors, store_error, store_error_filename
 
   implicit none
@@ -250,7 +250,8 @@ contains
       packobj => GetBndFromList(this%bndlist, ip)
       select type (packobj)
       type is (PrtPrpType)
-        call packobj%prp_set_pointers(this%ibound, this%mip%izone)
+        call packobj%prp_set_pointers(this%ibound, this%mip%izone, &
+                                      this%trackdata)
       end select
       ! -- Read and allocate package
       call packobj%bnd_ar()
@@ -269,9 +270,11 @@ contains
                               this%mip%izone, &
                               this%trackdata)
     !
-    ! -- Set trackdata file units
-    this%trackdata%ibinun = this%oc%itrkout
-    this%trackdata%icsvun = this%oc%itrkcsv
+    ! -- Initialize particle track output files
+    if (this%oc%itrkout > 0) &
+      call this%trackdata%init_track_file(this%oc%itrkout)
+    if (this%oc%itrkcsv > 0) &
+      call this%trackdata%init_track_file(this%oc%itrkcsv, csv=.true.)
     !
     ! -- return
     return
@@ -549,6 +552,8 @@ contains
     character(len=*), parameter :: fmtnocnvg = &
       "(1X,/9X,'****FAILED TO COMPLETE SOLUTION IN TIME STEP ', &
       &I0,' OF STRESS PERIOD ',I0,'****')"
+    !
+    ! -- Note: particle tracking output is handled elsewhere
     !
     ! -- Set write and print flags
     idvsave = 0
@@ -834,15 +839,13 @@ contains
     call mem_deallocate(this%inoc)
     call mem_deallocate(this%inobs)
     call mem_deallocate(this%nprp)
-    call mem_deallocate(this%trackdata%ibinun)
-    call mem_deallocate(this%trackdata%icsvun)
     !
     ! -- Arrays
     call mem_deallocate(this%masssto)
     call mem_deallocate(this%massstoold)
     call mem_deallocate(this%ratesto)
     !
-    ! -- Track data object
+    ! -- TrackData
     deallocate (this%trackdata)
     !
     ! -- TrackingModelType
@@ -888,8 +891,6 @@ contains
     call mem_allocate(this%inoc, 'INOC ', this%memoryPath)
     call mem_allocate(this%inobs, 'INOBS', this%memoryPath)
     call mem_allocate(this%nprp, 'NPRP', this%memoryPath) ! kluge?
-    call mem_allocate(this%trackdata%ibinun, 'ITRKBIN', this%memoryPath)
-    call mem_allocate(this%trackdata%icsvun, 'ITRKCSV', this%memoryPath)
     !
     this%infmi = 0
     this%inmip = 0
@@ -1045,6 +1046,7 @@ contains
     logical(LGP) :: limited
     integer(I4B) :: iprp
 
+    ! -- Initialize particle object
     call create_particle(particle)
 
     ! -- Loop over PRP packages
@@ -1053,8 +1055,21 @@ contains
       packobj => GetBndFromList(this%bndlist, ip)
       select type (packobj)
       type is (PrtPrpType)
-
+        ! -- Update PRP index
         iprp = iprp + 1
+
+        ! -- Initialize PRP-specific track files, if enabled
+        if (packobj%itrkout > 0) then
+          call this%trackdata%init_track_file( &
+            packobj%itrkout, &
+            iprp=iprp)
+        end if
+        if (packobj%itrkcsv > 0) then
+          call this%trackdata%init_track_file( &
+            packobj%itrkcsv, &
+            csv=.true., &
+            iprp=iprp)
+        end if
 
         ! -- Loop over particles in package
         do np = 1, packobj%npart
