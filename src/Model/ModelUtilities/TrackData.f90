@@ -3,18 +3,39 @@ module TrackDataModule
   use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: DZERO, DONE
   use ParticleModule, only: ParticleType
-  use UtilMiscModule, only: transform_coords
 
   implicit none
 
-  private
+  private save_internal
   public :: TrackDataType
+  public :: TrackFileType
 
-  !> @brief Handles saving pathlines to binary and/or CSV output files.
+  ! Types
+
+  type :: TrackFileType
+    ! Describes an output file containing all or some particle track data.
+    ! May be associated with a particular particle release package (PRP).
+    ! File is for entire model's pathlines if not associated with a PRP,
+    ! otherwise tracks only particles in the particle release package.
+    integer(I4B) :: iun = 0
+    logical(LGP) :: csv = .false.
+    integer(I4B) :: iprp = -1 ! prp 0 is reserved for exchange PRP
+  end type TrackFileType
+
   type :: TrackDataType
-    integer(I4B), pointer :: ibinun => null()
-    integer(I4B), pointer :: icsvun => null()
+    ! Handles saving particle tracks (pathlines) to binary/CSV output.
+    ! Writes to 1 file of each kind, at each level, at a time. At most,
+    ! this makes for 4. Kinds are: binary, csv. Levels are: model, prp.
+
+    ! model-level output files
+    type(TrackFileType) :: trackfile = TrackFileType()
+    type(TrackFileType) :: trackcsvfile = TrackFileType(csv=.true.)
+
+    ! PRP-level output files
+    type(TrackFileType) :: prptrackfile = TrackFileType()
+    type(TrackFileType) :: prptrackcsvfile = TrackFileType(csv=.true.)
   contains
+    procedure, public :: init_track_file
     procedure, public :: save_record
   end type TrackDataType
 
@@ -88,7 +109,117 @@ module TrackDataModule
 
 contains
 
-  !> @brief Save particle pathline record to a binary or CSV file.
+  !> @brief Initialize the appropriate track file
+  subroutine init_track_file(this, iun, csv, iprp)
+    ! -- dummy
+    class(TrackDataType) :: this
+    integer(I4B), intent(in) :: iun
+    logical(LGP), intent(in), optional :: csv
+    integer(I4B), intent(in), optional :: iprp
+    ! -- local
+    logical(LGP) :: lcsv
+    integer(I4B) :: lprp
+
+    ! parse csv argument
+    if (.not. present(csv)) then
+      lcsv = .false.
+    else
+      lcsv = csv
+    end if
+
+    ! parse prp argument
+    if (.not. present(iprp)) then
+      lprp = -1
+    else
+      lprp = iprp
+    end if
+
+    ! setup appropriate track file
+    if (lprp > -1) then
+      if (lcsv) then
+        this%prptrackcsvfile%iprp = lprp
+        this%prptrackcsvfile%iun = iun
+      else
+        this%prptrackfile%iprp = lprp
+        this%prptrackfile%iun = iun
+      end if
+    else
+      if (lcsv) then
+        this%trackcsvfile%iun = iun
+      else
+        this%trackfile%iun = iun
+      end if
+    end if
+
+  end subroutine init_track_file
+
+  subroutine save_internal(iun, particle, kper, kstp, reason, level, csv)
+    ! -- dummy
+    integer(I4B), intent(in) :: iun
+    type(ParticleType), pointer, intent(in) :: particle
+    integer(I4B), intent(in) :: kper, kstp
+    integer(I4B), intent(in) :: reason
+    integer(I4B), intent(in), optional :: level
+    logical(LGP), intent(in) :: csv
+    ! -- local
+    real(DP) :: xmodel, ymodel, zmodel
+    integer(I4B) :: status
+
+    ! -- Get model coordinates
+    call particle%get_model_coords(xmodel, ymodel, zmodel)
+
+    ! -- Get status
+    if (particle%istatus .lt. 0) then
+      status = 1
+    else
+      status = particle%istatus
+    end if
+
+    if (csv) then
+      write (iun, '(*(G0,:,","))') &
+        kper, &
+        kstp, &
+        particle%imdl, &
+        particle%iprp, &
+        particle%irpt, &
+        particle%ilay, &
+        particle%icu, &
+        particle%izone, &
+        status, &
+        reason, &
+        particle%trelease, &
+        particle%ttrack, &
+        xmodel, &
+        ymodel, &
+        zmodel
+    else
+      write (iun) &
+        kper, &
+        kstp, &
+        particle%imdl, &
+        particle%iprp, &
+        particle%irpt, &
+        particle%ilay, &
+        particle%icu, &
+        particle%izone, &
+        status, &
+        reason, &
+        particle%trelease, &
+        particle%ttrack, &
+        xmodel, &
+        ymodel, &
+        zmodel
+    end if
+
+  end subroutine
+
+  !> @brief Save the particle's current state to output file(s).
+  !!
+  !! The record will be saved to any model-level files on the
+  !! TrackData instance and any PRP-level files for which the
+  !! particle's PRP index matches the track file's PRP index.
+  !! This allows for outputting particle tracks for an entire
+  !! model, or independently for particular release packages.
   subroutine save_record(this, particle, kper, kstp, reason, level)
     ! -- dummy
     class(TrackDataType), intent(inout) :: this
@@ -96,73 +227,29 @@ contains
     integer(I4B), intent(in) :: kper, kstp
     integer(I4B), intent(in) :: reason
     integer(I4B), intent(in), optional :: level
-    ! -- local
-    logical(LGP) :: ladd
-    real(DP) :: xmodel, ymodel, zmodel
-    integer(I4B) :: status
 
-    ! -- Determine whether to add track data
-    if (.not. present(level)) then
-      ! -- If optional argument level is not present, track data will be added
-      ladd = .true.
-    else
-      ! If optional argument level is present, check criteria
-      ladd = .false.
-      if (level == 3) ladd = .true. ! kluge note: adds after each subcell-level track
+    ! -- If optional argument level is not present, track data will be added.
+    !    If optional argument level is present, check criteria.
+    if (present(level) .and. level .ne. 3) return ! kluge note: adds after each subcell-level track
+
+    ! save binary file(s) if enabled
+    if (this%trackfile%iun > 0) &
+      call save_internal(this%trackfile%iun, particle, &
+                         kper, kstp, reason, level, csv=.false.)
+    if (this%trackcsvfile%iun > 0) &
+      call save_internal(this%trackcsvfile%iun, particle, &
+                         kper, kstp, reason, level, csv=.true.)
+
+    ! save PRP-level file(s) if enabled
+    if (particle%iprp == this%prptrackfile%iprp) then
+      if (this%prptrackfile%iun > 0) &
+        call save_internal(this%prptrackfile%iun, particle, &
+                           kper, kstp, reason, level, csv=.false.)
+      if (this%prptrackcsvfile%iun > 0) &
+        call save_internal(this%prptrackcsvfile%iun, particle, &
+                           kper, kstp, reason, level, csv=.true.)
     end if
 
-    if (ladd) then
-
-      ! -- Get model coordinates
-      call particle%get_model_coords(xmodel, ymodel, zmodel)
-
-      ! -- Get status
-      if (particle%istatus .lt. 0) then
-        status = 1
-      else
-        status = particle%istatus
-      end if
-
-      ! -- Save to CSV file
-      if (this%icsvun /= 0) &
-        write (this%icsvun, '(*(G0,:,","))') &
-        kper, &
-        kstp, &
-        particle%imdl, &
-        particle%iprp, &
-        particle%irpt, &
-        particle%ilay, &
-        particle%icu, &
-        particle%izone, &
-        status, &
-        reason, &
-        particle%trelease, &
-        particle%ttrack, &
-        xmodel, &
-        ymodel, &
-        zmodel
-
-      ! -- Save to binary file
-      if (this%ibinun /= 0) &
-        write (this%ibinun) &
-        kper, &
-        kstp, &
-        particle%imdl, &
-        particle%iprp, &
-        particle%irpt, &
-        particle%ilay, &
-        particle%icu, &
-        particle%izone, &
-        status, &
-        reason, &
-        particle%trelease, &
-        particle%ttrack, &
-        xmodel, &
-        ymodel, &
-        zmodel
-
-    end if
-    return
   end subroutine save_record
 
 end module TrackDataModule

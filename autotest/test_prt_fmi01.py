@@ -180,6 +180,8 @@ def build_prt_sim(name, ws, mf6):
     assert np.allclose(releasepts_prt, releasepts)
 
     # create prp package
+    prp_track_file = f"{prtname}.prp.trk"
+    prp_track_csv_file = f"{prtname}.prp.trk.csv"
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp1",
@@ -187,6 +189,8 @@ def build_prt_sim(name, ws, mf6):
         nreleasepts=len(releasepts),
         packagedata=releasepts,
         perioddata={0: ["FIRST"]},
+        track_filerecord=[prp_track_file],
+        trackcsv_filerecord=[prp_track_csv_file]
     )
 
     # create output control package
@@ -295,10 +299,14 @@ def test_prt_fmi01(function_tmpdir, targets):
     gwf_head_file = f"{gwfname}.hds"
     prt_track_file = f"{prtname}.trk"
     prt_track_csv_file = f"{prtname}.trk.csv"
+    prp_track_file = f"{prtname}.prp.trk"
+    prp_track_csv_file = f"{prtname}.prp.trk.csv"
     assert (ws / gwf_budget_file).is_file()
     assert (ws / gwf_head_file).is_file()
     assert (ws / prt_track_file).is_file()
     assert (ws / prt_track_csv_file).is_file()
+    assert (ws / prp_track_file).is_file()
+    assert (ws / prp_track_csv_file).is_file()
 
     # check mp7 output files exist
     mp7_pathline_file = f"{mp7name}.mppth"
@@ -330,11 +338,12 @@ def test_prt_fmi01(function_tmpdir, targets):
     check_budget_data(ws / f"{simname}_prt.lst", perlen, nper)
 
     # check mf6 track data written to different formats are equal
-    check_track_data(
-        track_bin=ws / prt_track_file,
-        track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
-        track_csv=ws / prt_track_csv_file,
-    )
+    for track_csv in [ws / prt_track_csv_file, ws / prp_track_csv_file]:
+        check_track_data(
+            track_bin=ws / prt_track_file,
+            track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
+            track_csv=track_csv
+        )
 
     # extract head, budget, and specific discharge results from GWF model
     hds = HeadFile(ws / gwf_head_file).get_data()

@@ -376,7 +376,7 @@ contains
     return
   end subroutine get_model_coords
 
-  function get_particle_id(particle) result(id)
+  pure function get_particle_id(particle) result(id)
     ! -- dummy
     class(ParticleType), intent(in) :: particle
     character(len=LENMEMPATH) :: id
