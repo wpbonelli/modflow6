@@ -305,10 +305,11 @@ contains
         if (endOfBlock) exit
         call this%parser%GetStringCaps(keyword)
         select case (keyword)
-          ! no options to read
+        case ('SAVE_FLOWS')
+          this%ipakcb = -1
         case default
-          write (errmsg, '(a,a)') 'Unknown FMI option: ', &
-            trim(keyword)
+          write (errmsg, '(a,3(1x,a))') &
+            'UNKNOWN', trim(adjustl(this%text)), 'OPTION:', trim(keyword)
           call store_error(errmsg)
           call this%parser%StoreErrorUnit()
         end select
