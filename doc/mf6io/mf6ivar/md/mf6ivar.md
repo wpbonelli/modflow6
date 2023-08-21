@@ -1257,6 +1257,7 @@
 | PRT | OC | PERIOD | LAST | KEYWORD | keyword to indicate save for last step in period. This keyword may be used in conjunction with other keywords to print or save results for multiple time steps. |
 | PRT | OC | PERIOD | FREQUENCY | INTEGER | save at the specified time step frequency. This keyword may be used in conjunction with other keywords to print or save results for multiple time steps. |
 | PRT | OC | PERIOD | STEPS | INTEGER (<NSTP) | save for each step specified in STEPS. This keyword may be used in conjunction with other keywords to print or save results for multiple time steps. |
+| PRT | FMI | OPTIONS | SAVE_FLOWS | KEYWORD | keyword to indicate that FMI flow terms will be written to the file specified with ``BUDGET FILEOUT'' in Output Control. |
 | PRT | FMI | PACKAGEDATA | FLOWTYPE | STRING | is the word GWFBUDGET or GWFHEAD.  If GWFBUDGET is specified, then the corresponding file must be a budget file from a previous GWF Model run. |
 | PRT | FMI | PACKAGEDATA | FILEIN | KEYWORD | keyword to specify that an input filename is expected next. |
 | PRT | FMI | PACKAGEDATA | FNAME | STRING | is the name of the file containing flows.  The path to the file should be included if the file is not located in the folder where the program was run. |

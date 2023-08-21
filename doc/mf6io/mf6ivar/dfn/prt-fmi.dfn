@@ -1,5 +1,13 @@
 # --------------------- prt fmi options ---------------------
 
+block options
+name save_flows
+type keyword
+reader urword
+optional true
+longname save cell-by-cell flows to budget file
+description REPLACE save_flows {'{#1}': 'FMI'}
+
 # --------------------- prt fmi packagedata ---------------------
 
 block packagedata
