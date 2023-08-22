@@ -38,6 +38,7 @@ module ParticleModule
     real(DP), public :: trelease ! particle release time
     real(DP), public :: tstop ! particle stop time
     real(DP), public :: ttrack ! time to which particle has been tracked
+    logical(LGP), public :: advancing ! whether particle is still being tracked within time step
 
     ! coord transform
     logical(LGP), public :: isTransformed ! indicates whether coordinates have been transformed from model to local coordinates
@@ -241,7 +242,8 @@ contains
       partlist%iTrackingDomainBoundary(ip, levelMin:levelMax)
     this%icu = partlist%icu(ip)
     this%ilay = partlist%ilay(ip)
-    this%istatus = -1 ! need to reset this to -1 every timestep (for solution to proceed)
+    this%istatus = partlist%istatus(ip)
+    this%advancing = .true.
     this%x = partlist%x(ip)
     this%y = partlist%y(ip)
     this%z = partlist%z(ip)

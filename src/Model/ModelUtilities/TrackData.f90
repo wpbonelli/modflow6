@@ -163,17 +163,9 @@ contains
     logical(LGP), intent(in) :: csv
     ! -- local
     real(DP) :: xmodel, ymodel, zmodel
-    integer(I4B) :: status
 
     ! -- Get model coordinates
     call particle%get_model_coords(xmodel, ymodel, zmodel)
-
-    ! -- Get status
-    if (particle%istatus .lt. 0) then
-      status = 1
-    else
-      status = particle%istatus
-    end if
 
     if (csv) then
       write (iun, '(*(G0,:,","))') &
@@ -185,7 +177,7 @@ contains
         particle%ilay, &
         particle%icu, &
         particle%izone, &
-        status, &
+        particle%istatus, &
         reason, &
         particle%trelease, &
         particle%ttrack, &
@@ -202,7 +194,7 @@ contains
         particle%ilay, &
         particle%icu, &
         particle%izone, &
-        status, &
+        particle%istatus, &
         reason, &
         particle%trelease, &
         particle%ttrack, &
