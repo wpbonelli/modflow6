@@ -255,7 +255,9 @@ contains
         particle%istatus = 3
         particle%advancing = .false.
       end if
-    else
+    end if
+    !
+    if (particle%advancing) then
       !
       ! -- If the particle is above the top of the cell (which is presumed to
       ! -- represent a water table above the cell bottom), pass the particle

@@ -100,7 +100,9 @@ contains
         particle%istatus = 3
         particle%advancing = .false.
       end if
-    else
+    end if
+    !
+    if (particle%advancing) then
       !
       ! -- Pass particle vertically and instantaneously to cell bottom
       particle%z = this%cellDefn%bot
