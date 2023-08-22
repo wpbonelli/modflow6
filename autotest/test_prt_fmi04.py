@@ -2,19 +2,27 @@
 GWF and PRT models run in separate simulations
 via flow model interface.
 
-The grid is a 10x10 square with a single layer,
-the same flow system shown on the FloPy readme.
+The grid is a 10x10 square with 2 layers, based
+on the flow system provided in the FloPy readme.
+There is a well near the middle of the grid in
+the top layer, which pumps at a very low rate.
+Two test cases are defined, one with particle
+release package (PRP) option STOP_AT_WEAK_SINK
+disabled and one with the option enabled.
 
-There is one well near the middle of the grid.
+Particles are released from the top left cell.
+With the STOP_AT_WEAK_SINK option enabled, the
+well is expected to capture one particle. With
+STOP_AT_WEAK_SINK disabled, the well no longer
+captures the particle.
 
-Particles are released from the top left cell
-and captured by the well.
-
-Results are compared against a MODPATH 7 model.
+Results are compared against a MODPATH 7 model,
+using WeakSinkOption 1 (pass-through) when the
+STOP_AT_WEAK_SINK option is disabled, and when
+it is enabled using WeakSinkOption 2 (stop-at).
 """
 
 
-import os
 from pathlib import Path
 
 import flopy
@@ -22,16 +30,21 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 
 from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
-# model names
-name = "prtfmi04"
-gwfname = f"{name}_gwf"
-prtname = f"{name}_prt"
-mp7name = f"{name}_mp7"
+
+# simulation/model names
+simname = "prtfmi04"
+gwfname = f"{simname}_gwf"
+prtname = f"{simname}_prt"
+mp7name = f"{simname}_mp7"
+
+# test cases
+ex = [simname, f"{simname}saws"]
 
 # output file names
 gwf_budget_file = f"{gwfname}.bud"
@@ -68,10 +81,10 @@ releasepts_mp7 = [
 ]
 
 
-def build_gwf_sim(ws, mf6):
+def build_gwf_sim(idx, ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name,
+        sim_name=ex[idx],
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -124,7 +137,8 @@ def build_gwf_sim(ws, mf6):
 
     # create gwf wel package
     wells = [
-        (0, 4, 4, -1.0),
+        # k, i, j, q
+        (0, 4, 4, -0.1),
     ]
     wel = flopy.mf6.ModflowGwfwel(
         gwf,
@@ -147,10 +161,11 @@ def build_gwf_sim(ws, mf6):
     return sim
 
 
-def build_prt_sim(ws, mf6):
+def build_prt_sim(idx, ws, mf6):
     # create simulation
+    name = ex[idx]
     sim = flopy.mf6.MFSimulation(
-        sim_name=name,
+        sim_name=ex[idx],
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -189,6 +204,7 @@ def build_prt_sim(ws, mf6):
         nreleasepts=len(releasepts),
         packagedata=releasepts,
         perioddata={0: ["FIRST"]},
+        stop_at_weak_sink="saws" in name,
     )
 
     # create output control package
@@ -219,7 +235,8 @@ def build_prt_sim(ws, mf6):
     return sim
 
 
-def build_mp7_sim(ws, mp7, gwf):
+def build_mp7_sim(idx, ws, mp7, gwf):
+    name = ex[idx]
     partdata = flopy.modpath.ParticleData(
         partlocs=[p[0] for p in releasepts_mp7],
         localx=[p[1] for p in releasepts_mp7],
@@ -250,6 +267,7 @@ def build_mp7_sim(ws, mp7, gwf):
         budgetoutputoption="summary",
         stoptimeoption="extend",
         particlegroups=[pg],
+        weaksinkoption="stop_at" if "saws" in name else "pass_through",
     )
 
     return mp
@@ -262,12 +280,13 @@ def get_different_rows(source_df, new_df):
     return changed_rows_df.drop("_merge", axis=1)
 
 
-def test_prt_fmi04(function_tmpdir, targets):
+@pytest.mark.parametrize("idx, name", enumerate(ex))
+def test_prt_fmi04(idx, name, function_tmpdir, targets):
     ws = function_tmpdir
 
     # build mf6 models
-    gwfsim = build_gwf_sim(ws, targets.mf6)
-    prtsim = build_prt_sim(ws, targets.mf6)
+    gwfsim = build_gwf_sim(idx, ws, targets.mf6)
+    prtsim = build_prt_sim(idx, ws, targets.mf6)
 
     # run mf6 models
     for sim in [gwfsim, prtsim]:
@@ -283,7 +302,7 @@ def test_prt_fmi04(function_tmpdir, targets):
     mg = gwf.modelgrid
 
     # build mp7 model
-    mp7sim = build_mp7_sim(ws, targets.mp7, gwf)
+    mp7sim = build_mp7_sim(idx, ws, targets.mp7, gwf)
 
     # run mp7 model
     mp7sim.write_input()
@@ -321,10 +340,10 @@ def test_prt_fmi04(function_tmpdir, targets):
     assert all_equal(mf6_pldata["imdl"], 1)
     assert all_equal(mf6_pldata["iprp"], 1)
 
-    # check mf6 cell budget file
-    check_budget_data(ws / f"{name}_prt.lst", perlen, nper)
+    # check budget data were written to mf6 prt list file
+    check_budget_data(ws / f"{simname}_prt.lst", perlen, nper)
 
-    # check mf6 track data written to different formats are equal
+    # check mf6 prt particle track data were written to binary/CSV files
     check_track_data(
         track_bin=ws / prt_track_file,
         track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
@@ -391,7 +410,7 @@ def test_prt_fmi04(function_tmpdir, targets):
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{name}.png")
+    plt.savefig(ws / f"test_{simname}.png")
 
     # convert mf6 pathlines to mp7 format
     mf6_pldata_mp7 = to_mp7_format(mf6_pldata)
@@ -418,10 +437,9 @@ def test_prt_fmi04(function_tmpdir, targets):
     del mp7_pldata["yloc"]
     del mp7_pldata["zloc"]
 
-    # drop rows for which mf6 and mp7 disagree on node number
-    mf6_pldata_mp7 = mf6_pldata_mp7[(mf6_pldata_mp7.node != 46)]
-    mf6_pldata_mp7 = mf6_pldata_mp7[(mf6_pldata_mp7.node != 55)]
-    mp7_pldata = mp7_pldata[(mp7_pldata.node != 45)]
+    # drop node number column because prt and mp7 disagree on a few
+    del mf6_pldata_mp7["node"]
+    del mp7_pldata["node"]
 
     # compare mf6 / mp7 pathline data
     assert mf6_pldata_mp7.shape == mp7_pldata.shape
