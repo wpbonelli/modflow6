@@ -1074,7 +1074,7 @@ contains
         ! -- Loop over particles in package
         do np = 1, packobj%npart
 
-          ! -- If particle inactive, skip
+          ! -- If particle is inactive, skip it
           if (packobj%partlist%istatus(np) > 1) cycle
 
           ! -- Reset the particle's coordinate transformation
@@ -1106,6 +1106,9 @@ contains
           if (particle%trelease .ge. totimc) &
             call this%trackdata%save_record(particle, kper=kper, &
                                             kstp=kstp, reason=0)
+
+          ! -- Set particle active
+          particle%istatus = 1
 
           ! -- Apply the tracking method
           call method%apply(particle, tmax)
