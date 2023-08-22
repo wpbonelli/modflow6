@@ -189,6 +189,7 @@ contains
       ! particle%iTrackingDomain(1) = -abs(particle%iTrackingDomain(1))   ! kluge???
       ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
       particle%istatus = 2 ! kluge note: use -2 to allow check for transfer to another model???
+      particle%advancing = .false.
       ! particle%iTrackingDomainBoundary(2) = -1
     else
       idiag = this%fmi%dis%con%ia(this%cellRect%cellDefn%icell)
@@ -252,7 +253,6 @@ contains
     class(MethodDisType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
-    ! -- local
     !
     ! -- Track across cells
     call this%subtrack(particle, 1, tmax) ! kluge, hardwired to level 1
@@ -268,7 +268,6 @@ contains
     ! -- dummy
     class(MethodDisType), intent(inout) :: this
     integer, intent(in) :: ic
-    ! -- local
     ! -- result
     integer :: npolyverts
     !

@@ -441,7 +441,7 @@ contains
         this%partlist%icu = icu
         this%partlist%ilay = ilay
         this%partlist%izone = this%izone(ic)
-        this%partlist%istatus(np) = 1
+        this%partlist%istatus(np) = 0 ! awaiting release
         this%partlist%iTrackingDomain(np, 0) = 0
         this%partlist%iTrackingDomainBoundary(np, 0) = 0
         this%partlist%iTrackingDomain(np, 1) = 0

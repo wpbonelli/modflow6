@@ -38,6 +38,7 @@ module ParticleModule
     real(DP), public :: trelease ! particle release time
     real(DP), public :: tstop ! particle stop time
     real(DP), public :: ttrack ! time to which particle has been tracked
+    logical(LGP), public :: advancing ! whether the particle is still being tracked for the current time step
 
     ! coord transform
     logical(LGP), public :: isTransformed ! indicates whether coordinates have been transformed from model to local coordinates
@@ -219,7 +220,8 @@ contains
   !> @brief Initialize particle from particle list.
   !!
   !! This routine is used to initialize a particle from the list
-  !! so it can be tracked by prt_solve. The particle
+  !! so it can be tracked by prt_solve. The particle's advancing
+  !! flag is set to true.
   subroutine load_from_list(this, partlist, imdl, iprp, ip)
     ! -- dummy
     class(ParticleType), intent(inout) :: this
@@ -241,13 +243,14 @@ contains
       partlist%iTrackingDomainBoundary(ip, levelMin:levelMax)
     this%icu = partlist%icu(ip)
     this%ilay = partlist%ilay(ip)
-    this%istatus = -1 ! need to reset this to -1 every timestep (for solution to proceed)
+    this%istatus = partlist%istatus(ip)
     this%x = partlist%x(ip)
     this%y = partlist%y(ip)
     this%z = partlist%z(ip)
     this%trelease = partlist%trelease(ip)
     this%tstop = partlist%tstop(ip)
     this%ttrack = partlist%ttrack(ip)
+    this%advancing = .true.
     !
     return
   end subroutine load_from_list

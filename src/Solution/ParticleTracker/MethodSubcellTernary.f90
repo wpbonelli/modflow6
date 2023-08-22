@@ -231,6 +231,7 @@ contains
       dt = t - particle%ttrack
       exitFace = 0
       particle%istatus = 1
+      particle%advancing = .false.
     else
       ! -- The computed exit time is less than or equal to the maximum time,
       ! -- so set final time for particle trajectory equal to exit time.

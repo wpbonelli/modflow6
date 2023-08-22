@@ -53,15 +53,15 @@ contains
     ! local
     integer :: levelNext
     class(methodType), pointer :: submethod
-    logical :: isStillAdvancing
+    logical :: advancing
     !
     ! -- Set next level
     levelNext = level + 1
     !
     ! -- Track particle through next-level tracking domains (subdomains)
     ! -- where each domain is a grid cell (or subcell)
-    isStillAdvancing = .true.
-    do while (isStillAdvancing)
+    advancing = .true.
+    do while (advancing)
       ! -- Load subdomain tracking method (submethod)
       call this%loadsub(particle, levelNext, submethod)
 
@@ -71,7 +71,7 @@ contains
       call submethod%apply(particle, tmax)
 
       ! -- Advance particle
-      call advance(this, particle, levelNext, submethod, isStillAdvancing)
+      call advance(this, particle, levelNext, submethod, advancing)
 
       ! -- Store particle trackdata as appropriate
       call submethod%trackdata%save_record(particle, &
@@ -84,22 +84,21 @@ contains
   end subroutine subtrack
 
   !> @brief Advance the particle
-  subroutine advance(this, particle, levelNext, submethod, isStillAdvancing)
+  subroutine advance(this, particle, levelNext, submethod, advancing)
     ! dummy
     class(MethodType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     integer :: levelNext
     class(MethodType), pointer :: submethod
-    logical :: isStillAdvancing
+    logical :: advancing
     !
-    if (particle%istatus .ne. -1) then
+    if (.not. particle%advancing) then
       particle%iTrackingDomainBoundary = 0
-      isStillAdvancing = .false.
+      advancing = .false.
     else
       call this%pass(particle)
-      if (particle%iTrackingDomainBoundary(levelNext - 1) .ne. 0) then
-        isStillAdvancing = .false.
-      end if
+      if (particle%iTrackingDomainBoundary(levelNext - 1) .ne. 0) &
+        advancing = .false.
     end if
     !
     return

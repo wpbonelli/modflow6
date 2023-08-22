@@ -172,6 +172,7 @@ contains
       ! particle%iTrackingDomain(1) = -abs(particle%iTrackingDomain(1))   ! kluge???
       ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
       particle%istatus = 2 ! kluge note: use -2 to check for transfer to another model???
+      particle%advancing = .false.
       ! particle%iTrackingDomainBoundary(2) = -1
     else
       idiag = this%fmi%dis%con%ia(this%cellPoly%cellDefn%icell)
