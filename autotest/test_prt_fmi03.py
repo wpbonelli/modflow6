@@ -23,7 +23,6 @@ Results are compared against a MODPATH 7 model.
 """
 
 
-import os
 from pathlib import Path
 
 import flopy
@@ -37,14 +36,29 @@ from flopy.utils.binaryfile import HeadFile
 from matplotlib.collections import LineCollection
 from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
+
+# simulation name
+simname = "prtfmi02"
+
+# test cases
+ex = [f"{simname}_1l", f"{simname}_2l"]
+
+
 # model names
-name = "prtfmi02"
-ex = [f"{name}_1l", f"{name}_2l"]
-
-
 def get_model_name(idx, mdl):
     return f"{ex[idx]}_{mdl}"
 
+
+# model info
+nlay = 1
+nrow = 10
+ncol = 10
+top = 1.0
+nper = 1
+perlen = 1.0
+nstp = 1
+tsmult = 1.0
+porosity = 0.1
 
 # release points
 # todo: define for mp7 first, then use flopy utils to convert to global coords for mf6 prt
@@ -60,18 +74,6 @@ releasepts_mp7 = [
     (0, float(f"0.{i + 1}"), float(f"0.{i + 1}"), 0.5)
     for i in range(9)
 ]
-
-
-# problem info
-nlay = 1
-nrow = 10
-ncol = 10
-top = 1.0
-nper = 1
-perlen = 1.0
-nstp = 1
-tsmult = 1.0
-porosity = 0.1
 
 # zone array and stop zone cell ids
 stopzone_cells = [(0, 1, 8), (0, 8, 1)]
@@ -283,6 +285,11 @@ def build_mp7_sim(idx, ws, mp7, gwf):
 def test_mf6model(idx, name, function_tmpdir, targets):
     ws = function_tmpdir
 
+    # define model names
+    gwfname = get_model_name(idx, "gwf")
+    prtname = get_model_name(idx, "prt")
+    mp7name = get_model_name(idx, "mp7")
+
     # build mf6 simulations
     gwfsim = build_gwf_sim(idx, ws, targets.mf6)
     prtsim = build_prt_sim(idx, ws, targets.mf6)
@@ -292,11 +299,6 @@ def test_mf6model(idx, name, function_tmpdir, targets):
         sim.write_simulation()
         success, _ = sim.run_simulation()
         assert success
-
-    # define model names
-    gwfname = get_model_name(idx, "gwf")
-    prtname = get_model_name(idx, "prt")
-    mp7name = get_model_name(idx, "mp7")
 
     # extract mf6 models
     gwf = gwfsim.get_model(gwfname)
@@ -341,10 +343,10 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     # load mf6 pathline results
     mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
 
-    # check mf6 cell budget file
+    # check budget data were written to mf6 prt list file
     check_budget_data(ws / f"{name}_prt.lst", perlen, nper)
 
-    # check mf6 track data
+    # check mf6 prt particle track data were written to binary/CSV files
     check_track_data(
         track_bin=ws / prt_track_file,
         track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),

@@ -10,7 +10,6 @@ Results are compared against a MODPATH 7 model.
 """
 
 
-import os
 from pathlib import Path
 
 import flopy
@@ -26,11 +25,15 @@ from framework import TestFramework
 from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 from simulation import TestSimulation
 
-# model names
-name = "prtexg1"
-gwfname = f"{name}_gwf"
-prtname = f"{name}_prt"
-mp7name = f"{name}_mp7"
+
+# simulation/model names
+simname = "prtexg1"
+gwfname = f"{simname}_gwf"
+prtname = f"{simname}_prt"
+mp7name = f"{simname}_mp7"
+
+# test cases
+ex = [simname]
 
 # output file names
 gwf_budget_file = f"{gwfname}.bud"
@@ -65,15 +68,12 @@ releasepts_mp7 = [
     for i in range(9)
 ]
 
-# test cases
-ex = [name]
 
-
-def build_sim(name, ws, mf6):
+def build_sim(idx, ws, mf6):
     from test_prt_fmi01 import build_gwf_sim
 
     # create simulation
-    sim = build_gwf_sim(name, ws, mf6)
+    sim = build_gwf_sim(ex[idx], ws, mf6)
 
     # create prt model
     prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
@@ -195,10 +195,10 @@ def eval_results(sim):
     )
 
 
-@pytest.mark.parametrize("name", ex)
-def test_mf6model(name, function_tmpdir, targets):
+@pytest.mark.parametrize("idx, name", enumerate(ex))
+def test_mf6model(idx, name, function_tmpdir, targets):
     ws = function_tmpdir
-    sim = build_sim(name, str(ws), targets.mf6)
+    sim = build_sim(idx, str(ws), targets.mf6)
     sim.write_simulation()
 
     test = TestFramework()
@@ -251,10 +251,10 @@ def test_mf6model(name, function_tmpdir, targets):
     # load mf6 pathline results
     mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
 
-    # check mf6 cell budget file
+    # check budget data were written to mf6 prt list file
     check_budget_data(ws / f"{name}_prt.lst", perlen, nper)
 
-    # check mf6 track data written to different formats are equal
+    # check mf6 prt particle track data were written to binary/CSV files
     check_track_data(
         track_bin=ws / prt_track_file,
         track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),

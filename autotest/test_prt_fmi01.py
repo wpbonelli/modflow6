@@ -8,10 +8,17 @@ the same flow system shown on the FloPy readme.
 Particles are released from the top left cell.
 
 Results are compared against a MODPATH 7 model.
+
+Two test cases are defined, one with the particle
+release (PRP) package option STOP_AT_WEAK_SINK on
+and one with the option off. No effect on results
+are expected because the model has no weak sinks.
+(Motivated by bug reports in which particles were
+tracked improperly when this option was enabled,
+even with no weak sink cells in the vicinity.)
 """
 
 
-import os
 from pathlib import Path
 
 import flopy
@@ -19,12 +26,25 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
 
+# simulation name
 simname = "prtfmi01"
+
+# test cases
+ex = [simname, f"{simname}saws"]
+
+
+# model names
+def get_model_name(idx, mdl):
+    return f"{ex[idx]}_{mdl}"
+
+
+# model info
 nlay = 1
 nrow = 10
 ncol = 10
@@ -137,10 +157,10 @@ def build_gwf_sim(name, ws, mf6):
     return sim
 
 
-def build_prt_sim(name, ws, mf6):
+def build_prt_sim(idx, ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name,
+        sim_name=ex[idx],
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -156,7 +176,7 @@ def build_prt_sim(name, ws, mf6):
     )
 
     # create prt model
-    prtname = f"{name}_prt"
+    prtname = get_model_name(idx, "prt")
     prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
 
     # create prt discretization
@@ -190,7 +210,8 @@ def build_prt_sim(name, ws, mf6):
         packagedata=releasepts,
         perioddata={0: ["FIRST"]},
         track_filerecord=[prp_track_file],
-        trackcsv_filerecord=[prp_track_csv_file]
+        trackcsv_filerecord=[prp_track_csv_file],
+        stop_at_weak_sink="saws" in prtname,
     )
 
     # create output control package
@@ -204,7 +225,7 @@ def build_prt_sim(name, ws, mf6):
     )
 
     # create the flow model interface
-    gwfname = f"{name}_gwf"
+    gwfname = get_model_name(idx, "gwf")
     gwf_budget_file = f"{gwfname}.bud"
     gwf_head_file = f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
@@ -226,12 +247,12 @@ def build_prt_sim(name, ws, mf6):
     return sim
 
 
-def build_mp7_sim(ws, mp7, gwf):
+def build_mp7_sim(idx, ws, mp7, gwf):
     # convert mp7 particledata to prt release points
     partdata = get_partdata(gwf.modelgrid)
 
     # create modpath 7 simulation
-    mp7name = f"{simname}_mp7"
+    mp7name = get_model_name(idx, "mp7")
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
         particledata=partdata,
@@ -259,18 +280,19 @@ def build_mp7_sim(ws, mp7, gwf):
     return mp
 
 
-def test_prt_fmi01(function_tmpdir, targets):
+@pytest.mark.parametrize("idx, name", list(enumerate(ex)))
+def test_prt_fmi01(idx, name, function_tmpdir, targets):
     # workspace
     ws = function_tmpdir
 
     # model names
-    gwfname = f"{simname}_gwf"
-    prtname = f"{simname}_prt"
-    mp7name = f"{simname}_mp7"
+    gwfname = get_model_name(idx, "gwf")
+    prtname = get_model_name(idx, "prt")
+    mp7name = get_model_name(idx, "mp7")
 
     # build mf6 models
-    gwfsim = build_gwf_sim(simname, ws, targets.mf6)
-    prtsim = build_prt_sim(simname, ws, targets.mf6)
+    gwfsim = build_gwf_sim(ex[idx], ws, targets.mf6)
+    prtsim = build_prt_sim(idx, ws, targets.mf6)
 
     # run mf6 models
     for sim in [gwfsim, prtsim]:
@@ -278,8 +300,7 @@ def test_prt_fmi01(function_tmpdir, targets):
         success, _ = sim.run_simulation()
         assert success
 
-    # extract model objects
-
+    # extract mf6 models
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
 
@@ -287,7 +308,7 @@ def test_prt_fmi01(function_tmpdir, targets):
     mg = gwf.modelgrid
 
     # build mp7 model
-    mp7sim = build_mp7_sim(ws, targets.mp7, gwf)
+    mp7sim = build_mp7_sim(idx, ws, targets.mp7, gwf)
 
     # run mp7 model
     mp7sim.write_input()
@@ -334,15 +355,16 @@ def test_prt_fmi01(function_tmpdir, targets):
     assert all_equal(mf6_pldata["imdl"], 1)
     assert all_equal(mf6_pldata["iprp"], 1)
 
-    # check mf6 cell budget file
-    check_budget_data(ws / f"{simname}_prt.lst", perlen, nper)
+    # check budget data were written to mf6 prt list file
+    check_budget_data(ws / f"{name}_prt.lst", perlen, nper)
 
-    # check mf6 track data written to different formats are equal
+    # check mf6 prt particle track data were written to binary/CSV files
+    # and that different formats are equal
     for track_csv in [ws / prt_track_csv_file, ws / prp_track_csv_file]:
         check_track_data(
             track_bin=ws / prt_track_file,
             track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
-            track_csv=track_csv
+            track_csv=track_csv,
         )
 
     # extract head, budget, and specific discharge results from GWF model

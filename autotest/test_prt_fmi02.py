@@ -21,7 +21,6 @@ Results are compared against a MODPATH 7 model.
 """
 
 
-import os
 from pathlib import Path
 
 import flopy
@@ -34,11 +33,12 @@ from flopy.utils.binaryfile import HeadFile
 
 from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
 
-# model names
-name = "prtfmi02"
-gwfname = f"{name}_gwf"
-prtname = f"{name}_prt"
-mp7name = f"{name}_mp7"
+
+# simulation/model names
+simname = "prtfmi02"
+gwfname = f"{simname}_gwf"
+prtname = f"{simname}_prt"
+mp7name = f"{simname}_mp7"
 
 # output file names
 gwf_budget_file = f"{gwfname}.bud"
@@ -47,7 +47,7 @@ prt_track_file = f"{prtname}.trk"
 prt_track_csv_file = f"{prtname}.trk.csv"
 mp7_pathline_file = f"{mp7name}.mppth"
 
-# problem info
+# model info
 nlay = 1
 nrow = 10
 ncol = 10
@@ -96,7 +96,7 @@ idomain[0, 9, 0] = 0
 def build_gwf_sim(ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name,
+        sim_name=simname,
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -164,7 +164,7 @@ def build_gwf_sim(ws, mf6):
 def build_prt_sim(ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name,
+        sim_name=simname,
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -356,10 +356,10 @@ def test_prt_fmi02(function_tmpdir, targets):
         range(1, 6)
     )
 
-    # check mf6 cell budget file
-    check_budget_data(ws / f"{name}_prt.lst", perlen, nper)
+    # check budget data were written to mf6 prt list file
+    check_budget_data(ws / f"{simname}_prt.lst", perlen, nper)
 
-    # check mf6 track data
+    # check mf6 prt particle track data were written to binary/CSV files
     check_track_data(
         track_bin=ws / prt_track_file,
         track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
@@ -413,7 +413,7 @@ def test_prt_fmi02(function_tmpdir, targets):
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{name}.png")
+    plt.savefig(ws / f"test_{simname}.png")
 
     # convert mf6 pathlines to mp7 format
     mf6_pldata_mp7 = to_mp7_format(mf6_pldata)
