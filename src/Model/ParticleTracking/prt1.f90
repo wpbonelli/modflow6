@@ -1075,8 +1075,8 @@ contains
         do np = 1, packobj%npart
 
           ! -- If particle inactive, skip
-          if (packobj%partlist%istatus(np) .ne. 1) cycle
-          !
+          if (packobj%partlist%istatus(np) > 1) cycle
+
           ! -- Reset the particle's coordinate transformation
           call particle%reset_transf()
 
@@ -1112,7 +1112,6 @@ contains
 
           ! -- Update particle in PRP package
           call packobj%partlist%update_from_particle(particle, np)
-          !
         end do
       end select
     end do

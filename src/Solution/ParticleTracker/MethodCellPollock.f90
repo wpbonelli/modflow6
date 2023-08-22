@@ -161,14 +161,17 @@ contains
       if (particle%istopzone .eq. this%cellRect%cellDefn%izone) then
         ! -- Stop zone
         particle%istatus = 6
+        particle%advancing = .false.
       end if
     else if (this%cellRect%cellDefn%inoexitface .ne. 0) then
       ! -- No exit face
       particle%istatus = 5
+      particle%advancing = .false.
     else if (particle%istopweaksink .ne. 0) then
       if (this%cellRect%cellDefn%iweaksink .ne. 0) then
         ! -- Weak sink
         particle%istatus = 3
+        particle%advancing = .false.
       end if
     else
       !
