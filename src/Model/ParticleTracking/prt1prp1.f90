@@ -50,6 +50,7 @@ module PrtPrpModule
     real(DP), dimension(:), pointer, contiguous :: tstop => null()
     character(len=LENBOUNDNAME), dimension(:), pointer, contiguous :: rptname &
                                                                       => null() !< release point name
+    integer(I4B), dimension(:), pointer, contiguous :: ievent !< recording event option
     real(DP), dimension(:), pointer, contiguous :: massrls => null() !< mass released during time step
     integer(I4B), allocatable, dimension(:) :: kstp_list_rls !< allocatable time steps for releases in period
     integer(I4B), pointer :: ifreq_rls => null() !< release frequency (time steps) in period
@@ -160,6 +161,7 @@ contains
     call mem_deallocate(this%y)
     call mem_deallocate(this%z)
     call mem_deallocate(this%tstop)
+    call mem_deallocate(this%ievent, 'IEVENT', this%memoryPath)
     call mem_deallocate(this%rptname, 'RPTNAME', this%memoryPath)
     !
     ! -- deallocate particle list
@@ -213,6 +215,8 @@ contains
     call mem_allocate(this%tstop, this%nreleasepts, 'TSTOP', this%memoryPath)
     call mem_allocate(this%rptname, LENBOUNDNAME, this%nreleasepts, &
                       'RPTNAME', this%memoryPath)
+    call mem_allocate(this%ievent, this%nreleasepts, &
+                      'IEVENT', this%memoryPath)
 
     ! -- Allocate particle list
     allocate (this%partlist)
@@ -435,6 +439,7 @@ contains
         this%partlist%trelease(np) = trelease
         this%partlist%tstop(np) = tstop
         this%partlist%ttrack(np) = trelease
+        this%partlist%ievent(np) = this%ievent(np)
         this%partlist%istopweaksink(np) = this%istopweaksink
         this%partlist%istopzone(np) = this%istopzone
         this%partlist%irpt(np) = nps
@@ -825,7 +830,9 @@ contains
     class(PrtPrpType), intent(inout) :: this
     ! -- local
     character(len=LINELENGTH) :: cellid
-    character(len=LENBOUNDNAME) :: bndName
+    character(len=LENBOUNDNAME) :: bndName, bndNameTemp
+    character(len=LINELENGTH) :: event
+    integer(I4B), dimension(:), allocatable :: ievent
     character(len=9) :: cno
     logical :: isfound
     logical :: endOfBlock
@@ -851,6 +858,7 @@ contains
     allocate (z(this%nreleasepts))
     allocate (tstop(this%nreleasepts))
     allocate (nametxt(this%nreleasepts))
+    allocate (ievent(this%nreleasepts))
     allocate (nboundchk(this%nreleasepts))
     !
     ! -- initialize temporary variables
@@ -906,6 +914,29 @@ contains
         ! end if
         !
         nametxt(n) = bndName
+        !
+        ! -- parse and set recording event(s)
+        call this%parser%GetStringCaps(event)
+        select case (trim(adjustl(event)))
+        case ('')
+          ievent(n) = -1
+        case ('ALL')
+          ievent(n) = -1
+        case ('RELEASE')
+          ievent(n) = 0
+        case ('TRANSIT')
+          ievent(n) = 1
+        case ('TIMESTEP')
+          ievent(n) = 2
+        case ('WEAKSINK')
+          ievent(n) = 3
+        case default
+          write (errmsg, '(2a)') &
+            'Looking for ALL, RELEASE, TRANSIT, TIMESTEP, or WEAKSINK. Found: ', &
+            trim(adjustl(event))
+          call store_error(errmsg, terminate=.TRUE.)
+        end select
+        !
       end do
 
       write (this%iout, '(1x,a)') &
@@ -941,6 +972,7 @@ contains
       this%y(n) = y(n)
       this%z(n) = z(n)
       this%rptname(n) = nametxt(n)
+      this%ievent(n) = ievent(n)
     end do
     !
     ! -- deallocate local storage
@@ -949,6 +981,7 @@ contains
     deallocate (y)
     deallocate (z)
     deallocate (tstop)
+    deallocate (ievent)
     deallocate (nboundchk)
     !
     ! -- return

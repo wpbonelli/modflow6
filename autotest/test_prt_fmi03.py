@@ -65,7 +65,7 @@ porosity = 0.1
 releasepts = [
     # particle index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5)
+    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5, "ALL")
     for i in range(9)
 ]
 releasepts_mp7 = [

@@ -69,7 +69,7 @@ releasepts_mp7 = [
 releasepts_prt = [
     # particle index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5)
+    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5, "ALL")
     for i in range(9)
 ]
 
@@ -197,7 +197,7 @@ def build_prt_sim(idx, ws, mf6):
     releasepts = [(i, 0, 0, 0, c[0], c[1], c[2]) for i, c in enumerate(coords)]
 
     # check release points match expectation
-    assert np.allclose(releasepts_prt, releasepts)
+    assert np.allclose([rpts[:-1] for rpts in releasepts_prt], releasepts)
 
     # create prp package
     prp_track_file = f"{prtname}.prp.trk"
@@ -206,8 +206,8 @@ def build_prt_sim(idx, ws, mf6):
         prt,
         pname="prp1",
         filename=f"{prtname}_1.prp",
-        nreleasepts=len(releasepts),
-        packagedata=releasepts,
+        nreleasepts=len(releasepts_prt),
+        packagedata=releasepts_prt,
         perioddata={0: ["FIRST"]},
         track_filerecord=[prp_track_file],
         trackcsv_filerecord=[prp_track_csv_file],

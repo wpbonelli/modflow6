@@ -141,7 +141,7 @@ description is the number of particle release points.
 
 block packagedata
 name packagedata
-type recarray irptno cellid xrpt yrpt zrpt boundname
+type recarray irptno cellid xrpt yrpt zrpt boundname eventsetting
 shape (nreleasepts)
 reader urword
 longname
@@ -208,6 +208,61 @@ reader urword
 optional true
 longname release point name
 description REPLACE boundname {'{#1}': 'release-point'}
+
+block packagedata 
+name eventsetting
+type keystring all release transit timestep weaksink
+shape
+tagged false
+in_record true
+reader urword
+longname
+description event(s) upon which to record particle location
+
+block packagedata
+name all
+type keyword
+shape
+in_record true
+reader urword
+longname
+description keyword to indicate all particle events should be recorded
+
+block packagedata
+name release
+type keyword
+shape
+in_record true
+reader urword
+longname
+description keyword to indicate particle release events should be recorded
+
+block packagedata
+name transit
+type keyword
+shape
+in_record true
+reader urword
+longname
+description keyword to indicate particle transitions between cells should be recorded
+
+block packagedata
+name timestep
+type keyword
+shape
+in_record true
+reader urword
+longname
+description keyword to indicate time step ending events should be recorded
+
+block packagedata
+name weaksink
+type keyword
+shape
+in_record true
+reader urword
+longname
+description keyword to enable recording when particles exit weak sink cells
 
 # --------------------- prt prp period ---------------------
 

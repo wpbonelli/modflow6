@@ -1230,6 +1230,12 @@
 | PRT | PRP | PACKAGEDATA | YRPT | DOUBLE PRECISION | real value that defines the y coordinate of the release point in model coordinates.  The (x, y, z) location specified for the release point must lie within the cell that corresponds to the specified cellid. |
 | PRT | PRP | PACKAGEDATA | ZRPT | DOUBLE PRECISION | real value that defines the z coordinate of the release point in model coordinates.  The (x, y, z) location specified for the release point must lie within the cell that corresponds to the specified cellid. |
 | PRT | PRP | PACKAGEDATA | BOUNDNAME | STRING | name of the release-point cell.  BOUNDNAME is an ASCII character variable that can contain as many as 40 characters.  If BOUNDNAME contains spaces in it, then the entire name must be enclosed within single quotes. |
+| PRT | PRP | PACKAGEDATA | EVENTSETTING | KEYSTRING | event(s) upon which to record particle location |
+| PRT | PRP | PACKAGEDATA | ALL | KEYWORD | keyword to indicate all particle events should be recorded |
+| PRT | PRP | PACKAGEDATA | RELEASE | KEYWORD | keyword to indicate particle release events should be recorded |
+| PRT | PRP | PACKAGEDATA | TRANSIT | KEYWORD | keyword to indicate particle transitions between cells should be recorded |
+| PRT | PRP | PACKAGEDATA | TIMESTEP | KEYWORD | keyword to indicate time step ending events should be recorded |
+| PRT | PRP | PACKAGEDATA | WEAKSINK | KEYWORD | keyword to enable recording when particles exit weak sink cells |
 | PRT | PRP | PERIOD | IPER | INTEGER | integer value specifying the stress period number for which the data specified in the PERIOD block apply. IPER must be less than or equal to NPER in the TDIS Package and greater than zero. The IPER value assigned to a stress period block must be greater than the IPER value assigned for the previous PERIOD block. The information specified in the PERIOD block applies only to that stress period. |
 | PRT | PRP | PERIOD | RELEASESETTING | KEYSTRING | specifies the steps at the start of which particles will be released.  The setting applies to all release points defined in PACKAGEDATA. |
 | PRT | PRP | PERIOD | ALL | KEYWORD | keyword to indicate release of particles at the start of all time steps in the period. |

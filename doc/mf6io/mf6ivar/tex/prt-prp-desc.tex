@@ -47,6 +47,26 @@
 
 \item \texttt{boundname}---name of the release-point cell.  BOUNDNAME is an ASCII character variable that can contain as many as 40 characters.  If BOUNDNAME contains spaces in it, then the entire name must be enclosed within single quotes.
 
+\item \texttt{eventsetting}---event(s) upon which to record particle location
+
+\begin{lstlisting}[style=blockdefinition]
+ALL
+RELEASE
+TRANSIT
+TIMESTEP
+WEAKSINK
+\end{lstlisting}
+
+\item \texttt{ALL}---keyword to indicate all particle events should be recorded
+
+\item \texttt{RELEASE}---keyword to indicate particle release events should be recorded
+
+\item \texttt{TRANSIT}---keyword to indicate particle transitions between cells should be recorded
+
+\item \texttt{TIMESTEP}---keyword to indicate time step ending events should be recorded
+
+\item \texttt{WEAKSINK}---keyword to enable recording when particles exit weak sink cells
+
 \end{description}
 \item \textbf{Block: PERIOD}
 

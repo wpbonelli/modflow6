@@ -34,7 +34,7 @@ import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 
-from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
+from prt_test_utils import check_budget_data, check_track_data, get_event, to_mp7_format
 
 
 # simulation/model names
@@ -70,7 +70,7 @@ porosity = 0.1
 releasepts = [
     # particle index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5)
+    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5, "ALL")
     for i in range(9)
 ]
 releasepts_mp7 = [
@@ -331,6 +331,11 @@ def test_prt_fmi04(idx, name, function_tmpdir, targets):
 
     # load mf6 pathline results
     mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
+
+    # todo:
+    # if event is ALL, output should be the same as MODPATH 7
+    # plus 1 datum for the particle traversing the weak sink.
+    # if event is WEAKSINK, expect only 1 datum in output
 
     # make sure all mf6 pathline data have correct model and PRP index (1)
     def all_equal(col, val):

@@ -228,9 +228,13 @@ contains
     integer(I4B), intent(in) :: reason
     integer(I4B), intent(in), optional :: level
 
-    ! -- If optional argument level is not present, track data will be added.
-    !    If optional argument level is present, check criteria.
-    if (present(level) .and. level .ne. 3) return ! kluge note: adds after each subcell-level track
+    ! -- Only save record if particle is configured for all events or
+    !    particle ievent matches provided reason for saving
+    if (.not. (particle%ievent == -1 .or. particle%ievent == reason)) return
+
+    ! -- If optional argument level is present and level isn't 3, return early
+    !    (kluge note: adds after each subcell-level track)
+    if (present(level) .and. level .ne. 3) return 
 
     ! save binary file(s) if enabled
     if (this%trackfile%iun > 0) &
