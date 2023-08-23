@@ -1,7 +1,7 @@
 module ParticleModule
 
   use KindModule, only: DP, I4B, LGP
-  use ConstantsModule, only: DZERO, DONE, LENMEMPATH
+  use ConstantsModule, only: DZERO, DONE, LENMEMPATH, LENCOMPONENTNAME
   use GlobalDataModule
   use UtilMiscModule, only: transform_coords, modify_transf
   implicit none
@@ -20,7 +20,16 @@ module ParticleModule
     integer(I4B), public :: iprp ! index of release package the particle originated in
     integer(I4B), public :: irpt ! index of release point in the particle release package the particle originated in
     integer(I4B), public :: ip ! index of particle in the particle list
+    ! character(len=LENCOMPONENTNAME), public :: name = '' ! optional particle label (need not be unique)
 
+    ! recording event option:
+    ! -1: ALL
+    ! 0: RELEASE
+    ! 1: TRANSIT
+    ! 2: TIMESTEP
+    ! 3: WEAKSINK
+    integer(I4B), public :: ievent
+    
     ! stop criteria
     integer(I4B), public :: istopweaksink ! weak sink option: 0 = do not stop, 1 = stop
     integer(I4B), public :: istopzone ! stop zone number
@@ -65,6 +74,15 @@ module ParticleModule
     integer(I4B), dimension(:), pointer, contiguous :: imdl ! index of model particle originated in
     integer(I4B), dimension(:), pointer, contiguous :: iprp ! index of release package the particle originated in
     integer(I4B), dimension(:), pointer, contiguous :: irpt ! index of release point in the particle release package the particle originated in
+    ! character(len=LENCOMPONENTNAME), dimension(:), pointer, contiguous :: name ! optional particle label
+
+    ! recording event option:
+    ! -1: ALL
+    ! 0: RELEASE
+    ! 1: TRANSIT
+    ! 2: TIMESTEP
+    ! 3: WEAKSINK
+    integer(I4B), dimension(:), pointer, contiguous :: ievent
 
     ! stopping criteria
     integer(I4B), dimension(:), pointer, contiguous :: istopweaksink ! weak sink option: 0 = do not stop, 1 = stop
@@ -128,6 +146,7 @@ contains
     call mem_allocate(this%imdl, np, 'PLIMDL', mempath)
     call mem_allocate(this%irpt, np, 'PLIRPT', mempath)
     call mem_allocate(this%iprp, np, 'PLIPRP', mempath)
+    ! call mem_allocate(this%name, LENCOMPONENTNAME, np, 'PLNAME', mempath)
     ! -- kluge todo: update mem_allocate to allow custom range of indices?
     !    e.g. here we want to allocate 0-4 for trackdomain levels, not 1-5
     allocate (this%iTrackingDomain(np, lmin:lmax))
@@ -142,6 +161,7 @@ contains
     call mem_allocate(this%trelease, np, 'PLTRELEASE', mempath)
     call mem_allocate(this%tstop, np, 'PLTSTOP', mempath)
     call mem_allocate(this%ttrack, np, 'PLTTRACK', mempath)
+    call mem_allocate(this%ievent, np, 'PLIEVENT', mempath)
     call mem_allocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
     call mem_allocate(this%istopzone, np, 'PLISTOPZONE', mempath)
     !
@@ -159,6 +179,7 @@ contains
     call mem_deallocate(this%imdl, 'PLIMDL', mempath)
     call mem_deallocate(this%iprp, 'PLIPRP', mempath)
     call mem_deallocate(this%irpt, 'PLIRPT', mempath)
+    ! call mem_deallocate(this%name, 'PLNAME', mempath)
     deallocate (this%iTrackingDomain)
     deallocate (this%iTrackingDomainBoundary)
     call mem_deallocate(this%icu, 'PLICU', mempath)
@@ -171,6 +192,7 @@ contains
     call mem_deallocate(this%trelease, 'PLTRELEASE', mempath)
     call mem_deallocate(this%tstop, 'PLTSTOP', mempath)
     call mem_deallocate(this%ttrack, 'PLTTRACK', mempath)
+    call mem_deallocate(this%ievent, 'PLIEVENT', mempath)
     call mem_deallocate(this%istopweaksink, 'PLISTOPWEAKSINK', mempath)
     call mem_deallocate(this%istopzone, 'PLISTOPZONE', mempath)
     !
@@ -191,6 +213,7 @@ contains
     call mem_reallocate(this%imdl, np, 'PLIMDL', mempath)
     call mem_reallocate(this%iprp, np, 'PLIPRP', mempath)
     call mem_reallocate(this%irpt, np, 'PLIRPT', mempath)
+    ! call mem_reallocate(this%name, LENCOMPONENTNAME, np, 'PLNAME', mempath)
     call mem_reallocate(this%icu, np, 'PLICU', mempath)
     call mem_reallocate(this%ilay, np, 'PLILAY', mempath)
     call mem_reallocate(this%izone, np, 'PLIZONE', mempath)
@@ -201,6 +224,7 @@ contains
     call mem_reallocate(this%trelease, np, 'PLTRELEASE', mempath)
     call mem_reallocate(this%tstop, np, 'PLTSTOP', mempath)
     call mem_reallocate(this%ttrack, np, 'PLTTRACK', mempath)
+    call mem_reallocate(this%ievent, np, 'PLIEVENT', mempath)
     call mem_reallocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
     call mem_reallocate(this%istopzone, np, 'PLISTOPZONE', mempath)
     !
@@ -234,6 +258,8 @@ contains
     this%iprp = iprp
     this%irpt = partlist%irpt(ip) ! kluge note: necessary to reset this here?
     this%ip = ip
+    ! this%name = partlist%name(ip)
+    this%ievent = partlist%ievent(ip)
     this%istopweaksink = partlist%istopweaksink(ip)
     this%istopzone = partlist%istopzone(ip)
     this%iTrackingDomain(levelMin:levelMax) = &

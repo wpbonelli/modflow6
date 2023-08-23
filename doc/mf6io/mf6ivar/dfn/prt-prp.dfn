@@ -141,7 +141,7 @@ description is the number of particle release points.
 
 block packagedata
 name packagedata
-type recarray irptno cellid xrpt yrpt zrpt boundname
+type recarray irptno cellid xrpt yrpt zrpt boundname event
 shape (nreleasepts)
 reader urword
 longname
@@ -208,6 +208,17 @@ reader urword
 optional true
 longname release point name
 description REPLACE boundname {'{#1}': 'release-point'}
+
+block packagedata
+name event
+type string
+shape
+in_record true
+reader urword
+tagged false
+optional true
+longname recording event(s)
+description particle event(s) to record.  Can be ALL, RELEASE, TRANSIT, TIMESTEP, or WEAKSINK.
 
 # --------------------- prt prp period ---------------------
 

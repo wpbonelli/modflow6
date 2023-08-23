@@ -1,5 +1,5 @@
 BEGIN PACKAGEDATA
-  <irptno> <cellid(ncelldim)> <xrpt> <yrpt> <zrpt> [<boundname>]
-  <irptno> <cellid(ncelldim)> <xrpt> <yrpt> <zrpt> [<boundname>]
+  <irptno> <cellid(ncelldim)> <xrpt> <yrpt> <zrpt> [<boundname>] [<event>]
+  <irptno> <cellid(ncelldim)> <xrpt> <yrpt> <zrpt> [<boundname>] [<event>]
   ...
 END PACKAGEDATA

@@ -18,6 +18,9 @@ and top right corners.
 Particles are released from the top left cell.
 
 Results are compared against a MODPATH 7 model.
+
+This test case also configures recording events
+to check that they can be explicitly specified.
 """
 
 
@@ -28,10 +31,11 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 
-from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
+from prt_test_utils import check_budget_data, check_track_data, get_event, to_mp7_format
 
 
 # simulation/model names
@@ -39,6 +43,15 @@ simname = "prtfmi02"
 gwfname = f"{simname}_gwf"
 prtname = f"{simname}_prt"
 mp7name = f"{simname}_mp7"
+
+# test cases
+ex = [
+    f"{simname}all",
+    f"{simname}rel",
+    f"{simname}trst",
+    f"{simname}tstp",
+    f"{simname}wksk",
+]
 
 # output file names
 gwf_budget_file = f"{gwfname}.bud"
@@ -64,13 +77,13 @@ porosity = 0.1
 releasepts_a = [
     # index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5)
+    [i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5]
     for i in range(4)
 ]
 releasepts_b = [
     # index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 5}"), float(f"9.{i + 5}"), 0.5)
+    [i, 0, 0, 0, float(f"0.{i + 5}"), float(f"9.{i + 5}"), 0.5]
     for i in range(5)
 ]
 releasepts_mp7_a = [
@@ -93,10 +106,10 @@ idomain[0, 9, 0] = 0
 # idomain = idomain.ravel()
 
 
-def build_gwf_sim(ws, mf6):
+def build_gwf_sim(idx, ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=simname,
+        sim_name=ex[idx],
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -161,10 +174,11 @@ def build_gwf_sim(ws, mf6):
     return sim
 
 
-def build_prt_sim(ws, mf6):
+def build_prt_sim(idx, ws, mf6):
     # create simulation
+    name = ex[idx]
     sim = flopy.mf6.MFSimulation(
-        sim_name=simname,
+        sim_name=name,
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -196,20 +210,25 @@ def build_prt_sim(ws, mf6):
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
 
     # create prp packages
+    event = get_event(name)
+    rpts_a = [r + [event] for r in releasepts_a]
+    rpts_b = [r + [event] for r in releasepts_b]
+    print(rpts_a)
+    print(rpts_b)
     flopy.mf6.ModflowPrtprp(
         prt,
-        pname="prp",
+        pname="prp_a",
         filename=f"{prtname}_a.prp",
-        nreleasepts=len(releasepts_a),
-        packagedata=releasepts_a,
+        nreleasepts=len(rpts_a),
+        packagedata=rpts_a,
         perioddata={0: ["FIRST"]},
     )
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp_b",
         filename=f"{prtname}_b.prp",
-        nreleasepts=len(releasepts_b),
-        packagedata=releasepts_b,
+        nreleasepts=len(rpts_b),
+        packagedata=rpts_b,
         perioddata={0: ["FIRST"]},
     )
 
@@ -290,18 +309,27 @@ def build_mp7_sim(ws, mp7, gwf):
     return mp
 
 
-def test_prt_fmi02(function_tmpdir, targets):
+@pytest.mark.parametrize("idx, name", enumerate(ex))
+def test_prt_fmi02(idx, name, function_tmpdir, targets):
     ws = function_tmpdir
 
     # build mf6 simulations
-    gwfsim = build_gwf_sim(ws, targets.mf6)
-    prtsim = build_prt_sim(ws, targets.mf6)
+    gwfsim = build_gwf_sim(idx, ws, targets.mf6)
+    prtsim = build_prt_sim(idx, ws, targets.mf6)
 
-    # run mf6 simulations
-    for sim in [gwfsim, prtsim]:
-        sim.write_simulation()
-        success, _ = sim.run_simulation()
-        assert success
+    # write mf6 simulation input files
+    gwfsim.write_simulation()
+    
+    # run mf6 gwf simulation
+    success, _ = gwfsim.run_simulation()
+    assert success
+
+    # write mf6 prt simulation input files
+    prtsim.write_simulation()
+
+    # run mf6 prt simulation
+    success, _ = prtsim.run_simulation()
+    assert success
 
     # extract models
     gwf = gwfsim.get_model(gwfname)
@@ -341,7 +369,24 @@ def test_prt_fmi02(function_tmpdir, targets):
     # load mf6 pathline results
     mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
 
-    # make sure mf7 pathline data have correct
+    # if event is ALL, output should be the same as MODPATH 7,
+    # so continue with comparisons.
+    # if event is RELEASE, expect 1 location for each particle.
+    # if event is TRANSIT, expect full results minus start loc.
+    # if event is TIMESTEP or WEAKSINK, output should be empty.
+    # in either case, return early and skip MP7 comparison.
+    event = get_event(ex[idx])
+    if event == "RELEASE":
+        assert len(mf6_pldata) == len(releasepts_a) + len(releasepts_b)
+        return
+    elif event == "TRANSIT":
+        assert len(mf6_pldata) == (len(mp7_pldata) - 2 * (len(releasepts_a) + len(releasepts_b)))
+        return
+    elif event == "TIMESTEP" or event == "WEAKSINK":
+        assert len(mf6_pldata) == 0
+        return
+
+    # make sure mf6 pathline data have correct
     #   - model index (1)
     #   - PRP index (1 or 2, depending on release point index)
     def all_equal(col, val):
@@ -365,6 +410,9 @@ def test_prt_fmi02(function_tmpdir, targets):
         track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
         track_csv=ws / prt_track_csv_file,
     )
+
+    # check that particle names are particle indices
+    # assert len(mf6_pldata) == len(mf6_pldata[mf6_pldata['irpt'].astype(str).eq(mf6_pldata['name'])])
 
     # get head, budget, and spdis results from GWF model
     hds = HeadFile(ws / gwf_head_file).get_data()

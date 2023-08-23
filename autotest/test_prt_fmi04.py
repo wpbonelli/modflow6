@@ -332,6 +332,11 @@ def test_prt_fmi04(idx, name, function_tmpdir, targets):
     # load mf6 pathline results
     mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
 
+    # todo:
+    # if event is ALL, output should be the same as MODPATH 7
+    # plus 1 datum for the particle traversing the weak sink.
+    # if event is WEAKSINK, expect only 1 datum in output
+
     # make sure all mf6 pathline data have correct model and PRP index (1)
     def all_equal(col, val):
         a = col.to_numpy()
