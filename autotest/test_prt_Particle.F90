@@ -24,9 +24,8 @@ contains
     p%iprp = 1
     p%irpt = 1
     p%trelease = 0.0
-    p%name = 'testparticle'
     print *, "Particle ID: ", get_particle_id(p)
-    call check(error, get_particle_id(p) == "1-1-1-0.-testparticle    ")
+    call check(error, get_particle_id(p) == "1-1-1-0.")
 
   end subroutine test_get_particle_id
 
@@ -53,7 +52,6 @@ contains
     call check(error, size(partlist%imdl) == npartmax1)
     call check(error, size(partlist%iprp) == npartmax1)
     call check(error, size(partlist%irpt) == npartmax1)
-    call check(error, size(partlist%name) == npartmax1)
     call check(error, size(partlist%ievent) == npartmax1)
     call check(error, size(partlist%istopweaksink) == npartmax1)
     call check(error, size(partlist%istopzone) == npartmax1)
@@ -80,7 +78,6 @@ contains
     call check(error, size(partlist%imdl) == npartmax2)
     call check(error, size(partlist%iprp) == npartmax2)
     call check(error, size(partlist%irpt) == npartmax2)
-    call check(error, size(partlist%name) == npartmax2)
     call check(error, size(partlist%ievent) == npartmax2)
     call check(error, size(partlist%istopweaksink) == npartmax2)
     call check(error, size(partlist%istopzone) == npartmax2)

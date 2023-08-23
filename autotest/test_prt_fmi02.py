@@ -31,6 +31,7 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 
@@ -42,6 +43,16 @@ simname = "prtfmi02"
 gwfname = f"{simname}_gwf"
 prtname = f"{simname}_prt"
 mp7name = f"{simname}_mp7"
+
+# test cases
+ex = [
+    f"{simname}all",
+    f"{simname}rel",
+    f"{simname}trst",
+    f"{simname}tstp",
+    f"{simname}wksk",
+    f"{simname}term",
+]
 
 # output file names
 gwf_budget_file = f"{gwfname}.bud"
@@ -67,13 +78,13 @@ porosity = 0.1
 releasepts_a = [
     # index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5, "ALL")
+    [i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5]
     for i in range(4)
 ]
 releasepts_b = [
     # index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 5}"), float(f"9.{i + 5}"), 0.5, "ALL")
+    [i, 0, 0, 0, float(f"0.{i + 5}"), float(f"9.{i + 5}"), 0.5]
     for i in range(5)
 ]
 releasepts_mp7_a = [
@@ -96,10 +107,10 @@ idomain[0, 9, 0] = 0
 # idomain = idomain.ravel()
 
 
-def build_gwf_sim(ws, mf6):
+def build_gwf_sim(idx, ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=simname,
+        sim_name=ex[idx],
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -164,10 +175,11 @@ def build_gwf_sim(ws, mf6):
     return sim
 
 
-def build_prt_sim(ws, mf6):
+def build_prt_sim(idx, ws, mf6):
     # create simulation
+    name = ex[idx]
     sim = flopy.mf6.MFSimulation(
-        sim_name=simname,
+        sim_name=name,
         exe_name=mf6,
         version="mf6",
         sim_ws=ws,
@@ -199,20 +211,37 @@ def build_prt_sim(ws, mf6):
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
 
     # create prp packages
+    event = (
+        "ALL"
+        if "all" in name
+        else "RELEASE"
+        if "rel" in name
+        else "TRANSIT"
+        if "trst" in name
+        else "TIMESTEP"
+        if "tstp" in name
+        else "WEAKSINK"
+        if "wksk" in name
+        else "TERMINATE"
+        if "term" in name
+        else "ALL" # default
+    )
+    rpts_a = [r + [event] for r in releasepts_a]
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp",
         filename=f"{prtname}_a.prp",
-        nreleasepts=len(releasepts_a),
-        packagedata=releasepts_a,
+        nreleasepts=len(rpts_a),
+        packagedata=rpts_a,
         perioddata={0: ["FIRST"]},
     )
+    rpts_b = [r + [event] for r in releasepts_b]
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp_b",
         filename=f"{prtname}_b.prp",
-        nreleasepts=len(releasepts_b),
-        packagedata=releasepts_b,
+        nreleasepts=len(rpts_b),
+        packagedata=rpts_b,
         perioddata={0: ["FIRST"]},
     )
 
@@ -293,12 +322,13 @@ def build_mp7_sim(ws, mp7, gwf):
     return mp
 
 
-def test_prt_fmi02(function_tmpdir, targets):
+@pytest.mark.parametrize("idx, name", enumerate(ex))
+def test_prt_fmi02(idx, name, function_tmpdir, targets):
     ws = function_tmpdir
 
     # build mf6 simulations
-    gwfsim = build_gwf_sim(ws, targets.mf6)
-    prtsim = build_prt_sim(ws, targets.mf6)
+    gwfsim = build_gwf_sim(idx, ws, targets.mf6)
+    prtsim = build_prt_sim(idx, ws, targets.mf6)
 
     # run mf6 simulations
     for sim in [gwfsim, prtsim]:

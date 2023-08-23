@@ -906,35 +906,33 @@ contains
         bndName = 'PRP'//cno
         !
         ! ! -- todo read particle release point name from file
-        if (this%inamedbound /= 0) then
-          call this%parser%GetStringCaps(bndNameTemp)
-          if (bndNameTemp /= '') then
-            bndName = bndNameTemp
-          end if
-        end if
+        ! if (this%inamedbound /= 0) then
+        !   call this%parser%GetStringCaps(bndNameTemp)
+        !   if (bndNameTemp /= '') then
+        !     bndName = bndNameTemp
+        !   end if
+        ! end if
         !
         nametxt(n) = bndName
         !
         ! -- parse and set recording event(s)
         call this%parser%GetStringCaps(event)
-        select case (event)
+        select case (trim(adjustl(event)))
         case ('')
-          ievent(n) = 1
+          ievent(n) = -1
         case ('ALL')
-          ievent(n) = 0
+          ievent(n) = -1
         case ('RELEASE')
-          ievent(n) = 1
+          ievent(n) = 0
         case ('TRANSIT')
-          ievent(n) = 2
+          ievent(n) = 1
         case ('TIMESTEP')
-          ievent(n) = 3
+          ievent(n) = 2
         case ('WEAKSINK')
-          ievent(n) = 4
-        case ('TERMINATE')
-          ievent(n) = 5
+          ievent(n) = 3
         case default
           write (errmsg, '(2a)') &
-            'Looking for ALL, RELEASE, TRANSIT, TIMESTEP, SEAKSINK, or TERMINATE. Found: ', &
+            'Looking for ALL, RELEASE, TRANSIT, TIMESTEP, or WEAKSINK. Found: ', &
             trim(adjustl(event))
           call store_error(errmsg, terminate=.TRUE.)
         end select

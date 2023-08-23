@@ -20,15 +20,14 @@ module ParticleModule
     integer(I4B), public :: iprp ! index of release package the particle originated in
     integer(I4B), public :: irpt ! index of release point in the particle release package the particle originated in
     integer(I4B), public :: ip ! index of particle in the particle list
-    character(len=LENCOMPONENTNAME), public :: name = '' ! optional particle label (need not be unique)
+    ! character(len=LENCOMPONENTNAME), public :: name = '' ! optional particle label (need not be unique)
 
     ! recording event option:
-    ! 0: ALL
-    ! 1: RELEASE
-    ! 2: TRANSIT
-    ! 3: TIMESTEP
-    ! 4: WEAKSINK
-    ! 5: TERMINATE
+    ! -1: ALL
+    ! 0: RELEASE
+    ! 1: TRANSIT
+    ! 2: TIMESTEP
+    ! 3: WEAKSINK
     integer(I4B), public :: ievent
     
     ! stop criteria
@@ -75,15 +74,14 @@ module ParticleModule
     integer(I4B), dimension(:), pointer, contiguous :: imdl ! index of model particle originated in
     integer(I4B), dimension(:), pointer, contiguous :: iprp ! index of release package the particle originated in
     integer(I4B), dimension(:), pointer, contiguous :: irpt ! index of release point in the particle release package the particle originated in
-    character(len=LENCOMPONENTNAME), dimension(:), pointer, contiguous :: name ! optional particle label
+    ! character(len=LENCOMPONENTNAME), dimension(:), pointer, contiguous :: name ! optional particle label
 
     ! recording event option:
-    ! 0: ALL
-    ! 1: RELEASE
-    ! 2: TRANSIT
-    ! 3: TIMESTEP
-    ! 4: WEAKSINK
-    ! 5: TERMINATE
+    ! -1: ALL
+    ! 0: RELEASE
+    ! 1: TRANSIT
+    ! 2: TIMESTEP
+    ! 3: WEAKSINK
     integer(I4B), dimension(:), pointer, contiguous :: ievent
 
     ! stopping criteria
@@ -148,7 +146,7 @@ contains
     call mem_allocate(this%imdl, np, 'PLIMDL', mempath)
     call mem_allocate(this%irpt, np, 'PLIRPT', mempath)
     call mem_allocate(this%iprp, np, 'PLIPRP', mempath)
-    call mem_allocate(this%name, LENCOMPONENTNAME, np, 'PLNAME', mempath)
+    ! call mem_allocate(this%name, LENCOMPONENTNAME, np, 'PLNAME', mempath)
     ! -- kluge todo: update mem_allocate to allow custom range of indices?
     !    e.g. here we want to allocate 0-4 for trackdomain levels, not 1-5
     allocate (this%iTrackingDomain(np, lmin:lmax))
@@ -181,7 +179,7 @@ contains
     call mem_deallocate(this%imdl, 'PLIMDL', mempath)
     call mem_deallocate(this%iprp, 'PLIPRP', mempath)
     call mem_deallocate(this%irpt, 'PLIRPT', mempath)
-    call mem_deallocate(this%name, 'PLNAME', mempath)
+    ! call mem_deallocate(this%name, 'PLNAME', mempath)
     deallocate (this%iTrackingDomain)
     deallocate (this%iTrackingDomainBoundary)
     call mem_deallocate(this%icu, 'PLICU', mempath)
@@ -215,7 +213,7 @@ contains
     call mem_reallocate(this%imdl, np, 'PLIMDL', mempath)
     call mem_reallocate(this%iprp, np, 'PLIPRP', mempath)
     call mem_reallocate(this%irpt, np, 'PLIRPT', mempath)
-    call mem_reallocate(this%name, LENCOMPONENTNAME, np, 'PLNAME', mempath)
+    ! call mem_reallocate(this%name, LENCOMPONENTNAME, np, 'PLNAME', mempath)
     call mem_reallocate(this%icu, np, 'PLICU', mempath)
     call mem_reallocate(this%ilay, np, 'PLILAY', mempath)
     call mem_reallocate(this%izone, np, 'PLIZONE', mempath)
@@ -260,7 +258,7 @@ contains
     this%iprp = iprp
     this%irpt = partlist%irpt(ip) ! kluge note: necessary to reset this here?
     this%ip = ip
-    this%name = partlist%name(ip)
+    ! this%name = partlist%name(ip)
     this%ievent = partlist%ievent(ip)
     this%istopweaksink = partlist%istopweaksink(ip)
     this%istopzone = partlist%istopzone(ip)
@@ -412,8 +410,8 @@ contains
     class(ParticleType), intent(in) :: particle
     character(len=LENMEMPATH) :: id
     !
-    write (id, '(I0,"-",I0,"-",I0,"-",F0.0,"-",16A)') &
-      particle%imdl, particle%iprp, particle%irpt, particle%trelease, particle%name
+    write (id, '(I0,"-",I0,"-",I0,"-",F0.0)') &
+      particle%imdl, particle%iprp, particle%irpt, particle%trelease
     !
     return
   end function get_particle_id

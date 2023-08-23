@@ -43,11 +43,11 @@ module TrackDataModule
 
   character(len=*), parameter, public :: TRACKHEADERS = &
                 'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,istatus,ireason,&
-                &trelease,t,x,y,z,name'
+                &trelease,t,x,y,z'
 
   character(len=*), parameter, public :: TRACKTYPES = &
                              '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
-                             &<f8,<f8,<f8,<f8,<f8,|S16'
+                             &<f8,<f8,<f8,<f8,<f8'
 
   ! Notes
   ! -----
@@ -191,8 +191,7 @@ contains
         particle%ttrack, &
         xmodel, &
         ymodel, &
-        zmodel, &
-        particle%name
+        zmodel
     else
       write (iun) &
         kper, &
@@ -209,8 +208,7 @@ contains
         particle%ttrack, &
         xmodel, &
         ymodel, &
-        zmodel, &
-        particle%name
+        zmodel
     end if
 
   end subroutine
@@ -230,9 +228,13 @@ contains
     integer(I4B), intent(in) :: reason
     integer(I4B), intent(in), optional :: level
 
-    ! -- If optional argument level is not present, track data will be added.
-    !    If optional argument level is present, check criteria.
-    if (present(level) .and. level .ne. 3) return ! kluge note: adds after each subcell-level track
+    ! -- Only save record if particle is configured for all events or
+    !    particle ievent matches provided reason for saving
+    if (.not. (particle%ievent == -1 .or. particle%ievent == reason)) return
+
+    ! -- If optional argument level is present and level isn't 3, return early
+    !    (kluge note: adds after each subcell-level track)
+    if (present(level) .and. level .ne. 3) return 
 
     ! save binary file(s) if enabled
     if (this%trackfile%iun > 0) &
