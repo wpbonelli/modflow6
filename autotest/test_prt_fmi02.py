@@ -18,6 +18,9 @@ and top right corners.
 Particles are released from the top left cell.
 
 Results are compared against a MODPATH 7 model.
+
+This test case also configures recording events
+to check that they can be explicitly specified.
 """
 
 
@@ -64,13 +67,13 @@ porosity = 0.1
 releasepts_a = [
     # index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5)
+    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5, "ALL")
     for i in range(4)
 ]
 releasepts_b = [
     # index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 5}"), float(f"9.{i + 5}"), 0.5)
+    (i, 0, 0, 0, float(f"0.{i + 5}"), float(f"9.{i + 5}"), 0.5, "ALL")
     for i in range(5)
 ]
 releasepts_mp7_a = [
@@ -365,6 +368,9 @@ def test_prt_fmi02(function_tmpdir, targets):
         track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
         track_csv=ws / prt_track_csv_file,
     )
+
+    # check that particle names are particle indices
+    # assert len(mf6_pldata) == len(mf6_pldata[mf6_pldata['irpt'].astype(str).eq(mf6_pldata['name'])])
 
     # get head, budget, and spdis results from GWF model
     hds = HeadFile(ws / gwf_head_file).get_data()

@@ -39,6 +39,8 @@ def check_track_data(
     # check each column separately to avoid:
     # TypeError: The DType <class 'numpy._FloatAbstractDType'> could not be promoted by <class 'numpy.dtype[void]'>
     for k in data_bin.dtype.names:
+        if k == 'name':
+            continue
         assert np.allclose(data_bin[k], data_csv[k], equal_nan=True)
 
     # make sure columns all have values in the expected range

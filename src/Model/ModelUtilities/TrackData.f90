@@ -43,11 +43,11 @@ module TrackDataModule
 
   character(len=*), parameter, public :: TRACKHEADERS = &
                 'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,istatus,ireason,&
-                &trelease,t,x,y,z'
+                &trelease,t,x,y,z,name'
 
   character(len=*), parameter, public :: TRACKTYPES = &
                              '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
-                             &<f8,<f8,<f8,<f8,<f8'
+                             &<f8,<f8,<f8,<f8,<f8,|S16'
 
   ! Notes
   ! -----
@@ -191,7 +191,8 @@ contains
         particle%ttrack, &
         xmodel, &
         ymodel, &
-        zmodel
+        zmodel, &
+        particle%name
     else
       write (iun) &
         kper, &
@@ -208,7 +209,8 @@ contains
         particle%ttrack, &
         xmodel, &
         ymodel, &
-        zmodel
+        zmodel, &
+        particle%name
     end if
 
   end subroutine
