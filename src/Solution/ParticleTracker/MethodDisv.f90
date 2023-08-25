@@ -82,7 +82,7 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a DISV-grid method object
-  subroutine init(this, fmi, flowja, porosity, retfactor, izone, trackdata)
+  subroutine init(this, fmi, flowja, porosity, retfactor, izone, trackctl)
     ! -- dummy
     class(MethodDisvType), intent(inout) :: this
     type(PrtFmiType), pointer :: fmi
@@ -90,14 +90,14 @@ contains
     real(DP), dimension(:), pointer, contiguous :: porosity
     real(DP), dimension(:), pointer, contiguous :: retfactor
     integer(I4B), dimension(:), pointer, contiguous :: izone
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
     !
     this%fmi => fmi
     this%flowja => flowja
     this%porosity => porosity
     this%retfactor => retfactor
     this%izone => izone
-    this%trackdata => trackdata
+    this%trackctl => trackctl
     !
     return
     !
@@ -127,20 +127,20 @@ contains
       ! -- Cell is active but dry, so select and initialize pass-to-bottom
       ! -- cell method and set cell method pointer
       call methodCellPassToBot%init(particle, this%cellPoly%cellDefn, &
-                                    this%trackdata)
+                                    this%trackctl)
       submethod => methodCellPassToBot
     else
       ! -- Select and initialize cell method and set cell method pointer
       if (this%cellPoly%cellDefn%canBeCellRect) then
         call CellPolyToCellRect(this%cellPoly, cellRect, istatus)
-        call methodCellPollock%init(particle, cellRect, this%trackdata)
+        call methodCellPollock%init(particle, cellRect, this%trackctl)
         submethod => methodCellPollock
       else if (this%cellPoly%cellDefn%canBeCellRectQuad) then
         call CellPolyToCellRectQuad(this%cellPoly, cellRectQuad, istatus)
-        call methodCellPollockQuad%init(particle, cellRectQuad, this%trackdata)
+        call methodCellPollockQuad%init(particle, cellRectQuad, this%trackctl)
         submethod => methodCellPollockQuad
       else
-        call methodCellTernary%init(particle, this%cellPoly, this%trackdata)
+        call methodCellTernary%init(particle, this%cellPoly, this%trackctl)
         submethod => methodCellTernary
       end if
     end if
@@ -174,8 +174,8 @@ contains
       ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
       particle%istatus = 2 ! kluge note: use -2 to check for transfer to another model???
       particle%advancing = .false.
-      call this%trackdata%save_record(particle, kper=kper, &
-                                      kstp=kstp, reason=3) ! reason=3: termination
+      call this%trackctl%save_record(particle, kper=kper, &
+                                     kstp=kstp, reason=3) ! reason=3: termination
       ! particle%iTrackingDomainBoundary(2) = -1
     else
       idiag = this%fmi%dis%con%ia(this%cellPoly%cellDefn%icell)

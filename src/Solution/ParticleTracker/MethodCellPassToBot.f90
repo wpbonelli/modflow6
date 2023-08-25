@@ -55,18 +55,18 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a pass-to-bottom cell-method object
-  subroutine init(this, particle, cellDefn, trackdata)
+  subroutine init(this, particle, cellDefn, trackctl)
     ! -- dummy
     class(MethodCellPassToBotType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(cellDefnType), pointer, intent(in) :: cellDefn
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
     !
     ! -- Set pointer to cell definition
     this%cellDefn => cellDefn
     !
     ! -- Set pointer to model track data
-    this%trackdata => trackdata
+    this%trackctl => trackctl
     !
     return
     !
@@ -93,9 +93,9 @@ contains
     particle%z = this%cellDefn%bot
     particle%iTrackingDomainBoundary(2) = this%cellDefn%npolyverts + 2
     !
-    ! -- Store track data
-    call this%trackdata%save_record(particle, kper=kper, &
-                                    kstp=kstp, reason=1)
+    ! -- Store particle track record
+    call this%trackctl%save_record(particle, kper=kper, &
+                                   kstp=kstp, reason=1) ! reason=1: cell transition
     !
     return
     !

@@ -13,8 +13,8 @@ module MethodModule
   type, abstract :: MethodType
     ! private
     character(len=40), pointer, public :: trackingDomainType ! character string that names the tracking domain type
-    logical, public :: delegatesTracking
-    type(TrackControlType), pointer :: trackdata
+    logical, public :: delegatesTracking ! whether the method delegates tracking to an internal method
+    type(TrackControlType), pointer :: trackctl ! the track output control object
   contains
     ! -- Implemented in all tracking methods
     procedure(apply), deferred :: apply ! applies the method
@@ -45,8 +45,6 @@ contains
 
   !> @brief Track particle across subdomains
   recursive subroutine subtrack(this, particle, level, tmax)
-    ! modules
-    use TdisModule, only: kper, kstp
     ! dummy
     class(MethodType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
@@ -74,11 +72,6 @@ contains
 
       ! -- Advance particle
       call advance(this, particle, levelNext, submethod, advancing)
-
-      ! -- Store particle trackdata as appropriate
-      call submethod%trackdata%save_record(particle, &
-                                           kper=kper, kstp=kstp, &
-                                           reason=1, level=levelNext)
     end do
     !
     return
@@ -164,23 +157,23 @@ contains
       if (particle%istopzone .eq. celldefn%izone) then
         particle%advancing = .false.
         particle%istatus = 6
-        call this%trackdata%save_record(particle, kper=kper, &
-                                        kstp=kstp, reason=3) ! reason=3: termination
+        call this%trackctl%save_record(particle, kper=kper, &
+                                       kstp=kstp, reason=3) ! reason=3: termination
       end if
     else if (celldefn%inoexitface .ne. 0) then
       particle%advancing = .false.
       particle%istatus = 5
-      call this%trackdata%save_record(particle, kper=kper, &
-                                      kstp=kstp, reason=3) ! reason=3: termination
+      call this%trackctl%save_record(particle, kper=kper, &
+                                     kstp=kstp, reason=3) ! reason=3: termination
     else if (celldefn%iweaksink .ne. 0) then
       if (particle%istopweaksink .ne. 0) then
         particle%advancing = .false.
         particle%istatus = 3
-        call this%trackdata%save_record(particle, kper=kper, &
-                                        kstp=kstp, reason=3) ! reason=3: termination
+        call this%trackctl%save_record(particle, kper=kper, &
+                                       kstp=kstp, reason=3) ! reason=3: termination
       else
-        call this%trackdata%save_record(particle, kper=kper, &
-                                        kstp=kstp, reason=4) ! reason=4: exited weak sink
+        call this%trackctl%save_record(particle, kper=kper, &
+                                       kstp=kstp, reason=4) ! reason=4: exited weak sink
       end if
     end if
 

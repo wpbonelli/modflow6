@@ -60,7 +60,7 @@ module PrtPrpModule
     integer(I4B), pointer :: itrkout => null()
     integer(I4B), pointer :: itrkhdr => null()
     integer(I4B), pointer :: itrkcsv => null()
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
 
   contains
 
@@ -176,16 +176,16 @@ contains
 
   !> @ brief Set pointers to model variables
   !<
-  subroutine prp_set_pointers(this, ibound, izone, trackdata)
+  subroutine prp_set_pointers(this, ibound, izone, trackctl)
     ! -- dummy variables
     class(PrtPrpType) :: this
     integer(I4B), dimension(:), pointer, contiguous :: ibound
     integer(I4B), dimension(:), pointer, contiguous :: izone
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
     !
     this%ibound => ibound
     this%izone => izone
-    this%trackdata => trackdata
+    this%trackctl => trackctl
     !
     return
   end subroutine prp_set_pointers

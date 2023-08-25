@@ -65,18 +65,18 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a Pollock's cell-method object
-  subroutine init(this, particle, cellRect, trackdata)
+  subroutine init(this, particle, cellRect, trackctl)
     ! -- dummy
     class(MethodCellPollockType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellRectType), pointer, intent(in) :: cellRect
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
     !
     ! -- Set pointer to cell definition
     this%cellRect => cellRect
     !
-    ! -- Set pointer to model track data
-    this%trackdata => trackdata
+    ! -- Set pointer to model track output control
+    this%trackctl => trackctl
     !
     return
     !
@@ -94,7 +94,7 @@ contains
     call this%load_subcell(particle, levelNext, this%subcellRect)
     ! -- Select and initialize Pollock's subcell method and set subcell
     ! -- method pointer
-    call methodSubcellPollock%init(this%subcellRect, this%trackdata)
+    call methodSubcellPollock%init(this%subcellRect, this%trackctl)
     submethod => methodSubcellPollock
     !
     return
@@ -163,12 +163,12 @@ contains
     !
     ! -- If the particle is above the top of the cell (which is presumed to
     ! -- represent a water table above the cell bottom), pass the particle
-    ! -- vertically and instantaneously to the cell top elevation.
+    ! -- vertically and instantaneously to the cell top elevation and save
+    ! -- the particle state to output file(s).
     if (particle%z > this%cellRect%cellDefn%top) then
       particle%z = this%cellRect%cellDefn%top
-      ! -- Store track data
-      call this%trackdata%save_record(particle, kper=kper, &
-                                      kstp=kstp, reason=1)
+      call this%trackctl%save_record(particle, kper=kper, &
+                                     kstp=kstp, reason=1) ! reason=1: cell transition
     end if
     !
     ! -- Transform particle location into local cell coordinates.

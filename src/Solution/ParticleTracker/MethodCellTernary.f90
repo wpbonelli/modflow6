@@ -73,17 +73,17 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a ternary cell-method object
-  subroutine init(this, particle, cellPoly, trackdata)
+  subroutine init(this, particle, cellPoly, trackctl)
     ! -- dummy
     class(MethodCellTernaryType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellPolyType), pointer, intent(in) :: cellPoly
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
     !
     this%cellPoly => cellPoly
     !
-    ! -- Set pointer to model track data
-    this%trackdata => trackdata
+    ! -- Set pointer to model track output control
+    this%trackctl => trackctl
     !
     return
     !
@@ -100,7 +100,7 @@ contains
     ! -- Load subcell for injection into subcell method
     call this%load_subcell(particle, levelNext, this%subcellTri)
     ! -- Initialize subcell method and set subcell method pointer
-    call methodSubcellTernary%init(this%subcellTri, this%trackdata)
+    call methodSubcellTernary%init(this%subcellTri, this%trackctl)
     submethod => methodSubcellTernary
     !
     return
@@ -184,12 +184,12 @@ contains
     !
     ! -- If the particle is above the top of the cell (which is presumed to
     ! -- represent a water table above the cell bottom), pass the particle
-    ! -- vertically and instantaneously to the cell top elevation.
+    ! -- vertically and instantaneously to the cell top elevation and save
+    ! -- the particle state to output file(s).
     if (particle%z > this%cellPoly%cellDefn%top) then
       particle%z = this%cellPoly%cellDefn%top
-      ! -- Store track data
-      call this%trackdata%save_record(particle, kper=kper, &
-                                      kstp=kstp, reason=1)
+      call this%trackctl%save_record(particle, kper=kper, &
+                                     kstp=kstp, reason=1) ! reason=1: cell transition
     end if
     !
     npolyverts = this%cellPoly%cellDefn%npolyverts
@@ -264,6 +264,8 @@ contains
 
   !> @brief Loads the triangular subcell from the polygonal cell
   subroutine load_subcell(this, particle, levelNext, subcellTri)
+    ! -- modules
+    use ParticleModule, only: get_particle_id
     ! -- dummy
     class(MethodCellTernaryType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
@@ -320,13 +322,12 @@ contains
         end if
       end do
       if (isc .le. 0) then
-        ! kluge note: todo identify particle by "composite key" (not just irpt)
         write (*, '(A,I0,A,I0)') &
           "error -- initial triangle not found for particle ", &
-          particle%irpt, " in cell ", ic ! kluge
+          get_particle_id(particle), " in cell ", ic ! kluge
         write (69, '(A,I0,A,I0)') &
           "error -- initial triangle not found for particle ", &
-          particle%irpt, " in cell ", ic
+          get_particle_id(particle), " in cell ", ic
         ! pause
         stop
       else

@@ -23,6 +23,7 @@ module MethodSubcellTernaryModule
     procedure, public :: destroy ! destructor for the method
     procedure, public :: init ! initializes the method
     procedure, public :: apply => apply_mST ! applies ternary subcell tracking method
+    procedure, private :: track_sub
   end type MethodSubcellTernaryType
 
 contains
@@ -59,17 +60,17 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a ternary subcell-method object
-  subroutine init(this, subcellTri, trackdata)
+  subroutine init(this, subcellTri, trackctl)
     ! -- dummy
     class(MethodSubcellTernaryType), intent(inout) :: this
     type(SubcellTriType), pointer :: subcellTri
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
     !
     ! -- Set pointer to subcell definition
     this%subcellTri => subcellTri
     !
     ! -- Set pointer to particle track data
-    this%trackdata => trackdata
+    this%trackctl => trackctl
     !
     return
     !
@@ -82,17 +83,19 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
     !
-    call track_sub(this%subcellTri, particle, tmax)
+    call this%track_sub(this%subcellTri, particle, tmax)
     !
     return
     !
   end subroutine apply_mST
 
   !> @brief Track a particle across a triangular subcell using the ternary method
-  subroutine track_sub(subcellTri, particle, tmax) ! kluge note: rename???
+  subroutine track_sub(this, subcellTri, particle, tmax) ! kluge note: rename???
     ! modules
     use ParticleModule, only: get_particle_id
+    use TdisModule, only: kper, kstp
     ! dummy
+    class(MethodSubcellTernaryType), intent(inout) :: this
     class(SubcellTriType), intent(in) :: subcellTri
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
@@ -109,6 +112,7 @@ contains
     integer :: ntmax, nsave, isolv, itrifaceenter, itrifaceexit
     double precision :: diff, rdiff, tol, step, dtexit, alpexit, betexit
     integer :: ntdebug ! kluge
+    integer :: reason
     !
     lbary = .true. ! kluge
     ntmax = 10000
@@ -118,6 +122,7 @@ contains
     ! tol = 1d-7     ! adjustable
     tol = 1d-7
     step = 1e-3 ! needed only for euler
+    reason = -1
     !
     if (.not. allocated(ivert_polygon)) allocate (ivert_polygon(1, 4)) ! kluge, needed???
     ivert_polygon(1, 1) = 1
@@ -234,11 +239,13 @@ contains
       exitFace = 0
       particle%istatus = 1
       particle%advancing = .false.
+      reason = 2 ! timestep end
     else
       ! -- The computed exit time is less than or equal to the maximum time,
       ! -- so set final time for particle trajectory equal to exit time.
       t = texit
       dt = dtexit
+      reason = 1 ! cell transition
     end if
     !
     ! -- Calculate final particle location
@@ -286,6 +293,11 @@ contains
     ! write(*,'(4G)') x, y, z, dt                           ! kluge debug
     ! write(69,*) itopbotexit, itrifaceexit, exitFace       ! kluge debug
     ! write(69,'(4G)') x, y, z, dt                          ! kluge debug
+    !
+    ! -- Save particle track record
+    if (reason > -1) &
+      call this%trackctl%save_record(particle, kper=kper, &
+                                     kstp=kstp, reason=reason) ! reason=2: timestep
     !
     return
     !

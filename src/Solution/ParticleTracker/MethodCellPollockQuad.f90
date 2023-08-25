@@ -64,18 +64,18 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a Pollock's cell-quad-method object
-  subroutine init(this, particle, cellRectQuad, trackdata)
+  subroutine init(this, particle, cellRectQuad, trackctl)
     ! -- dummy
     class(MethodCellPollockQuadType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellRectQuadType), pointer, intent(in) :: cellRectQuad
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
     !
     ! -- Set pointer to cell definition
     this%cellRectQuad => cellRectQuad
     !
-    ! -- Set pointer to model track data
-    this%trackdata => trackdata
+    ! -- Set pointer to model track output control
+    this%trackctl => trackctl
     !
     return
     !
@@ -92,7 +92,7 @@ contains
     ! -- Load subcell for injection into subcell method
     call this%load_subcell(particle, levelNext, this%subcellRect)
     ! -- Initialize subcell method and set subcell method pointer
-    call methodSubcellPollock%init(this%subcellRect, this%trackdata)
+    call methodSubcellPollock%init(this%subcellRect, this%trackctl)
     submethod => methodSubcellPollock
     !
     return
@@ -249,8 +249,8 @@ contains
     ! -- the particle state to output file(s).
     if (particle%z > this%cellRectQuad%cellDefn%top) then
       particle%z = this%cellRectQuad%cellDefn%top
-      call this%trackdata%save_record(particle, kper=kper, &
-                                      kstp=kstp, reason=1)
+      call this%trackctl%save_record(particle, kper=kper, &
+                                     kstp=kstp, reason=1) ! reason=1: cell transition
     end if
     !
     ! -- Transform particle location into local cell coordinates.

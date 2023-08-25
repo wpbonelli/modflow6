@@ -19,6 +19,7 @@ module MethodSubcellPollockModule
     procedure, public :: destroy ! destructor for the method
     procedure, public :: init ! initializes the method
     procedure, public :: apply => apply_mSP ! applies Pollock's subcell method (tracks particle)
+    procedure, private :: track_sub
   end type MethodSubcellPollockType
 
 contains
@@ -52,17 +53,17 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a Pollock's subcell-method object
-  subroutine init(this, subcellRect, trackdata)
+  subroutine init(this, subcellRect, trackctl)
     ! -- dummy
     class(MethodSubcellPollockType), intent(inout) :: this
     type(SubcellRectType), pointer :: subcellRect
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
     !
     ! -- Set pointer to subcell definition
     this%subcellRect => subcellRect
     !
     ! -- Set pointer to particle track data
-    this%trackdata => trackdata
+    this%trackctl => trackctl
     !
     return
   end subroutine init
@@ -90,7 +91,7 @@ contains
     !
     ! -- Track the particle across the subcell
     ! call track_sub(this%subcellRect,particle,initialTime,maximumTime,t)
-    call track_sub(this%subcellRect, particle, tmax)
+    call this%track_sub(this%subcellRect, particle, tmax)
     !
     ! -- Transform particle location back to local cell coordinates
     call particle%transf_coords(xOrigin, yOrigin, invert_opt=.true.)
@@ -107,10 +108,12 @@ contains
   !! and for any modifications or errors.
   !!
   !<
-  subroutine track_sub(subcellRect, particle, tmax) ! kluge note: rename???
+  subroutine track_sub(this, subcellRect, particle, tmax) ! kluge note: rename???
     ! modules
     use ParticleModule, only: get_particle_id
+    use TdisModule, only: kper, kstp
     ! dummy
+    class(MethodSubcellPollockType), intent(inout) :: this
     class(SubcellRectType), intent(in) :: subcellRect
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
@@ -122,6 +125,9 @@ contains
     integer :: statusVX, statusVY, statusVZ
     doubleprecision :: initialX, initialY, initialZ
     integer :: exitFace
+    integer :: reason
+    !
+    reason = -1
     !
     ! -- Initial particle location in scaled subcell coordinates
     initialX = particle%x / subcellRect%dx
@@ -208,6 +214,7 @@ contains
       exitFace = 0
       particle%istatus = 1
       particle%advancing = .false.
+      reason = 2 ! timestep end
     else
       ! -- The computed exit time is less than or equal to the maximum time,
       ! -- so set final time for particle trajectory equal to exit time and
@@ -233,6 +240,7 @@ contains
         print *, "something went wrong in track_sub" ! kluge
         stop ! kluge
       end if
+      reason = 1 ! cell transition
     end if
     !
     ! -- Set final particle location in local (unscaled) subcell coordinates,
@@ -242,6 +250,11 @@ contains
     particle%z = z * subcellRect%dz
     particle%ttrack = t
     particle%iTrackingDomainBoundary(3) = exitFace
+    !
+    ! -- Save particle track record
+    if (reason > -1) &
+      call this%trackctl%save_record(particle, kper=kper, &
+                                     kstp=kstp, reason=reason)
     !
     return
     !

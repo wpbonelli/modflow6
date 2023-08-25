@@ -75,7 +75,7 @@ contains
   end subroutine destroy
 
   !> @brief Initialize a DIS-grid method object
-  subroutine init(this, fmi, flowja, porosity, retfactor, izone, trackdata)
+  subroutine init(this, fmi, flowja, porosity, retfactor, izone, trackctl)
     ! -- dummy
     class(MethodDisType), intent(inout) :: this
     type(PrtFmiType), pointer :: fmi
@@ -83,14 +83,14 @@ contains
     real(DP), dimension(:), pointer, contiguous :: porosity
     real(DP), dimension(:), pointer, contiguous :: retfactor
     integer(I4B), dimension(:), pointer, contiguous :: izone
-    type(TrackControlType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl
     !
     this%fmi => fmi
     this%flowja => flowja
     this%porosity => porosity
     this%retfactor => retfactor
     this%izone => izone
-    this%trackdata => trackdata
+    this%trackctl => trackctl
     !
     return
     !
@@ -121,7 +121,7 @@ contains
       ! -- Cell is active but dry, so select and initialize pass-to-bottom
       ! -- cell method and set cell method pointer
       call methodCellPassToBot%init(particle, this%cellRect%cellDefn, &
-                                    this%trackdata)
+                                    this%trackctl)
       submethod => methodCellPassToBot
     else
       ! -- load rectangular cell
@@ -158,7 +158,7 @@ contains
       this%cellRect%vz2 = -this%cellRect%cellDefn%faceflow(7) * term
       ! -- Select and initialize Pollock's cell method and set cell method
       ! -- pointer
-      call methodCellPollock%init(particle, this%cellRect, this%trackdata)
+      call methodCellPollock%init(particle, this%cellRect, this%trackctl)
       submethod => methodCellPollock
     end if
     !
@@ -191,8 +191,8 @@ contains
       ! particle%iTrackingDomain(2) = -abs(particle%iTrackingDomain(2))   ! kluge???
       particle%istatus = 2 ! kluge note: use -2 to allow check for transfer to another model???
       particle%advancing = .false.
-      call this%trackdata%save_record(particle, kper=kper, &
-                                      kstp=kstp, reason=3) ! reason=3: termination
+      call this%trackctl%save_record(particle, kper=kper, &
+                                     kstp=kstp, reason=3) ! reason=3: termination
       ! particle%iTrackingDomainBoundary(2) = -1
     else
       idiag = this%fmi%dis%con%ia(this%cellRect%cellDefn%icell)
