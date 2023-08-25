@@ -24,7 +24,7 @@ module PrtModule
   use ParticleModule ! kluge
   use MethodModule
   use GlobalDataModule
-  use TrackDataModule, only: TrackDataType, TrackFileType
+  use TrackModule, only: TrackControlType, TrackFileType
   use SimModule, only: count_errors, store_error, store_error_filename
 
   implicit none
@@ -45,8 +45,8 @@ module PrtModule
     type(PrtOcType), pointer :: oc => null() ! output control package
     type(PrtObsType), pointer :: obs => null() ! observation package
     type(BudgetType), pointer :: budget => null() ! budget object
-    type(MethodDisType), pointer :: methodDis => null() ! method for dis grid        ! kluge?
-    type(MethodDisvType), pointer :: methodDisv => null() ! method for disv grid
+    type(MethodDisType), pointer :: methoddis => null() ! method for dis grid        ! kluge?
+    type(MethodDisvType), pointer :: methoddisv => null() ! method for disv grid
     ! type(MethodDisuType), pointer :: methodDisu => null() ! method for disu grid
     integer(I4B), pointer :: infmi => null() ! unit number FMI
     integer(I4B), pointer :: inmip => null() ! unit number MIP
@@ -61,7 +61,7 @@ module PrtModule
     real(DP), dimension(:), pointer, contiguous :: masssto => null() !< particle mass storage in cells, new value
     real(DP), dimension(:), pointer, contiguous :: massstoold => null() !< particle mass storage in cells, old value
     real(DP), dimension(:), pointer, contiguous :: ratesto => null() !< particle mass storage rate in cells
-    type(TrackDataType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackctl ! particle track control object
 
   contains
 
@@ -128,8 +128,8 @@ contains
     ! -- Set this before any allocs in the memory manager can be done
     this%memoryPath = create_mem_path(modelname)
     !
-    ! -- Allocate track data object
-    allocate (this%trackdata)
+    ! -- Allocate track control object
+    allocate (this%trackctl)
     !
     ! -- Allocate scalars and add model to basemodellist
     call this%allocate_scalars(modelname)
@@ -251,30 +251,31 @@ contains
       select type (packobj)
       type is (PrtPrpType)
         call packobj%prp_set_pointers(this%ibound, this%mip%izone, &
-                                      this%trackdata)
+                                      this%trackctl)
       end select
       ! -- Read and allocate package
       call packobj%bnd_ar()
     end do
     !
-    call this%methodDis%init(this%fmi, &
+    call this%methoddis%init(this%fmi, &
                              this%flowja, &
                              this%mip%porosity, &
                              this%mip%retfactor, &
                              this%mip%izone, &
-                             this%trackdata)
-    call this%methodDisv%init(this%fmi, &
+                             this%trackctl)
+    call this%methoddisv%init(this%fmi, &
                               this%flowja, &
                               this%mip%porosity, &
                               this%mip%retfactor, &
                               this%mip%izone, &
-                              this%trackdata)
+                              this%trackctl)
     !
-    ! -- Initialize particle track output files
+    ! -- Initialize track output files and reporting options
     if (this%oc%itrkout > 0) &
-      call this%trackdata%init_track_file(this%oc%itrkout)
+      call this%trackctl%init_track_file(this%oc%itrkout)
     if (this%oc%itrkcsv > 0) &
-      call this%trackdata%init_track_file(this%oc%itrkcsv, csv=.true.)
+      call this%trackctl%init_track_file(this%oc%itrkcsv, csv=.true.)
+    call this%trackctl%set_track_event(this%oc%itrkevent)
     !
     ! -- return
     return
@@ -813,12 +814,12 @@ contains
     deallocate (this%oc)
     deallocate (this%obs)
     !
-    call this%methodDis%destroy
-    call this%methodDisv%destroy
+    call this%methoddis%destroy
+    call this%methoddisv%destroy
     ! call this%methodDisu%destroy
     !
-    deallocate (this%methodDis)
-    deallocate (this%methodDisv)
+    deallocate (this%methoddis)
+    deallocate (this%methoddisv)
     ! deallocate(this%methodDisu)
     !
     ! -- Boundary packages
@@ -846,7 +847,7 @@ contains
     call mem_deallocate(this%ratesto)
     !
     ! -- TrackData
-    deallocate (this%trackdata)
+    deallocate (this%trackctl)
     !
     ! -- TrackingModelType
     call this%TrackingModelType%model_da()
@@ -1060,12 +1061,12 @@ contains
 
         ! -- Initialize PRP-specific track files, if enabled
         if (packobj%itrkout > 0) then
-          call this%trackdata%init_track_file( &
+          call this%trackctl%init_track_file( &
             packobj%itrkout, &
             iprp=iprp)
         end if
         if (packobj%itrkcsv > 0) then
-          call this%trackdata%init_track_file( &
+          call this%trackctl%init_track_file( &
             packobj%itrkcsv, &
             csv=.true., &
             iprp=iprp)
@@ -1104,8 +1105,8 @@ contains
           ! -- If particle released during this time step, record its
           ! -- initial location in track data
           if (particle%trelease .ge. totimc) &
-            call this%trackdata%save_record(particle, kper=kper, &
-                                            kstp=kstp, reason=0)
+            call this%trackctl%save_record(particle, kper=kper, &
+                                           kstp=kstp, reason=0) ! reason=0: release
 
           ! -- Set particle active
           particle%istatus = 1
@@ -1140,9 +1141,9 @@ contains
     !
     select type (dis => this%dis)
     type is (GwfDisType)
-      method => this%methodDis
+      method => this%methoddis
     type is (GwfDisvType)
-      method => this%methodDisv
+      method => this%methoddisv
     type is (GwfDisuType)
       print *, "DISU grids not currently supported" ! kluge
       stop
@@ -1303,8 +1304,8 @@ contains
     !
     ! -- Create utility objects
     call budget_cr(this%budget, this%name)
-    call create_methodDis(this%methodDis)
-    call create_methodDisv(this%methodDisv)
+    call create_methodDis(this%methoddis)
+    call create_methodDisv(this%methoddisv)
     ! call create_methodDisu(this%methodDisu)
     call create_methodCellPool() ! kluge
     call create_methodSubcellPool() ! kluge

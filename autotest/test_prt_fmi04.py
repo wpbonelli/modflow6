@@ -34,7 +34,12 @@ import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 
-from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
+from prt_test_utils import (
+    check_budget_data,
+    check_track_data,
+    get_ireason_code,
+    to_mp7_format,
+)
 
 
 # simulation/model names
@@ -332,6 +337,16 @@ def test_prt_fmi04(idx, name, function_tmpdir, targets):
     # load mf6 pathline results
     mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
 
+    # if STOP_AT_WEAK_SINK disabled, check for an extra datum when particle exited weak sink
+    wksk_irsn = get_ireason_code("WEAKSINK")
+    assert len(mf6_pldata[mf6_pldata["ireason"] == wksk_irsn]) == (
+        1 if not "saws" in name else 0
+    )
+    # then drop the row so comparison will succeed below
+    mf6_pldata.drop(
+        mf6_pldata[mf6_pldata["ireason"] == wksk_irsn].index, inplace=True
+    )
+
     # make sure all mf6 pathline data have correct model and PRP index (1)
     def all_equal(col, val):
         a = col.to_numpy()
@@ -418,12 +433,6 @@ def test_prt_fmi04(idx, name, function_tmpdir, targets):
     # sort both dataframes by particleid and time
     mf6_pldata_mp7.sort_values(by=["particleid", "time"], inplace=True)
     mp7_pldata.sort_values(by=["particleid", "time"], inplace=True)
-
-    # drop duplicate locations
-    # (mp7 includes a duplicate location at the end of each pathline??)
-    cols = ["particleid", "x", "y", "z", "time"]
-    mp7_pldata = mp7_pldata.drop_duplicates(subset=cols)
-    mf6_pldata_mp7 = mf6_pldata_mp7.drop_duplicates(subset=cols)
 
     # drop columns for which there is no direct correspondence between mf6 and mp7
     del mf6_pldata_mp7["sequencenumber"]

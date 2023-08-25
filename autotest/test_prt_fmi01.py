@@ -423,12 +423,6 @@ def test_prt_fmi01(idx, name, function_tmpdir, targets):
     mf6_pldata_mp7.sort_values(by=["particleid", "time"], inplace=True)
     mp7_pldata.sort_values(by=["particleid", "time"], inplace=True)
 
-    # drop duplicate locations
-    # (mp7 includes a duplicate location at the end of each pathline??)
-    cols = ["particleid", "x", "y", "z", "time"]
-    mp7_pldata = mp7_pldata.drop_duplicates(subset=cols)
-    mf6_pldata_mp7 = mf6_pldata_mp7.drop_duplicates(subset=cols)
-
     # drop columns for which there is no direct correspondence between mf6 and mp7
     del mf6_pldata_mp7["sequencenumber"]
     del mf6_pldata_mp7["particleidloc"]

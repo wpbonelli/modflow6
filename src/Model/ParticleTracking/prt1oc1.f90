@@ -11,17 +11,13 @@ module PrtOcModule
   private
   public PrtOcType, oc_cr
 
-  !> @ brief Output control for PRT
-  !!
-  !!  Concrete implementation of OutputControlType for the
-  !!  PRT Model
-  !<
+  !> @ brief Output control for particle tracking models
   type, extends(OutputControlType) :: PrtOcType
 
-    ! output files
-    integer(I4B), pointer :: itrkout => null()
-    integer(I4B), pointer :: itrkhdr => null()
-    integer(I4B), pointer :: itrkcsv => null()
+    integer(I4B), pointer :: itrkout => null() ! binary output file
+    integer(I4B), pointer :: itrkhdr => null() ! output header file
+    integer(I4B), pointer :: itrkcsv => null() ! CSV output file
+    integer(I4B), pointer :: itrkevent => null() ! track event option
 
   contains
     procedure :: oc_ar
@@ -82,6 +78,7 @@ contains
     call mem_allocate(this%itrkout, 'ITRKOUT', this%memoryPath)
     call mem_allocate(this%itrkhdr, 'ITRKHDR', this%memoryPath)
     call mem_allocate(this%itrkcsv, 'ITRKCSV', this%memoryPath)
+    call mem_allocate(this%itrkevent, 'ITRACKEVENT', this%memoryPath)
     !
     this%name_model = name_model
     this%inunit = 0
@@ -92,6 +89,7 @@ contains
     this%itrkout = 0
     this%itrkhdr = 0
     this%itrkcsv = 0
+    this%itrkevent = -1
     !
     return
   end subroutine prt_oc_allocate_scalars
@@ -163,6 +161,7 @@ contains
     call mem_deallocate(this%itrkout)
     call mem_deallocate(this%itrkhdr)
     call mem_deallocate(this%itrkcsv)
+    call mem_deallocate(this%itrkevent)
   end subroutine prt_oc_da
 
   subroutine prt_oc_read_options(this)
@@ -170,7 +169,7 @@ contains
     use OpenSpecModule, only: access, form
     use InputOutputModule, only: getunit, openfile, lowcase
     use ConstantsModule, only: LINELENGTH
-    use TrackDataModule, only: TRACKHEADERS, TRACKTYPES
+    use TrackModule, only: TRACKHEADERS, TRACKTYPES
     use SimModule, only: store_error, store_error_unit
     use InputOutputModule, only: openfile, getunit
     ! -- dummy
@@ -184,6 +183,7 @@ contains
     integer(I4B) :: ipos
     logical :: isfound, found, endOfBlock
     type(OutputControlDataType), pointer :: ocdobjptr
+    character(len=LINELENGTH) :: trkevent
     ! -- formats
     character(len=*), parameter :: fmttrkbin = &
       "(4x, 'PARTICLE TRACKS WILL BE SAVED TO BINARY FILE: ', a, /4x, &
@@ -255,6 +255,31 @@ contains
             call store_error('OPTIONAL TRACKCSV KEYWORD MUST BE &
               &FOLLOWED BY FILEOUT')
           end if
+          found = .true.
+        case ('TRACKEVENT')
+          call this%parser%GetStringCaps(trkevent)
+          select case (trkevent)
+          case ('')
+            this%itrkevent = -1
+          case ('ALL')
+            this%itrkevent = -1
+          case ('RELEASE')
+            this%itrkevent = 0
+          case ('TRANSIT')
+            this%itrkevent = 1
+          case ('TIMESTEP')
+            this%itrkevent = 2
+          case ('TERMINATE')
+            this%itrkevent = 3
+          case ('WEAKSINK')
+            this%itrkevent = 4
+          case default
+            write (errmsg, '(2a)') &
+              'Looking for ALL, RELEASE, TRANSIT, TIMESTEP, &
+              &TERMINATE, or WEAKSINK. Found: ', &
+              trim(adjustl(trkevent))
+            call store_error(errmsg, terminate=.TRUE.)
+          end select
           found = .true.
         case default
           found = .false.

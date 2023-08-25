@@ -1,7 +1,7 @@
 module ParticleModule
 
   use KindModule, only: DP, I4B, LGP
-  use ConstantsModule, only: DZERO, DONE, LENMEMPATH
+  use ConstantsModule, only: DZERO, DONE, LENMEMPATH, LENCOMPONENTNAME
   use GlobalDataModule
   use UtilMiscModule, only: transform_coords, modify_transf
   implicit none

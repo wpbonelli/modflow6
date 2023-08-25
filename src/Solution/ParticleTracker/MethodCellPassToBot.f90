@@ -4,7 +4,7 @@ module MethodCellPassToBotModule
   use MethodModule
   use CellDefnModule
   use ParticleModule
-  use TrackDataModule, only: TrackDataType
+  use TrackModule, only: TrackControlType
   implicit none
 
   private
@@ -60,7 +60,7 @@ contains
     class(MethodCellPassToBotType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(cellDefnType), pointer, intent(in) :: cellDefn
-    type(TrackDataType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackdata
     !
     ! -- Set pointer to cell definition
     this%cellDefn => cellDefn
@@ -82,33 +82,16 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
     !
-    particle%izone = this%cellDefn%izone
+    ! -- Update particle state, checking whether any reporting or
+    ! -- termination conditions apply
+    call this%update(particle, this%cellDefn)
     !
-    if (this%cellDefn%izone .ne. 0) then
-      if (particle%istopzone .eq. this%cellDefn%izone) then
-        ! -- Stop zone
-        particle%istatus = 6
-        particle%advancing = .false.
-      end if
-    else if (this%cellDefn%inoexitface .ne. 0) then
-      ! -- No exit face
-      particle%istatus = 5
-      particle%advancing = .false.
-    else if (particle%istopweaksink .ne. 0) then
-      if (this%cellDefn%iweaksink .ne. 0) then
-        ! -- Weak sink
-        particle%istatus = 3
-        particle%advancing = .false.
-      end if
-    end if
+    ! -- Return early if particle is done advancing
+    if (.not. particle%advancing) return
     !
-    if (particle%advancing) then
-      !
-      ! -- Pass particle vertically and instantaneously to cell bottom
-      particle%z = this%cellDefn%bot
-      particle%iTrackingDomainBoundary(2) = this%cellDefn%npolyverts + 2
-      !
-    end if
+    ! -- Pass particle vertically and instantaneously to cell bottom
+    particle%z = this%cellDefn%bot
+    particle%iTrackingDomainBoundary(2) = this%cellDefn%npolyverts + 2
     !
     ! -- Store track data
     call this%trackdata%save_record(particle, kper=kper, &

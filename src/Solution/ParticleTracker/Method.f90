@@ -3,7 +3,8 @@ module MethodModule
   use KindModule, only: DP, I4B
   use GlobalDataModule
   use ParticleModule ! kluge???
-  use TrackDataModule, only: TrackDataType
+  use CellDefnModule, only: CellDefnType
+  use TrackModule, only: TrackControlType
   implicit none
 
   private
@@ -13,7 +14,7 @@ module MethodModule
     ! private
     character(len=40), pointer, public :: trackingDomainType ! character string that names the tracking domain type
     logical, public :: delegatesTracking
-    type(TrackDataType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackdata
   contains
     ! -- Implemented in all tracking methods
     procedure(apply), deferred :: apply ! applies the method
@@ -23,6 +24,7 @@ module MethodModule
     ! -- Implemented in this base class
     procedure :: subtrack ! tracks the particle across subdomains
     procedure :: advance ! advances the particle
+    procedure :: update ! update particle state, terminating if appropriate and reporting
   end type MethodType
 
   abstract interface
@@ -142,5 +144,47 @@ contains
     return
     !
   end subroutine pass
+
+  !> @brief Update particle state and check termination conditions
+  !!
+  !! Update the particle's properties (e.g. advancing flag, zone number,
+  !! status). If any termination conditions apply, the particle's status
+  !! will be set to the appropriate termination value. If any reporting
+  !! conditions apply, save particle state with the proper reason code.
+  subroutine update(this, particle, celldefn)
+    ! -- modules
+    use TdisModule, only: kper, kstp
+    ! -- dummy
+    class(MethodType), intent(inout) :: this
+    type(ParticleType), pointer, intent(inout) :: particle
+    type(CellDefnType), pointer, intent(inout) :: celldefn
+
+    particle%izone = celldefn%izone
+
+    if (celldefn%izone .ne. 0) then
+      if (particle%istopzone .eq. celldefn%izone) then
+        particle%advancing = .false.
+        particle%istatus = 6
+        call this%trackdata%save_record(particle, kper=kper, &
+                                        kstp=kstp, reason=3) ! reason=3: termination
+      end if
+    else if (celldefn%inoexitface .ne. 0) then
+      particle%advancing = .false.
+      particle%istatus = 5
+      call this%trackdata%save_record(particle, kper=kper, &
+                                      kstp=kstp, reason=3) ! reason=3: termination
+    else if (celldefn%iweaksink .ne. 0) then
+      if (particle%istopweaksink .ne. 0) then
+        particle%advancing = .false.
+        particle%istatus = 3
+        call this%trackdata%save_record(particle, kper=kper, &
+                                        kstp=kstp, reason=3) ! reason=3: termination
+      else
+        call this%trackdata%save_record(particle, kper=kper, &
+                                        kstp=kstp, reason=4) ! reason=4: exited weak sink
+      end if
+    end if
+
+  end subroutine update
 
 end module MethodModule

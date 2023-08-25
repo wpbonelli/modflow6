@@ -39,6 +39,8 @@ def check_track_data(
     # check each column separately to avoid:
     # TypeError: The DType <class 'numpy._FloatAbstractDType'> could not be promoted by <class 'numpy.dtype[void]'>
     for k in data_bin.dtype.names:
+        if k == 'name':
+            continue
         assert np.allclose(data_bin[k], data_csv[k], equal_nan=True)
 
     # make sure columns all have values in the expected range
@@ -124,3 +126,32 @@ def check_budget_data(lst: os.PathLike, perlen, nper):
         "PRP_OUT",
     ]
     assert all(en in names for en in expected_entries)
+
+
+def get_output_event(case_name):
+    return (
+        "ALL"
+        if "all" in case_name
+        else "RELEASE"
+        if "rel" in case_name
+        else "TRANSIT"
+        if "trst" in case_name
+        else "TIMESTEP"
+        if "tstp" in case_name
+        else "WEAKSINK"
+        if "wksk" in case_name
+        else "TERMINATE"
+        if "terminate" in case_name
+        else "ALL" # default
+    )
+
+
+def get_ireason_code(output_event):
+    return (
+        0 if output_event == "RELEASE"
+        else 1 if output_event == "TRANSIT"
+        else 2 if output_event == "TIMESTEP"
+        else 3 if output_event == "TERMINATE"
+        else 4 if output_event == "WEAKSINK"
+        else -1 # default
+    )

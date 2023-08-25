@@ -8,7 +8,7 @@ module MethodCellTernaryModule
   use SubcellTriModule
   use ParticleModule
   use Ternary
-  use TrackDataModule, only: TrackDataType
+  use TrackModule, only: TrackControlType
   implicit none
 
   private
@@ -78,7 +78,7 @@ contains
     class(MethodCellTernaryType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellPolyType), pointer, intent(in) :: cellPoly
-    type(TrackDataType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackdata
     !
     this%cellPoly => cellPoly
     !
@@ -175,106 +175,88 @@ contains
     double precision :: vxsum, vysum, flow0, flow1, v0x, v0y
     double precision :: d01x, d01y, d02x, d02y, det, area, term
     !
-    ! -- Update particle zone
-    particle%izone = this%cellPoly%cellDefn%izone
+    ! -- Update particle state, checking whether any reporting or
+    ! -- termination conditions apply
+    call this%update(particle, this%cellPoly%cellDefn)
     !
-    if (this%cellPoly%cellDefn%izone .ne. 0) then
-      if (particle%istopzone .eq. this%cellPoly%cellDefn%izone) then
-        ! -- Stop zone
-        particle%istatus = 6
-        particle%advancing = .false.
-      end if
-    else if (this%cellPoly%cellDefn%inoexitface .ne. 0) then
-      ! -- No exit face
-      particle%istatus = 5
-      particle%advancing = .false.
-    else if (particle%istopweaksink .ne. 0) then
-      if (this%cellPoly%cellDefn%iweaksink .ne. 0) then
-        ! -- Weak sink
-        particle%istatus = 3
-        particle%advancing = .false.
-      end if
+    ! -- Return early if particle is done advancing
+    if (.not. particle%advancing) return
+    !
+    ! -- If the particle is above the top of the cell (which is presumed to
+    ! -- represent a water table above the cell bottom), pass the particle
+    ! -- vertically and instantaneously to the cell top elevation.
+    if (particle%z > this%cellPoly%cellDefn%top) then
+      particle%z = this%cellPoly%cellDefn%top
+      ! -- Store track data
+      call this%trackdata%save_record(particle, kper=kper, &
+                                      kstp=kstp, reason=1)
     end if
     !
-    if (particle%advancing) then
-      !
-      ! -- If the particle is above the top of the cell (which is presumed to
-      ! -- represent a water table above the cell bottom), pass the particle
-      ! -- vertically and instantaneously to the cell top elevation.
-      if (particle%z > this%cellPoly%cellDefn%top) then
-        particle%z = this%cellPoly%cellDefn%top
-        ! -- Store track data
-        call this%trackdata%save_record(particle, kper=kper, &
-                                        kstp=kstp, reason=1)
-      end if
-      !
-      npolyverts = this%cellPoly%cellDefn%npolyverts
-      !
-      xsum = DZERO
-      ysum = DZERO
-      vxsum = DZERO
-      vysum = DZERO
-      area = DZERO
-      this%ztop = this%cellPoly%cellDefn%top
-      this%zbot = this%cellPoly%cellDefn%bot
-      this%dz = this%ztop - this%zbot
-      do iv = 1, npolyverts
-        ivp1 = iv + 1
-        if (ivp1 .gt. npolyverts) ivp1 = 1
-        ivm1 = iv - 1
-        if (ivm1 .lt. 1) ivm1 = npolyverts
-        x0 = this%cellPoly%cellDefn%polyvert(iv)%x
-        y0 = this%cellPoly%cellDefn%polyvert(iv)%y
-        x2 = this%cellPoly%cellDefn%polyvert(ivp1)%x
-        y2 = this%cellPoly%cellDefn%polyvert(ivp1)%y
-        x1 = this%cellPoly%cellDefn%polyvert(ivm1)%x
-        y1 = this%cellPoly%cellDefn%polyvert(ivm1)%y
-        term = DONE / (this%cellPoly%cellDefn%porosity * this%dz)
-        flow0 = this%cellPoly%cellDefn%faceflow(iv) * term
-        flow1 = this%cellPoly%cellDefn%faceflow(ivm1) * term
-        d01x = x1 - x0 ! kluge note: do this more efficiently, not recomputing things so much???
-        d01y = y1 - y0
-        d02x = x2 - x0
-        d02y = y2 - y0
-        ! kluge note: can det ever be zero, like maybe for a 180-deg vertex???
-        ! oodet = DONE/(d01y*d02x - d02y*d01x)
-        ! velmult = particle%velmult
-        ! kluge note: "flow" is volumetric (face) flow rate per unit thickness, divided by porosity
-        ! v0x = -velmult*oodet*(d02x*flow1 + d01x*flow0)
-        ! v0y = -velmult*oodet*(d02y*flow1 + d01y*flow0)   !
-        det = d01y * d02x - d02y * d01x
-        retfactor = this%cellPoly%cellDefn%retfactor
-        ! kluge note: can det ever be zero, like maybe for a 180-deg vertex???
-        ! term = velfactor/det
-        ! kluge note: can det ever be zero, like maybe for a 180-deg vertex???
-        term = DONE / (retfactor * det)
-        ! kluge note: "flow" here is volumetric flow rate (MODFLOW face flow)
-        v0x = -term * (d02x * flow1 + d01x * flow0)
-        ! per unit thickness, divided by porosity
-        v0y = -term * (d02y * flow1 + d01y * flow0)
-        this%vx_vert_polygon(iv) = v0x
-        this%vy_vert_polygon(iv) = v0y
-        xsum = xsum + x0
-        ysum = ysum + y0
-        vxsum = vxsum + v0x
-        vysum = vysum + v0y
-        this%x_vert(iv) = x0
-        this%y_vert(iv) = y0
-        area = area + x0 * y1 - x1 * y0
-      end do
-      area = area * DHALF
-      term = DONE / (retfactor * this%cellPoly%cellDefn%porosity * area)
-      this%vzbot = this%cellPoly%cellDefn%faceflow(npolyverts + 2) * term
-      this%vztop = -this%cellPoly%cellDefn%faceflow(npolyverts + 3) * term
-      this%xctr = xsum / dble(npolyverts)
-      this%yctr = ysum / dble(npolyverts)
-      this%vxctr = vxsum / dble(npolyverts)
-      this%vyctr = vysum / dble(npolyverts)
-      !
-      ! -- Track across subcells
-      call this%subtrack(particle, 2, tmax) ! kluge, hardwired to level 2
-      !
-    end if
+    npolyverts = this%cellPoly%cellDefn%npolyverts
+    !
+    xsum = DZERO
+    ysum = DZERO
+    vxsum = DZERO
+    vysum = DZERO
+    area = DZERO
+    this%ztop = this%cellPoly%cellDefn%top
+    this%zbot = this%cellPoly%cellDefn%bot
+    this%dz = this%ztop - this%zbot
+    do iv = 1, npolyverts
+      ivp1 = iv + 1
+      if (ivp1 .gt. npolyverts) ivp1 = 1
+      ivm1 = iv - 1
+      if (ivm1 .lt. 1) ivm1 = npolyverts
+      x0 = this%cellPoly%cellDefn%polyvert(iv)%x
+      y0 = this%cellPoly%cellDefn%polyvert(iv)%y
+      x2 = this%cellPoly%cellDefn%polyvert(ivp1)%x
+      y2 = this%cellPoly%cellDefn%polyvert(ivp1)%y
+      x1 = this%cellPoly%cellDefn%polyvert(ivm1)%x
+      y1 = this%cellPoly%cellDefn%polyvert(ivm1)%y
+      term = DONE / (this%cellPoly%cellDefn%porosity * this%dz)
+      flow0 = this%cellPoly%cellDefn%faceflow(iv) * term
+      flow1 = this%cellPoly%cellDefn%faceflow(ivm1) * term
+      d01x = x1 - x0 ! kluge note: do this more efficiently, not recomputing things so much???
+      d01y = y1 - y0
+      d02x = x2 - x0
+      d02y = y2 - y0
+      ! kluge note: can det ever be zero, like maybe for a 180-deg vertex???
+      ! oodet = DONE/(d01y*d02x - d02y*d01x)
+      ! velmult = particle%velmult
+      ! kluge note: "flow" is volumetric (face) flow rate per unit thickness, divided by porosity
+      ! v0x = -velmult*oodet*(d02x*flow1 + d01x*flow0)
+      ! v0y = -velmult*oodet*(d02y*flow1 + d01y*flow0)   !
+      det = d01y * d02x - d02y * d01x
+      retfactor = this%cellPoly%cellDefn%retfactor
+      ! kluge note: can det ever be zero, like maybe for a 180-deg vertex???
+      ! term = velfactor/det
+      ! kluge note: can det ever be zero, like maybe for a 180-deg vertex???
+      term = DONE / (retfactor * det)
+      ! kluge note: "flow" here is volumetric flow rate (MODFLOW face flow)
+      v0x = -term * (d02x * flow1 + d01x * flow0)
+      ! per unit thickness, divided by porosity
+      v0y = -term * (d02y * flow1 + d01y * flow0)
+      this%vx_vert_polygon(iv) = v0x
+      this%vy_vert_polygon(iv) = v0y
+      xsum = xsum + x0
+      ysum = ysum + y0
+      vxsum = vxsum + v0x
+      vysum = vysum + v0y
+      this%x_vert(iv) = x0
+      this%y_vert(iv) = y0
+      area = area + x0 * y1 - x1 * y0
+    end do
+    area = area * DHALF
+    term = DONE / (retfactor * this%cellPoly%cellDefn%porosity * area)
+    this%vzbot = this%cellPoly%cellDefn%faceflow(npolyverts + 2) * term
+    this%vztop = -this%cellPoly%cellDefn%faceflow(npolyverts + 3) * term
+    this%xctr = xsum / dble(npolyverts)
+    this%yctr = ysum / dble(npolyverts)
+    this%vxctr = vxsum / dble(npolyverts)
+    this%vyctr = vysum / dble(npolyverts)
+    !
+    ! -- Track across subcells
+    call this%subtrack(particle, 2, tmax) ! kluge, hardwired to level 2
     !
     return
     !

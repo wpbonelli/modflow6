@@ -7,7 +7,7 @@ module MethodCellPollockModule
   use CellRectModule
   use SubcellRectModule
   use ParticleModule
-  use TrackDataModule, only: TrackDataType
+  use TrackModule, only: TrackControlType
   implicit none
 
   private
@@ -70,7 +70,7 @@ contains
     class(MethodCellPollockType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellRectType), pointer, intent(in) :: cellRect
-    type(TrackDataType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackdata
     !
     ! -- Set pointer to cell definition
     this%cellRect => cellRect
@@ -154,60 +154,42 @@ contains
     ! -- local
     double precision :: xOrigin, yOrigin, zOrigin, sinrot, cosrot
     !
-    ! -- Update particle zone
-    particle%izone = this%cellRect%cellDefn%izone
+    ! -- Update particle state, checking whether any reporting or
+    ! -- termination conditions apply
+    call this%update(particle, this%cellRect%cellDefn)
     !
-    if (this%cellRect%cellDefn%izone .ne. 0) then
-      if (particle%istopzone .eq. this%cellRect%cellDefn%izone) then
-        ! -- Stop zone
-        particle%istatus = 6
-        particle%advancing = .false.
-      end if
-    else if (this%cellRect%cellDefn%inoexitface .ne. 0) then
-      ! -- No exit face
-      particle%istatus = 5
-      particle%advancing = .false.
-    else if (particle%istopweaksink .ne. 0) then
-      if (this%cellRect%cellDefn%iweaksink .ne. 0) then
-        ! -- Weak sink
-        particle%istatus = 3
-        particle%advancing = .false.
-      end if
+    ! -- Return early if particle is done advancing
+    if (.not. particle%advancing) return
+    !
+    ! -- If the particle is above the top of the cell (which is presumed to
+    ! -- represent a water table above the cell bottom), pass the particle
+    ! -- vertically and instantaneously to the cell top elevation.
+    if (particle%z > this%cellRect%cellDefn%top) then
+      particle%z = this%cellRect%cellDefn%top
+      ! -- Store track data
+      call this%trackdata%save_record(particle, kper=kper, &
+                                      kstp=kstp, reason=1)
     end if
     !
-    if (particle%advancing) then
-      !
-      ! -- If the particle is above the top of the cell (which is presumed to
-      ! -- represent a water table above the cell bottom), pass the particle
-      ! -- vertically and instantaneously to the cell top elevation.
-      if (particle%z > this%cellRect%cellDefn%top) then
-        particle%z = this%cellRect%cellDefn%top
-        ! -- Store track data
-        call this%trackdata%save_record(particle, kper=kper, &
-                                        kstp=kstp, reason=1)
-      end if
-      !
-      ! -- Transform particle location into local cell coordinates.
-      ! -- Translated and rotated but not scaled relative to model.
-      xOrigin = this%cellRect%xOrigin
-      yOrigin = this%cellRect%yOrigin
-      zOrigin = this%cellRect%zOrigin
-      sinrot = this%cellRect%sinrot
-      cosrot = this%cellRect%cosrot
-      call particle%transf_coords(xOrigin, yOrigin, zOrigin, &
-                                  sinrot, cosrot, .false.)
-      !
-      ! -- Track across lone subcell
-      call this%subtrack(particle, 2, tmax) ! kluge, hardwired to level 2
-      !
-      ! -- Transform particle location back to model coordinates
-      call particle%transf_coords(xOrigin, yOrigin, zOrigin, &
-                                  sinrot, cosrot, .true.)
-      !
-      ! -- Reset transformation and eliminate accumulated roundoff error
-      call particle%reset_transf()
-      !
-    end if
+    ! -- Transform particle location into local cell coordinates.
+    ! -- Translated and rotated but not scaled relative to model.
+    xOrigin = this%cellRect%xOrigin
+    yOrigin = this%cellRect%yOrigin
+    zOrigin = this%cellRect%zOrigin
+    sinrot = this%cellRect%sinrot
+    cosrot = this%cellRect%cosrot
+    call particle%transf_coords(xOrigin, yOrigin, zOrigin, &
+                                sinrot, cosrot, .false.)
+    !
+    ! -- Track across lone subcell
+    call this%subtrack(particle, 2, tmax) ! kluge, hardwired to level 2
+    !
+    ! -- Transform particle location back to model coordinates
+    call particle%transf_coords(xOrigin, yOrigin, zOrigin, &
+                                sinrot, cosrot, .true.)
+    !
+    ! -- Reset transformation and eliminate accumulated roundoff error
+    call particle%reset_transf()
     !
     return
     !

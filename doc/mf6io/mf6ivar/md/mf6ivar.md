@@ -1244,6 +1244,7 @@
 | PRT | OC | OPTIONS | CONCENTRATION | KEYWORD | keyword to specify that record corresponds to concentration. |
 | PRT | OC | OPTIONS | CONCENTRATIONFILE | STRING | name of the output file to write conc information. |
 | PRT | OC | OPTIONS | PRINT_FORMAT | KEYWORD | keyword to specify format for printing to the listing file. |
+| PRT | OC | OPTIONS | TRACKEVENT | STRING | particle tracking event(s) to include in track output files.  Can be ALL, RELEASE, TRANSIT, TIMESTEP, TERMINATE, or WEAKSINK.  RELEASE selects particle releases.  TRANSIT selects cell-to-cell transitions.  TIMESTEP selects transitions between timesteps.  TERMINATE selects particle terminations.  WEAKSINK selects particle exits from weak sink cells.  Events may coincide with other events. |
 | PRT | OC | OPTIONS | TRACK | KEYWORD | keyword to specify that record corresponds to track. |
 | PRT | OC | OPTIONS | TRACKFILE | STRING | name of the output file to write tracking information. |
 | PRT | OC | OPTIONS | TRACKCSV | KEYWORD | keyword to specify that record corresponds to the track CSV. |

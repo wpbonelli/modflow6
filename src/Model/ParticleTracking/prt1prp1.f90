@@ -18,7 +18,7 @@ module PrtPrpModule
   use SimVariablesModule, only: errmsg, warnmsg
   use ArrayHandlersModule, only: expandarray
   use GlobalDataModule
-  use TrackDataModule, only: TrackDataType
+  use TrackModule, only: TrackControlType
 
   implicit none
 
@@ -60,7 +60,7 @@ module PrtPrpModule
     integer(I4B), pointer :: itrkout => null()
     integer(I4B), pointer :: itrkhdr => null()
     integer(I4B), pointer :: itrkcsv => null()
-    type(TrackDataType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackdata
 
   contains
 
@@ -181,7 +181,7 @@ contains
     class(PrtPrpType) :: this
     integer(I4B), dimension(:), pointer, contiguous :: ibound
     integer(I4B), dimension(:), pointer, contiguous :: izone
-    type(TrackDataType), pointer :: trackdata
+    type(TrackControlType), pointer :: trackdata
     !
     this%ibound => ibound
     this%izone => izone
@@ -739,7 +739,7 @@ contains
     use OpenSpecModule, only: access, form
     use ConstantsModule, only: MAXCHARLEN, DZERO
     use InputOutputModule, only: urword, getunit, openfile
-    use TrackDataModule, only: TRACKHEADERS, TRACKTYPES
+    use TrackModule, only: TRACKHEADERS, TRACKTYPES
     ! -- dummy
     class(PrtPrpType), intent(inout) :: this
     character(len=*), intent(inout) :: option
@@ -825,7 +825,7 @@ contains
     class(PrtPrpType), intent(inout) :: this
     ! -- local
     character(len=LINELENGTH) :: cellid
-    character(len=LENBOUNDNAME) :: bndName
+    character(len=LENBOUNDNAME) :: bndName !, bndNameTemp
     character(len=9) :: cno
     logical :: isfound
     logical :: endOfBlock
@@ -906,6 +906,7 @@ contains
         ! end if
         !
         nametxt(n) = bndName
+        !
       end do
 
       write (this%iout, '(1x,a)') &
