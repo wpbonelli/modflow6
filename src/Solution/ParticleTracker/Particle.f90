@@ -1,7 +1,7 @@
 module ParticleModule
 
   use KindModule, only: DP, I4B, LGP
-  use ConstantsModule, only: DZERO, DONE, LENMEMPATH, LENCOMPONENTNAME
+  use ConstantsModule, only: DZERO, DONE, LENMEMPATH, LENBOUNDNAME
   use GlobalDataModule
   use UtilMiscModule, only: transform_coords, modify_transf
   implicit none
@@ -20,6 +20,7 @@ module ParticleModule
     integer(I4B), public :: iprp ! index of release package the particle originated in
     integer(I4B), public :: irpt ! index of release point in the particle release package the particle originated in
     integer(I4B), public :: ip ! index of particle in the particle list
+    character(len=LENBOUNDNAME), public :: name = '' ! optional particle label (need not be unique)
 
     ! stop criteria
     integer(I4B), public :: istopweaksink ! weak sink option: 0 = do not stop, 1 = stop
@@ -65,6 +66,7 @@ module ParticleModule
     integer(I4B), dimension(:), pointer, contiguous :: imdl ! index of model particle originated in
     integer(I4B), dimension(:), pointer, contiguous :: iprp ! index of release package the particle originated in
     integer(I4B), dimension(:), pointer, contiguous :: irpt ! index of release point in the particle release package the particle originated in
+    character(len=LENBOUNDNAME), dimension(:), pointer, contiguous :: name ! optional particle label (need not be unique)
 
     ! stopping criteria
     integer(I4B), dimension(:), pointer, contiguous :: istopweaksink ! weak sink option: 0 = do not stop, 1 = stop
@@ -128,6 +130,7 @@ contains
     call mem_allocate(this%imdl, np, 'PLIMDL', mempath)
     call mem_allocate(this%irpt, np, 'PLIRPT', mempath)
     call mem_allocate(this%iprp, np, 'PLIPRP', mempath)
+    call mem_allocate(this%name, LENBOUNDNAME, np, 'PLNAME', mempath)
     ! -- kluge todo: update mem_allocate to allow custom range of indices?
     !    e.g. here we want to allocate 0-4 for trackdomain levels, not 1-5
     allocate (this%iTrackingDomain(np, lmin:lmax))
@@ -159,6 +162,7 @@ contains
     call mem_deallocate(this%imdl, 'PLIMDL', mempath)
     call mem_deallocate(this%iprp, 'PLIPRP', mempath)
     call mem_deallocate(this%irpt, 'PLIRPT', mempath)
+    call mem_deallocate(this%name, 'PLNAME', mempath)
     deallocate (this%iTrackingDomain)
     deallocate (this%iTrackingDomainBoundary)
     call mem_deallocate(this%icu, 'PLICU', mempath)
@@ -191,6 +195,7 @@ contains
     call mem_reallocate(this%imdl, np, 'PLIMDL', mempath)
     call mem_reallocate(this%iprp, np, 'PLIPRP', mempath)
     call mem_reallocate(this%irpt, np, 'PLIRPT', mempath)
+    call mem_reallocate(this%name, LENBOUNDNAME, np, 'PLNAME', mempath)
     call mem_reallocate(this%icu, np, 'PLICU', mempath)
     call mem_reallocate(this%ilay, np, 'PLILAY', mempath)
     call mem_reallocate(this%izone, np, 'PLIZONE', mempath)
@@ -234,6 +239,7 @@ contains
     this%iprp = iprp
     this%irpt = partlist%irpt(ip) ! kluge note: necessary to reset this here?
     this%ip = ip
+    this%name = partlist%name(ip)
     this%istopweaksink = partlist%istopweaksink(ip)
     this%istopzone = partlist%istopzone(ip)
     this%iTrackingDomain(levelMin:levelMax) = &

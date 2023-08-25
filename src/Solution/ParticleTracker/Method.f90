@@ -2,7 +2,7 @@ module MethodModule
 
   use KindModule, only: DP, I4B
   use GlobalDataModule
-  use ParticleModule ! kluge???
+  use ParticleModule
   use CellDefnModule, only: CellDefnType
   use TrackModule, only: TrackControlType
   implicit none
@@ -158,7 +158,6 @@ contains
     class(MethodType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellDefnType), pointer, intent(inout) :: celldefn
-
     particle%izone = celldefn%izone
 
     if (celldefn%izone .ne. 0) then

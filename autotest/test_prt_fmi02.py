@@ -321,7 +321,6 @@ def test_prt_fmi02(idx, name, function_tmpdir, targets):
 
     # write mf6 simulation input files
     gwfsim.write_simulation()
-
     # run mf6 gwf simulation
     success, _ = gwfsim.run_simulation()
     assert success

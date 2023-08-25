@@ -13,9 +13,14 @@ Two test cases are defined, one with the particle
 release (PRP) package option STOP_AT_WEAK_SINK on
 and one with the option off. No effect on results
 are expected because the model has no weak sinks.
-(Motivated by bug reports in which particles were
+(Motivated by an old bug in which particles were
 tracked improperly when this option was enabled,
 even with no weak sink cells in the vicinity.)
+
+This test also specifies `boundnames=True` for
+the PRP package, but does not provide boundnames
+(particle names), and checks that the "name" col
+in the track output files contains empty strings.
 """
 
 
@@ -29,7 +34,7 @@ import pandas as pd
 import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
-from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
+from prt_test_utils import all_equal, check_budget_data, check_track_data, has_default_boundnames, to_mp7_format
 
 
 # simulation name
@@ -212,6 +217,7 @@ def build_prt_sim(idx, ws, mf6):
         track_filerecord=[prp_track_file],
         trackcsv_filerecord=[prp_track_csv_file],
         stop_at_weak_sink="saws" in prtname,
+        boundnames=True
     )
 
     # create output control package
@@ -285,13 +291,16 @@ def test_prt_fmi01(idx, name, function_tmpdir, targets):
     # workspace
     ws = function_tmpdir
 
+    # test case name
+    name = ex[idx]
+
     # model names
     gwfname = get_model_name(idx, "gwf")
     prtname = get_model_name(idx, "prt")
     mp7name = get_model_name(idx, "mp7")
 
     # build mf6 models
-    gwfsim = build_gwf_sim(ex[idx], ws, targets.mf6)
+    gwfsim = build_gwf_sim(name, ws, targets.mf6)
     prtsim = build_prt_sim(idx, ws, targets.mf6)
 
     # run mf6 models
@@ -345,13 +354,13 @@ def test_prt_fmi01(idx, name, function_tmpdir, targets):
     mp7_pldata["k"] = mp7_pldata["k"] + 1
 
     # load mf6 pathline results
-    mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
+    mf6_pldata = pd.read_csv(ws / prt_track_csv_file, na_filter=False)
+
+    # make sure pathline df has "name" (boundname) column and default values
+    assert "name" in mf6_pldata
+    assert has_default_boundnames(mf6_pldata)
 
     # make sure all mf6 pathline data have correct model and PRP index (1)
-    def all_equal(col, val):
-        a = col.to_numpy()
-        return a[0] == val and (a[0] == a).all()
-
     assert all_equal(mf6_pldata["imdl"], 1)
     assert all_equal(mf6_pldata["iprp"], 1)
 

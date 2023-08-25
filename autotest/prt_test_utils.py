@@ -155,3 +155,14 @@ def get_ireason_code(output_event):
         else 4 if output_event == "WEAKSINK"
         else -1 # default
     )
+
+
+def all_equal(col, val):
+    a = col.to_numpy()
+    return a[0] == val and (a[0] == a).all()
+
+
+def has_default_boundnames(data):
+    name = [int(n.rpartition("0")[2]) for n in data["name"].to_numpy()]
+    irpt = data["irpt"].to_numpy()
+    return np.array_equal(name, irpt)

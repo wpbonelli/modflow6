@@ -338,6 +338,7 @@ contains
     integer(I4B) :: nps, np
     real(DP) :: trelease, tstop
     logical(LGP) :: isRelease
+    character(len=LENBOUNDNAME) :: bndName = ''
     !
     ! -- Reset particle mass released for time step
     do nps = 1, this%nreleasepts
@@ -421,6 +422,10 @@ contains
 
         ! -- Todo: check that location is within the specified cell
 
+        ! -- Set particle boundname
+        if (size(this%boundname) /= 0) &
+          bndName = this%boundname(nps)
+
         ! -- Add particle to particle list (todo: factor out a routine?)
         !    The routine should branch based on whether this is an exchange
         !    PRP or a normal PRP. If exchange PRP, particle identity info
@@ -438,6 +443,7 @@ contains
         this%partlist%istopweaksink(np) = this%istopweaksink
         this%partlist%istopzone(np) = this%istopzone
         this%partlist%irpt(np) = nps
+        this%partlist%name(np) = bndName
         this%partlist%icu = icu
         this%partlist%ilay = ilay
         this%partlist%izone = this%izone(ic)
@@ -825,7 +831,7 @@ contains
     class(PrtPrpType), intent(inout) :: this
     ! -- local
     character(len=LINELENGTH) :: cellid
-    character(len=LENBOUNDNAME) :: bndName !, bndNameTemp
+    character(len=LENBOUNDNAME) :: bndName, bndNameTemp
     character(len=9) :: cno
     logical :: isfound
     logical :: endOfBlock
@@ -893,18 +899,20 @@ contains
         y(n) = this%parser%GetDouble()
         z(n) = this%parser%GetDouble()
         !
-        ! -- set default bndName
+        ! -- set default boundname
         write (cno, '(i9.9)') n
         bndName = 'PRP'//cno
         !
-        ! ! -- todo read particle release point name from file
-        ! if (this%inamedbound /= 0) then
-        !   call this%parser%GetStringCaps(bndNameTemp)
-        !   if (bndNameTemp /= '') then
-        !     bndName = bndNameTemp
-        !   end if
-        ! end if
+        ! -- read boundnames from file, if provided
+        if (this%inamedbound /= 0) then
+          call this%parser%GetStringCaps(bndNameTemp)
+          if (bndNameTemp /= '') &
+            bndName = bndNameTemp
+        else
+          bndName = ''
+        end if
         !
+        ! -- store temp boundnames
         nametxt(n) = bndName
         !
       end do
@@ -950,6 +958,7 @@ contains
     deallocate (y)
     deallocate (z)
     deallocate (tstop)
+    deallocate (nametxt)
     deallocate (nboundchk)
     !
     ! -- return

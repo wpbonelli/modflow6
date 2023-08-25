@@ -7,6 +7,9 @@ The same flow system shown on the FloPy readme.
 Particles are released from the top left cell.
 
 Results are compared against a MODPATH 7 model.
+
+This test includes two cases, one which gives
+boundnames to particles and one which does not.
 """
 
 
@@ -22,25 +25,17 @@ from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 
 from framework import TestFramework
-from prt_test_utils import check_budget_data, check_track_data, to_mp7_format
+from prt_test_utils import all_equal, check_budget_data, check_track_data, has_default_boundnames, to_mp7_format
 from simulation import TestSimulation
 
 
 # simulation/model names
 simname = "prtexg1"
-gwfname = f"{simname}_gwf"
-prtname = f"{simname}_prt"
-mp7name = f"{simname}_mp7"
 
 # test cases
-ex = [simname]
+ex = [simname, f"{simname}bnms"]
 
-# output file names
-gwf_budget_file = f"{gwfname}.bud"
-gwf_head_file = f"{gwfname}.hds"
-prt_track_file = f"{prtname}.trk"
-prt_track_csv_file = f"{prtname}.trk.csv"
-mp7_pathline_file = f"{mp7name}.mppth"
+
 
 # model info
 nlay = 1
@@ -58,7 +53,7 @@ porosity = 0.1
 releasepts = [
     # index, k, i, j, x, y, z
     # (0-based indexing converted to 1-based for mf6 by flopy)
-    (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5)
+    [i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5]
     for i in range(9)
 ]
 releasepts_mp7 = [
@@ -69,13 +64,20 @@ releasepts_mp7 = [
 ]
 
 
+# model names
+def get_model_name(idx, mdl):
+    return f"{ex[idx]}_{mdl}"
+
+
 def build_sim(idx, ws, mf6):
     from test_prt_fmi01 import build_gwf_sim
 
     # create simulation
-    sim = build_gwf_sim(ex[idx], ws, mf6)
+    name = ex[idx]
+    sim = build_gwf_sim(name, ws, mf6)
 
     # create prt model
+    prtname = get_model_name(idx, "prt")
     prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
 
     # create prt discretization
@@ -91,16 +93,20 @@ def build_sim(idx, ws, mf6):
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
 
     # create prp package
+    rpts = [r + [str(r[0] + 1)] for r in releasepts] if "bnms" in name else releasepts
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp1",
         filename=f"{prtname}_1.prp",
-        nreleasepts=len(releasepts),
-        packagedata=releasepts,
+        nreleasepts=len(rpts),
+        packagedata=rpts,
         perioddata={0: ["FIRST"]},
+        boundnames="bnms" in name
     )
 
     # create output control package
+    prt_track_file = f"{prtname}.trk"
+    prt_track_csv_file = f"{prtname}.trk.csv"
     flopy.mf6.ModflowPrtoc(
         prt,
         pname="oc",
@@ -119,6 +125,7 @@ def build_sim(idx, ws, mf6):
     # )
 
     # create exchange
+    gwfname = get_model_name(idx, "gwf")
     flopy.mf6.ModflowGwfprt(
         sim,
         exgtype="GWF6-PRT6",
@@ -138,7 +145,7 @@ def build_sim(idx, ws, mf6):
     return sim
 
 
-def build_mp7_sim(ws, mp7, gwf):
+def build_mp7_sim(idx, ws, mp7, gwf):
     partdata = flopy.modpath.ParticleData(
         partlocs=[p[0] for p in releasepts_mp7],
         localx=[p[1] for p in releasepts_mp7],
@@ -147,6 +154,7 @@ def build_mp7_sim(ws, mp7, gwf):
         timeoffset=0,
         drape=0,
     )
+    mp7name = get_model_name(idx, "mp7")
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
         particledata=partdata,
@@ -213,6 +221,11 @@ def test_mf6model(idx, name, function_tmpdir, targets):
         str(ws),
     )
 
+    # model names
+    gwfname = get_model_name(idx, "gwf")
+    prtname = get_model_name(idx, "prt")
+    mp7name = get_model_name(idx, "mp7")
+
     # extract model objects
     gwf = sim.get_model(gwfname)
     prt = sim.get_model(prtname)
@@ -221,7 +234,7 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     mg = gwf.modelgrid
 
     # build mp7 model
-    mp7sim = build_mp7_sim(ws, targets.mp7, gwf)
+    mp7sim = build_mp7_sim(idx, ws, targets.mp7, gwf)
 
     # run mp7 model
     mp7sim.write_input()
@@ -229,6 +242,11 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     assert success
 
     # check mf6 output files exist
+    gwf_budget_file = f"{gwfname}.bud"
+    gwf_head_file = f"{gwfname}.hds"
+    prt_track_file = f"{prtname}.trk"
+    prt_track_csv_file = f"{prtname}.trk.csv"
+    mp7_pathline_file = f"{mp7name}.mppth"
     assert (ws / gwf_budget_file).is_file()
     assert (ws / gwf_head_file).is_file()
     assert (ws / prt_track_file).is_file()
@@ -249,7 +267,18 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     mp7_pldata["k"] = mp7_pldata["k"] + 1
 
     # load mf6 pathline results
-    mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
+    mf6_pldata = pd.read_csv(ws / prt_track_csv_file).replace(r'^\s*$', np.nan, regex=True)
+
+    # make sure pathline dataframe has "name" column
+    assert "name" in mf6_pldata
+
+    # check boundname values
+    if "bnms" in name:
+        # boundnames should be release point numbers (so pandas parses them as ints)
+        assert np.array_equal(mf6_pldata["name"].to_numpy(), mf6_pldata["irpt"].to_numpy())
+    else:
+        # no boundnames given so check for defaults
+        assert pd.isna(mf6_pldata["name"]).all()
 
     # check budget data were written to mf6 prt list file
     check_budget_data(ws / f"{name}_prt.lst", perlen, nper)

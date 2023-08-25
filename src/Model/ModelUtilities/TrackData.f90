@@ -55,11 +55,11 @@ module TrackModule
 
   character(len=*), parameter, public :: TRACKHEADERS = &
                 'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,istatus,ireason,&
-                &trelease,t,x,y,z'
+                &trelease,t,x,y,z,name'
 
   character(len=*), parameter, public :: TRACKTYPES = &
                              '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
-                             &<f8,<f8,<f8,<f8,<f8'
+                             &<f8,<f8,<f8,<f8,<f8,|S40'
 
   ! Notes
   ! -----
@@ -205,7 +205,8 @@ contains
         particle%ttrack, &
         xmodel, &
         ymodel, &
-        zmodel
+        zmodel, &
+        trim(adjustl(particle%name))
     else
       write (iun) &
         kper, &
@@ -222,7 +223,8 @@ contains
         particle%ttrack, &
         xmodel, &
         ymodel, &
-        zmodel
+        zmodel, &
+        particle%name
     end if
   end subroutine
 
@@ -254,7 +256,7 @@ contains
     !    deeper before advancing the particle and unwinding.
     if (present(level) .and. level .ne. 3) return
 
-    ! save binary file(s) if enabled
+    ! save model-level file(s) if enabled
     if (this%trackfile%iun > 0) &
       call save_internal(this%trackfile%iun, particle, &
                          kper, kstp, reason, level, csv=.false.)
@@ -273,6 +275,11 @@ contains
     end if
   end subroutine save_record
 
+  !> @brief Set the event to be reported.
+  !!
+  !! itrackevent -1 corresponds to TRACKEVENT ALL
+  !! and so on. If itrackevent >= 0, the selected
+  !! event type will be saved and others omitted.
   subroutine set_track_event(this, itrackevent)
     class(TrackControlType) :: this
     integer(I4B), intent(in) :: itrackevent

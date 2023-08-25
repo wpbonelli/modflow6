@@ -21,7 +21,7 @@ module PrtModule
   use MethodDisModule, only: MethodDisType
   use MethodDisvModule, only: MethodDisvType
   ! use MethodDisuModule, only: MethodDisuType
-  use ParticleModule ! kluge
+  use ParticleModule
   use MethodModule
   use GlobalDataModule
   use TrackModule, only: TrackControlType, TrackFileType
