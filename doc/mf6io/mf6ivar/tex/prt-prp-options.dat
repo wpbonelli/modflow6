@@ -7,4 +7,5 @@ BEGIN OPTIONS
   [STOP_AT_WEAK_SINK]
   [ISTOPZONE <istopzone>]
   [DRAPE]
+  [REFERENCETIME <referencetime>]
 END OPTIONS

@@ -127,6 +127,14 @@ optional true
 longname drape
 description is a text keyword to indicate that a particle is to be moved to the topmost active cell prior to release if its release point is in a cell that is dry at the scheduled time of release.  By default, a particle does not get released into the simulation if its release point is in a cell that is dry at the scheduled time of release.  ??? Move to what elevation within topmost active cell ???
 
+block options
+name referencetime
+type double precision
+reader urword
+optional true
+longname period referencetime
+description real value defining the time at which to release particles. This is comparable to MODPATH 7 referencetime option 1.
+
 # --------------------- prt prp dimensions ---------------------
 
 block dimensions
@@ -234,13 +242,13 @@ description
 
 block period
 name releasesetting
-type keystring all first frequency steps
+type keystring all first frequency steps fraction
 shape
 tagged false
 in_record true
 reader urword
 longname
-description specifies the steps at the start of which particles will be released.  The setting applies to all release points defined in PACKAGEDATA.
+description specifies when to release particles within the stress period.  Overrides package-level REFERENCETIME option, which applies to all stress periods. By default, RELEASESETTING configures particles for release at the beginning of the specified time steps. For time-offset releases, provide a FRACTION with another RELEASESETTING option.
 
 block period
 name all
@@ -279,3 +287,14 @@ in_record true
 reader urword
 longname
 description release particles at the start of each step specified in STEPS. This keyword may be used in conjunction with other keywords to release particles at the start of multiple time steps.
+
+block period
+name fraction
+type double precision
+shape (<nstp)
+tagged true
+in_record true
+reader urword
+optional true
+longname
+description release particles after the specified fraction of the time step has elapsed. If FRACTION is not set, particles are released at the start of the specified time step(s). FRACTION must be a single value when used with ALL, FIRST, or FREQUENCY. When used with STEPS, FRACTION may be a single value or an array of the same length as STEPS. If a single FRACTION value is provided with STEPS, the fraction applies to all steps.

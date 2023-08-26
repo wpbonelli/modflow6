@@ -40,6 +40,8 @@ module PrtPrpModule
     integer(I4B), pointer :: istopweaksink => null() !< weak sink option: 0 = do not stop, 1 = stop
     integer(I4B), pointer :: istopzone => null() !< optional stop zone number; 0 = no stop zone
     integer(I4B), pointer :: idrape => null() !< drape option: 0 = do not drape, 1 = drape to topmost active cell
+    real(DP), pointer :: reftime => null() !< reference time for particle release
+    logical(LGP), pointer :: usereftime => null() !< flag indicating whether reference time is used
     integer(I4B), dimension(:), pointer, contiguous :: noder => null() !< reduced node number of release point
     integer(I4B), dimension(:), pointer, contiguous :: izone => null() !< zone number
     real(DP), dimension(:), pointer, contiguous :: x => null() !< x coordinate of particle release point
@@ -52,6 +54,7 @@ module PrtPrpModule
                                                                       => null() !< release point name
     real(DP), dimension(:), pointer, contiguous :: massrls => null() !< mass released during time step
     integer(I4B), allocatable, dimension(:) :: kstp_list_rls !< allocatable time steps for releases in period
+    real(DP), allocatable, dimension(:) :: frac_list_rls !< allocatable time step fractions for releases in period
     integer(I4B), pointer :: ifreq_rls => null() !< release frequency (time steps) in period
     logical(LGP), pointer :: rls_first => null() !< flag for release on first time step in period
     logical(LGP), pointer :: rls_all => null() !< flag for release on all time steps in period
@@ -137,6 +140,8 @@ contains
     call this%BndType%bnd_da()
     !
     ! -- scalars
+    call mem_deallocate(this%reftime)
+    call mem_deallocate(this%usereftime)
     call mem_deallocate(this%stoptime)
     call mem_deallocate(this%stoptraveltime)
     call mem_deallocate(this%istopweaksink)
@@ -167,8 +172,9 @@ contains
     deallocate (this%partlist)
     call mem_deallocate(this%massrls)
     !
-    ! -- deallocate step release array
+    ! -- deallocate step, fraction, and reference time arrays
     if (allocated(this%kstp_list_rls)) deallocate (this%kstp_list_rls)
+    if (allocated(this%frac_list_rls)) deallocate (this%frac_list_rls)
     !
     ! -- return
     return
@@ -232,6 +238,10 @@ contains
     if (allocated(this%kstp_list_rls)) deallocate (this%kstp_list_rls)
     allocate (this%kstp_list_rls(0))
     !
+    ! -- The following array is allocatable (not a pointer) so it can be resized using
+    if (allocated(this%frac_list_rls)) deallocate (this%frac_list_rls)
+    allocate (this%frac_list_rls(1))
+    !
     ! -- Return
     return
   end subroutine prp_allocate_arrays
@@ -247,6 +257,8 @@ contains
     call this%BndType%allocate_scalars()
     !
     ! -- Allocate scalars for this type
+    call mem_allocate(this%reftime, 'REFERENCETIME', this%memoryPath)
+    call mem_allocate(this%usereftime, 'USEREFERENCETIME', this%memoryPath)
     call mem_allocate(this%stoptime, 'STOPTIME', this%memoryPath)
     call mem_allocate(this%stoptraveltime, 'STOPTRAVELTIME', this%memoryPath)
     call mem_allocate(this%istopweaksink, 'ISTOPWEAKSINK', this%memoryPath)
@@ -265,6 +277,8 @@ contains
     call mem_allocate(this%itrkcsv, 'ITRKCSV', this%memoryPath)
     !
     ! -- Set values
+    this%reftime = 0
+    this%usereftime = .true.
     this%stoptime = huge(1d0)
     this%stoptraveltime = huge(1d0)
     this%istopweaksink = 0
@@ -323,11 +337,19 @@ contains
     return
   end subroutine prp_ar
 
-  !> @brief Advance a time step & release new particles according to period data
-  !<
+  !> @brief Advance a time step & release new particles if appropriate
+  !!
+  !! Particle releases may be scheduled via REFERENCETIME or within a
+  !! stress period, via ALL, FIRST, FREQUENCY or STEPS (with optional
+  !! FRACTION). If no release configuration is provided at the period
+  !! block level, particle release is scheduled by REFERENCETIME, and
+  !! this routine releases immediately, on the first time step of the
+  !! first stress period. If finer-grained period-level scheduling is
+  !! used, this routine will release particles in the period and time
+  !! step specified by the period block configuration.
   subroutine prp_ad(this)
     ! -- modules
-    use TdisModule, only: kstp, totimc
+    use TdisModule, only: kper, kstp, totimc, delt
     use InputOutputModule, only: get_ijk, get_jk
     use GwfDisModule, only: GwfDisType
     use GwfDisvModule, only: GwfDisvType
@@ -336,9 +358,11 @@ contains
     ! -- local
     integer(I4B) :: i, n, ic, icu, icpl, irow, icol, ilay
     integer(I4B) :: nps, np
-    real(DP) :: trelease, tstop
+    real(DP) :: rls_frac, trelease, tstop
     logical(LGP) :: isRelease
     character(len=LENBOUNDNAME) :: bndName = ''
+
+    isRelease = .false.
     !
     ! -- Reset particle mass released for time step
     do nps = 1, this%nreleasepts
@@ -346,32 +370,42 @@ contains
     end do
     !
     ! -- Return early if there are no particles to release
-    if (.not. this%rls_any) then
-      return
-    end if
-
-    ! -- Check if there is to be a release at the start of this time step
-    isRelease = .false.
-    ! -- release all time steps
-    if (this%rls_all) then
-      isRelease = .true.
+    if (.not. this%rls_any) return
+    !
+    ! -- Setup fractional timestep release timing
+    rls_frac = this%frac_list_rls(1)
+    !
+    ! -- Check if 1st period/step and using referencetime scheduling
+    if (this%usereftime) then
+      if (kper == 1 .and. kstp == 1) isRelease = .true.
     else
-      ! -- release on the first time step
-      if (this%rls_first) then
-        if (kstp == 1) isRelease = .true.
-      end if
-      ! -- release only after every this%ifreq_rls time steps elapse
-      if (this%ifreq_rls > 0) then
-        if ((kstp / this%ifreq_rls) * this%ifreq_rls == kstp) & ! kluge note: use modulo?
-          isRelease = .true.
-      end if
       !
-      n = size(this%kstp_list_rls)
-      if (n > 0) then
-        do i = 1, n
-          ! todo: store advancing counter to avoid re-searching entire array each time?
-          if (this%kstp_list_rls(i) == kstp) isRelease = .true.
-        end do
+      ! -- Check if there is to be a release at the start of this time step
+      ! -- release all time steps
+      if (this%rls_all) then
+        isRelease = .true.
+      else
+        ! -- release on the first time step
+        if (this%rls_first) then
+          if (kstp == 1) isRelease = .true.
+        end if
+        ! -- release only after every this%ifreq_rls time steps elapse
+        if (this%ifreq_rls > 0) then
+          if ((kstp / this%ifreq_rls) * this%ifreq_rls == kstp) & ! kluge note: use modulo?
+            isRelease = .true.
+        end if
+        !
+        ! -- release on specified time steps
+        n = size(this%kstp_list_rls)
+        if (n > 0) then
+          do i = 1, n
+            ! todo: store advancing counter to avoid re-searching entire array each time?
+            if (this%kstp_list_rls(i) == kstp) then
+              isRelease = .true.
+              if (size(this%frac_list_rls) > 1) rls_frac = this%frac_list_rls(i)
+            end if
+          end do
+        end if
       end if
     end if
     !
@@ -394,15 +428,24 @@ contains
             ! -- Search for highest active cell
             call this%dis%highest_active(ic, this%ibound)
             ! -- If returned cell is inactive, do not release particle
-            ! kluge note: somehow record for the user that a particle was scheduled but not released?
-            ! another ireason code? record single datum for release into inactive cell?
-            if (this%ibound(ic) == 0) cycle
+            if (this%ibound(ic) == 0) cycle ! todo: terminate with istatus 8 and ireason 3
           end if
         end if
         np = this%npart + 1 ! particle index
         this%npart = np
-        trelease = totimc ! release time
-
+        !
+        ! -- Use reference time, if configured
+        if (this%usereftime) then
+          trelease = this%reftime ! reference time
+        else
+          ! -- Apply fractional timestep release timing, if configured
+          if (rls_frac > 0.0_DP) then
+            trelease = totimc + rls_frac * delt ! release at fraction of time step
+          else
+            trelease = totimc ! release at beginning of time step
+          end if
+        end if
+        !
         ! -- Set stopping time to earlier of times specified by STOPTIME and STOPTRAVELTIME
         if (this%stoptraveltime == huge(1d0)) then
           tstop = this%stoptime
@@ -420,7 +463,7 @@ contains
           call get_jk(icu, dis%ncpl, dis%nlay, icpl, ilay)
         end select
 
-        ! -- Todo: check that location is within the specified cell
+        ! -- todo: check that location is within the specified cell
 
         ! -- Set particle boundname
         if (size(this%boundname) /= 0) &
@@ -467,7 +510,6 @@ contains
   end subroutine prp_ad
 
   !> @ brief Read and prepare period data for particle input
-  !<
   subroutine prp_rp(this)
     ! -- modules
     use TdisModule, only: kper, nper
@@ -492,6 +534,8 @@ contains
                                    "(6x,'TIME STEP(S) ',50(I0,' '))" ! kluge 50 (similar to STEPS in OC)?
     character(len=*), parameter :: fmt_freq = &
                                    "(6x,'EVERY ',I0,' TIME STEP(S)')"
+    character(len=*), parameter :: fmt_fracs = &
+                                   "(6x,50(f10.3,' '))"
     !
     ! -- Set ionper to the stress period number for which a new block of data
     !    will be read.
@@ -533,6 +577,9 @@ contains
       if (kper == 1) then
         if (allocated(this%kstp_list_rls)) deallocate (this%kstp_list_rls)
         allocate (this%kstp_list_rls(0))
+        if (allocated(this%frac_list_rls)) deallocate (this%frac_list_rls)
+        allocate (this%frac_list_rls(1))
+        this%frac_list_rls(1) = 0.0_DP
         this%ifreq_rls = 0
         this%rls_first = .true.
         this%rls_all = .false.
@@ -548,6 +595,9 @@ contains
       ! -- clear period data
       if (allocated(this%kstp_list_rls)) deallocate (this%kstp_list_rls)
       allocate (this%kstp_list_rls(0))
+      if (allocated(this%frac_list_rls)) deallocate (this%frac_list_rls)
+      allocate (this%frac_list_rls(1))
+      this%frac_list_rls(1) = 0.0_DP
       this%ifreq_rls = 0
       this%rls_first = .false.
       this%rls_all = .false.
@@ -567,30 +617,61 @@ contains
         case ('ALL')
           this%rls_all = .true.
           this%rls_any = .true.
+          this%usereftime = .false.
         case ('STEPS')
           call this%parser%GetRemainingLine(line)
           lloc = 1
-          listsearch: do
+          stepslistsearch: do
             call urword(line, lloc, istart, istop, 2, ival, rval, -1, 0)
             if (ival > 0) then
               n = size(this%kstp_list_rls)
               call expandarray(this%kstp_list_rls)
               this%kstp_list_rls(n + 1) = ival
-              cycle listsearch
+              cycle stepslistsearch
             end if
-            exit listsearch
-          end do listsearch
+            exit stepslistsearch
+          end do stepslistsearch
           this%rls_any = .true.
+          this%usereftime = .false.
+        case ('FIRST')
+          this%rls_first = .true.
+          this%rls_any = .true.
+          this%usereftime = .false.
         case ('FREQUENCY')
           ival = this%parser%GetInteger() ! todo: check for nonnegative?
           this%ifreq_rls = ival
           this%rls_any = .true.
-        case ('FIRST')
-          this%rls_first = .true.
+          this%usereftime = .false.
+        case ('FRACTION')
+          call this%parser%GetRemainingLine(line)
+          lloc = 1
+          fraclistsearch: do
+            ! -- first element allocated and set 0.0 by default
+            !    so deallocate before we populate parsed values
+            if (lloc == 1 .and. allocated(this%frac_list_rls)) then
+              deallocate (this%frac_list_rls)
+              allocate (this%frac_list_rls(0))
+            end if
+            ! -- parse the next value
+            call urword(line, lloc, istart, istop, 3, ival, rval, -1, 0)
+            ! -- if istart == istop, no more values, done parsing
+            if (istart == istop) exit fraclistsearch
+            ! -- terminate with error if not between 0 and 1
+            if (rval < 0.0_DP .or. rval > 1.0_DP) then
+              write (errmsg, '(2a, f12.6)') &
+                'FRACTION must be between 0 and 1. Found: ', rval
+              call store_error(errmsg, terminate=.TRUE.)
+            end if
+            ! -- populate parsed values, expanding array as needed
+            n = size(this%frac_list_rls)
+            call expandarray(this%frac_list_rls)
+            this%frac_list_rls(n + 1) = rval
+          end do fraclistsearch
           this%rls_any = .true.
+          this%usereftime = .false.
         case default
           write (errmsg, '(2a)') &
-            'Looking for ALL, STEPS, FIRST, or FREQUENCY. Found: ', &
+            'Looking for ALL, STEPS, FIRST, FREQUENCY, or FRACTION. Found: ', &
             trim(adjustl(keyword))
           call store_error(errmsg, terminate=.TRUE.)
         end select
@@ -602,23 +683,53 @@ contains
       rls_lsp = .true.
     end if
     !
+    ! -- if FRACTION is provided without any other setting, it must be
+    !    a single value, and the release settings default is the first
+    !    time step of the stress period, same as default if no settings
+    !    are provided. FRACTION may not be an array if it is the only
+    !    setting provided.
+    !
+    ! -- todo: should we interpret an array-valued FRACTION of length N
+    !    applying to first N steps of period? or terminate with error?
+    if (this%rls_any .and. .not. (this%rls_first .or. &
+                                  this%rls_all .or. &
+                                  this%ifreq_rls > 0 .or. &
+                                  size(this%kstp_list_rls) > 0)) then
+      if (size(this%frac_list_rls) > 1) then
+        write (errmsg, '(2a)') &
+          'FRACTION must be a single value if no other release setting'// &
+          ' is provided.'
+        call store_error(errmsg, terminate=.TRUE.)
+      else
+        this%rls_first = .true.
+      end if
+    end if
+    !
+    ! -- write settings to list file
     if (.not. this%rls_any) then
       write (this%iout, "(1x,/1x,a)") 'NO PARTICLE RELEASES IN THIS STRESS '// &
         'PERIOD'
     else if (rls_lsp) then
       write (this%iout, "(1x,/1x,a)") 'REUSING PARTICLE RELEASE SETTINGS '// &
         'FROM LAST STRESS PERIOD'
-    else if (this%rls_all) then
-      write (this%iout, "(1x,/1x,a)") 'PARTICLE RELEASE SCHEDULED AT THE '// &
-        'START OF ALL TIME STEPS IN STRESS PERIOD'
     else
-      write (this%iout, "(1x,/1x,a)") 'PARTICLE RELEASE SCHEDULED AT THE '// &
-        'START OF EACH TIME STEP THAT MATCHES ONE OR MORE OF THE FOLLOWING:'
-      if (this%rls_first) write (this%iout, "(6x,a)") 'FIRST TIME STEP '// &
-        '(START OF STRESS PERIOD)'
-      if (this%ifreq_rls > 0) write (this%iout, fmt_freq) this%ifreq_rls
-      n = size(this%kstp_list_rls)
-      if (n > 0) write (this%iout, fmt_steps) this%kstp_list_rls
+      ! -- write particle release setting
+      write (this%iout, "(1x,/1x,a)", advance='no') 'PARTICLE RELEASE'
+      if (this%rls_first) then
+        write (this%iout, "(1x,a)", advance='no') 'IN FIRST TIME STEP'
+      else if (this%rls_all) then
+        write (this%iout, "(1x,a)", advance='no') 'IN ALL TIME STEPS'
+      else if (this%ifreq_rls > 0) then
+        write (this%iout, fmt_freq, advance='no') this%ifreq_rls
+      else
+        n = size(this%kstp_list_rls)
+        if (n > 0) write (this%iout, fmt_steps, advance='no') this%kstp_list_rls
+      end if
+      ! -- write time step fraction(s)
+      write (this%iout, "(1x,a)", advance='no') 'AT FRACTION(S)'
+      n = size(this%frac_list_rls)
+      if (n > 0) write (this%iout, fmt_fracs) this%frac_list_rls
+      write (this%iout, '(A)')
     end if
     !
     ! -- return
@@ -776,6 +887,9 @@ contains
       found = .true.
     case ('DRAPE')
       this%idrape = 1
+      found = .true.
+    case ('REFERENCETIME')
+      this%reftime = this%parser%GetDouble()
       found = .true.
     case ('TRACK')
       call this%parser%GetStringCaps(keyword)
