@@ -19,8 +19,8 @@ even with no weak sink cells in the vicinity.)
 
 This test also specifies `boundnames=True` for
 the PRP package, but does not provide boundnames
-(particle names), and checks that the "name" col
-in the track output files contains empty strings.
+values, and checks that the "name" column in the
+track output files contain the expected defaults.
 """
 
 

@@ -19,8 +19,8 @@ Particles are released from the top left cell.
 
 Results are compared against a MODPATH 7 model.
 
-This test case also configures recording events
-to check that they can be explicitly specified.
+A case is defined for each TRACKEVENT optional
+value to check that events can be selected.
 """
 
 
