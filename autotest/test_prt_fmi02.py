@@ -424,7 +424,7 @@ def test_prt_fmi02(idx, name, function_tmpdir, targets):
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
     # setup plot
-    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(13, 13))
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 10))
     for a in ax:
         a.set_aspect("equal")
 

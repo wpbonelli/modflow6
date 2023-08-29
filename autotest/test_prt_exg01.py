@@ -25,7 +25,13 @@ from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 
 from framework import TestFramework
-from prt_test_utils import all_equal, check_budget_data, check_track_data, has_default_boundnames, to_mp7_format
+from prt_test_utils import (
+    all_equal,
+    check_budget_data,
+    check_track_data,
+    has_default_boundnames,
+    to_mp7_format,
+)
 from simulation import TestSimulation
 
 
@@ -34,7 +40,6 @@ simname = "prtexg1"
 
 # test cases
 ex = [simname, f"{simname}bnms"]
-
 
 
 # model info
@@ -93,7 +98,11 @@ def build_sim(idx, ws, mf6):
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
 
     # create prp package
-    rpts = [r + [str(r[0] + 1)] for r in releasepts] if "bnms" in name else releasepts
+    rpts = (
+        [r + [str(r[0] + 1)] for r in releasepts]
+        if "bnms" in name
+        else releasepts
+    )
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp1",
@@ -101,7 +110,7 @@ def build_sim(idx, ws, mf6):
         nreleasepts=len(rpts),
         packagedata=rpts,
         perioddata={0: ["FIRST"]},
-        boundnames="bnms" in name
+        boundnames="bnms" in name,
     )
 
     # create output control package
@@ -267,7 +276,9 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     mp7_pldata["k"] = mp7_pldata["k"] + 1
 
     # load mf6 pathline results
-    mf6_pldata = pd.read_csv(ws / prt_track_csv_file).replace(r'^\s*$', np.nan, regex=True)
+    mf6_pldata = pd.read_csv(ws / prt_track_csv_file).replace(
+        r"^\s*$", np.nan, regex=True
+    )
 
     # make sure pathline dataframe has "name" column
     assert "name" in mf6_pldata
@@ -275,7 +286,9 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     # check boundname values
     if "bnms" in name:
         # boundnames should be release point numbers (so pandas parses them as ints)
-        assert np.array_equal(mf6_pldata["name"].to_numpy(), mf6_pldata["irpt"].to_numpy())
+        assert np.array_equal(
+            mf6_pldata["name"].to_numpy(), mf6_pldata["irpt"].to_numpy()
+        )
     else:
         # no boundnames given so check for defaults
         assert pd.isna(mf6_pldata["name"]).all()
@@ -298,7 +311,7 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
     # setup plot
-    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(13, 13))
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 10))
     for a in ax:
         a.set_aspect("equal")
 

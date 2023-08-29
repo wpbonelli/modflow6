@@ -34,7 +34,14 @@ import pandas as pd
 import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
-from prt_test_utils import all_equal, check_budget_data, check_track_data, has_default_boundnames, to_mp7_format
+from prt_test_utils import (
+    all_equal,
+    check_budget_data,
+    check_track_data,
+    get_partdata,
+    has_default_boundnames,
+    to_mp7_format,
+)
 
 
 # simulation name
@@ -77,18 +84,6 @@ releasepts_prt = [
     (i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5)
     for i in range(9)
 ]
-
-
-def get_partdata(grid):
-    return flopy.modpath.ParticleData(
-        partlocs=[grid.get_lrc(p[0])[0] for p in releasepts_mp7],
-        structured=True,
-        localx=[p[1] for p in releasepts_mp7],
-        localy=[p[2] for p in releasepts_mp7],
-        localz=[p[3] for p in releasepts_mp7],
-        timeoffset=0,
-        drape=0,
-    )
 
 
 def build_gwf_sim(name, ws, mf6):
@@ -197,7 +192,7 @@ def build_prt_sim(idx, ws, mf6):
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
 
     # convert mp7 particledata to prt release points
-    partdata = get_partdata(prt.modelgrid)
+    partdata = get_partdata(prt.modelgrid, releasepts_mp7)
     coords = partdata.to_coords(prt.modelgrid)
     releasepts = [(i, 0, 0, 0, c[0], c[1], c[2]) for i, c in enumerate(coords)]
 
@@ -217,7 +212,7 @@ def build_prt_sim(idx, ws, mf6):
         track_filerecord=[prp_track_file],
         trackcsv_filerecord=[prp_track_csv_file],
         stop_at_weak_sink="saws" in prtname,
-        boundnames=True
+        boundnames=True,
     )
 
     # create output control package
@@ -255,7 +250,7 @@ def build_prt_sim(idx, ws, mf6):
 
 def build_mp7_sim(idx, ws, mp7, gwf):
     # convert mp7 particledata to prt release points
-    partdata = get_partdata(gwf.modelgrid)
+    partdata = get_partdata(gwf.modelgrid, releasepts_mp7)
 
     # create modpath 7 simulation
     mp7name = get_model_name(idx, "mp7")
@@ -383,7 +378,7 @@ def test_prt_fmi01(idx, name, function_tmpdir, targets):
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
     # setup plot
-    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(13, 13))
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 10))
     for a in ax:
         a.set_aspect("equal")
 

@@ -104,7 +104,7 @@ def to_mp7_format(data: Union[pd.DataFrame, np.recarray]) -> pd.DataFrame:
     )
 
 
-def check_budget_data(lst: os.PathLike, perlen, nper):
+def check_budget_data(lst: os.PathLike, perlen=1, nper=1, nstp=1):
     # load PRT model's list file
     mflist = flopy.utils.mflistfile.ListBudget(
         lst, budgetkey="MASS BUDGET FOR ENTIRE MODEL"
@@ -115,7 +115,8 @@ def check_budget_data(lst: os.PathLike, perlen, nper):
     # check timesteps
     inc = mflist.get_incremental()
     v = inc["totim"][-1]
-    assert v == perlen * nper, f"Last time should be {perlen}.  Found {v}"
+    exp = float(perlen * nper)
+    assert v == exp, f"Last time should be {exp}, found {v}"
 
     # entries should be a subset of names
     assert all(e in names for e in entries)
@@ -163,6 +164,30 @@ def all_equal(col, val):
 
 
 def has_default_boundnames(data):
-    name = [int(n.rpartition("0")[2]) for n in data["name"].to_numpy()]
+    name = [int(n.partition("0")[2]) for n in data["name"].to_numpy()]
     irpt = data["irpt"].to_numpy()
     return np.array_equal(name, irpt)
+
+
+def get_partdata(grid, rpts):
+    if grid.grid_type == "structured":
+        return flopy.modpath.ParticleData(
+            partlocs=[grid.get_lrc(p[0])[0] for p in rpts],
+            structured=True,
+            localx=[p[1] for p in rpts],
+            localy=[p[2] for p in rpts],
+            localz=[p[3] for p in rpts],
+            timeoffset=0,
+            drape=0,
+        )
+    else:
+        return flopy.modpath.ParticleData(
+            partlocs=[p[0] for p in rpts],
+            structured=False,
+            localx=[p[1] for p in rpts],
+            localy=[p[2] for p in rpts],
+            localz=[p[3] for p in rpts],
+            timeoffset=0,
+            drape=0,
+        )
+
