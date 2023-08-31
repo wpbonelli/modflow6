@@ -34,12 +34,12 @@ import pandas as pd
 import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
+from flopy.plot.plotutil import to_mp7_pathlines
 
 from prt_test_utils import (
     check_budget_data,
     check_track_data,
     get_output_event,
-    to_mp7_format,
 )
 
 
@@ -358,17 +358,16 @@ def test_prt_fmi02(idx, name, function_tmpdir, targets):
 
     # load mp7 pathline results
     plf = PathlineFile(ws / mp7_pathline_file)
-    mp7_pldata = pd.DataFrame(
+    mp7_pls = pd.DataFrame(
         plf.get_destination_pathline_data(range(mg.nnodes), to_recarray=True)
     )
     # convert zero-based to one-based
-    mp7_pldata["particleid"] = mp7_pldata["particleid"] + 1
-    mp7_pldata["particlegroup"] = mp7_pldata["particlegroup"] + 1
-    mp7_pldata["node"] = mp7_pldata["node"] + 1
-    mp7_pldata["k"] = mp7_pldata["k"] + 1
+    mp7_pls["particlegroup"] = mp7_pls["particlegroup"] + 1
+    mp7_pls["node"] = mp7_pls["node"] + 1
+    mp7_pls["k"] = mp7_pls["k"] + 1
 
     # load mf6 pathline results
-    mf6_pldata = pd.read_csv(ws / prt_track_csv_file)
+    mf6_pls = pd.read_csv(ws / prt_track_csv_file)
 
     # if event is ALL, output should be the same as MODPATH 7,
     # so continue with comparisons.
@@ -378,15 +377,15 @@ def test_prt_fmi02(idx, name, function_tmpdir, targets):
     # in either case, return early and skip MP7 comparison.
     event = get_output_event(ex[idx])
     if event == "RELEASE" or event == "TERMINATE":
-        assert len(mf6_pldata) == len(releasepts_a) + len(releasepts_b)
+        assert len(mf6_pls) == len(releasepts_a) + len(releasepts_b)
         return
     elif event == "TRANSIT":
-        assert len(mf6_pldata) == (
-            len(mp7_pldata) - 2 * (len(releasepts_a) + len(releasepts_b))
+        assert len(mf6_pls) == (
+            len(mp7_pls) - 2 * (len(releasepts_a) + len(releasepts_b))
         )
         return
     elif event == "TIMESTEP" or event == "WEAKSINK":
-        assert len(mf6_pldata) == 0
+        assert len(mf6_pls) == 0
         return
 
     # make sure mf6 pathline data have correct
@@ -396,11 +395,11 @@ def test_prt_fmi02(idx, name, function_tmpdir, targets):
         a = col.to_numpy()
         return a[0] == val and (a[0] == a).all()
 
-    assert all_equal(mf6_pldata["imdl"], 1)
-    assert set(mf6_pldata[mf6_pldata["iprp"] == 1]["irpt"].unique()) == set(
+    assert all_equal(mf6_pls["imdl"], 1)
+    assert set(mf6_pls[mf6_pls["iprp"] == 1]["irpt"].unique()) == set(
         range(1, 5)
     )
-    assert set(mf6_pldata[mf6_pldata["iprp"] == 2]["irpt"].unique()) == set(
+    assert set(mf6_pls[mf6_pls["iprp"] == 2]["irpt"].unique()) == set(
         range(1, 6)
     )
 
@@ -433,7 +432,7 @@ def test_prt_fmi02(idx, name, function_tmpdir, targets):
     pmv.plot_grid()
     pmv.plot_array(hds[0], alpha=0.1)
     pmv.plot_vector(qx, qy, normalize=True, color="white")
-    mf6_plines = mf6_pldata.groupby(["iprp", "irpt", "trelease"])
+    mf6_plines = mf6_pls.groupby(["iprp", "irpt", "trelease"])
     for ipl, ((iprp, irpt, trelease), pl) in enumerate(mf6_plines):
         pl.plot(
             title="MF6 pathlines",
@@ -450,7 +449,7 @@ def test_prt_fmi02(idx, name, function_tmpdir, targets):
     pmv.plot_grid()
     pmv.plot_array(hds[0], alpha=0.1)
     pmv.plot_vector(qx, qy, normalize=True, color="white")
-    mp7_plines = mp7_pldata.groupby(["particleid"])
+    mp7_plines = mp7_pls.groupby(["particleid"])
     for ipl, (pid, pl) in enumerate(mp7_plines):
         pl.plot(
             title="MP7 pathlines",
@@ -466,34 +465,8 @@ def test_prt_fmi02(idx, name, function_tmpdir, targets):
     # plt.show()
     plt.savefig(ws / f"test_{simname}.png")
 
-    # convert mf6 pathlines to mp7 format
-    mf6_pldata_mp7 = to_mp7_format(mf6_pldata)
-
-    # drop columns for which there is no direct correspondence between mf6 and mp7
-    del mf6_pldata_mp7["particleid"]
-    del mf6_pldata_mp7["sequencenumber"]
-    del mf6_pldata_mp7["particleidloc"]
-    del mf6_pldata_mp7["xloc"]
-    del mf6_pldata_mp7["yloc"]
-    del mf6_pldata_mp7["zloc"]
-    del mp7_pldata["particleid"]
-    del mp7_pldata["sequencenumber"]
-    del mp7_pldata["particleidloc"]
-    del mp7_pldata["xloc"]
-    del mp7_pldata["yloc"]
-    del mp7_pldata["zloc"]
-
-    # sort both dataframes
-    cols = ["x", "y", "z", "time"]
-    mf6_pldata_mp7 = mf6_pldata_mp7.sort_values(by=cols)
-    mp7_pldata = mp7_pldata.sort_values(by=cols)
-
-    # compare mf6 / mp7 pathline data
-    assert mf6_pldata_mp7.shape == mp7_pldata.shape
-    assert np.allclose(mf6_pldata_mp7, mp7_pldata, atol=1e-3)
-
     # check that cell numbers are correct
-    for i, row in list(mf6_pldata.iterrows()):
+    for i, row in list(mf6_pls.iterrows()):
         # todo debug final cell number disagreement
         if row.ireason == 3:  # termination
             continue
@@ -513,3 +486,29 @@ def test_prt_fmi02(idx, name, function_tmpdir, targets):
             (nn - 1) == n for n in neighbors
         ), f"nn comparison failed: expected {nn}, got {icell}"
         assert ilay == (k + 1) == 1
+
+    # convert mf6 pathlines to mp7 format
+    mf6_pls = to_mp7_pathlines(mf6_pls)
+
+    # drop columns for which there is no direct correspondence between mf6 and mp7
+    del mf6_pls["particleid"]
+    del mf6_pls["sequencenumber"]
+    del mf6_pls["particleidloc"]
+    del mf6_pls["xloc"]
+    del mf6_pls["yloc"]
+    del mf6_pls["zloc"]
+    del mp7_pls["particleid"]
+    del mp7_pls["sequencenumber"]
+    del mp7_pls["particleidloc"]
+    del mp7_pls["xloc"]
+    del mp7_pls["yloc"]
+    del mp7_pls["zloc"]
+
+    # sort both dataframes
+    cols = ["x", "y", "z", "time"]
+    mf6_pls = mf6_pls.sort_values(by=cols)
+    mp7_pls = mp7_pls.sort_values(by=cols)
+
+    # compare mf6 / mp7 pathline data
+    assert mf6_pls.shape == mp7_pls.shape
+    assert np.allclose(mf6_pls, mp7_pls, atol=1e-3)

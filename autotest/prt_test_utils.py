@@ -54,56 +54,6 @@ def check_track_data(
     assert all(data_bin["ireason"] >= 0)
 
 
-def to_mp7_format(data: Union[pd.DataFrame, np.recarray]) -> pd.DataFrame:
-    if isinstance(data, pd.DataFrame):
-        data = data.to_records(index=False)
-
-    mp7_dtypes = np.dtype(
-        [
-            ("particleid", np.int32),
-            ("particlegroup", np.int32),
-            ("sequencenumber", np.int32),
-            ("particleidloc", np.int32),
-            ("time", np.float32),
-            ("x", np.float32),
-            ("y", np.float32),
-            ("z", np.float32),
-            ("k", np.int32),
-            ("node", np.int32),
-            ("xloc", np.float32),
-            ("yloc", np.float32),
-            ("zloc", np.float32),
-            ("stressperiod", np.int32),
-            ("timestep", np.int32),
-        ]
-    )
-
-    return pd.DataFrame(
-        np.core.records.fromarrays(
-            [
-                data["irpt"],
-                data["iprp"],
-                np.zeros(
-                    data.shape[0]
-                ),  # todo use sequencenumber passed explicitly as particle name
-                np.zeros(data.shape[0]),
-                data["t"],
-                data["x"],
-                data["y"],
-                data["z"],
-                data["ilay"],  # todo add to PRT output?
-                data["icell"],
-                np.zeros(data.shape[0]),
-                np.zeros(data.shape[0]),
-                np.zeros(data.shape[0]),
-                data["kper"],
-                data["kstp"],
-            ],
-            dtype=mp7_dtypes,
-        )
-    )
-
-
 def check_budget_data(lst: os.PathLike, perlen=1, nper=1, nstp=1):
     # load PRT model's list file
     mflist = flopy.utils.mflistfile.ListBudget(
@@ -190,4 +140,3 @@ def get_partdata(grid, rpts):
             timeoffset=0,
             drape=0,
         )
-

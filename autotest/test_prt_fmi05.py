@@ -35,12 +35,12 @@ import pandas as pd
 import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
+from flopy.plot.plotutil import to_mp7_pathlines
 from prt_test_utils import (
     all_equal,
     check_budget_data,
     check_track_data,
     has_default_boundnames,
-    to_mp7_format,
 )
 
 
@@ -379,28 +379,27 @@ def test_prt_fmi01(idx, name, function_tmpdir, targets, fraction):
 
     # load mp7 pathline results
     plf = PathlineFile(ws / mp7_pathline_file)
-    mp7_pldata = pd.DataFrame(
+    mp7_pls = pd.DataFrame(
         plf.get_destination_pathline_data(range(mg.nnodes), to_recarray=True)
     )
     # convert zero-based to one-based indexing in mp7 results
-    mp7_pldata["particleid"] = mp7_pldata["particleid"] + 1
-    mp7_pldata["particlegroup"] = mp7_pldata["particlegroup"] + 1
-    mp7_pldata["node"] = mp7_pldata["node"] + 1
-    mp7_pldata["k"] = mp7_pldata["k"] + 1
+    mp7_pls["particlegroup"] = mp7_pls["particlegroup"] + 1
+    mp7_pls["node"] = mp7_pls["node"] + 1
+    mp7_pls["k"] = mp7_pls["k"] + 1
 
     # apply reference time to mp7 results (mp7 reports relative times)
-    mp7_pldata["time"] = mp7_pldata["time"] + fraction
+    mp7_pls["time"] = mp7_pls["time"] + fraction
 
     # load mf6 pathline results
-    mf6_pldata = pd.read_csv(ws / prt_track_csv_file, na_filter=False)
+    mf6_pls = pd.read_csv(ws / prt_track_csv_file, na_filter=False)
 
     # make sure pathline df has "name" (boundname) column and empty values
-    assert "name" in mf6_pldata
-    assert (mf6_pldata["name"] == "").all()
+    assert "name" in mf6_pls
+    assert (mf6_pls["name"] == "").all()
 
     # make sure all mf6 pathline data have correct model and PRP index (1)
-    assert all_equal(mf6_pldata["imdl"], 1)
-    assert all_equal(mf6_pldata["iprp"], 1)
+    assert all_equal(mf6_pls["imdl"], 1)
+    assert all_equal(mf6_pls["iprp"], 1)
 
     # check budget data were written to mf6 prt list file
     check_budget_data(ws / f"{name}_prt.lst", perlen, nper)
@@ -430,7 +429,7 @@ def test_prt_fmi01(idx, name, function_tmpdir, targets, fraction):
     pmv.plot_grid()
     pmv.plot_array(hds[0], alpha=0.1)
     pmv.plot_vector(qx, qy, normalize=True, color="white")
-    mf6_plines = mf6_pldata.groupby(["iprp", "irpt", "trelease"])
+    mf6_plines = mf6_pls.groupby(["iprp", "irpt", "trelease"])
     for ipl, ((iprp, irpt, trelease), pl) in enumerate(mf6_plines):
         pl.plot(
             title="MF6 pathlines",
@@ -447,7 +446,7 @@ def test_prt_fmi01(idx, name, function_tmpdir, targets, fraction):
     pmv.plot_grid()
     pmv.plot_array(hds[0], alpha=0.1)
     pmv.plot_vector(qx, qy, normalize=True, color="white")
-    mp7_plines = mp7_pldata.groupby(["particleid"])
+    mp7_plines = mp7_pls.groupby(["particleid"])
     for ipl, (pid, pl) in enumerate(mp7_plines):
         pl.plot(
             title="MP7 pathlines",
@@ -464,24 +463,24 @@ def test_prt_fmi01(idx, name, function_tmpdir, targets, fraction):
     plt.savefig(ws / f"test_{simname}.png")
 
     # convert mf6 pathlines to mp7 format
-    mf6_pldata_mp7 = to_mp7_format(mf6_pldata)
+    mf6_pls = to_mp7_pathlines(mf6_pls)
 
     # sort both dataframes by particleid and time
-    mf6_pldata_mp7.sort_values(by=["particleid", "time"], inplace=True)
-    mp7_pldata.sort_values(by=["particleid", "time"], inplace=True)
+    mf6_pls.sort_values(by=["particleid", "time"], inplace=True)
+    mp7_pls.sort_values(by=["particleid", "time"], inplace=True)
 
     # drop columns for which there is no direct correspondence between mf6 and mp7
-    del mf6_pldata_mp7["sequencenumber"]
-    del mf6_pldata_mp7["particleidloc"]
-    del mf6_pldata_mp7["xloc"]
-    del mf6_pldata_mp7["yloc"]
-    del mf6_pldata_mp7["zloc"]
-    del mp7_pldata["sequencenumber"]
-    del mp7_pldata["particleidloc"]
-    del mp7_pldata["xloc"]
-    del mp7_pldata["yloc"]
-    del mp7_pldata["zloc"]
+    del mf6_pls["sequencenumber"]
+    del mf6_pls["particleidloc"]
+    del mf6_pls["xloc"]
+    del mf6_pls["yloc"]
+    del mf6_pls["zloc"]
+    del mp7_pls["sequencenumber"]
+    del mp7_pls["particleidloc"]
+    del mp7_pls["xloc"]
+    del mp7_pls["yloc"]
+    del mp7_pls["zloc"]
 
     # compare mf6 / mp7 pathline data
-    assert mf6_pldata_mp7.shape == mp7_pldata.shape
-    assert np.allclose(mf6_pldata_mp7, mp7_pldata, atol=1e-3)
+    assert mf6_pls.shape == mp7_pls.shape
+    assert np.allclose(mf6_pls, mp7_pls, atol=1e-3)
