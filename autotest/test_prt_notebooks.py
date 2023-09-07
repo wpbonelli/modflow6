@@ -245,8 +245,7 @@ def test_notebooks(notebook, function_tmpdir, targets):
     # compare result shape
     assert prt_pls.shape == mp7_pls.shape
 
-    # skip comparison for ex-prt-mp7-p02 until NodeParticleData.to_coords()
-    # debugged, and mp7 and prt particleids can be guaranteed to correspond
+    # skip comparison for ex-prt-mp7-p02 until mp7 and prt particleids can be guaranteed to correspond
     if "ex-prt-mp7-p02" in notebook.name:
         return
 

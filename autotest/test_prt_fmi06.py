@@ -193,11 +193,7 @@ def build_prt_sim(idx, ws, mf6):
 
     # convert mp7 particledata to prt release points
     partdata = get_partdata(prt.modelgrid, releasepts_mp7)
-    coords = partdata.to_coords(prt.modelgrid)
-    releasepts = [
-        (i, (0, r[0]), c[0], c[1], c[2])
-        for i, (r, c) in enumerate(zip(releasepts_mp7, coords))
-    ]
+    releasepts = list(partdata.to_prp(prt.modelgrid))
 
     # create prp package
     prp_track_file = f"{prtname}.prp.trk"

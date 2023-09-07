@@ -212,8 +212,7 @@ def build_prt_sim(idx, ws, mf6, fraction=None):
 
     # convert mp7 particledata to prt release points
     partdata = get_partdata(prt.modelgrid)
-    coords = partdata.to_coords(prt.modelgrid)
-    releasepts = [(i, 0, 0, 0, c[0], c[1], c[2]) for i, c in enumerate(coords)]
+    releasepts = list(partdata.to_prp(prt.modelgrid))
 
     # check release points match expectation
     assert np.allclose(releasepts_prt, releasepts)

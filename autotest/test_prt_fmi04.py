@@ -342,14 +342,13 @@ def test_prt_fmi04(idx, name, function_tmpdir, targets):
         1 if not "saws" in name else 0
     )
     # then drop the row so comparison will succeed below
-    mf6_pls.drop(
-        mf6_pls[mf6_pls["ireason"] == wksk_irsn].index, inplace=True
-    )
+    mf6_pls.drop(mf6_pls[mf6_pls["ireason"] == wksk_irsn].index, inplace=True)
 
     # make sure all mf6 pathline data have correct model and PRP index (1)
     def all_equal(col, val):
         a = col.to_numpy()
         return a[0] == val and (a[0] == a).all()
+
     assert all_equal(mf6_pls["imdl"], 1)
     assert all_equal(mf6_pls["iprp"], 1)
 
