@@ -5,6 +5,7 @@ if test_drive.found()
     'DevFeature',
     'GeomUtil',
     'InputOutput',
+    'MathUtil',
     'Sim'
   ]
 
