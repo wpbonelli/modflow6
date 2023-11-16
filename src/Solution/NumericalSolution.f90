@@ -12,7 +12,8 @@ module NumericalSolutionModule
                              LENMEMPATH
   use MemoryHelperModule, only: create_mem_path
   use TableModule, only: TableType, table_cr
-  use GenericUtilitiesModule, only: sim_message, stop_with_error
+  use SimModule, only: store_error, count_errors, deprecation_warning, &
+                       sim_message
   use MathUtilModule, only: is_same
   use VersionModule, only: IDEVELOPMODE
   use BaseModelModule, only: BaseModelType
@@ -513,7 +514,7 @@ contains
     ! -- modules
     use MemoryManagerModule, only: mem_reallocate
     use SimVariablesModule, only: iout
-    use SimModule, only: store_error, count_errors, deprecation_warning
+
     use InputOutputModule, only: getunit, openfile
     ! -- dummy variables
     class(NumericalSolutionType) :: this !< NumericalSolutionType instance
@@ -1611,7 +1612,7 @@ contains
       WRITE (99, *) 'MATRIX SOLUTION FOLLOWS'
       WRITE (99, '(10(I8,G15.4))') (n, this%x(N), N=1, this%NEQ)
       close (99)
-      call stop_with_error()
+      call exit(0)
     end if
     !-------------------------------------------------------
     !

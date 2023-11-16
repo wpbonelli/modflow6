@@ -5,7 +5,7 @@ module ExchangeModule
   use FileWriterModule, only: FileWriterType
   use GLOBAL, only: NLAY, NROW, NCOL, IBOUND, BOTM, DELC, DELR, LBOTM, NBOTM
   use GlobalVariablesModule, only: LgrBilinear
-  use InputOutputModule, only: get_ijk, get_node
+  use GeomUtilModule, only: get_ijk, get_node
   use LGRMODULE, only: IBFLG, NPLBEG, NPRBEG, NPCBEG, NPLEND, &
                        NPREND, NPCEND, NCPP, NCPPL
   use ModelModule, only: ModelType
@@ -58,7 +58,6 @@ contains
   ! Type-bound procedures
 
   subroutine InitializeExchange(this, Model1, Model2)
-    implicit none
     ! dummy
     class(ExchangeType) :: this
     type(ModelType), pointer :: Model1
@@ -73,12 +72,9 @@ contains
     !! Assign filename for exchange input file.
     !write(this%FileWriter%fileobj%FName,10) &
     !    'gwf',Model1%IGrid,'-gwf',Model2%IGrid,'.exg'
-    !
-    return
   end subroutine InitializeExchange
   
   subroutine WriteExchangeFile(this, mvrFileName)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     character(len=*), intent(in) :: mvrFileName
@@ -89,12 +85,9 @@ contains
     call this%WriteDimensionsBlock()
     call this%DefineConnections()
     call this%WriteExchangeDataBlock()
-    !
-    return
   end subroutine WriteExchangeFile
   
   subroutine WriteOptionsBlock(this, mvrFileName)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     character(len=*), intent(in) :: mvrFileName
@@ -142,8 +135,6 @@ contains
       write(iu,20)'GNC6 FILEIN', trim(this%GncFileWriter%fileobj%FName)
     endif
     write(iu,10)'End Options'
-    !
-    return
   end subroutine WriteOptionsBlock
   
   subroutine WriteDimensionsBlock(this)
@@ -163,15 +154,12 @@ contains
     write(iu,10)'Begin Dimensions'
     write(iu,20)'NEXG', this%Nexg
     write(iu,10)'End Dimensions'
-    !
-    return
   end subroutine WriteDimensionsBlock
 
   subroutine CalcNexg(this)
     ! Count connections required by exchange and
     ! assign number to this%Nexg.
     ! Assumes Model1 is parent and Model2 is child in LGR
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     ! local
@@ -262,12 +250,9 @@ contains
     enddo
     !
     this%Nexg = ncon
-    ! 
-    return
   end subroutine CalcNexg
 
   subroutine DefineConnections(this)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     ! local
@@ -524,12 +509,9 @@ contains
         kp = kp + 1
       endif
     enddo
-    !
-    return
   end subroutine DefineConnections
   
   subroutine DefineFaceconnect(this)
-    implicit none
     ! dummy
     class(ExchangeType) :: this
     !
@@ -549,7 +531,6 @@ contains
   end subroutine DefineFaceconnect
   
   subroutine DefineOneConnection(this, ip, jp, kp, ic, jc, kc, idir, con)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     integer, intent(in) :: ip, jp, kp, ic, jc, kc, idir
@@ -636,14 +617,11 @@ contains
     con%cl1 = clp
     con%cl2 = clc
     con%hwva =  hwva
-    !
-    return
   end subroutine DefineOneConnection
   
   subroutine DefineGhostNodeCorrection(this, idir, mlayc, mrowc, mcolc, mcppl, conn, &
                  ncolp, nrowp, nlayp, iboundp, delcp, delrp, nbotmp, botmp, lbotmp, &
                  ncolc, nrowc, nlayc, delcc, delrc, nbotmc, botmc, lbotmc)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     integer, intent(in) :: ncolp, nrowp, nlayp
@@ -971,12 +949,9 @@ contains
     ! Calculate contributing factor(s).
     call this%CalcContribFactors(d1c, d1p, d2c, d2p, ibound12, conn%alphaj1, &
                                  conn%alphaj2, conn%alphaj12)
-    !
-    return
   end subroutine DefineGhostNodeCorrection
 
   subroutine WriteExchangeDataBlock(this)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     ! local
@@ -1020,12 +995,9 @@ contains
       call this%FaceProc(i, j, k, newface, iface)
     enddo
     write(iu,10)'End ExchangeData'
-    !
-    return
   end subroutine WriteExchangeDataBlock
 
   subroutine WriteGhostNodeFile(this)
-    implicit none
     ! dummy
     class(ExchangeType) :: this
     ! local
@@ -1033,12 +1005,9 @@ contains
     call this%WriteGhostNodeOptions()
     call this%WriteGhostNodeDimensions()
     call this%WriteGncdata()
-    !
-    return
   end subroutine WriteGhostNodeFile
   
   subroutine WriteGhostNodeOptions(this)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     ! local
@@ -1056,12 +1025,9 @@ contains
     write(iu,20)'PRINT_FLOWS'
     !write(iu,20)'EXPLICIT'
     write(iu,10)'END OPTIONS'
-    !
-    return
   end subroutine WriteGhostNodeOptions
   
   subroutine WriteGhostNodeDimensions(this)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     ! local
@@ -1078,12 +1044,9 @@ contains
     write(iu,20)'NUMGNC',this%Nexg
     write(iu,20)'NUMALPHAJ',this%Numalphaj
     write(iu,10)'END DIMENSIONS'
-    !
-    return
   end subroutine WriteGhostNodeDimensions
   
   subroutine WriteGncdata(this)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     ! local
@@ -1128,12 +1091,9 @@ contains
       call this%FaceProc(i, j, k, newface, iface)
     enddo
     write(iu,10)'END GNCDATA'
-    !
-    return
   end subroutine WriteGncdata
   
   subroutine FaceProc(this, i, j, k, newface, iface)
-    implicit none
     ! dummy
     class(ExchangeType) :: this
     integer, intent(inout) :: i, j, k
@@ -1223,13 +1183,10 @@ contains
       ! bottom
       ! nothing more to do
     end select
-    !
-    return
   end subroutine FaceProc
   
   function NextFace(this, iface) result(iresult)
     ! Return number of next face that has connections.
-    implicit none
     ! dummy
     class(ExchangeType) this
     integer, intent(in) :: iface
@@ -1246,8 +1203,6 @@ contains
     !
     ! If control reaches here, no next face.
     iresult = -1
-    !
-    return
   end function NextFace
     
   subroutine CalcContribFactors(this, d1c, d1p, d2c, d2p, ibound12, cf1, cf2, cf12)
@@ -1256,7 +1211,6 @@ contains
     ! If this%bilinear is true and off-corner cell is active, bilinear is used.
     ! If this%bilinear is false, triangular is used.
     ! If off-corner cell is inactive, triangular is used.
-    implicit none
     ! dummy
     class(ExchangeType) :: this
     double precision, intent(in) :: d1c, d1p, d2c, d2p
@@ -1283,8 +1237,6 @@ contains
       cf12 = DZERO
       call CalcContribFactorsTriangular(d1c, d1p, d2c, d2p, cf1, cf2)
     endif
-    !
-    return
   end subroutine CalcContribFactors
     
     
@@ -1293,7 +1245,6 @@ contains
   function GetGhostHorizDistance(i, maxi, del, mc) result(hdist)
     ! Returns distance in row or column direction
     ! between parent node and child node.
-    implicit none
     ! dummy
     integer,          intent(in) :: i     ! row or column index in child grid
     integer,          intent(in) :: maxi  ! NROW or NCOL of child grid
@@ -1310,14 +1261,11 @@ contains
     px = pcellwid / DTWO         ! parent node X relative to parent cell side
     cx = cellwid * (rmc - DHALF) ! child node X relative to parent cell side
     hdist = abs(px - cx)         ! distance between parent node and child node
-    !
-    return
   end function GetGhostHorizDistance
   
   function GetGhostVertDistance(ic, jc, kc, nbotmc, ncolc, nrowc, nlayc, &
                                 botmc, lbotmc, mc, mcppl) result(vdist)
     ! Returns vertical distance between parent node and child node.
-    implicit none
     ! dummy
     integer, intent(in) :: ic, jc, kc ! row, column, layer indices of child cell
     integer, intent(in) :: nbotmc     ! NBOTM of child grid
@@ -1339,15 +1287,12 @@ contains
     pz = pcellheight / DTWO
     cz = cellheight * (rmc - DHALF)
     vdist = abs(pz - cz)
-    !
-    return
   end function GetGhostVertDistance
   
   function GetInternodeHorizDistance(i, maxi, del, ioff) result(hdist)
     ! Returns horizontal distance between node with row or column 
     ! index i and adjacent node defined by ioff (= -1 or +1). 
     ! Intended for use with parent grid, but also could be used with child.
-    implicit none
     ! dummy
     integer,          intent(in) :: i     ! row or column index in child grid
     integer,          intent(in) :: maxi  ! NROW or NCOL of child grid
@@ -1356,8 +1301,6 @@ contains
     double precision :: hdist
     !
     hdist = DHALF * (del(i) + del(i+ioff))
-    !
-    return
   end function GetInternodeHorizDistance
   
   function GetInternodeVertDistance(ip, jp, kp, ioff, nbotmp, ncolp, nrowp, &
@@ -1365,7 +1308,6 @@ contains
     ! Returns vertical distance between specified node and vertically 
     ! adjacent node defined by ioff (= -1 or +1).
     ! Intended for use with parent grid, but also could be used with child.
-    implicit none
     ! dummy
     integer, intent(in) :: ip, jp, kp ! row, column, layer indices of cell of interest (in parent grid)
     integer, intent(in) :: ioff       ! Layer index offset, either -1 or +1
@@ -1389,8 +1331,6 @@ contains
     zadj = (topadj + botadj) / DTWO
     ! Vertical distance between nodes
     vdist = abs(z - zadj)
-    !
-    return
   end function GetInternodeVertDistance
     
   function GetIoffset(mc,ncp) result(ioff)
@@ -1398,7 +1338,6 @@ contains
     ! If mc is at midpoint, return 0.
     ! If mc < midpoint, return -1.
     ! If mc > midpoint, return +1.
-    implicit none
     ! dummy
     integer, intent(in) :: mc, ncp
     integer :: ioff
@@ -1424,8 +1363,6 @@ contains
     else
       ioff = -1
     endif
-    !
-    return
   end function GetIoffset
   
   subroutine CalcContribFactorsTriangular(d1c, d1p, d2c, d2p, cf1, cf2)
@@ -1439,7 +1376,6 @@ contains
     ! OR:
     !       d1c = 0; results in: a1 = 0, contributing factor returned in cf1 = 0
     !                (d1p value is arbitrary, non-zero).
-    implicit none
     ! dummy
     double precision, intent(in) :: d1c, d1p, d2c, d2p
     ! Where: d1c = Distance from parent node (in cell where ghost node is
@@ -1462,8 +1398,6 @@ contains
     ! These calculations are simplified to:
     cf1 = d1c / d1p
     cf2 = d2c / d2p
-    ! 
-    return
   end subroutine CalcContribFactorsTriangular
 
   subroutine CalcContribFactorsBilinear(d1c, d1p, d2c, d2p, cf1, cf2, cf12)
@@ -1471,7 +1405,6 @@ contains
     ! Method: 
     ! http://bmia.bmt.tue.nl/people/BRomeny/Courses/8C080/Interpolation.pdf
     !
-    implicit none
     ! dummy
     double precision, intent(in) :: d1c, d1p, d2c, d2p
     ! Where: d1c = Distance from parent node (in cell where ghost node is
@@ -1517,12 +1450,9 @@ contains
     if (d1c > DZERO .and. d2c > DZERO) then
       cf12 = d1c * d2c / ap
     endif
-    ! 
-    return
   end subroutine CalcContribFactorsBilinear
 
   subroutine ModifyIdomainForChild(this, nc, nr, nl, idomain)
-    implicit none
     ! dummy
     class(ExchangeType), intent(inout) :: this
     integer, intent(in) :: nc, nr, nl
@@ -1539,8 +1469,6 @@ contains
         enddo
       enddo
     enddo
-    !
-    return
   end subroutine ModifyIdomainForChild
 
 end module ExchangeModule

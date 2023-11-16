@@ -10,7 +10,6 @@ module UzfModule
                              DHNOFLO, DHDRY, &
                              TABLEFT, TABCENTER, TABRIGHT, &
                              TABSTRING, TABUCSTRING, TABINTEGER, TABREAL
-  use GenericUtilitiesModule, only: sim_message
   use MemoryManagerModule, only: mem_allocate, mem_reallocate, mem_setptr, &
                                  mem_deallocate
   use MemoryHelperModule, only: create_mem_path
@@ -23,7 +22,7 @@ module UzfModule
   use ObsModule, only: ObsType
   use InputOutputModule, only: URWORD
   use SimVariablesModule, only: errmsg
-  use SimModule, only: count_errors, store_error, store_error_unit
+  use SimModule, only: count_errors, store_error, store_error_unit, sim_message
   use BlockParserModule, only: BlockParserType
   use TableModule, only: TableType, table_cr
   use MatrixBaseModule

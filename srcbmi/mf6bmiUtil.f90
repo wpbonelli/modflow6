@@ -8,7 +8,7 @@ module mf6bmiUtil
                              LENMODELNAME, LINELENGTH, LENMEMTYPE, &
                              LENMEMADDRESS, LENCOMPONENTNAME
   use KindModule, only: DP, I4B, LGP
-  use GenericUtilitiesModule, only: sim_message
+  use SimModule, only: sim_message
   use SimVariablesModule, only: istdout
   use MemoryHelperModule, only: split_mem_address, split_mem_path
   implicit none

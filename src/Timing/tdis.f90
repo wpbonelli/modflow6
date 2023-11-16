@@ -113,7 +113,7 @@ contains
     ! -- modules
     use ConstantsModule, only: DONE, DZERO, MNORMAL, MVALIDATE, DNODATA
     use SimVariablesModule, only: isim_mode
-    use GenericUtilitiesModule, only: sim_message
+    use SimModule, only: sim_message
     use AdaptiveTimeStepModule, only: isAdaptivePeriod, dtstable, &
                                       ats_period_message
     ! -- local

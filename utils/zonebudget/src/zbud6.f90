@@ -3,8 +3,7 @@ program zonbudmf6
   use ConstantsModule, only: LINELENGTH, LENHUGELINE
   use VersionModule, only: VERSION
   use SimVariablesModule, only: iout, errmsg
-  use SimModule, only: store_error
-  use GenericUtilitiesModule, only: sim_message, write_centered
+  use SimModule, only: store_error, sim_message, write_centered
   use InputOutputModule, only: openfile
 
   implicit none
@@ -144,8 +143,7 @@ subroutine process_budget(iunit_csv, iunit_bud, iunit_zon, iunit_grb)
   use KindModule
   use ConstantsModule, only: LINELENGTH
   use SimVariablesModule, only: iout, errmsg
-  use GenericUtilitiesModule, only: sim_message
-  use SimModule, only: store_error
+  use SimModule, only: store_error, sim_message
   use BudgetDataModule, only: budgetdata_init, budgetdata_read, &
                               budgetdata_finalize, &
                               ia, ja, budtxt, nbudterms, &

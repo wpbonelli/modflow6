@@ -43,9 +43,6 @@ contains
     ios = OSWIN
 # endif
 #endif
-    !
-    ! return
-    return
   end function get_os
 
   !> @brief Determine if this is the extended version
@@ -75,9 +72,6 @@ contains
     if (ispetsc .EQV. .TRUE. .OR. isnetcdf .EQV. .TRUE.) then
       isextended = .TRUE.
     end if
-    !
-    ! return
-    return
   end function is_extended
 
   !> @brief Determine if using petsc
@@ -98,9 +92,6 @@ contains
 #ifdef __WITH_PETSC__
     petscused = .TRUE.
 #endif
-    !
-    ! return
-    return
   end function using_petsc
 
   !> @brief Determine if using netcdf
@@ -121,9 +112,6 @@ contains
 #ifdef __WITH_NETCDF__
     netcdfused = .TRUE.
 #endif
-    !
-    ! return
-    return
   end function using_netcdf
 
 end module DefinedMacros

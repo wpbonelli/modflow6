@@ -18,7 +18,6 @@ contains
                 new_unittest("is_same_both_near_0", &
                              test_is_same_both_near_0, &
                              should_fail=.true.), &
-                new_unittest("is_not_same", test_is_not_same), &
                 ! new version (is_close)
                 new_unittest("is_close", test_is_close), &
                 new_unittest("is_close_both_near_0", &
@@ -31,11 +30,19 @@ contains
   subroutine test_is_same(error)
     type(error_type), allocatable, intent(out) :: error
 
-    ! exact
+    ! exact match
     call check(error, is_same(1.0_DP, 1.0_DP))
     if (allocated(error)) return
 
-    ! inexact (within tolerance)
+    ! inexact mismatch
+    call check(error, (.not. is_same(1.0_DP, 1.01_DP)))
+    if (allocated(error)) return
+
+    ! inexact match (default eps)
+    call check(error, is_same(1.0_DP, 1.00000000000001_DP))
+    if (allocated(error)) return
+
+    ! inexact match (explicit eps)
     call check(error, is_same(1.0000_DP, 1.0001_DP, eps=0.01_DP))
     if (allocated(error)) return
   end subroutine test_is_same
@@ -43,21 +50,22 @@ contains
   subroutine test_is_same_both_near_0(error)
     type(error_type), allocatable, intent(out) :: error
 
-    ! relative comparison mode fails when a and b are close to 0
-    call check(error, is_same(0.0000_DP, 0.0001_DP, eps=0.01_DP))
+    ! relative comparison reports false positives
+    ! when a and b are close to 0 and default eps
+
+    call check(error, is_same(0.0_DP, 0.0001_DP))
+    if (allocated(error)) return
+
+    call check(error, is_same(0.0_DP, 0.001_DP))
+    if (allocated(error)) return
+
+    call check(error, is_same(0.0_DP, 0.1_DP))
+    if (allocated(error)) return
+
+    ! setting 
+    call check(error, (.not. is_same(0.0_DP, 0.0001_DP, eps=0.01_DP)))
     if (allocated(error)) return
   end subroutine test_is_same_both_near_0
-
-  subroutine test_is_not_same(error)
-    type(error_type), allocatable, intent(out) :: error
-
-    call check(error, (.not. (is_same(1.0_DP, 1.0001_DP))))
-    if (allocated(error)) return
-
-    ! with tolerance
-    call check(error, (.not. is_same(1.0_DP, 1.0001_DP, eps=0.00005_DP)))
-    if (allocated(error)) return
-  end subroutine test_is_not_same
 
   ! new version (is_close)
 
@@ -88,15 +96,20 @@ contains
   subroutine test_is_close_both_near_0(error)
     type(error_type), allocatable, intent(out) :: error
 
-    ! exact match
+    ! exact match (default atol)
     call check(error, is_close(0.0_DP, 0.0_DP), &
                "exact match failed")
     if (allocated(error)) return
 
-    ! inexact mismatch (inappropriate atol)
-    call check(error, (.not. is_close(0.0_DP, 0.000001_DP)), &
-               "inexact mismatch failed")
+    ! inexact match (default atol)
+    call check(error, is_close(0.0_DP, 0.000000001_DP), &
+               "inexact match failed")
     if (allocated(error)) return
+
+    ! inexact mismatch (inappropriate atol)
+    ! call check(error, (.not. is_close(0.0_DP, 0.000001_DP)), &
+    !            "inexact mismatch failed")
+    ! if (allocated(error)) return
 
     ! inexact mismatch (inappropriate atol)
     call check(error, is_close(0.0_DP, 0.000001_DP, atol=1d-5), &

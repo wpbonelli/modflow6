@@ -10,7 +10,7 @@ module VersionModule
   use DefinedMacros, only: is_extended, using_petsc, using_netcdf
   use ConstantsModule, only: LENBIGLINE, LENHUGELINE, DZERO
   use SimVariablesModule, only: istdout
-  use GenericUtilitiesModule, only: write_centered, write_message, sim_message
+  use SimModule, only: write_centered, write_message, sim_message
   use CompilerVersion, only: get_compiler, get_compile_options
   implicit none
   public

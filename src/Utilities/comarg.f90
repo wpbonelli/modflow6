@@ -9,8 +9,7 @@ module CommandArguments
   use SimVariablesModule, only: istdout, isim_level, &
                                 simfile, simlstfile, simstdout, &
                                 isim_mode, simulation_mode
-  use GenericUtilitiesModule, only: sim_message, write_message
-  use SimModule, only: store_error, ustop
+  use SimModule, only: store_error, ustop, sim_message, write_message
   use InputOutputModule, only: upcase, getunit
   !
   implicit none

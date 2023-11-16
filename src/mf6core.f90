@@ -233,14 +233,15 @@ contains
   !<
   subroutine create_lstfile()
     use ConstantsModule, only: LINELENGTH
+    use SimModule, only: sim_message
     use SimVariablesModule, only: proc_id, nr_procs, simlstfile, iout
-    use InputOutputModule, only: getunit, openfile, append_processor_id
-    use GenericUtilitiesModule, only: sim_message
+    use InputOutputModule, only: openfile, append_processor_id
     use VersionModule, only: write_listfile_header
+    use FileUtilModule, only: get_fileunit
     character(len=LINELENGTH) :: line
     !
     ! -- Open simulation list file
-    iout = getunit()
+    iout = get_fileunit()
     !
     if (nr_procs > 1) then
       call append_processor_id(simlstfile, proc_id)

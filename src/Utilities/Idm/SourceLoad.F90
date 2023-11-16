@@ -145,7 +145,7 @@ contains
 
   subroutine load_simnam()
     use SimVariablesModule, only: simfile, iout
-    use GenericUtilitiesModule, only: sim_message
+    use SimModule, only: sim_message
     use IdmMf6FileModule, only: input_load
     type(ModflowInputType) :: mf6_input
     character(len=LINELENGTH) :: line

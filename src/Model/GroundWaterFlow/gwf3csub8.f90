@@ -18,7 +18,6 @@ module GwfCsubModule
                              TABLEFT, TABCENTER, TABRIGHT, &
                              TABSTRING, TABUCSTRING, TABINTEGER, TABREAL
   use MemoryHelperModule, only: create_mem_path
-  use GenericUtilitiesModule, only: sim_message
   use MathUtilModule, only: is_same
   use SmoothingModule, only: sQuadraticSaturation, &
                              sQuadraticSaturationDerivative, &
@@ -33,7 +32,7 @@ module GwfCsubModule
   use InputOutputModule, only: get_node, extract_idnum_or_bndname
   use BaseDisModule, only: DisBaseType
   use SimModule, only: count_errors, store_error, store_error_unit, &
-                       store_warning
+                       store_warning, sim_message
   use SimVariablesModule, only: errmsg, warnmsg
   use SortModule, only: qsort, selectn
   !

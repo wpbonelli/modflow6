@@ -3,7 +3,7 @@ module ArrayHandlersModule
   use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: LINELENGTH, MAXCHARLEN, DZERO, DTEN
   use SimVariablesModule, only: iout
-  use GenericUtilitiesModule, only: sim_message, stop_with_error
+
   private
   public :: ExpandArray, ExpandArray2D, ExpandArrayWrapper, ExtendPtrArray
   public :: ConcatArray
@@ -47,7 +47,6 @@ module ArrayHandlersModule
 contains
 
   subroutine expand_integer_wrapper(nsize, array, minvalue, loginc)
-    implicit none
     ! -- dummy
     integer(I4B), intent(in) :: nsize
     integer(I4B), allocatable, intent(inout) :: array(:)
@@ -59,7 +58,7 @@ contains
     integer(I4B) :: increment
     integer(I4B) :: isize
     integer(I4B) :: n
-    !
+    
     ! -- process optional variables
     if (present(minvalue)) then
       minimum_increment = minvalue
@@ -71,57 +70,51 @@ contains
     else
       log_increment = .FALSE.
     end if
-    !
+    
     ! -- determine current size of the array
     isize = size(array)
-    !
+    
     ! -- expand the array if necessary
     if (nsize > isize) then
-      !
-      ! -- increase array size by 1, 10, 100, 1000, etc.
-      !    from 1 to 9, 10 to 99, 100 to 999, 1000 to 10000, etc.
       if (loginc) then
+        ! -- increase array size by 1, 10, 100, 1000, etc.
+        !    from 1 to 9, 10 to 99, 100 to 999, 1000 to 10000, etc.
         increment = int(log10(real(nsize, DP)), I4B)
         increment = int(DTEN**increment, I4B)
-        !
+      else
         ! -- increase increment by a multiplier and a value no
         !    smaller than a default or specified minimum size
-      else
         increment = int(nsize * 0.2_DP)
         increment = max(minimum_increment, increment)
       end if
-      !
+      
       ! -- expand the array
       call ExpandArray(array, increment)
-      !
+      
       ! -- initialize expanded array elements
       do n = isize + 1, size(array)
         array(n) = 0
       end do
     end if
-    !
-    ! -- return
-    return
   end subroutine expand_integer_wrapper
 
   ! -- Specific procedures that implement ExpandArray for allocatable arrays
 
   subroutine expand_integer(array, increment)
-    implicit none
     ! -- dummy
     integer(I4B), allocatable, intent(inout) :: array(:)
     integer(I4B), optional, intent(in) :: increment
     ! -- local
     integer(I4B) :: inclocal, isize, newsize
     integer(I4B), allocatable, dimension(:) :: array_temp
-    !
+    
     ! -- initialize
     if (present(increment)) then
       inclocal = increment
     else
       inclocal = 1
     end if
-    !
+    
     ! -- increase size of array by inclocal, retaining
     !    contained data
     if (allocated(array)) then
@@ -134,26 +127,23 @@ contains
     else
       allocate (array(inclocal))
     end if
-    !
-    return
   end subroutine expand_integer
 
   subroutine expand_double(array, increment)
-    implicit none
     ! -- dummy
     real(DP), allocatable, intent(inout) :: array(:)
     integer(I4B), optional, intent(in) :: increment
     ! -- local
     integer(I4B) :: inclocal, isize, newsize
     real(DP), allocatable, dimension(:) :: array_temp
-    !
+    
     ! -- initialize
     if (present(increment)) then
       inclocal = increment
     else
       inclocal = 1
     end if
-    !
+    
     ! -- increase size of array by inclocal, retaining
     !    contained data
     if (allocated(array)) then
@@ -166,12 +156,9 @@ contains
     else
       allocate (array(inclocal))
     end if
-    !
-    return
   end subroutine expand_double
 
   subroutine expand_character(array, increment)
-    implicit none
     ! -- dummy
     character(len=*), allocatable, intent(inout) :: array(:)
     integer(I4B), optional, intent(in) :: increment
@@ -181,31 +168,23 @@ contains
     integer(I4B) :: i, inclocal, isize, lenc, newsize
     ! -- format
     character(len=*), parameter :: stdfmt = "(/,'ERROR REPORT:',/,1x,a)"
-    !
+    
     ! -- check character length
     lenc = len(array)
     if (lenc > MAXCHARLEN) then
-      write (line, '(a)') 'Error in ArrayHandlersModule: '// &
+      print *, 'Error in ArrayHandlersModule: '// &
         'Need to increase MAXCHARLEN'
-      call sim_message(line, iunit=iout, fmt=stdfmt)
-      call sim_message(line, fmt=stdfmt)
-      !
-      ! -- stop message
-      write (line, '(a)') 'Stopping...'
-      call sim_message(line, iunit=iout)
-      call sim_message(line)
-      call stop_with_error(138)
+      call exit(138)
     end if
-    !
+    
     ! -- initialize
     if (present(increment)) then
       inclocal = increment
     else
       inclocal = 1
     end if
-    !
-    ! -- increase size of array by inclocal, retaining
-    !    contained data
+    
+    ! -- increase size of array by inclocal
     ! [Ned TODO: may be able to use mold here, e.g.:
     !       allocate(values(num), mold=proto)]
     if (allocated(array)) then
@@ -227,14 +206,11 @@ contains
     else
       allocate (array(inclocal))
     end if
-    !
-    return
   end subroutine expand_character
 
   ! -- Specific procedures that implement ExtendArray2D
 
   subroutine expand_integer_2d(array, increment1, increment2)
-    implicit none
     ! -- dummy
     integer(I4B), allocatable, intent(inout) :: array(:, :)
     integer(I4B), optional, intent(in) :: increment1
@@ -242,7 +218,7 @@ contains
     ! -- local
     integer(I4B) :: inclocal1, inclocal2, isize1, isize2, newsize1, newsize2
     integer(I4B), allocatable, dimension(:, :) :: array_temp
-    !
+    
     ! -- initialize
     if (present(increment1)) then
       inclocal1 = increment1
@@ -254,9 +230,8 @@ contains
     else
       inclocal2 = 1
     end if
-    !
-    ! -- increase size of array by inclocal corresponding to each dim,
-    !    retaining contained data
+    
+    ! -- increase size of array by inclocal corresponding to each dim
     if (allocated(array)) then
       isize1 = size(array, 1)
       isize2 = size(array, 2)
@@ -269,12 +244,9 @@ contains
     else
       allocate (array(inclocal1, inclocal2))
     end if
-    !
-    return
   end subroutine expand_integer_2d
 
   subroutine expand_double_2d(array, increment1, increment2)
-    implicit none
     ! -- dummy
     real(DP), allocatable, intent(inout) :: array(:, :)
     integer(I4B), optional, intent(in) :: increment1
@@ -282,7 +254,7 @@ contains
     ! -- local
     integer(I4B) :: inclocal1, inclocal2, isize1, isize2, newsize1, newsize2
     real(DP), allocatable, dimension(:, :) :: array_temp
-    !
+    
     ! -- initialize
     if (present(increment1)) then
       inclocal1 = increment1
@@ -294,9 +266,8 @@ contains
     else
       inclocal2 = 1
     end if
-    !
+    
     ! -- increase size of array by inclocal corresponding to each dim,
-    !    retaining contained data
     if (allocated(array)) then
       isize1 = size(array, 1)
       isize2 = size(array, 2)
@@ -309,14 +280,11 @@ contains
     else
       allocate (array(inclocal1, inclocal2))
     end if
-    !
-    return
   end subroutine expand_double_2d
 
   ! -- Specific procedures that implement ExtendPtrArray for pointer arrays
 
   subroutine extend_double(array, increment)
-    implicit none
     ! -- dummy
     real(DP), dimension(:), pointer, contiguous, intent(inout) :: array
     integer(I4B), optional, intent(in) :: increment
@@ -327,21 +295,24 @@ contains
     real(DP), dimension(:), pointer, contiguous :: array_temp => null()
     ! -- format
     character(len=*), parameter :: stdfmt = "(/,'ERROR REPORT:',/,1x,a)"
-    !
+    
     ! -- initialize
     if (present(increment)) then
       inclocal = increment
     else
       inclocal = 1
     end if
-    !
-    ! -- increase size of array by inclocal, retaining
-    !    contained data
+    
+    ! -- increase size of array by inclocal
     if (associated(array)) then
       isize = size(array)
       newsize = isize + inclocal
       allocate (array_temp(newsize), stat=istat, errmsg=ermsg)
-      if (istat /= 0) goto 99
+      if (istat /= 0) then
+        print *, 'Error in ArrayHandlersModule: '// &
+          'Could not increase array size'
+        call exit(138)
+      end if
       do i = 1, isize
         array_temp(i) = array(i)
       end do
@@ -350,27 +321,6 @@ contains
     else
       allocate (array(inclocal))
     end if
-    !
-    ! -- normal return
-    return
-    !
-    ! -- Error reporting
-99  continue
-
-    write (line, '(a)') 'Error in ArrayHandlersModule: '// &
-      'Could not increase array size'
-    call sim_message(line, iunit=iout, fmt=stdfmt)
-    call sim_message(line, fmt=stdfmt)
-    !
-    ! -- error message
-    call sim_message(ermsg, iunit=iout)
-    call sim_message(ermsg)
-    !
-    ! -- stop message
-    write (line, '(a)') 'Stopping...'
-    call sim_message(line, iunit=iout)
-    call sim_message(line)
-    call stop_with_error(138)
 
   end subroutine extend_double
 
@@ -386,7 +336,7 @@ contains
     integer(I4B), dimension(:), pointer, contiguous :: array_temp => null()
     ! -- format
     character(len=*), parameter :: stdfmt = "(/,'ERROR REPORT:',/,1x,a)"
-    !
+    
     ! -- initialize
     if (present(increment)) then
       inclocal = increment
@@ -400,7 +350,11 @@ contains
       isize = size(array)
       newsize = isize + inclocal
       allocate (array_temp(newsize), stat=istat, errmsg=ermsg)
-      if (istat /= 0) goto 99
+      if (istat /= 0) then
+        print *, 'Error in ArrayHandlersModule: '// &
+          'Could not increase array size'
+        call exit(138)
+      end if
       do i = 1, isize
         array_temp(i) = array(i)
       end do
@@ -409,27 +363,6 @@ contains
     else
       allocate (array(inclocal))
     end if
-    !
-    ! -- normal return
-    return
-    !
-    ! -- Error reporting
-99  continue
-
-    write (line, '(a)') 'Error in ArrayHandlersModule: '// &
-      'Could not increase array size'
-    call sim_message(line, iunit=iout, fmt=stdfmt)
-    call sim_message(line, fmt=stdfmt)
-    !
-    ! -- error message
-    call sim_message(ermsg, iunit=iout)
-    call sim_message(ermsg)
-    !
-    ! -- stop message
-    write (line, '(a)') 'Stopping...'
-    call sim_message(line, iunit=iout)
-    call sim_message(line)
-    call stop_with_error(138)
 
   end subroutine extend_integer
 
@@ -478,10 +411,8 @@ contains
 
   end subroutine concat_integer
 
+  !> @brief Get index of 1st element containing str, otherwise return -1.
   function ifind_character(array, str)
-    ! -- Find the first array element containing str
-    ! -- Return -1 if not found.
-    implicit none
     ! -- return
     integer(I4B) :: ifind_character
     ! -- dummy
@@ -496,13 +427,10 @@ contains
         exit findloop
       end if
     end do findloop
-    return
   end function ifind_character
 
+  !> @brief Get index of 1st element containing ival, otherwise return -1.
   function ifind_integer(iarray, ival)
-    ! -- Find the first array element containing str
-    ! -- Return -1 if not found.
-    implicit none
     ! -- return
     integer(I4B) :: ifind_integer
     ! -- dummy
@@ -517,12 +445,10 @@ contains
         exit findloop
       end if
     end do findloop
-    return
   end function ifind_integer
 
+  !> @brief Remove the character at index ipos from the character array.
   subroutine remove_character(array, ipos)
-    !remove the ipos position from array
-    implicit none
     ! -- dummy
     character(len=*), allocatable, intent(inout) :: array(:)
     integer(I4B), intent(in) :: ipos
@@ -536,17 +462,9 @@ contains
     ! -- check character length
     lenc = len(array)
     if (lenc > MAXCHARLEN) then
-
-      write (line, '(a)') 'Error in ArrayHandlersModule: '// &
+      print *, 'Error in ArrayHandlersModule: '// &
         'Need to increase MAXCHARLEN'
-      call sim_message(line, iunit=iout, fmt=stdfmt)
-      call sim_message(line, fmt=stdfmt)
-      !
-      ! -- stop message
-      write (line, '(a)') 'Stopping...'
-      call sim_message(line, iunit=iout)
-      call sim_message(line)
-      call stop_with_error(138)
+      call exit(138)
     end if
     !
     ! -- calculate sizes
@@ -569,8 +487,6 @@ contains
       end if
     end do
     deallocate (array_temp)
-    !
-    return
   end subroutine remove_character
 
 end module ArrayHandlersModule

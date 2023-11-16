@@ -211,7 +211,7 @@ contains
   subroutine gwf_gwf_df(this)
     ! -- modules
     use SimVariablesModule, only: iout
-    use InputOutputModule, only: getunit, openfile
+    use FileUtilModule, only: get_fileunit, openfile
     use GhostNodeModule, only: gnc_cr
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
@@ -219,7 +219,7 @@ contains
     integer(I4B) :: inunit
     !
     ! -- open the file
-    inunit = getunit()
+    inunit = get_fileunit()
     write (iout, '(/a,a)') ' Creating exchange: ', this%name
     call openfile(inunit, iout, this%filename, 'GWF-GWF')
     !

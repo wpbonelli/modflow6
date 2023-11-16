@@ -2,7 +2,6 @@ module ListModule
   ! -- ListType implements a generic list.
   use KindModule, only: DP, I4B
   use ConstantsModule, only: LINELENGTH
-  use GenericUtilitiesModule, only: sim_message, stop_with_error
   implicit none
   private
   public :: ListType, ListNodeType, isEqualIface, arePointersEqual
@@ -285,9 +284,8 @@ contains
         followingNode%prevNode => newNode
         this%nodeCount = this%nodeCount + 1
       else
-        write (line, '(a)') 'Programming error in ListType%insert_after'
-        call sim_message(line)
-        call stop_with_error(1)
+        print *, 'Programming error in ListType%insert_after'
+        call exit(1)
       end if
     end if
     !

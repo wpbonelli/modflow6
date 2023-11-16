@@ -5,7 +5,7 @@ module GwfDisvModule
   use ConstantsModule, only: LINELENGTH, LENMEMPATH, LENVARNAME, DZERO, DONE, &
                              DHALF
   use BaseDisModule, only: DisBaseType
-  use InputOutputModule, only: get_node, URWORD, ulasav, ulaprufw, ubdsv1, &
+  use InputOutputModule, only: URWORD, ulasav, ulaprufw, ubdsv1, &
                                ubdsv06
   use SimModule, only: count_errors, store_error, store_error_unit, &
                        store_error_filename
@@ -13,6 +13,7 @@ module GwfDisvModule
   use DisvGeom, only: DisvGeomType
   use MemoryManagerModule, only: mem_allocate
   use TdisModule, only: kstp, kper, pertim, totim, delt
+  use GeomUtilModule, only: get_node, get_ijk, get_jk
 
   implicit none
   private
@@ -932,8 +933,6 @@ contains
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    ! -- modules
-    use InputOutputModule, only: get_ijk
     ! -- dummy
     class(GwfDisvType) :: this
     integer(I4B), intent(in) :: nodeu
@@ -961,8 +960,6 @@ contains
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    use InputOutputModule, only: get_ijk
-    implicit none
     class(GwfDisvType) :: this
     integer(I4B), intent(in) :: nodeu
     integer(I4B), dimension(:), intent(inout) :: arr
@@ -1041,8 +1038,6 @@ contains
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    use InputOutputModule, only: get_node
-    implicit none
     ! -- return
     integer(I4B) :: nodenumber
     ! -- dummy
@@ -1165,7 +1160,6 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
-    use InputOutputModule, only: get_jk
     use DisvGeom, only: line_unit_vector
     ! -- dummy
     class(GwfDisvType) :: this
@@ -1546,10 +1540,8 @@ contains
   end function nodeu_from_cellid
 
   logical function supports_layers(this)
-    implicit none
-    ! -- dummy
     class(GwfDisvType) :: this
-    !
+    
     supports_layers = .true.
     return
   end function supports_layers
@@ -1719,8 +1711,6 @@ contains
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    ! -- modules
-    use InputOutputModule, only: get_node
     ! -- dummy
     class(GwfDisvType) :: this
     integer(I4B), intent(in) :: ncolbnd
@@ -1917,8 +1907,6 @@ contains
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    ! -- modules
-    use InputOutputModule, only: get_node
     ! -- dummy
     class(GwfDisvType) :: this
     integer(I4B), intent(in) :: maxbnd

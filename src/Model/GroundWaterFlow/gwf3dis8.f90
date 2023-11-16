@@ -4,13 +4,14 @@ module GwfDisModule
   use KindModule, only: DP, I4B
   use ConstantsModule, only: LINELENGTH, DHALF, DZERO, LENMEMPATH, LENVARNAME
   use BaseDisModule, only: DisBaseType
-  use InputOutputModule, only: get_node, URWORD, ulasav, ulaprufw, ubdsv1, &
+  use InputOutputModule, only: URWORD, ulasav, ulaprufw, ubdsv1, &
                                ubdsv06
   use SimModule, only: count_errors, store_error, store_error_unit, &
                        store_error_filename
   use SimVariablesModule, only: errmsg
   use MemoryManagerModule, only: mem_allocate
   use TdisModule, only: kstp, kper, pertim, totim, delt
+  use GeomUtilModule, only: get_node, get_ijk, get_jk
 
   implicit none
   private
@@ -707,7 +708,6 @@ contains
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    use InputOutputModule, only: get_ijk
     implicit none
     class(GwfDisType) :: this
     integer(I4B), intent(in) :: nodeu
@@ -737,7 +737,6 @@ contains
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    use InputOutputModule, only: get_ijk
     implicit none
     class(GwfDisType) :: this
     integer(I4B), intent(in) :: nodeu
@@ -820,7 +819,6 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     use ConstantsModule, only: LINELENGTH
-    use InputOutputModule, only: get_node
     implicit none
     ! -- return
     integer(I4B) :: nodenumber
@@ -1172,7 +1170,6 @@ contains
 ! ------------------------------------------------------------------------------
     ! -- modules
     use ConstantsModule, only: DZERO, DONE
-    use InputOutputModule, only: get_ijk
     ! -- dummy
     class(GwfDisType) :: this
     integer(I4B), intent(in) :: noden
@@ -1238,7 +1235,6 @@ contains
     ! -- modules
     use ConstantsModule, only: DZERO, DONE, DHALF
     use DisvGeom, only: line_unit_vector
-    use InputOutputModule, only: get_ijk
     ! -- dummy
     class(GwfDisType) :: this
     integer(I4B), intent(in) :: noden
@@ -1327,7 +1323,6 @@ contains
 ! ------------------------------------------------------------------------------
     ! -- modules
     use InputOutputModule, only: urword
-    use ConstantsModule, only: LINELENGTH
     ! -- dummy
     class(GwfDisType), intent(inout) :: this
     character(len=*), intent(inout) :: line
@@ -1396,7 +1391,6 @@ contains
 ! ------------------------------------------------------------------------------
     ! -- modules
     use InputOutputModule, only: urword
-    use ConstantsModule, only: LINELENGTH
     ! -- dummy
     class(GwfDisType), intent(inout) :: this
     character(len=*), intent(inout) :: line
@@ -1465,8 +1459,6 @@ contains
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    ! -- modules
-    use InputOutputModule, only: get_node
     ! -- dummy
     class(GwfDisType) :: this
     integer(I4B), intent(in) :: maxbnd
@@ -1666,7 +1658,6 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
-    use InputOutputModule, only: get_node
     use ConstantsModule, only: LINELENGTH
     ! -- dummy
     class(GwfDisType) :: this

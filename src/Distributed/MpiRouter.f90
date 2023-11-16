@@ -60,8 +60,8 @@ contains
   end function create_mpi_router
 
   subroutine mr_initialize(this)
-    use InputOutputModule, only: getunit
     use ConstantsModule, only: LINELENGTH
+    use FileUtilModule, only: get_fileunit
     class(MpiRouterType) :: this
     ! local
     integer :: ierr
@@ -123,7 +123,7 @@ contains
 
     ! open log file
     if (this%enable_monitor) then
-      this%imon = getunit()
+      this%imon = get_fileunit()
       write (monitor_file, '(a,i0,a)') "mpi.p", proc_id, ".log"
       open (unit=this%imon, file=monitor_file)
       call this%message_builder%set_monitor(this%imon)

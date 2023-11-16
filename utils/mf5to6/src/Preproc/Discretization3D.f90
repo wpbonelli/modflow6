@@ -5,9 +5,10 @@ module DnmDis3dModule
   use ConstantsPHMFModule,       only: PI
   use DnmDisBaseModule,          only: DisBaseType
   use GlobalVariablesPHMFModule, only: verbose
-  use InputOutputModule,         only: get_ijk, get_node, URWORD
+  use InputOutputModule,         only: URWORD
   use SimModule,                 only: count_errors, store_error, &
                                        store_error_unit, ustop
+  use GeomUtilModule, only: get_node, get_ijk
   implicit none
   private
   public dis3d_cr, Dis3dType, CastAsDis3dType
@@ -545,8 +546,6 @@ module DnmDis3dModule
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    use InputOutputModule, only: get_ijk
-    implicit none
     class(Dis3dType) :: this
     integer, intent(in) :: nodeu
     character(len=*), intent(inout) :: str
@@ -617,8 +616,6 @@ module DnmDis3dModule
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     use ConstantsModule, only: LINELENGTH
-    use InputOutputModule, only: get_node
-    implicit none
     ! dummy
     class(Dis3dType), intent(in) :: this
     integer, intent(in) :: k, i, j
@@ -670,7 +667,6 @@ module DnmDis3dModule
 !
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
-    implicit none
     class(Dis3dType) :: this
     integer, intent(in) :: noder
 ! ------------------------------------------------------------------------------
@@ -761,7 +757,6 @@ module DnmDis3dModule
 !   is allowed to be a string (e.g. boundary name). In this case, if a string
 !   is encountered, return value as -2.
 ! ******************************************************************************
-    implicit none
     ! dummy
     class(Dis3dType)                 :: this
     integer,           intent(inout) :: lloc
@@ -840,12 +835,8 @@ module DnmDis3dModule
   end function noder_from_string
 
   logical function supports_layers(this)
-    implicit none
-    ! dummy
     class(Dis3dType) :: this
-    !
     supports_layers = .true.
-    return
   end function supports_layers
 
   subroutine get_cell(this, x, y, irow, jcol, gridX, gridY)
@@ -979,7 +970,6 @@ module DnmDis3dModule
   end subroutine get_node_coords_idx2
 
   function CastAsDis3dType(obj) result (res)
-    implicit none
     class(*), pointer, intent(inout) :: obj
     type(Dis3dType), pointer :: res
     !

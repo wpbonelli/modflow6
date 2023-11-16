@@ -2,7 +2,7 @@ module TimerModule
 
   use KindModule, only: DP, I4B
   use ConstantsModule, only: LINELENGTH, DZERO
-  use GenericUtilitiesModule, only: sim_message
+  use SimModule, only: sim_message
   implicit none
   private
   public :: print_start_time

@@ -26,8 +26,7 @@ module LakModule
   use InputOutputModule, only: get_node, URWORD, extract_idnum_or_bndname
   use BaseDisModule, only: DisBaseType
   use SimModule, only: count_errors, store_error, store_error_unit, &
-                       deprecation_warning
-  use GenericUtilitiesModule, only: sim_message
+                       deprecation_warning, sim_message
   use MathUtilModule, only: is_same
   use BlockParserModule, only: BlockParserType
   use BaseDisModule, only: DisBaseType

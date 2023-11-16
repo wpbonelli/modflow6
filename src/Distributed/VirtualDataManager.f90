@@ -241,7 +241,7 @@ contains
   !> @brief Reduce the halo for all solutions. This will
   !< activate the mapping tables in the virtual data items.
   subroutine vds_reduce_halo(this)
-    use InputOutputModule, only: getunit
+    use FileUtilModule, only: get_fileunit
     use SimVariablesModule, only: proc_id
     use IndexMapModule
     class(VirtualDataManagerType) :: this
@@ -270,7 +270,7 @@ contains
 
     ! some testing
     if (.false.) then
-      outunit = getunit()
+      outunit = get_fileunit()
       write (monitor_file, '(a,i0,a)') "iface.p", proc_id, ".log"
       open (unit=outunit, file=monitor_file)
       do isol = 1, this%nr_solutions

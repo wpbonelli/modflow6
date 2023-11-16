@@ -11,13 +11,12 @@
         use global, only: iout
         use GlobalVariablesModule, only: echo
         use GwfBasModule, only: SGWF2BAS7PNT, SGWF2BAS7PSV
-        use GenericUtilitiesModule, only: write_centered
         use ModelModule, only: ModelType
         use ObsWriterModule, only: ObsWriterType
         use OpenSpecModule, only: ACCESS, ACTION, FORM
         use PackageWriterModule, only : PackageWriterType
         use SimModule, only: store_error, store_note, store_warning,
-     &                       ustop
+     &                       ustop, write_centered
         use TdisWriterModule, only: TdisWriterType
         use UtilitiesModule, only: ConstantReal2D, Write1Drel,
      &                             Write2Drel

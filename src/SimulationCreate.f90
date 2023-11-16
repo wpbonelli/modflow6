@@ -8,11 +8,11 @@ module SimulationCreateModule
   use SimVariablesModule, only: iout, simulation_mode, proc_id, &
                                 nr_procs, model_names, model_ranks, &
                                 model_loc_idx
-  use GenericUtilitiesModule, only: sim_message, write_centered
   use SimModule, only: store_error, count_errors, &
-                       store_error_filename, MaxErrors
+                       store_error_filename, set_max_errors, &
+                       sim_message, write_centered
   use VersionModule, only: write_listfile_header
-  use InputOutputModule, only: getunit, urword, openfile
+  use InputOutputModule, only: urword, openfile
   use ArrayHandlersModule, only: expandarray, ifind
   use BaseModelModule, only: BaseModelType
   use BaseSolutionModule, only: BaseSolutionType, AddBaseSolutionToList, &
@@ -134,7 +134,7 @@ contains
     ! -- update sim options
     isimcontinue = simcontinue
     isimcheck = nocheck
-    call MaxErrors(maxerror)
+    call set_max_errors(maxerror)
     !
     if (prmem /= '') then
       errmsg = ''

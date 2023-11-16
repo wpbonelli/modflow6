@@ -8,7 +8,7 @@
 ! --         5       RIV              0               ()             ()
 ! --       ...
 
-module IunitModule
+module SimFileUnitModule
 
   use KindModule, only: DP, I4B
   use ConstantsModule, only: LINELENGTH, LENFTYPE
@@ -35,42 +35,26 @@ module IunitModule
 
 contains
 
+  !> @brief Allocate and initialize unit number and package name arrays.
   subroutine init(this, niunit, cunit)
-! ******************************************************************************
-! init -- allocate the cunit and iunit entries of this object, and copy
-!   cunit into the object.
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     ! -- dummy
     class(IunitType), intent(inout) :: this
     integer(I4B), intent(in) :: niunit
     character(len=*), dimension(niunit), intent(in) :: cunit
     ! -- local
     integer(I4B) :: i
-! ------------------------------------------------------------------------------
-    !
+    
     allocate (this%cunit(niunit))
     allocate (this%iunit(niunit))
     this%niunit = niunit
     do i = 1, niunit
       this%cunit(i) = cunit(i)
     end do
-    !
-    ! -- Return
-    return
   end subroutine init
 
+  !> @brief Add a unit number for a given file type. Finds the row for the given
+  !! file type and associates it with the file unit, expanding arrays if needed.
   subroutine addfile(this, ftyp, iunit, ipos, namefilename)
-! ******************************************************************************
-! addfile -- add an ftyp and unit number.  Find the row for the ftyp and
-!            store another iunit value.
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
-    ! -- modules
     ! -- dummy
     class(IunitType), intent(inout) :: this
     character(len=*), intent(in) :: ftyp
@@ -81,8 +65,7 @@ contains
     character(len=LINELENGTH) :: errmsg
     integer(I4B), allocatable, dimension(:) :: itemp
     integer(I4B) :: i, irow
-! ------------------------------------------------------------------------------
-    !
+    
     ! -- Find the row containing ftyp
     irow = 0
     do i = 1, this%niunit
@@ -96,14 +79,13 @@ contains
       call store_error(errmsg)
       call store_error_filename(namefilename, terminate=.TRUE.)
     end if
-    !
+    
     ! -- Store the iunit number for this ftyp
     if (this%iunit(irow)%nval == 0) then
       allocate (this%iunit(irow)%iunit(1))
       allocate (this%iunit(irow)%ipos(1))
       this%iunit(irow)%nval = 1
     else
-      !
       ! -- increase size of iunit
       allocate (itemp(this%iunit(irow)%nval))
       itemp(:) = this%iunit(irow)%iunit(:)
@@ -111,38 +93,29 @@ contains
       this%iunit(irow)%nval = this%iunit(irow)%nval + 1
       allocate (this%iunit(irow)%iunit(this%iunit(irow)%nval))
       this%iunit(irow)%iunit(1:this%iunit(irow)%nval - 1) = itemp(:)
-      !
+      
       ! -- increase size of ipos
       itemp(:) = this%iunit(irow)%ipos(:)
       deallocate (this%iunit(irow)%ipos)
       allocate (this%iunit(irow)%ipos(this%iunit(irow)%nval))
       this%iunit(irow)%ipos(1:this%iunit(irow)%nval - 1) = itemp(:)
-      !
+      
       ! -- cleanup temp
       deallocate (itemp)
     end if
     this%iunit(irow)%iunit(this%iunit(irow)%nval) = iunit
     this%iunit(irow)%ipos(this%iunit(irow)%nval) = ipos
-    !
-    ! -- Return
-    return
   end subroutine
 
+  !> @brief Pop the last unit number for the given file type, disassociating and
+  !! returning the unit number. Return 0 if the type has no associated file units.
   subroutine getunitnumber(this, ftyp, iunit, iremove)
-! ******************************************************************************
-! Get the last unit number for type ftyp or return 0 for iunit.  If iremove
-! is 1, then remove this unit number.  Similar to a list.pop().
-! ******************************************************************************
-!
-!    SPECIFICATIONS:
-! ------------------------------------------------------------------------------
     class(IunitType), intent(inout) :: this
     character(len=*), intent(in) :: ftyp
     integer(I4B), intent(inout) :: iunit
     integer(I4B), intent(in) :: iremove
     integer(I4B) :: i, irow, nval
-! ------------------------------------------------------------------------------
-    !
+    
     ! -- Find the row
     irow = 0
     do i = 1, this%niunit
@@ -151,7 +124,7 @@ contains
         exit
       end if
     end do
-    !
+    
     ! -- Find the unit number.
     iunit = 0
     if (irow > 0) then
@@ -168,4 +141,4 @@ contains
     end if
   end subroutine getunitnumber
 
-end module IunitModule
+end module SimFileUnitModule
