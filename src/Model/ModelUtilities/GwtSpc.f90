@@ -538,7 +538,7 @@ contains
   subroutine spc_rp_array(this, line)
     use ConstantsModule, only: LENTIMESERIESNAME
     use SimModule, only: store_error
-    use ArrayHandlersModule, only: ifind
+    use ArrayUtilModule, only: ifind
     ! -- dummy
     class(GwtSpcType), intent(inout) :: this !< GwtSpcType object
     character(len=LINELENGTH), intent(inout) :: line

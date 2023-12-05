@@ -395,10 +395,10 @@ meson test -C builddir --no-rebuild --verbose
 
 Without the `--no-rebuild` options, Meson will rebuild the project before running tests.
 
-Unit tests can be selected by module name (as listed in `autotest/tester.f90`). For instance, to test the `ArrayHandlersModule`:
+Unit tests can be selected by module name (as listed in `autotest/tester.f90`). For instance, to test the `ArrayUtilModule`:
 
 ```shell
-meson test -C builddir --no-rebuild --verbose ArrayHandlers
+meson test -C builddir --no-rebuild --verbose ArrayUtil
 ```
 
 To run a test module in the `gdb` debugger, just add the `--gdb` flag to the test command.

@@ -115,7 +115,7 @@ $(OBJDIR)/GwfBuyInputData.o \
 $(OBJDIR)/ims8misc.o \
 $(OBJDIR)/LinearSolverBase.o \
 $(OBJDIR)/genericutils.o \
-$(OBJDIR)/ArrayHandlers.o \
+$(OBJDIR)/ArrayUtil.o \
 $(OBJDIR)/IndexMap.o \
 $(OBJDIR)/version.o \
 $(OBJDIR)/InterfaceMap.o \

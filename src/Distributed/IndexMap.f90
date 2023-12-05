@@ -1,6 +1,6 @@
 module IndexMapModule
   use KindModule, only: I4B
-  use ArrayHandlersModule, only: ConcatArray
+  use ArrayUtilModule, only: ConcatArray
   implicit none
   private
 

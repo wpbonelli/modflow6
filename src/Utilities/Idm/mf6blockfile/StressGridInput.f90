@@ -144,7 +144,7 @@ contains
     use BlockParserModule, only: BlockParserType
     use InputDefinitionModule, only: InputParamDefinitionType
     use DefinitionSelectModule, only: get_param_definition_type
-    use ArrayHandlersModule, only: ifind
+    use ArrayUtilModule, only: ifind
     use SourceCommonModule, only: ifind_charstr
     class(StressGridInputType), intent(inout) :: this !< Mf6FileGridInputType
     type(BlockParserType), pointer, intent(inout) :: parser
@@ -271,7 +271,7 @@ contains
     use MemoryManagerModule, only: mem_allocate
     use InputDefinitionModule, only: InputParamDefinitionType
     use DefinitionSelectModule, only: get_param_definition_type
-    use ArrayHandlersModule, only: expandarray
+    use ArrayUtilModule, only: expandarray
     ! -- dummy
     class(StressGridInputType), intent(inout) :: this !< StressGridInputType
     type(InputParamDefinitionType), pointer :: idt
@@ -332,7 +332,7 @@ contains
                                tagname, mempath, iaux)
     ! -- modules
     use MemoryManagerModule, only: mem_setptr
-    use ArrayHandlersModule, only: ifind
+    use ArrayUtilModule, only: ifind
     use InputDefinitionModule, only: InputParamDefinitionType
     use DefinitionSelectModule, only: get_param_definition_type
     use Double1dReaderModule, only: read_dbl1d

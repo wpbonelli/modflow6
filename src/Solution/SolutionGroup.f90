@@ -165,7 +165,7 @@ contains
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
-    use ArrayHandlersModule, only: ExpandArray
+    use ArrayUtilModule, only: ExpandArray
     ! -- dummy
     class(SolutionGroupType) :: this
     integer(I4B), intent(in) :: isoln

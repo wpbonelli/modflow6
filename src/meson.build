@@ -213,7 +213,7 @@ modflow_sources = files(
     'Utilities' / 'TimeSeries' / 'TimeSeriesRecord.f90',
     'Utilities' / 'Vector' / 'VectorBase.f90',
     'Utilities' / 'Vector' / 'SeqVector.f90',
-    'Utilities' / 'ArrayHandlers.f90',
+    'Utilities' / 'ArrayUtil.f90',
     'Utilities' / 'ArrayReaders.f90',
     'Utilities' / 'BlockParser.f90',
     'Utilities' / 'Budget.f90',

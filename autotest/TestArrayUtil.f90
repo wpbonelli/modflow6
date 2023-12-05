@@ -1,15 +1,15 @@
-module TestArrayHandlers
+module TestArrayUtil
   use KindModule, only: I4B, DP, LGP
   use testdrive, only: error_type, unittest_type, new_unittest, check, test_failed
-  use ArrayHandlersModule, only: ExpandArray, ExpandArray2D
+  use ArrayUtilModule, only: ExpandArray, ExpandArray2D
   use ConstantsModule, only: LINELENGTH
   implicit none
   private
-  public :: collect_arrayhandlers
+  public :: collect_arrayutil
 
 contains
 
-  subroutine collect_arrayhandlers(testsuite)
+  subroutine collect_arrayutil(testsuite)
     type(unittest_type), allocatable, intent(out) :: testsuite(:)
     testsuite = [ &
                 new_unittest("ExpandArray_int", test_ExpandArray_int), &
@@ -18,7 +18,7 @@ contains
                 new_unittest("ExpandArray2D_int", test_ExpandArray2D_int), &
                 new_unittest("ExpandArray2D_dbl", test_ExpandArray2D_dbl) &
                 ]
-  end subroutine collect_arrayhandlers
+  end subroutine collect_arrayutil
 
   subroutine test_ExpandArray_int(error)
     type(error_type), allocatable, intent(out) :: error
@@ -204,4 +204,4 @@ contains
     deallocate (array)
 
   end subroutine test_ExpandArray2D_dbl
-end module TestArrayHandlers
+end module TestArrayUtil

@@ -267,7 +267,7 @@ contains
     use ConstantsModule, only: LINELENGTH
     use TdisModule, only: kper, nper
     use SimModule, only: store_error, store_error_unit, count_errors
-    use ArrayHandlersModule, only: ifind
+    use ArrayUtilModule, only: ifind
     ! -- dummy
     class(GwfMvrType), intent(inout) :: this
     ! -- local
@@ -559,7 +559,7 @@ contains
   subroutine mvr_ot_bdsummary(this, ibudfl)
     ! -- modules
     use TdisModule, only: kstp, kper, delt, totim
-    use ArrayHandlersModule, only: ifind, expandarray
+    use ArrayUtilModule, only: ifind, expandarray
     ! -- dummy
     class(GwfMvrType) :: this
     integer(I4B), intent(in) :: ibudfl

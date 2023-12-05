@@ -3002,7 +3002,7 @@ contains
   !<
   subroutine mem_unique_origins(cunique)
     ! -- modules
-    use ArrayHandlersModule, only: ExpandArray, ifind
+    use ArrayUtilModule, only: ExpandArray, ifind
     ! -- dummy
     character(len=LENMEMPATH), allocatable, dimension(:), intent(inout) :: cunique !< array with unique first components
     ! -- local

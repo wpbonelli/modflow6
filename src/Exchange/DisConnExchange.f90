@@ -76,7 +76,7 @@ contains
   !<
   function parse_option(this, keyword, iout) result(parsed)
     ! -- modules
-    use ArrayHandlersModule, only: ifind
+    use ArrayUtilModule, only: ifind
     use InputOutputModule, only: urdaux
     ! -- dummy
     class(DisConnExchangeType) :: this !< instance of exchange object

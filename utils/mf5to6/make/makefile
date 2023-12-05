@@ -36,7 +36,7 @@ $(OBJDIR)/version.o \
 $(OBJDIR)/OpenSpec.o \
 $(OBJDIR)/Global.o \
 $(OBJDIR)/GlobalVariables.o \
-$(OBJDIR)/ArrayHandlers.o \
+$(OBJDIR)/ArrayUtil.o \
 $(OBJDIR)/SimPHMF.o \
 $(OBJDIR)/InputOutput.o \
 $(OBJDIR)/TableTerm.o \

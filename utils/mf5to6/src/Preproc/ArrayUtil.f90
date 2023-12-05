@@ -1,4 +1,4 @@
-module ArrayHandlersModule
+module ArrayUtilModule
 
   use ConstantsModule, only: MAXCHARLEN
   use GLOBAL, only: iout
@@ -137,9 +137,9 @@ contains
     lenc = len(array)
     if (lenc>MAXCHARLEN) then
       ! Can't use store_error or ustop here because SimModule
-      ! is dependent on ArrayHandlersModule.
-      write(iout,*)'Error in ArrayHandlersModule: Need to increase MAXCHARLEN'
-      write(*,*)'Error in ArrayHandlersModule: Need to increase MAXCHARLEN'
+      ! is dependent on ArrayUtilModule.
+      write(iout,*)'Error in ArrayUtilModule: Need to increase MAXCHARLEN'
+      write(*,*)'Error in ArrayUtilModule: Need to increase MAXCHARLEN'
       write(iout,*)'Stopping...'
       write(*,*)'Stopping...'
       stop
@@ -219,7 +219,7 @@ contains
     ! -- Error reporting
     99 continue
       ! Can't use store_error or ustop here because SimModule
-      ! is dependent on ArrayHandlersModule.
+      ! is dependent on ArrayUtilModule.
       write(iout,*)'Error encountered while trying to increase array size:'
       write(iout,'(a)')trim(ermsg)
       write(iout,*)'Stopping...'
@@ -267,7 +267,7 @@ contains
     ! -- Error reporting
     99 continue
       ! Can't use store_error or ustop here because SimModule
-      ! is dependent on ArrayHandlersModule.
+      ! is dependent on ArrayUtilModule.
       write(iout,*)'Error encountered while trying to increase array size:'
       write(iout,'(a)')trim(ermsg)
       write(iout,*)'Stopping...'
@@ -309,9 +309,9 @@ contains
     lenc = len(array)
     if (lenc>MAXCHARLEN) then
       ! Can't use store_error or ustop here because SimModule
-      ! is dependent on ArrayHandlersModule.
-      write(iout,*)'Error in ArrayHandlersModule: Need to increase MAXCHARLEN'
-      write(*,*)'Error in ArrayHandlersModule: Need to increase MAXCHARLEN'
+      ! is dependent on ArrayUtilModule.
+      write(iout,*)'Error in ArrayUtilModule: Need to increase MAXCHARLEN'
+      write(*,*)'Error in ArrayUtilModule: Need to increase MAXCHARLEN'
       write(iout,*)'Stopping...'
       write(*,*)'Stopping...'
       stop
@@ -341,4 +341,4 @@ contains
     return
   end subroutine remove_character
 
-end module ArrayHandlersModule
+end module ArrayUtilModule

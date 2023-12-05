@@ -13,7 +13,7 @@ module SimulationCreateModule
                        store_error_filename, MaxErrors
   use VersionModule, only: write_listfile_header
   use InputOutputModule, only: getunit, urword, openfile
-  use ArrayHandlersModule, only: expandarray, ifind
+  use ArrayUtilModule, only: expandarray, ifind
   use BaseModelModule, only: BaseModelType
   use BaseSolutionModule, only: BaseSolutionType, AddBaseSolutionToList, &
                                 GetBaseSolutionFromList

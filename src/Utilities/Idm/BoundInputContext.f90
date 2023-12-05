@@ -402,7 +402,7 @@ contains
     ! -- modules
     use InputDefinitionModule, only: InputParamDefinitionType
     use DefinitionSelectModule, only: get_aggregate_definition_type
-    use ArrayHandlersModule, only: expandarray
+    use ArrayUtilModule, only: expandarray
     use InputOutputModule, only: parseline
     ! -- dummy
     class(BoundInputContextType) :: this

@@ -127,7 +127,7 @@
 module ObsModule
 
   use KindModule, only: DP, I4B
-  use ArrayHandlersModule, only: ExpandArray
+  use ArrayUtilModule, only: ExpandArray
   use BaseDisModule, only: DisBaseType
   use BlockParserModule, only: BlockParserType
   use ConstantsModule, only: LENBIGLINE, LENFTYPE, LENOBSNAME, &

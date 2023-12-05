@@ -232,7 +232,7 @@ contains
   !<
   subroutine add_tasfile(this, fname)
     ! -- modules
-    use ArrayHandlersModule, only: ExpandArray
+    use ArrayUtilModule, only: ExpandArray
     ! -- dummy
     class(TimeArraySeriesManagerType) :: this
     character(len=*), intent(in) :: fname

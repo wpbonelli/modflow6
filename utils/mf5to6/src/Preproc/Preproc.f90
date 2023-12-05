@@ -1,6 +1,6 @@
 ! This module implements all logic of the PreHeadsMF preprocessor.
 module PreprocModule
-  use ArrayHandlersModule,       only: ExpandArray
+  use ArrayUtilModule,       only: ExpandArray
   use BlockParserModule,         only: BlockParserType
   use LineListModule,            only: LineListType
   use ConstantsModule,           only: DONE, DZERO, LENBIGLINE, &

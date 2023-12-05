@@ -13,7 +13,7 @@ module MessageModule
                              VSUMMARY
   use GenericUtilitiesModule, only: sim_message, write_message
   use SimVariablesModule, only: istdout
-  use ArrayHandlersModule, only: ExpandArray
+  use ArrayUtilModule, only: ExpandArray
 
   implicit none
 

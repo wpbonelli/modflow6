@@ -1,5 +1,5 @@
 module SimModule
-  use ArrayHandlersModule, only: ExpandArray
+  use ArrayUtilModule, only: ExpandArray
   use ConstantsModule, only: MAXCHARLEN,LINELENGTH
   use global, only: iout
   use GlobalVariablesModule, only: msgc

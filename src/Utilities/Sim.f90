@@ -302,7 +302,7 @@ contains
   !<
   subroutine deprecation_warning(cblock, cvar, cver, endmsg, iunit)
     ! -- modules
-    use ArrayHandlersModule, only: ExpandArray
+    use ArrayUtilModule, only: ExpandArray
     ! -- dummy variables
     character(len=*), intent(in) :: cblock !< block name
     character(len=*), intent(in) :: cvar !< variable name
@@ -343,7 +343,7 @@ contains
   !<
   subroutine store_note(note)
     ! -- modules
-    use ArrayHandlersModule, only: ExpandArray
+    use ArrayUtilModule, only: ExpandArray
     ! -- dummy variables
     character(len=*), intent(in) :: note !< note
     !

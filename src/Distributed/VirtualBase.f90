@@ -127,7 +127,7 @@ contains
   !> @brief Check if this data item requires syncing
   !< for this particular stage
   function vm_check_stage(this, stage) result(has_stage)
-    use ArrayHandlersModule, only: ifind
+    use ArrayUtilModule, only: ifind
     class(VirtualDataType), target :: this
     integer(I4B) :: stage, stg_idx
     logical(LGP) :: has_stage

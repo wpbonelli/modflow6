@@ -30,7 +30,7 @@
 module PrintSaveManagerModule
 
   use KindModule, only: DP, I4B, LGP
-  use ArrayHandlersModule, only: expandarray
+  use ArrayUtilModule, only: expandarray
   use SimVariablesModule, only: errmsg
   use SimModule, only: store_error
   use InputOutputModule, only: urword

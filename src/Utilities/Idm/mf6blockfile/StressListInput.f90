@@ -205,7 +205,7 @@ contains
     use TimeSeriesLinkModule, only: TimeSeriesLinkType
     use TimeSeriesManagerModule, only: read_value_or_time_series
     use StructVectorModule, only: StructVectorType, TSStringLocType
-    !use ArrayHandlersModule, only: ifind
+    !use ArrayUtilModule, only: ifind
     ! -- dummy
     class(StressListInputType), intent(inout) :: this
     type(StructVectorType), pointer, intent(in) :: structvector

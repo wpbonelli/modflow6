@@ -12,7 +12,7 @@ module ModelPackageInputsModule
                              LENPACKAGETYPE, LENPACKAGENAME
   use SimModule, only: store_error, store_error_filename
   use SimVariablesModule, only: iout
-  use ArrayHandlersModule, only: expandarray
+  use ArrayUtilModule, only: expandarray
   use CharacterStringModule, only: CharacterStringType
 
   implicit none

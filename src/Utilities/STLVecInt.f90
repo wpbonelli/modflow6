@@ -1,7 +1,7 @@
 module STLVecIntModule
   use KindModule, only: I4B, LGP
   use SimModule, only: ustop
-  use ArrayHandlersModule, only: ExpandArray
+  use ArrayUtilModule, only: ExpandArray
   implicit none
   private
   public :: STLVecInt

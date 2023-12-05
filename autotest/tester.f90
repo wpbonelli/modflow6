@@ -2,7 +2,7 @@ program tester
   use, intrinsic :: iso_fortran_env, only: error_unit
   use testdrive, only: run_testsuite, new_testsuite, testsuite_type, &
     & select_suite, run_selected, get_argument
-  use TestArrayHandlers, only: collect_arrayhandlers
+  use TestArrayUtil, only: collect_arrayutil
   use TestDevFeature, only: collect_dev_feature
   use TestGeomUtil, only: collect_geomutil
   use TestInputOutput, only: collect_inputoutput
@@ -15,7 +15,7 @@ program tester
 
   stat = 0
   testsuites = [ &
-               new_testsuite("ArrayHandlers", collect_arrayhandlers), &
+               new_testsuite("ArrayUtil", collect_arrayutil), &
                new_testsuite("DevFeature", collect_dev_feature), &
                new_testsuite("GeomUtil", collect_geomutil), &
                new_testsuite("InputOutput", collect_inputoutput), &

@@ -1492,7 +1492,7 @@ END SUBROUTINE URWORD
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
-    use ArrayHandlersModule, only: ExpandArray
+    use ArrayUtilModule, only: ExpandArray
     use ConstantsModule,     only: LENAUXNAME
     ! -- implicit
     implicit none

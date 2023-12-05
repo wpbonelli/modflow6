@@ -1,6 +1,6 @@
 module SfrReachModule
 
-  use ArrayHandlersModule, only: ExpandArray
+  use ArrayUtilModule, only: ExpandArray
   use AuxiliaryModule, only: AuxiliaryType
   use ListModule, only: ListType
   use SfrDiversionModule, only: SfrDiversionType, ConstructSfrDiversion, &

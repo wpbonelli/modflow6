@@ -24,7 +24,7 @@ module ObserveModule
   use SimModule, only: store_warning, store_error, &
                        store_error_unit
   use TdisModule, only: totim, totalsimtime
-  use ArrayHandlersModule, only: ExpandArrayWrapper
+  use ArrayUtilModule, only: ExpandArrayWrapper
 
   implicit none
 

@@ -401,7 +401,7 @@ contains
     ! -- modules
     use ConstantsModule, only: LENBOUNDNAME, LINELENGTH, DZERO
     use InputOutputModule, only: urword, get_node
-    use ArrayHandlersModule, only: ExpandArray
+    use ArrayUtilModule, only: ExpandArray
     use TdisModule, only: kper
     ! -- dummy
     class(ListReaderType) :: this

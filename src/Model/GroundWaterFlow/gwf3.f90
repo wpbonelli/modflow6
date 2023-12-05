@@ -1489,7 +1489,7 @@ contains
     ! -- modules
     use ConstantsModule, only: LINELENGTH, LENPACKAGENAME
     use CharacterStringModule, only: CharacterStringType
-    use ArrayHandlersModule, only: expandarray
+    use ArrayUtilModule, only: expandarray
     use MemoryManagerModule, only: mem_setptr
     use MemoryHelperModule, only: create_mem_path
     use SimVariablesModule, only: idm_context

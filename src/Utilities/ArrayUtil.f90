@@ -1,4 +1,4 @@
-module ArrayHandlersModule
+module ArrayUtilModule
 
   use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: LINELENGTH, MAXCHARLEN, DZERO, DTEN
@@ -209,7 +209,7 @@ contains
     ! -- check character length
     lenc = len(array)
     if (lenc > MAXCHARLEN) then
-      write (line, '(a)') 'Error in ArrayHandlersModule: '// &
+      write (line, '(a)') 'Error in ArrayUtilModule: '// &
         'Need to increase MAXCHARLEN'
       call sim_message(line, iunit=iout, fmt=stdfmt)
       call sim_message(line, fmt=stdfmt)
@@ -375,7 +375,7 @@ contains
     ! -- Error reporting
 99  continue
 
-    write (line, '(a)') 'Error in ArrayHandlersModule: '// &
+    write (line, '(a)') 'Error in ArrayUtilModule: '// &
       'Could not increase array size'
     call sim_message(line, iunit=iout, fmt=stdfmt)
     call sim_message(line, fmt=stdfmt)
@@ -433,7 +433,7 @@ contains
     ! -- Error reporting
 99  continue
 
-    write (line, '(a)') 'Error in ArrayHandlersModule: '// &
+    write (line, '(a)') 'Error in ArrayUtilModule: '// &
       'Could not increase array size'
     call sim_message(line, iunit=iout, fmt=stdfmt)
     call sim_message(line, fmt=stdfmt)
@@ -546,7 +546,7 @@ contains
     lenc = len(array)
     if (lenc > MAXCHARLEN) then
 
-      write (line, '(a)') 'Error in ArrayHandlersModule: '// &
+      write (line, '(a)') 'Error in ArrayUtilModule: '// &
         'Need to increase MAXCHARLEN'
       call sim_message(line, iunit=iout, fmt=stdfmt)
       call sim_message(line, fmt=stdfmt)
@@ -581,4 +581,4 @@ contains
 
   end subroutine remove_character
 
-end module ArrayHandlersModule
+end module ArrayUtilModule

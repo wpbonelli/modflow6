@@ -20,7 +20,7 @@ $(OBJDIR)/SimVariables.o \
 $(OBJDIR)/genericutils.o \
 $(OBJDIR)/defmacro.o \
 $(OBJDIR)/compilerversion.o \
-$(OBJDIR)/ArrayHandlers.o \
+$(OBJDIR)/ArrayUtil.o \
 $(OBJDIR)/version.o \
 $(OBJDIR)/Message.o \
 $(OBJDIR)/Sim.o \

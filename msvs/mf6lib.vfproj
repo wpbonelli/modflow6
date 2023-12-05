@@ -136,7 +136,7 @@
 		<File RelativePath="..\src\Utilities\TimeSeries\TimeSeriesLink.f90"/>
 		<File RelativePath="..\src\Utilities\TimeSeries\TimeSeriesManager.f90"/>
 		<File RelativePath="..\src\Utilities\TimeSeries\TimeSeriesRecord.f90"/></Filter>
-		<File RelativePath="..\src\Utilities\ArrayHandlers.f90"/>
+		<File RelativePath="..\src\Utilities\ArrayUtil.f90"/>
 		<File RelativePath="..\src\Utilities\ArrayReaders.f90"/>
 		<File RelativePath="..\src\Utilities\BlockParser.f90"/>
 		<File RelativePath="..\src\Utilities\Budget.f90"/>

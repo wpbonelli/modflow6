@@ -353,7 +353,7 @@ contains
   !> @brief Synchronize one particular solution for this stage
   !<
   subroutine vds_synchronize_sln(this, id_sln, stage)
-    use ArrayHandlersModule, only: ifind
+    use ArrayUtilModule, only: ifind
     class(VirtualDataManagerType) :: this
     integer(I4B) :: id_sln !< the id of the solution
     integer(I4B) :: stage

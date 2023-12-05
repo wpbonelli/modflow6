@@ -102,7 +102,7 @@ contains
   subroutine add_tsfile(this, fname, inunit)
     ! -- modules
     use SimModule, only: store_error, store_error_unit
-    use ArrayHandlersModule, only: ExpandArray
+    use ArrayUtilModule, only: ExpandArray
     ! -- dummy
     class(TimeSeriesManagerType) :: this
     character(len=*), intent(in) :: fname
