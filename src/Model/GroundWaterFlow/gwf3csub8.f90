@@ -34,7 +34,7 @@ module GwfCsubModule
   use SimModule, only: count_errors, store_error, store_error_unit, &
                        store_warning
   use SimVariablesModule, only: errmsg, warnmsg
-  use SortModule, only: qsort, selectn
+  use SortModule, only: selectn
   !
   use TimeSeriesLinkModule, only: TimeSeriesLinkType
   use TimeSeriesManagerModule, only: TimeSeriesManagerType, tsmanager_cr
@@ -1913,7 +1913,7 @@ contains
           iexceed = iexceed + 1
         end if
       end do
-      call selectn(imap_sel, pctcomp_arr, reverse=.TRUE.)
+      call selectn(pctcomp_arr, n=nlen, indx=imap_sel, reverse=.TRUE.)
       !
       ! -- summary interbed strain table
       i0 = max(1, this%ninterbeds - ncells + 1)
@@ -2103,7 +2103,7 @@ contains
         iexceed = iexceed + 1
       end if
     end do
-    call selectn(imap_sel, pctcomp_arr, reverse=.TRUE.)
+    call selectn(pctcomp_arr, n=nlen, indx=imap_sel, reverse=.TRUE.)
     !
     ! -- summary coarse-grained strain table
     i0 = max(1, this%dis%nodes - ncells + 1)

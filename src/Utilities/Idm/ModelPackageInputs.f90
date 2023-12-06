@@ -335,8 +335,7 @@ contains
     allocate (this%pkglist(size(cunit_idxs)))
     !
     ! -- sort cunit indexes
-    allocate (indx(size(cunit_idxs)))
-    call qsort(indx, cunit_idxs)
+    call qsort(cunit_idxs, indx)
     !
     ! -- create sorted LoadablePackageType object list
     do n = 1, size(cunit_idxs)

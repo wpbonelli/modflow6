@@ -1,35 +1,37 @@
 module SortModule
-  use KindModule
+  use KindModule, only: I4B, DP, LGP
   use SimVariablesModule, only: errmsg
-  use SimModule, only: store_error
   use ConstantsModule, only: LINELENGTH
+  use ArrayUtilModule, only: ExpandArray
   implicit none
 
   private
   public :: qsort, selectn, unique_values
 
+  !> @brief Quick sort an array.
   interface qsort
     module procedure qsort_int1d, qsort_dbl1d
   end interface
 
+  !> @brief Find the unique elements of an array.
   interface unique_values
     module procedure unique_values_int1d, unique_values_dbl1d
   end interface
 
 contains
-  subroutine qsort_int1d(indx, v, reverse)
-! **************************************************************************
-! qsort -- quick sort that also includes an index number
-! **************************************************************************
-!
-!    SPECIFICATIONS:
-! --------------------------------------------------------------------------
+
+  !> @brief Quicksort an integer array in place, in ascending order.
+  !!
+  !! Set reverse true for descending. An array of heap indices indx
+  !! may optionally be provided/accessed.
+  !<
+  subroutine qsort_int1d(v, indx, reverse)
     ! -- dummy arguments
-    integer(I4B), dimension(:), intent(inout) :: indx
-    integer(I4B), dimension(:), intent(inout) :: v
-    logical, intent(in), optional :: reverse
+    integer(I4B), intent(inout) :: v(:)
+    integer(I4B), allocatable, intent(out) :: indx(:)
+    logical(LGP), intent(in), optional :: reverse
     ! -- local variables
-    logical :: lrev
+    logical(LGP) :: lrev
     integer(I4B), parameter :: nn = 15
     integer(I4B), parameter :: nstack = 50
     integer(I4B) :: nsize
@@ -43,8 +45,6 @@ contains
     integer(I4B) :: iidx
     integer(I4B) :: ia
     integer(I4B) :: a
-    ! -- functions
-    ! -- code
     !
     ! -- process optional dummy variables
     if (present(reverse)) then
@@ -58,6 +58,9 @@ contains
     jstack = 0
     ileft = 1
     iright = nsize
+    !
+    ! -- allocate heap index array
+    call ExpandArray(indx, nsize)
     !
     ! -- perform quicksort
     do
@@ -122,9 +125,8 @@ contains
         indx(j) = ia
         jstack = jstack + 2
         if (jstack > nstack) then
-          write (errmsg, '(a,3(1x,a))') &
-            'JSTACK > NSTACK IN SortModule::qsort'
-          call store_error(errmsg, terminate=.TRUE.)
+          print *, 'JSTACK > NSTACK IN SortModule::qsort'
+          error stop 1
         end if
         if ((iright - i + 1) >= (j - 1)) then
           istack(jstack) = iright
@@ -147,24 +149,21 @@ contains
         j = j - 1
       end do
     end if
-    !
-    ! -- return
-    return
+
   end subroutine qsort_int1d
 
-  subroutine qsort_dbl1d(indx, v, reverse)
-! **************************************************************************
-! qsort -- quick sort that also includes an index number
-! **************************************************************************
-!
-!    SPECIFICATIONS:
-! --------------------------------------------------------------------------
+  !> @brief Quicksort a real array in place, in ascending order.
+  !!
+  !! Set reverse true for descending. An array of heap indices indx
+  !! may optionally be provided/accessed.
+  !<
+  subroutine qsort_dbl1d(v, indx, reverse)
     ! -- dummy arguments
-    integer(I4B), dimension(:), intent(inout) :: indx
-    real(DP), dimension(:), intent(inout) :: v
-    logical, intent(in), optional :: reverse
+    real(DP), intent(inout) :: v(:)
+    integer(I4B), allocatable, intent(out) :: indx(:)
+    logical(LGP), intent(in), optional :: reverse
     ! -- local variables
-    logical :: lrev
+    logical(LGP) :: lrev
     integer(I4B), parameter :: nn = 15
     integer(I4B), parameter :: nstack = 50
     integer(I4B) :: nsize
@@ -178,8 +177,6 @@ contains
     integer(I4B) :: iidx
     integer(I4B) :: ia
     real(DP) :: a
-    ! -- functions
-    ! -- code
     !
     ! -- process optional dummy variables
     if (present(reverse)) then
@@ -193,6 +190,9 @@ contains
     jstack = 0
     ileft = 1
     iright = nsize
+    !
+    ! -- allocate heap index array
+    call ExpandArray(indx, nsize)
     !
     ! -- perform quicksort
     do
@@ -257,9 +257,8 @@ contains
         indx(j) = ia
         jstack = jstack + 2
         if (jstack > nstack) then
-          write (errmsg, '(a,3(1x,a))') &
-            'JSTACK > NSTACK IN SortModule::qsort'
-          call store_error(errmsg, terminate=.TRUE.)
+          print *, 'JSTACK > NSTACK IN SortModule::qsort'
+          error stop 1
         end if
         if ((iright - i + 1) >= (j - 1)) then
           istack(jstack) = iright
@@ -282,11 +281,10 @@ contains
         j = j - 1
       end do
     end if
-    !
-    ! -- return
-    return
+
   end subroutine qsort_dbl1d
 
+  !> @brief Find the unique elements of the given integer array.
   subroutine unique_values_int1d(a, b)
     ! - dummy arguments
     integer(I4B), dimension(:), allocatable, intent(in) :: a
@@ -296,8 +294,6 @@ contains
     integer(I4B) :: n
     integer(I4B), dimension(:), allocatable :: indxarr
     integer(I4B), dimension(:), allocatable :: tarr
-    ! -- functions
-    ! -- code
     !
     ! -- allocate tarr and create idxarr
     allocate (tarr(size(a)))
@@ -310,7 +306,7 @@ contains
     end do
     !
     ! -- sort a in increasing order
-    call qsort(indxarr, tarr, reverse=.TRUE.)
+    call qsort(tarr, indx=indxarr, reverse=.TRUE.)
     !
     ! -- determine the number of unique values
     count = 1
@@ -337,11 +333,10 @@ contains
     ! -- allocate tarr and create idxarr
     deallocate (tarr)
     deallocate (indxarr)
-    !
-    ! -- return
-    return
+
   end subroutine unique_values_int1d
 
+  !> @brief Find the unique elements of the given double precision array.
   subroutine unique_values_dbl1d(a, b)
     ! - dummy arguments
     real(DP), dimension(:), allocatable, intent(in) :: a
@@ -351,8 +346,6 @@ contains
     integer(I4B) :: n
     integer(I4B), dimension(:), allocatable :: indxarr
     real(DP), dimension(:), allocatable :: tarr
-    ! -- functions
-    ! -- code
     !
     ! -- allocate tarr and create idxarr
     allocate (tarr(size(a)))
@@ -365,7 +358,7 @@ contains
     end do
     !
     ! -- sort a in increasing order
-    call qsort(indxarr, tarr, reverse=.TRUE.)
+    call qsort(tarr, indx=indxarr, reverse=.TRUE.)
     !
     ! -- determine the number of unique values
     count = 1
@@ -392,21 +385,15 @@ contains
     ! -- allocate tarr and create idxarr
     deallocate (tarr)
     deallocate (indxarr)
-    !
-    ! -- return
-    return
+
   end subroutine unique_values_dbl1d
 
-  subroutine selectn(indx, v, reverse)
-! **************************************************************************
-! selectn -- heap selection
-! **************************************************************************
-!
-!    SPECIFICATIONS:
-! --------------------------------------------------------------------------
+  !> @brief Select the n smallest value(s) of an array (heap select).
+  subroutine selectn(v, n, indx, reverse)
     ! -- dummy arguments
-    integer(I4B), dimension(:), intent(inout) :: indx
-    real(DP), dimension(:), intent(inout) :: v
+    real(DP), dimension(:), intent(in) :: v
+    integer(I4B), intent(in), optional :: n
+    integer(I4B), allocatable, dimension(:), intent(inout), optional :: indx
     logical, intent(in), optional :: reverse
     ! -- local variables
     logical :: lrev
@@ -415,11 +402,8 @@ contains
     integer(I4B) :: i
     integer(I4B) :: j
     integer(I4B) :: k
-    integer(I4B) :: n
-    !integer(I4B) :: iidx
+    integer(I4B) :: nn
     real(DP), dimension(:), allocatable :: vv
-    ! -- functions
-    ! -- code
     !
     ! -- process optional dummy variables
     if (present(reverse)) then
@@ -430,17 +414,26 @@ contains
     !
     ! -- initialize heap
     nsizev = size(v)
-    nsizei = min(nsizev, size(indx))
+    if (present(indx) .and. allocated(indx)) then
+      nsizei = size(indx)
+    else
+      if (present(n)) then
+        nsizei = n
+      else
+        nsizei = 1
+      end if
+      allocate (indx(nsizei))
+    end if
     allocate (vv(nsizei))
     !
     ! -- initialize heap index (indx) and heap (vv)
-    do n = 1, nsizei
-      vv(n) = v(n)
-      indx(n) = n
+    do nn = 1, nsizei
+      vv(nn) = v(nn)
+      indx(nn) = nn
     end do
     !
     ! -- initial sort
-    call qsort(indx, vv)
+    call qsort(vv, indx=indx)
     !
     ! -- evaluate the remaining elements in v
     do i = nsizei + 1, nsizev
@@ -471,7 +464,7 @@ contains
     end do
     !
     ! -- final sort
-    call qsort(indx, vv)
+    call qsort(vv, indx=indx)
     !
     ! -- reverse order of the heap index
     if (lrev) then
@@ -481,41 +474,35 @@ contains
         j = j - 1
       end do
     end if
-    !
-    ! -- return
-    return
+
   end subroutine selectn
 
+  !> @brief Swap two reals.
   subroutine rswap(a, b)
     ! -- dummy arguments
     real(DP), intent(inout) :: a
     real(DP), intent(inout) :: b
     ! -- local variables
     real(DP) :: d
-    ! -- functions
-    ! -- code
+
     d = a
     a = b
     b = d
-    !
-    ! -- return
-    return
+
   end subroutine rswap
 
+  !> @brief Swap two integers.
   subroutine iswap(ia, ib)
     ! -- dummy arguments
     integer(I4B), intent(inout) :: ia
     integer(I4B), intent(inout) :: ib
     ! -- local variables
     integer(I4B) :: id
-    ! -- functions
-    ! -- code
+
     id = ia
     ia = ib
     ib = id
-    !
-    ! -- return
-    return
+
   end subroutine iswap
 
 end module SortModule
