@@ -207,8 +207,7 @@ jobs:
       - name: Checkout modflow6-examples
         uses: actions/checkout@v4
         with:
-          repository: w-bonelli/modflow6-examples
-          ref: PRT
+          repository: MODFLOW-USGS/modflow6-examples
           path: modflow6-examples
       
       - name: Setup GNU Fortran ${{ env.GCC }}
@@ -324,10 +323,9 @@ jobs:
           path: modflow6-testmodels
       
       - name: Checkout modflow6-examples
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          repository: w-bonelli/modflow6-examples
-          ref: PRT
+          repository: MODFLOW-USGS/modflow6-examples
           path: modflow6-examples
 
       - name: Setup Micromamba
