@@ -11,7 +11,6 @@ Particles are released from the top left cell.
 
 
 from pathlib import Path
-from pprint import pformat
 
 import flopy
 import matplotlib.cm as cm
@@ -22,8 +21,10 @@ import pytest
 from flopy.utils.binaryfile import HeadFile
 from prt_test_utils import all_equal, check_track_data, get_model_name
 
+from framework import TestFramework
+
 simname = "prtfmi09"
-ex = [simname, f"{simname}_drp"]
+cases = [simname, f"{simname}_drp"]
 nlay, nrow, ncol = 2, 1, 5
 chdheads = [25.0]
 nper = len(chdheads)
@@ -136,8 +137,8 @@ def build_gwf_sim(name, ws, mf6):
     return sim
 
 
-def build_prt_sim(name, ws, mf6):
-    ws = Path(ws)
+def build_prt_sim(name, gwf_ws, prt_ws, mf6):
+    prt_ws = Path(prt_ws)
     gwfname = get_model_name(name, "gwf")
     prtname = get_model_name(name, "prt")
 
@@ -146,7 +147,7 @@ def build_prt_sim(name, ws, mf6):
         sim_name=prtname,
         exe_name=mf6,
         version="mf6",
-        sim_ws=ws,
+        sim_ws=prt_ws,
     )
 
     # create tdis package
@@ -198,8 +199,8 @@ def build_prt_sim(name, ws, mf6):
     )
 
     # create the flow model interface
-    gwf_budget_file = f"{gwfname}.cbc"
-    gwf_head_file = f"{gwfname}.hds"
+    gwf_budget_file = gwf_ws / f"{gwfname}.cbc"
+    gwf_head_file = gwf_ws / f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -219,29 +220,23 @@ def build_prt_sim(name, ws, mf6):
     return sim
 
 
-@pytest.mark.parametrize("name", ex)
-def test_mf6model(name, function_tmpdir, targets):
-    # workspace
-    ws = function_tmpdir
+def build_models(idx, test):
+    gwfsim = build_gwf_sim(test.name, test.workspace, test.targets.mf6)
+    prtsim = build_prt_sim(test.name, test.workspace, test.workspace / "prt", test.targets.mf6)
+    return gwfsim, prtsim
 
-    # determine if drape is enabled
-    drape = "drp" in name
 
-    # model names
+def check_output(idx, test):
+    name = test.name
+    gwf_ws = test.workspace
+    prt_ws = test.workspace / "prt"
     gwfname = get_model_name(name, "gwf")
     prtname = get_model_name(name, "prt")
+    drape = "drp" in name
 
-    # build mf6 models
-    gwfsim = build_gwf_sim(name, ws, targets.mf6)
-    prtsim = build_prt_sim(name, ws, targets.mf6)
-
-    # run mf6 models
-    for sim in [gwfsim, prtsim]:
-        sim.write_simulation()
-        success, buff = sim.run_simulation(report=True)
-        assert success, pformat(buff)
-
-    # extract mf6 models and grid
+    # extract mf6 simulations/models and grid
+    gwfsim = test.sims[0]
+    prtsim = test.sims[1]
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
     mg = gwf.modelgrid
@@ -253,15 +248,15 @@ def test_mf6model(name, function_tmpdir, targets):
     prt_track_csv_file = f"{prtname}.trk.csv"
     prp_track_file = f"{prtname}.prp.trk"
     prp_track_csv_file = f"{prtname}.prp.trk.csv"
-    assert (ws / gwf_budget_file).is_file()
-    assert (ws / gwf_head_file).is_file()
-    assert (ws / prt_track_file).is_file()
-    assert (ws / prt_track_csv_file).is_file()
-    assert (ws / prp_track_file).is_file()
-    assert (ws / prp_track_csv_file).is_file()
+    assert (gwf_ws / gwf_budget_file).is_file()
+    assert (gwf_ws / gwf_head_file).is_file()
+    assert (prt_ws / prt_track_file).is_file()
+    assert (prt_ws / prt_track_csv_file).is_file()
+    assert (prt_ws / prp_track_file).is_file()
+    assert (prt_ws / prp_track_csv_file).is_file()
 
     # load mf6 pathline results
-    mf6_pls = pd.read_csv(ws / prt_track_csv_file, na_filter=False)
+    mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
     # make sure all mf6 pathline data have correct model and PRP index (1)
     assert all_equal(mf6_pls["imdl"], 1)
@@ -272,15 +267,15 @@ def test_mf6model(name, function_tmpdir, targets):
 
     # check mf6 prt particle track data were written to binary/CSV files
     # and that different formats are equal
-    for track_csv in [ws / prt_track_csv_file, ws / prp_track_csv_file]:
+    for track_csv in [prt_ws / prt_track_csv_file, prt_ws / prp_track_csv_file]:
         check_track_data(
-            track_bin=ws / prt_track_file,
-            track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
+            track_bin=prt_ws / prt_track_file,
+            track_hdr=prt_ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
             track_csv=track_csv,
         )
 
     # extract head, budget, and specific discharge results from GWF model
-    hds = HeadFile(ws / gwf_head_file).get_data()
+    hds = HeadFile(gwf_ws / gwf_head_file).get_data()
     bud = gwf.output.budget()
     spdis = bud.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
@@ -308,7 +303,7 @@ def test_mf6model(name, function_tmpdir, targets):
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{simname}.png")
+    plt.savefig(gwf_ws / f"test_{simname}.png")
 
     if drape:
         assert mf6_pls.shape[0] == 36
@@ -317,3 +312,16 @@ def test_mf6model(name, function_tmpdir, targets):
         assert mf6_pls.shape[0] == 9
         # istatus=8 permanently unreleased
         assert mf6_pls.istatus.eq(8).all()
+
+
+@pytest.mark.parametrize("idx, name", enumerate(cases))
+def test_mf6model(idx, name, function_tmpdir, targets):
+    test = TestFramework(
+        name=name,
+        workspace=function_tmpdir,
+        build=lambda t: build_models(idx, t),
+        check=lambda t: check_output(idx, t),
+        targets=targets,
+        compare=None,
+    )
+    test.run()

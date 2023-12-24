@@ -13,7 +13,6 @@ bottom left.
 
 from math import isclose
 from pathlib import Path
-from pprint import pformat
 
 import flopy
 import matplotlib.pyplot as plt
@@ -25,6 +24,8 @@ from flopy.utils import GridIntersect
 from flopy.utils.triangle import Triangle
 from prt_test_utils import get_model_name
 from shapely.geometry import LineString
+
+from framework import TestFramework
 
 simname = "prtfmi10"
 cases = [f"{simname}l2r", f"{simname}diag"]
@@ -44,7 +45,7 @@ def chdhead(x):
 
 
 def get_tri(workspace, targets) -> Triangle:
-    workspace.mkdir(exist_ok=True)
+    workspace.mkdir(exist_ok=True, parents=True)
     tri = Triangle(
         angle=angle,
         maximum_area=max_area,
@@ -118,13 +119,13 @@ def build_gwf_sim(name, ws, targets):
     return sim
 
 
-def build_prt_sim(name, ws, targets):
-    ws = Path(ws)
+def build_prt_sim(name, gwf_ws, prt_ws, targets):
+    prt_ws = Path(prt_ws)
     gwfname = get_model_name(name, "gwf")
     prtname = get_model_name(name, "prt")
 
     # create grid
-    tri = get_tri(ws / "grid", targets)
+    tri = get_tri(prt_ws / "grid", targets)
     grid = VertexGrid(tri)
     gi = GridIntersect(grid)
 
@@ -135,7 +136,7 @@ def build_prt_sim(name, ws, targets):
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name, version="mf6", exe_name=targets.mf6, sim_ws=ws
+        sim_name=name, version="mf6", exe_name=targets.mf6, sim_ws=prt_ws
     )
     tdis = flopy.mf6.ModflowTdis(
         sim, time_units="DAYS", perioddata=[[1.0, 1, 1.0]]
@@ -184,8 +185,8 @@ def build_prt_sim(name, ws, targets):
         track_filerecord=[prt_track_file],
         trackcsv_filerecord=[prt_track_csv_file],
     )
-    gwf_budget_file = f"{gwfname}.cbc"
-    gwf_head_file = f"{gwfname}.hds"
+    gwf_budget_file = gwf_ws / f"{gwfname}.cbc"
+    gwf_head_file = gwf_ws / f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -202,19 +203,28 @@ def build_prt_sim(name, ws, targets):
     return sim
 
 
-@pytest.mark.parametrize("name", cases)
-def test_mf6model(name, function_tmpdir, targets):
-    # workspace
-    ws = function_tmpdir
+def build_models(idx, test):
+    gwfsim = build_gwf_sim(test.name, test.workspace, test.targets)
+    prtsim = build_prt_sim(
+        test.name, test.workspace, test.workspace / "prt", test.targets
+    )
+    return gwfsim, prtsim
 
-    # build mf6 models
-    gwfsim = build_gwf_sim(name, ws, targets)
-    prtsim = build_prt_sim(name, ws, targets)
 
-    # run gwf
-    gwfsim.write_simulation()
-    success, buff = gwfsim.run_simulation(report=True)
-    assert success, pformat(buff)
+def check_output(idx, test):
+    name = test.name
+    gwf_ws = test.workspace
+    prt_ws = test.workspace / "prt"
+    gwfname = get_model_name(name, "gwf")
+    prtname = get_model_name(name, "prt")
+    drape = "drp" in name
+
+    # extract mf6 simulations/models and grid
+    gwfsim = test.sims[0]
+    prtsim = test.sims[1]
+    gwf = gwfsim.get_model(gwfname)
+    prt = prtsim.get_model(prtname)
+    mg = gwf.modelgrid
 
     # get gwf output
     gwf = gwfsim.get_model()
@@ -223,15 +233,10 @@ def test_mf6model(name, function_tmpdir, targets):
     spdis = bdobj.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
-    # run prt
-    prtsim.write_simulation()
-    success, buff = prtsim.run_simulation(report=True)
-    assert success, pformat(buff)
-
     # get prt output
     prtname = get_model_name(name, "prt")
     prt_track_csv_file = f"{prtname}.prp.trk.csv"
-    pls = pd.read_csv(ws / prt_track_csv_file, na_filter=False)
+    pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
     endpts = (
         pls.sort_values("t")
         .groupby(["imdl", "iprp", "irpt", "trelease"])
@@ -269,3 +274,16 @@ def test_mf6model(name, function_tmpdir, targets):
         assert pls.shape == (112, 16)
         assert endpts.shape == (2, 16)
         assert set(endpts.icell) == {111, 144}
+
+
+@pytest.mark.parametrize("idx, name", enumerate(cases))
+def test_mf6model(idx, name, function_tmpdir, targets):
+    test = TestFramework(
+        name=name,
+        workspace=function_tmpdir,
+        build=lambda t: build_models(idx, t),
+        check=lambda t: check_output(idx, t),
+        targets=targets,
+        compare=None,
+    )
+    test.run()

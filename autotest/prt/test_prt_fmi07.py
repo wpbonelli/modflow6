@@ -15,19 +15,21 @@ from pprint import pformat
 
 import flopy
 import pytest
-from prt_test_utils import get_gwf_sim, get_model_name, get_partdata
+from prt_test_utils import BasicDisCase, get_model_name, get_partdata
+
+from framework import TestFramework
 
 simname = "prtfmi07"
-ex = [simname]
+cases = [simname]
 
 
-def build_prt_sim(ctx, name, ws, mf6):
+def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
         exe_name=mf6,
         version="mf6",
-        sim_ws=ws,
+        sim_ws=prt_ws,
     )
 
     # create tdis package
@@ -35,8 +37,10 @@ def build_prt_sim(ctx, name, ws, mf6):
         sim,
         pname="tdis",
         time_units="DAYS",
-        nper=ctx.nper,
-        perioddata=[(ctx.perlen, ctx.nstp, ctx.tsmult)],
+        nper=BasicDisCase.nper,
+        perioddata=[
+            (BasicDisCase.perlen, BasicDisCase.nstp, BasicDisCase.tsmult)
+        ],
     )
 
     # create prt model
@@ -47,16 +51,16 @@ def build_prt_sim(ctx, name, ws, mf6):
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
         prt,
         pname="dis",
-        nlay=ctx.nlay,
-        nrow=ctx.nrow,
-        ncol=ctx.ncol,
+        nlay=BasicDisCase.nlay,
+        nrow=BasicDisCase.nrow,
+        ncol=BasicDisCase.ncol,
     )
 
     # create mip package
-    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=ctx.porosity)
+    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=BasicDisCase.porosity)
 
     # convert mp7 to prt release points and check against expectation
-    partdata = get_partdata(prt.modelgrid, ctx.releasepts_mp7)
+    partdata = get_partdata(prt.modelgrid, BasicDisCase.releasepts_mp7)
     coords = partdata.to_coords(prt.modelgrid)
     # bad cell indices!
     releasepts = [(i, 0, 1, 1, c[0], c[1], c[2]) for i, c in enumerate(coords)]
@@ -89,8 +93,8 @@ def build_prt_sim(ctx, name, ws, mf6):
 
     # create the flow model interface
     gwfname = get_model_name(name, "gwf")
-    gwf_budget_file = f"{gwfname}.bud"
-    gwf_head_file = f"{gwfname}.hds"
+    gwf_budget_file = gwf_ws / f"{gwfname}.bud"
+    gwf_head_file = gwf_ws / f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -110,22 +114,31 @@ def build_prt_sim(ctx, name, ws, mf6):
     return sim
 
 
-@pytest.mark.parametrize("name", ex)
-def test_mf6model(name, function_tmpdir, targets):
-    # workspace
-    ws = function_tmpdir
-
+def build_models(idx, test):
     # build mf6 models
-    gwfsim, ctx = get_gwf_sim(name, ws, targets.mf6)
-    prtsim = build_prt_sim(ctx, name, ws, targets.mf6)
+    gwfsim = BasicDisCase.get_gwf_sim(
+        test.name, test.workspace, test.targets.mf6
+    )
+    prtsim = build_prt_sim(
+        test.name, test.workspace, test.workspace / "prt", test.targets.mf6
+    )
+    return gwfsim, prtsim
 
-    # run gwf models
-    gwfsim.write_simulation()
-    success, buff = gwfsim.run_simulation(report=True)
-    assert success, pformat(buff)
 
-    # run prt model (expect failure)
-    prtsim.write_simulation()
-    success, buff = prtsim.run_simulation(report=True)
-    assert not success, pformat(buff)
+def check_output(idx, test):
+    buff = test.buffs[1]
     assert any("Error: release point" in l for l in buff)
+
+
+@pytest.mark.parametrize("idx, name", enumerate(cases))
+def test_mf6model(idx, name, function_tmpdir, targets):
+    test = TestFramework(
+        name=name,
+        workspace=function_tmpdir,
+        build=lambda t: build_models(idx, t),
+        check=lambda t: check_output(idx, t),
+        targets=targets,
+        compare=None,
+        xfail=[False, True],
+    )
+    test.run()
