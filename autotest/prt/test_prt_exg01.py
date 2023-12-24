@@ -25,23 +25,22 @@ import pytest
 from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
-from prt_test_utils import check_budget_data, check_track_data, get_gwf_sim
+from prt_test_utils import BasicDisCase, check_budget_data, check_track_data
 
 from framework import TestFramework
 
 simname = "prtexg01"
-ex = [simname, f"{simname}bnms"]
+cases = [simname, f"{simname}bnms"]
 
 
-# model names
 def get_model_name(idx, mdl):
-    return f"{ex[idx]}_{mdl}"
+    return f"{cases[idx]}_{mdl}"
 
 
-def build_sim(idx, ws, mf6):
+def build_models(idx, test):
     # create simulation
-    name = ex[idx]
-    sim, ctx = get_gwf_sim(name, ws, mf6)
+    name = cases[idx]
+    sim = BasicDisCase.get_gwf_sim(name, test.workspace, test.targets.mf6)
 
     # create prt model
     prtname = get_model_name(idx, "prt")
@@ -51,19 +50,19 @@ def build_sim(idx, ws, mf6):
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
         prt,
         pname="dis",
-        nlay=ctx.nlay,
-        nrow=ctx.nrow,
-        ncol=ctx.ncol,
+        nlay=BasicDisCase.nlay,
+        nrow=BasicDisCase.nrow,
+        ncol=BasicDisCase.ncol,
     )
 
     # create mip package
-    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=ctx.porosity)
+    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=BasicDisCase.porosity)
 
     # create prp package
     rpts = (
-        [r + [str(r[0] + 1)] for r in ctx.releasepts_prt]
+        [r + [str(r[0] + 1)] for r in BasicDisCase.releasepts_prt]
         if "bnms" in name
-        else ctx.releasepts_prt
+        else BasicDisCase.releasepts_prt
     )
     flopy.mf6.ModflowPrtprp(
         prt,
@@ -113,15 +112,15 @@ def build_sim(idx, ws, mf6):
     )
     sim.register_solution_package(ems, [prt.name])
 
-    return sim, ctx
+    return sim
 
 
-def build_mp7_sim(ctx, idx, ws, mp7, gwf):
+def build_mp7_sim(idx, ws, mp7, gwf):
     partdata = flopy.modpath.ParticleData(
-        partlocs=[p[0] for p in ctx.releasepts_mp7],
-        localx=[p[1] for p in ctx.releasepts_mp7],
-        localy=[p[2] for p in ctx.releasepts_mp7],
-        localz=[p[3] for p in ctx.releasepts_mp7],
+        partlocs=[p[0] for p in BasicDisCase.releasepts_mp7],
+        localx=[p[1] for p in BasicDisCase.releasepts_mp7],
+        localy=[p[2] for p in BasicDisCase.releasepts_mp7],
+        localz=[p[3] for p in BasicDisCase.releasepts_mp7],
         timeoffset=0,
         drape=0,
     )
@@ -139,7 +138,7 @@ def build_mp7_sim(ctx, idx, ws, mp7, gwf):
     )
     mpbas = flopy.modpath.Modpath7Bas(
         mp,
-        porosity=ctx.porosity,
+        porosity=BasicDisCase.porosity,
     )
     mpsim = flopy.modpath.Modpath7Sim(
         mp,
@@ -153,41 +152,9 @@ def build_mp7_sim(ctx, idx, ws, mp7, gwf):
     return mp
 
 
-def eval_results(ctx, test):
-    print(f"Evaluating results for sim {test.name}")
-    simpath = Path(test.workspace)
-
-    # check budget data
-    check_budget_data(simpath / f"{test.name}_prt.lst", ctx.perlen, ctx.nper)
-
-    # check particle track data
-    prt_track_file = simpath / f"{test.name}_prt.trk"
-    prt_track_hdr_file = simpath / f"{test.name}_prt.trk.hdr"
-    prt_track_csv_file = simpath / f"{test.name}_prt.trk.csv"
-    assert prt_track_file.exists()
-    assert prt_track_hdr_file.exists()
-    assert prt_track_csv_file.exists()
-    check_track_data(
-        track_bin=prt_track_file,
-        track_hdr=prt_track_hdr_file,
-        track_csv=prt_track_csv_file,
-    )
-
-
-@pytest.mark.parametrize("idx, name", enumerate(ex))
-def test_mf6model(idx, name, function_tmpdir, targets):
-    ws = function_tmpdir
-    sim, ctx = build_sim(idx, str(ws), targets.mf6)
-    sim.write_simulation()
-
-    test = TestFramework(
-        name=name,
-        workspace=ws,
-        targets=targets,
-        check=lambda s: eval_results(ctx, s),
-        compare=None,
-    )
-    test.run()
+def check_output(idx, test):
+    name = test.name
+    ws = Path(test.workspace)
 
     # model names
     gwfname = get_model_name(idx, "gwf")
@@ -195,6 +162,7 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     mp7name = get_model_name(idx, "mp7")
 
     # extract model objects
+    sim = test.sims[0]
     gwf = sim.get_model(gwfname)
     prt = sim.get_model(prtname)
 
@@ -202,7 +170,7 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     mg = gwf.modelgrid
 
     # build mp7 model
-    mp7sim = build_mp7_sim(ctx, idx, ws, targets.mp7, gwf)
+    mp7sim = build_mp7_sim(idx, ws, test.targets.mp7, gwf)
 
     # run mp7 model
     mp7sim.write_input()
@@ -252,7 +220,9 @@ def test_mf6model(idx, name, function_tmpdir, targets):
         assert pd.isna(mf6_pls["name"]).all()
 
     # check budget data were written to mf6 prt list file
-    check_budget_data(ws / f"{name}_prt.lst", ctx.perlen, ctx.nper)
+    check_budget_data(
+        ws / f"{name}_prt.lst", BasicDisCase.perlen, BasicDisCase.nper
+    )
 
     # check mf6 prt particle track data were written to binary/CSV files
     check_track_data(
@@ -333,3 +303,16 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     # compare mf6 / mp7 pathline data
     assert mf6_pls.shape == mp7_pls.shape
     assert np.allclose(mf6_pls, mp7_pls, atol=1e-3)
+
+
+@pytest.mark.parametrize("idx, name", enumerate(cases))
+def test_mf6model(idx, name, function_tmpdir, targets):
+    test = TestFramework(
+        name=name,
+        workspace=function_tmpdir,
+        build=lambda t: build_models(idx, t),
+        check=lambda t: check_output(idx, t),
+        targets=targets,
+        compare=None,
+    )
+    test.run()

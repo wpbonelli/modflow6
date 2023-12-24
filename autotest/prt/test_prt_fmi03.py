@@ -37,11 +37,17 @@ from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 from matplotlib.collections import LineCollection
-from prt_test_utils import (check_budget_data, check_track_data, get_gwf_sim,
-                            get_model_name)
+from prt_test_utils import (
+    BasicDisCase,
+    check_budget_data,
+    check_track_data,
+    get_model_name,
+)
+
+from framework import TestFramework
 
 simname = "prtfmi03"
-ex = [f"{simname}_l1", f"{simname}_l2"]
+cases = [f"{simname}_l1", f"{simname}_l2"]
 stopzone_cells = [(0, 1, 8), (0, 8, 1)]
 
 
@@ -52,13 +58,13 @@ def create_izone(nlay, nrow, ncol):
     return izone
 
 
-def build_prt_sim(ctx, name, ws, mf6):
+def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
         exe_name=mf6,
         version="mf6",
-        sim_ws=ws,
+        sim_ws=prt_ws,
     )
 
     # create tdis package
@@ -66,8 +72,10 @@ def build_prt_sim(ctx, name, ws, mf6):
         sim,
         pname="tdis",
         time_units="DAYS",
-        nper=ctx.nper,
-        perioddata=[(ctx.perlen, ctx.nstp, ctx.tsmult)],
+        nper=BasicDisCase.nper,
+        perioddata=[
+            (BasicDisCase.perlen, BasicDisCase.nstp, BasicDisCase.tsmult)
+        ],
     )
 
     # create prt model
@@ -75,25 +83,25 @@ def build_prt_sim(ctx, name, ws, mf6):
     prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
 
     # create prt discretization
-    ctx.nlay = int(name[-1])
-    botm = [ctx.top - (k + 1) for k in range(ctx.nlay)]
+    nlay = int(name[-1])
+    botm = [BasicDisCase.top - (k + 1) for k in range(nlay)]
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
         prt,
         pname="dis",
-        nlay=ctx.nlay,
-        nrow=ctx.nrow,
-        ncol=ctx.ncol,
-        top=ctx.top,
+        nlay=nlay,
+        nrow=BasicDisCase.nrow,
+        ncol=BasicDisCase.ncol,
+        top=BasicDisCase.top,
         botm=botm,
     )
 
     # create mip package
-    izone = create_izone(ctx.nlay, ctx.nrow, ctx.ncol)
+    izone = create_izone(nlay, BasicDisCase.nrow, BasicDisCase.ncol)
     flopy.mf6.ModflowPrtmip(
         prt,
         pname="mip",
-        porosity=ctx.porosity,
-        izone=izone,  # if ctx.nlay == 1 else np.array([izone, izone]),
+        porosity=BasicDisCase.porosity,
+        izone=izone,
     )
 
     # create prp package
@@ -101,8 +109,8 @@ def build_prt_sim(ctx, name, ws, mf6):
         prt,
         pname="prp1",
         filename=f"{prtname}_1.prp",
-        nreleasepts=len(ctx.releasepts_prt),
-        packagedata=ctx.releasepts_prt,
+        nreleasepts=len(BasicDisCase.releasepts_prt),
+        packagedata=BasicDisCase.releasepts_prt,
         perioddata={0: ["FIRST"]},
         istopzone=1,
     )
@@ -119,8 +127,8 @@ def build_prt_sim(ctx, name, ws, mf6):
 
     # create the flow model interface
     gwfname = get_model_name(name, "gwf")
-    gwf_budget_file = f"{gwfname}.bud"
-    gwf_head_file = f"{gwfname}.hds"
+    gwf_budget_file = gwf_ws / f"{gwfname}.bud"
+    gwf_head_file = gwf_ws / f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -137,15 +145,15 @@ def build_prt_sim(ctx, name, ws, mf6):
     )
     sim.register_solution_package(ems, [prt.name])
 
-    return sim, ctx
+    return sim
 
 
-def build_mp7_sim(ctx, name, ws, mp7, gwf):
+def build_mp7_sim(name, ws, mp7, gwf):
     partdata = flopy.modpath.ParticleData(
-        partlocs=[p[0] for p in ctx.releasepts_mp7],
-        localx=[p[1] for p in ctx.releasepts_mp7],
-        localy=[p[2] for p in ctx.releasepts_mp7],
-        localz=[p[3] for p in ctx.releasepts_mp7],
+        partlocs=[p[0] for p in BasicDisCase.releasepts_mp7],
+        localx=[p[1] for p in BasicDisCase.releasepts_mp7],
+        localy=[p[2] for p in BasicDisCase.releasepts_mp7],
+        localz=[p[3] for p in BasicDisCase.releasepts_mp7],
         timeoffset=0,
         drape=0,
     )
@@ -163,10 +171,10 @@ def build_mp7_sim(ctx, name, ws, mp7, gwf):
     )
     mpbas = flopy.modpath.Modpath7Bas(
         mp,
-        porosity=ctx.porosity,
+        porosity=BasicDisCase.porosity,
     )
-    ctx.nlay = int(name[-1])
-    izone = create_izone(ctx.nlay, ctx.nrow, ctx.ncol)
+    nlay = int(name[-1])
+    izone = create_izone(nlay, BasicDisCase.nrow, BasicDisCase.ncol)
     mpsim = flopy.modpath.Modpath7Sim(
         mp,
         simulationtype="pathline",
@@ -174,7 +182,7 @@ def build_mp7_sim(ctx, name, ws, mp7, gwf):
         budgetoutputoption="summary",
         stoptimeoption="extend",
         stopzone=1,
-        zones=izone,  # if ctx.nlay == 1 else np.array([izone, izone]),
+        zones=izone,
         zonedataoption="on",
         particlegroups=[pg],
     )
@@ -182,43 +190,45 @@ def build_mp7_sim(ctx, name, ws, mp7, gwf):
     return mp
 
 
-@pytest.mark.parametrize("name", ex)
-def test_mf6model(name, function_tmpdir, targets):
-    ws = function_tmpdir
+def build_models(idx, test):
+    gwfsim = BasicDisCase.get_gwf_sim(
+        test.name, test.workspace, test.targets.mf6
+    )
+    gwf = gwfsim.get_model()
+    dis = gwf.get_package("DIS")
+    nlay = int(test.name[-1])
+    botm = [BasicDisCase.top - (k + 1) for k in range(nlay)]
+    botm_data = np.array(
+        [list(repeat(b, BasicDisCase.nrow * BasicDisCase.ncol)) for b in botm]
+    ).reshape((nlay, BasicDisCase.nrow, BasicDisCase.ncol))
+    dis.nlay = nlay
+    dis.botm.set_data(botm_data)
+    prtsim = build_prt_sim(
+        test.name, test.workspace, test.workspace / "prt", test.targets.mf6
+    )
+    return gwfsim, prtsim
 
-    # define model names
+
+def check_output(idx, test):
+    name = test.name
+    gwf_ws = test.workspace
+    prt_ws = test.workspace / "prt"
+    mp7_ws = test.workspace / "mp7"
+
+    # model names
     gwfname = get_model_name(name, "gwf")
     prtname = get_model_name(name, "prt")
     mp7name = get_model_name(name, "mp7")
 
-    # build mf6 simulations
-    gwfsim, ctx = get_gwf_sim(name, ws, targets.mf6)
-    gwf = gwfsim.get_model()
-    dis = gwf.get_package("DIS")
-    ctx.nlay = int(name[-1])
-    botm = [ctx.top - (k + 1) for k in range(ctx.nlay)]
-    botm_data = np.array(
-        [list(repeat(b, ctx.nrow * ctx.ncol)) for b in botm]
-    ).reshape((ctx.nlay, ctx.nrow, ctx.ncol))
-    dis.nlay = ctx.nlay
-    dis.botm.set_data(botm_data)
-    prtsim, ctx = build_prt_sim(ctx, name, ws, targets.mf6)
-
-    # run mf6 simulations
-    for sim in [gwfsim, prtsim]:
-        sim.write_simulation()
-        success, buff = sim.run_simulation(report=True)
-        assert success, pformat(buff)
-
-    # extract mf6 models
+    # extract mf6 simulations/models and grid
+    gwfsim = test.sims[0]
+    prtsim = test.sims[1]
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
-
-    # extract model grid
     mg = gwf.modelgrid
 
     # build mp7 model
-    mp7sim = build_mp7_sim(ctx, name, ws, targets.mp7, gwf)
+    mp7sim = build_mp7_sim(name, mp7_ws, test.targets.mp7, gwf)
 
     # run mp7 model
     mp7sim.write_input()
@@ -230,17 +240,17 @@ def test_mf6model(name, function_tmpdir, targets):
     gwf_head_file = f"{gwfname}.hds"
     prt_track_file = f"{prtname}.trk"
     prt_track_csv_file = f"{prtname}.trk.csv"
-    assert (ws / gwf_budget_file).is_file()
-    assert (ws / gwf_head_file).is_file()
-    assert (ws / prt_track_file).is_file()
-    assert (ws / prt_track_csv_file).is_file()
+    assert (gwf_ws / gwf_budget_file).is_file()
+    assert (gwf_ws / gwf_head_file).is_file()
+    assert (prt_ws / prt_track_file).is_file()
+    assert (prt_ws / prt_track_csv_file).is_file()
 
     # check mp7 output files exist
     mp7_pathline_file = f"{mp7name}.mppth"
-    assert (ws / mp7_pathline_file).is_file()
+    assert (mp7_ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
-    plf = PathlineFile(ws / mp7_pathline_file)
+    plf = PathlineFile(mp7_ws / mp7_pathline_file)
     mp7_pls = pd.DataFrame(
         plf.get_destination_pathline_data(range(mg.nnodes), to_recarray=True)
     )
@@ -250,20 +260,22 @@ def test_mf6model(name, function_tmpdir, targets):
     mp7_pls["k"] = mp7_pls["k"] + 1
 
     # load mf6 pathline results
-    mf6_pls = pd.read_csv(ws / prt_track_csv_file)
+    mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file)
 
     # check budget data were written to mf6 prt list file
-    check_budget_data(ws / f"{name}_prt.lst", ctx.perlen, ctx.nper)
+    check_budget_data(
+        prt_ws / f"{name}_prt.lst", BasicDisCase.perlen, BasicDisCase.nper
+    )
 
     # check mf6 prt particle track data were written to binary/CSV files
     check_track_data(
-        track_bin=ws / prt_track_file,
-        track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
-        track_csv=ws / prt_track_csv_file,
+        track_bin=prt_ws / prt_track_file,
+        track_hdr=prt_ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
+        track_csv=prt_ws / prt_track_csv_file,
     )
 
     # get head, budget, and spdis results from GWF model
-    hds = HeadFile(ws / gwf_head_file).get_data()
+    hds = HeadFile(gwf_ws / gwf_head_file).get_data()
     bud = gwf.output.budget()
     spdis = bud.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
@@ -351,7 +363,7 @@ def test_mf6model(name, function_tmpdir, targets):
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{name}_map.png")
+    plt.savefig(gwf_ws / f"test_{name}_map.png")
 
     # check that cell numbers are correct
     for i, row in list(mf6_pls.iterrows()):
@@ -400,3 +412,16 @@ def test_mf6model(name, function_tmpdir, targets):
     # compare mf6 / mp7 pathline data
     assert mf6_pls.shape == mp7_pls.shape
     assert np.allclose(mf6_pls, mp7_pls, atol=1e-3)
+
+
+@pytest.mark.parametrize("idx, name", enumerate(cases))
+def test_mf6model(idx, name, function_tmpdir, targets):
+    test = TestFramework(
+        name=name,
+        workspace=function_tmpdir,
+        build=lambda t: build_models(idx, t),
+        check=lambda t: check_output(idx, t),
+        targets=targets,
+        compare=None,
+    )
+    test.run()

@@ -38,13 +38,15 @@ from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 from prt_test_utils import (
+    BasicDisCase,
     all_equal,
     check_budget_data,
     check_track_data,
-    get_gwf_sim,
     get_model_name,
     get_partdata,
 )
+
+from framework import TestFramework
 
 simname = "prtfmi05"
 cases = [
@@ -76,13 +78,13 @@ def get_perioddata(name, periods=1, fraction=None) -> Optional[dict]:
     return {i: opt for i in range(periods)}
 
 
-def build_prt_sim(ctx, name, ws, mf6, fraction=None):
+def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
         exe_name=mf6,
         version="mf6",
-        sim_ws=ws,
+        sim_ws=prt_ws,
     )
 
     # create tdis package
@@ -90,8 +92,10 @@ def build_prt_sim(ctx, name, ws, mf6, fraction=None):
         sim,
         pname="tdis",
         time_units="DAYS",
-        nper=ctx.nper,
-        perioddata=[(ctx.perlen, ctx.nstp, ctx.tsmult)],
+        nper=BasicDisCase.nper,
+        perioddata=[
+            (BasicDisCase.perlen, BasicDisCase.nstp, BasicDisCase.tsmult)
+        ],
     )
 
     # create prt model
@@ -102,20 +106,20 @@ def build_prt_sim(ctx, name, ws, mf6, fraction=None):
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
         prt,
         pname="dis",
-        nlay=ctx.nlay,
-        nrow=ctx.nrow,
-        ncol=ctx.ncol,
+        nlay=BasicDisCase.nlay,
+        nrow=BasicDisCase.nrow,
+        ncol=BasicDisCase.ncol,
     )
 
     # create mip package
-    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=ctx.porosity)
+    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=BasicDisCase.porosity)
 
     # convert mp7 particledata to prt release points
-    partdata = get_partdata(prt.modelgrid, ctx.releasepts_mp7)
+    partdata = get_partdata(prt.modelgrid, BasicDisCase.releasepts_mp7)
     releasepts = list(partdata.to_prp(prt.modelgrid))
 
     # check release points match expectation
-    assert np.allclose(ctx.releasepts_prt, releasepts)
+    assert np.allclose(BasicDisCase.releasepts_prt, releasepts)
 
     # create prp package
     prp_track_file = f"{prtname}.prp.trk"
@@ -147,8 +151,8 @@ def build_prt_sim(ctx, name, ws, mf6, fraction=None):
 
     # create the flow model interface
     gwfname = get_model_name(name, "gwf")
-    gwf_budget_file = f"{gwfname}.bud"
-    gwf_head_file = f"{gwfname}.hds"
+    gwf_budget_file = gwf_ws / f"{gwfname}.bud"
+    gwf_head_file = gwf_ws / f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -168,11 +172,8 @@ def build_prt_sim(ctx, name, ws, mf6, fraction=None):
     return sim
 
 
-def build_mp7_sim(ctx, name, ws, mp7, gwf):
-    # convert mp7 particledata to prt release points
-    partdata = get_partdata(gwf.modelgrid, ctx.releasepts_mp7)
-
-    # create modpath 7 simulation
+def build_mp7_sim(name, ws, mp7, gwf):
+    partdata = get_partdata(gwf.modelgrid, BasicDisCase.releasepts_mp7)
     mp7name = get_model_name(name, "mp7")
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
@@ -187,7 +188,7 @@ def build_mp7_sim(ctx, name, ws, mp7, gwf):
     )
     mpbas = flopy.modpath.Modpath7Bas(
         mp,
-        porosity=ctx.porosity,
+        porosity=BasicDisCase.porosity,
     )
     mpsim = flopy.modpath.Modpath7Sim(
         mp,
@@ -201,28 +202,33 @@ def build_mp7_sim(ctx, name, ws, mp7, gwf):
     return mp
 
 
-@pytest.mark.parametrize("name", cases)
-@pytest.mark.parametrize("fraction", [0.5])
-def test_mf6model(name, function_tmpdir, targets, fraction):
-    # workspace
-    ws = function_tmpdir
+def build_models(idx, test, fraction):
+    # build mf6 models
+    gwfsim = BasicDisCase.get_gwf_sim(
+        test.name, test.workspace, test.targets.mf6
+    )
+    prtsim = build_prt_sim(
+        test.name,
+        test.workspace,
+        test.workspace / "prt",
+        test.targets.mf6,
+        fraction,
+    )
+    return gwfsim, prtsim
 
-    # model names
+
+def check_output(idx, test, fraction):
+    name = test.name
+    ws = test.workspace
+    prt_ws = test.workspace / "prt"
+    mp7_ws = test.workspace / "mp7"
     gwfname = get_model_name(name, "gwf")
     prtname = get_model_name(name, "prt")
     mp7name = get_model_name(name, "mp7")
 
-    # build mf6 models
-    gwfsim, ctx = get_gwf_sim(name, ws, targets.mf6)
-    prtsim = build_prt_sim(ctx, name, ws, targets.mf6, fraction)
-
-    # run mf6 models
-    for sim in [gwfsim, prtsim]:
-        sim.write_simulation()
-        success, buff = sim.run_simulation(report=True)
-        assert success, pformat(buff)
-
-    # extract mf6 models
+    # extract mf6 simulations/models and grid
+    gwfsim = test.sims[0]
+    prtsim = test.sims[1]
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
 
@@ -230,7 +236,7 @@ def test_mf6model(name, function_tmpdir, targets, fraction):
     mg = gwf.modelgrid
 
     # build mp7 model
-    mp7sim = build_mp7_sim(ctx, name, ws, targets.mp7, gwf)
+    mp7sim = build_mp7_sim(name, mp7_ws, test.targets.mp7, gwf)
 
     # run mp7 model
     mp7sim.write_input()
@@ -246,17 +252,17 @@ def test_mf6model(name, function_tmpdir, targets, fraction):
     prp_track_csv_file = f"{prtname}.prp.trk.csv"
     assert (ws / gwf_budget_file).is_file()
     assert (ws / gwf_head_file).is_file()
-    assert (ws / prt_track_file).is_file()
-    assert (ws / prt_track_csv_file).is_file()
-    assert (ws / prp_track_file).is_file()
-    assert (ws / prp_track_csv_file).is_file()
+    assert (prt_ws / prt_track_file).is_file()
+    assert (prt_ws / prt_track_csv_file).is_file()
+    assert (prt_ws / prp_track_file).is_file()
+    assert (prt_ws / prp_track_csv_file).is_file()
 
     # check mp7 output files exist
     mp7_pathline_file = f"{mp7name}.mppth"
-    assert (ws / mp7_pathline_file).is_file()
+    assert (mp7_ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
-    plf = PathlineFile(ws / mp7_pathline_file)
+    plf = PathlineFile(mp7_ws / mp7_pathline_file)
     mp7_pls = pd.DataFrame(
         plf.get_destination_pathline_data(range(mg.nnodes), to_recarray=True)
     )
@@ -269,7 +275,7 @@ def test_mf6model(name, function_tmpdir, targets, fraction):
     mp7_pls["time"] = mp7_pls["time"] + fraction
 
     # load mf6 pathline results
-    mf6_pls = pd.read_csv(ws / prt_track_csv_file, na_filter=False)
+    mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
     # make sure pathline df has "name" (boundname) column and empty values
     assert "name" in mf6_pls
@@ -280,14 +286,20 @@ def test_mf6model(name, function_tmpdir, targets, fraction):
     assert all_equal(mf6_pls["iprp"], 1)
 
     # check budget data were written to mf6 prt list file
-    check_budget_data(ws / f"{name}_prt.lst", ctx.perlen, ctx.nper)
+    check_budget_data(
+        prt_ws / f"{name}_prt.lst", BasicDisCase.perlen, BasicDisCase.nper
+    )
 
     # check mf6 prt particle track data were written to binary/CSV files
     # and that different formats are equal
-    for track_csv in [ws / prt_track_csv_file, ws / prp_track_csv_file]:
+    for track_csv in [
+        prt_ws / prt_track_csv_file,
+        prt_ws / prp_track_csv_file,
+    ]:
         check_track_data(
-            track_bin=ws / prt_track_file,
-            track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
+            track_bin=prt_ws / prt_track_file,
+            track_hdr=prt_ws
+            / Path(prt_track_file.replace(".trk", ".trk.hdr")),
             track_csv=track_csv,
         )
 
@@ -362,3 +374,17 @@ def test_mf6model(name, function_tmpdir, targets, fraction):
     # compare mf6 / mp7 pathline data
     assert mf6_pls.shape == mp7_pls.shape
     assert np.allclose(mf6_pls, mp7_pls, atol=1e-3)
+
+
+@pytest.mark.parametrize("idx, name", enumerate(cases))
+@pytest.mark.parametrize("fraction", [0.5])
+def test_mf6model(idx, name, function_tmpdir, targets, fraction):
+    test = TestFramework(
+        name=name,
+        workspace=function_tmpdir,
+        build=lambda t: build_models(idx, t, fraction),
+        check=lambda t: check_output(idx, t, fraction),
+        targets=targets,
+        compare=None,
+    )
+    test.run()
