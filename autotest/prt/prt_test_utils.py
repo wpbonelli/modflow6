@@ -1,6 +1,6 @@
 import os
 from types import SimpleNamespace
-from typing import Optional, Tuple
+from typing import Tuple
 
 import flopy
 import matplotlib as mpl
@@ -12,107 +12,104 @@ def all_equal(series, val):
     return a[0] == val and (a[0] == a).all()
 
 
-def get_gwf_sim(
-    name, ws, mf6
-) -> Tuple[flopy.mf6.MFSimulation, SimpleNamespace]:
-    """
-    Simple GWF simulation for use/modification by PRT tests
-    """
+class BasicDisCase:
+    nlay = 1
+    nrow = 10
+    ncol = 10
+    top = 1.0
+    botm = [0.0]
+    nper = 1
+    perlen = 1.0
+    nstp = 1
+    tsmult = 1.0
+    porosity = 0.1
+    releasepts_mp7 = [
+        # node number, localx, localy, localz
+        (0, float(f"0.{i + 1}"), float(f"0.{i + 1}"), 0.5)
+        for i in range(9)
+    ]
+    releasepts_prt = [
+        # particle index, k, i, j, x, y, z
+        [i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5]
+        for i in range(9)
+    ]
 
-    # test case context
-    ctx = SimpleNamespace(
-        nlay=1,
-        nrow=10,
-        ncol=10,
-        top=1.0,
-        botm=[0.0],
-        nper=1,
-        perlen=1.0,
-        nstp=1,
-        tsmult=1.0,
-        porosity=0.1,
-        # mp7 release points (cell-local coordinates)
-        releasepts_mp7=[
-            # node number, localx, localy, localz
-            (0, float(f"0.{i + 1}"), float(f"0.{i + 1}"), 0.5)
-            for i in range(9)
-        ],
-        # PRT release points (cell indices and global coordinates both required)
-        releasepts_prt=[
-            # particle index, k, i, j, x, y, z
-            [i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5]
-            for i in range(9)
-        ],
-    )
+    @staticmethod
+    def get_gwf_sim(name, ws, mf6) -> flopy.mf6.MFSimulation:
+        """
+        Simple GWF simulation for use/modification by PRT tests
+        """
 
-    # create simulation
-    sim = flopy.mf6.MFSimulation(
-        sim_name=name,
-        exe_name=mf6,
-        version="mf6",
-        sim_ws=ws,
-    )
+        # create simulation
+        sim = flopy.mf6.MFSimulation(
+            sim_name=name,
+            exe_name=mf6,
+            version="mf6",
+            sim_ws=ws,
+        )
 
-    # create tdis package
-    flopy.mf6.modflow.mftdis.ModflowTdis(
-        sim,
-        pname="tdis",
-        time_units="DAYS",
-        nper=ctx.nper,
-        perioddata=[(ctx.perlen, ctx.nstp, ctx.tsmult)],
-    )
+        # create tdis package
+        flopy.mf6.modflow.mftdis.ModflowTdis(
+            sim,
+            pname="tdis",
+            time_units="DAYS",
+            nper=BasicDisCase.nper,
+            perioddata=[
+                (BasicDisCase.perlen, BasicDisCase.nstp, BasicDisCase.tsmult)
+            ],
+        )
 
-    # create gwf model
-    gwfname = f"{name}_gwf"
-    gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
+        # create gwf model
+        gwfname = f"{name}_gwf"
+        gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
 
-    # create gwf discretization
-    flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
-        gwf,
-        pname="dis",
-        nlay=ctx.nlay,
-        nrow=ctx.nrow,
-        ncol=ctx.ncol,
-    )
+        # create gwf discretization
+        flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
+            gwf,
+            pname="dis",
+            nlay=BasicDisCase.nlay,
+            nrow=BasicDisCase.nrow,
+            ncol=BasicDisCase.ncol,
+        )
 
-    # create gwf initial conditions package
-    flopy.mf6.modflow.mfgwfic.ModflowGwfic(gwf, pname="ic")
+        # create gwf initial conditions package
+        flopy.mf6.modflow.mfgwfic.ModflowGwfic(gwf, pname="ic")
 
-    # create gwf node property flow package
-    flopy.mf6.modflow.mfgwfnpf.ModflowGwfnpf(
-        gwf,
-        pname="npf",
-        save_saturation=True,
-        save_specific_discharge=True,
-    )
+        # create gwf node property flow package
+        flopy.mf6.modflow.mfgwfnpf.ModflowGwfnpf(
+            gwf,
+            pname="npf",
+            save_saturation=True,
+            save_specific_discharge=True,
+        )
 
-    # create gwf chd package
-    spd = {
-        0: [[(0, 0, 0), 1.0, 1.0], [(0, 9, 9), 0.0, 0.0]],
-        1: [[(0, 0, 0), 0.0, 0.0], [(0, 9, 9), 1.0, 2.0]],
-    }
-    chd = flopy.mf6.ModflowGwfchd(
-        gwf,
-        pname="CHD-1",
-        stress_period_data=spd,
-        auxiliary=["concentration"],
-    )
+        # create gwf chd package
+        spd = {
+            0: [[(0, 0, 0), 1.0, 1.0], [(0, 9, 9), 0.0, 0.0]],
+            1: [[(0, 0, 0), 0.0, 0.0], [(0, 9, 9), 1.0, 2.0]],
+        }
+        chd = flopy.mf6.ModflowGwfchd(
+            gwf,
+            pname="CHD-1",
+            stress_period_data=spd,
+            auxiliary=["concentration"],
+        )
 
-    # create gwf output control package
-    # output file names
-    gwf_budget_file = f"{gwfname}.bud"
-    gwf_head_file = f"{gwfname}.hds"
-    oc = flopy.mf6.ModflowGwfoc(
-        gwf,
-        budget_filerecord=gwf_budget_file,
-        head_filerecord=gwf_head_file,
-        saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
-    )
+        # create gwf output control package
+        # output file names
+        gwf_budget_file = f"{gwfname}.bud"
+        gwf_head_file = f"{gwfname}.hds"
+        oc = flopy.mf6.ModflowGwfoc(
+            gwf,
+            budget_filerecord=gwf_budget_file,
+            head_filerecord=gwf_head_file,
+            saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
+        )
 
-    # create iterative model solution for gwf model
-    ims = flopy.mf6.ModflowIms(sim)
+        # create iterative model solution for gwf model
+        ims = flopy.mf6.ModflowIms(sim)
 
-    return sim, ctx
+        return sim
 
 
 def check_track_data(

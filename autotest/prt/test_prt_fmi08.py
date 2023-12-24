@@ -19,7 +19,6 @@ filters these but mf6 probably should too)
 
 
 from pathlib import Path
-from pprint import pformat
 
 import flopy
 import matplotlib.cm as cm
@@ -34,8 +33,10 @@ from flopy.utils.voronoi import VoronoiGrid
 from prt_test_utils import get_model_name
 from shapely.geometry import LineString, Point
 
+from framework import TestFramework
+
 simname = "prtfmi08"
-ex = [simname, f"{simname}_wel"]
+cases = [simname, f"{simname}_wel"]
 xmin = 0.0
 xmax = 2000.0
 ymin = 0.0
@@ -62,7 +63,7 @@ rpts = [
 
 
 def get_grid(workspace, targets):
-    workspace.mkdir(exist_ok=True)
+    workspace.mkdir(exist_ok=True, parents=True)
     tri = Triangle(
         maximum_area=area_max,
         angle=angle_min,
@@ -165,13 +166,13 @@ def build_gwf_sim(name, ws, targets):
     return sim
 
 
-def build_prt_sim(name, ws, targets):
-    ws = Path(ws)
+def build_prt_sim(name, gwf_ws, prt_ws, targets):
+    prt_ws = Path(prt_ws)
     gwfname = get_model_name(name, "gwf")
     prtname = get_model_name(name, "prt")
 
     # create grid
-    grid = get_grid(ws / "grid", targets)
+    grid = get_grid(prt_ws / "grid", targets)
     gridprops = grid.get_gridprops_vertexgrid()
     vgrid = VertexGrid(**gridprops, nlay=1)
     ibd = np.zeros(vgrid.ncpl, dtype=int)
@@ -195,7 +196,7 @@ def build_prt_sim(name, ws, targets):
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name, version="mf6", exe_name=targets.mf6, sim_ws=ws
+        sim_name=name, version="mf6", exe_name=targets.mf6, sim_ws=prt_ws
     )
     tdis = flopy.mf6.ModflowTdis(
         sim, time_units="DAYS", perioddata=[[1.0, 1, 1.0]]
@@ -233,8 +234,8 @@ def build_prt_sim(name, ws, targets):
         track_filerecord=[prt_track_file],
         trackcsv_filerecord=[prt_track_csv_file],
     )
-    gwf_budget_file = f"{gwfname}.bud"
-    gwf_head_file = f"{gwfname}.hds"
+    gwf_budget_file = gwf_ws / f"{gwfname}.bud"
+    gwf_head_file = gwf_ws / f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -251,19 +252,25 @@ def build_prt_sim(name, ws, targets):
     return sim
 
 
-@pytest.mark.parametrize("name", ex)
-def test_mf6model(name, function_tmpdir, targets):
-    # workspace
-    ws = function_tmpdir
+def build_models(idx, test):
+    gwfsim = build_gwf_sim(test.name, test.workspace, test.targets)
+    prtsim = build_prt_sim(
+        test.name, test.workspace, test.workspace / "prt", test.targets
+    )
+    return gwfsim, prtsim
 
-    # build mf6 models
-    gwfsim = build_gwf_sim(name, ws, targets)
-    prtsim = build_prt_sim(name, ws, targets)
 
-    # run gwf
-    gwfsim.write_simulation()
-    success, buff = gwfsim.run_simulation(report=True)
-    assert success, pformat(buff)
+def check_output(idx, test):
+    name = test.name
+    gwf_ws = test.workspace
+    prt_ws = test.workspace / "prt"
+    gwfname = get_model_name(name, "gwf")
+    prtname = get_model_name(name, "prt")
+    mp7name = get_model_name(name, "mp7")
+
+    # extract mf6 simulations/models and grid
+    gwfsim = test.sims[0]
+    prtsim = test.sims[1]
 
     # get gwf output
     gwf = gwfsim.get_model()
@@ -272,15 +279,9 @@ def test_mf6model(name, function_tmpdir, targets):
     spdis = bdobj.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
-    # run prt
-    prtsim.write_simulation()
-    success, buff = prtsim.run_simulation(report=True)
-    assert success, pformat(buff)
-
     # get prt output
-    prtname = get_model_name(name, "prt")
     prt_track_csv_file = f"{prtname}.prp.trk.csv"
-    pls = pd.read_csv(ws / prt_track_csv_file, na_filter=False)
+    pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
     plot_debug = False
     if plot_debug:
@@ -307,9 +308,9 @@ def test_mf6model(name, function_tmpdir, targets):
         plt.show()
 
         # plot in 3d with pyvista (via vtk)
+        import pyvista as pv
         from flopy.export.vtk import Vtk
         from flopy.plot.plotutil import to_mp7_pathlines
-        import pyvista as pv
 
         def get_meshes(model, pathlines):
             vtk = Vtk(model=model, binary=False, smooth=False)
@@ -340,3 +341,16 @@ def test_mf6model(name, function_tmpdir, targets):
         p.camera.zoom(1)
         p.add_slider_widget(lambda v: callback(path_mesh, v), [0, 30202])
         p.show()
+
+
+@pytest.mark.parametrize("idx, name", enumerate(cases))
+def test_mf6model(idx, name, function_tmpdir, targets):
+    test = TestFramework(
+        name=name,
+        workspace=function_tmpdir,
+        build=lambda t: build_models(idx, t),
+        check=lambda t: check_output(idx, t),
+        targets=targets,
+        compare=None,
+    )
+    test.run()
