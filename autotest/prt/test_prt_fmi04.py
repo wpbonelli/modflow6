@@ -35,37 +35,44 @@ import pytest
 from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
-from prt_test_utils import (check_budget_data, check_track_data, get_gwf_sim,
-                            get_ireason_code, get_model_name)
+from prt_test_utils import (
+    BasicDisCase,
+    check_budget_data,
+    check_track_data,
+    get_ireason_code,
+    get_model_name,
+)
+
+from framework import TestFramework
 
 simname = "prtfmi04"
-ex = [simname, f"{simname}saws"]
+cases = [simname, f"{simname}saws"]
 
 
-def build_prt_sim(ctx, name, ws, mf6):
-    # output file names
+def build_prt_sim(name, gwf_ws, prt_ws, mf6):
+    # output files
     gwfname = f"{name}_gwf"
     prtname = f"{name}_prt"
-    gwf_budget_file = f"{gwfname}.bud"
-    gwf_head_file = f"{gwfname}.hds"
-    prt_track_file = f"{prtname}.trk"
-    prt_track_csv_file = f"{prtname}.trk.csv"
+    gwf_budget_file = gwf_ws / f"{gwfname}.bud"
+    gwf_head_file = gwf_ws / f"{gwfname}.hds"
+    prt_track_file = prt_ws / f"{prtname}.trk"
+    prt_track_csv_file = prt_ws / f"{prtname}.trk.csv"
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
         exe_name=mf6,
         version="mf6",
-        sim_ws=ws,
+        sim_ws=prt_ws,
     )
 
     # create tdis package
-    pd = (ctx.perlen, ctx.nstp, ctx.tsmult)
+    pd = (BasicDisCase.perlen, BasicDisCase.nstp, BasicDisCase.tsmult)
     flopy.mf6.modflow.mftdis.ModflowTdis(
         sim,
         pname="tdis",
         time_units="DAYS",
-        nper=ctx.nper,
+        nper=BasicDisCase.nper,
         perioddata=[pd],
     )
 
@@ -76,21 +83,21 @@ def build_prt_sim(ctx, name, ws, mf6):
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
         prt,
         pname="dis",
-        nlay=ctx.nlay,
-        nrow=ctx.nrow,
-        ncol=ctx.ncol,
+        nlay=BasicDisCase.nlay,
+        nrow=BasicDisCase.nrow,
+        ncol=BasicDisCase.ncol,
     )
 
     # create mip package
-    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=ctx.porosity)
+    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=BasicDisCase.porosity)
 
     # create prp package
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp1",
         filename=f"{prtname}_1.prp",
-        nreleasepts=len(ctx.releasepts_prt),
-        packagedata=ctx.releasepts_prt,
+        nreleasepts=len(BasicDisCase.releasepts_prt),
+        packagedata=BasicDisCase.releasepts_prt,
         perioddata={0: ["FIRST"]},
         stop_at_weak_sink="saws" in name,
     )
@@ -123,15 +130,13 @@ def build_prt_sim(ctx, name, ws, mf6):
     return sim
 
 
-def build_mp7_sim(ctx, name, ws, mp7, gwf):
+def build_mp7_sim(name, ws, mp7, gwf):
     mp7name = f"{name}_mp7"
-    mp7_pathline_file = f"{mp7name}.mppth"
-
     partdata = flopy.modpath.ParticleData(
-        partlocs=[p[0] for p in ctx.releasepts_mp7],
-        localx=[p[1] for p in ctx.releasepts_mp7],
-        localy=[p[2] for p in ctx.releasepts_mp7],
-        localz=[p[3] for p in ctx.releasepts_mp7],
+        partlocs=[p[0] for p in BasicDisCase.releasepts_mp7],
+        localx=[p[1] for p in BasicDisCase.releasepts_mp7],
+        localy=[p[2] for p in BasicDisCase.releasepts_mp7],
+        localz=[p[3] for p in BasicDisCase.releasepts_mp7],
         timeoffset=0,
         drape=0,
     )
@@ -148,7 +153,7 @@ def build_mp7_sim(ctx, name, ws, mp7, gwf):
     )
     mpbas = flopy.modpath.Modpath7Bas(
         mp,
-        porosity=ctx.porosity,
+        porosity=BasicDisCase.porosity,
     )
     mpsim = flopy.modpath.Modpath7Sim(
         mp,
@@ -170,19 +175,11 @@ def get_different_rows(source_df, new_df):
     return changed_rows_df.drop("_merge", axis=1)
 
 
-@pytest.mark.parametrize("name", ex)
-def test_mf6model(name, function_tmpdir, targets):
-    # workspace
-    ws = function_tmpdir
-
-    # output file names
-    gwfname = get_model_name(name, "gwf")
-    prtname = get_model_name(name, "prt")
-    mp7name = get_model_name(name, "mp7")
-
+def build_models(idx, test):
     # build gwf model
-    gwfsim, ctx = get_gwf_sim(name, ws, targets.mf6)
-
+    gwfsim = BasicDisCase.get_gwf_sim(
+        test.name, test.workspace, test.targets.mf6
+    )
     # add wel package
     gwf = gwfsim.get_model()
     wells = [
@@ -197,21 +194,32 @@ def test_mf6model(name, function_tmpdir, targets):
     )
 
     # build prt model
-    prtsim = build_prt_sim(ctx, name, ws, targets.mf6)
+    prtsim = build_prt_sim(
+        test.name, test.workspace, test.workspace / "prt", test.targets.mf6
+    )
+    return gwfsim, prtsim
 
-    # run mf6 models
-    for sim in [gwfsim, prtsim]:
-        sim.write_simulation()
-        success, buff = sim.run_simulation(report=True)
-        assert success, pformat(buff)
+
+def check_output(idx, test):
+    name = test.name
+    gwf_ws = test.workspace
+    prt_ws = test.workspace / "prt"
+    mp7_ws = test.workspace / "mp7"
+
+    # model names
+    gwfname = get_model_name(name, "gwf")
+    prtname = get_model_name(name, "prt")
+    mp7name = get_model_name(name, "mp7")
 
     # extract mf6 models and grid
+    gwfsim = test.sims[0]
+    prtsim = test.sims[1]
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
     mg = gwf.modelgrid
 
     # build mp7 model
-    mp7sim = build_mp7_sim(ctx, name, ws, targets.mp7, gwf)
+    mp7sim = build_mp7_sim(name, mp7_ws, test.targets.mp7, gwf)
 
     # run mp7 model
     mp7sim.write_input()
@@ -224,16 +232,16 @@ def test_mf6model(name, function_tmpdir, targets):
     prt_track_file = f"{prtname}.trk"
     prt_track_csv_file = f"{prtname}.trk.csv"
     mp7_pathline_file = f"{mp7name}.mppth"
-    assert (ws / gwf_budget_file).is_file()
-    assert (ws / gwf_head_file).is_file()
-    assert (ws / prt_track_file).is_file()
-    assert (ws / prt_track_csv_file).is_file()
+    assert (gwf_ws / gwf_budget_file).is_file()
+    assert (gwf_ws / gwf_head_file).is_file()
+    assert (prt_ws / prt_track_file).is_file()
+    assert (prt_ws / prt_track_csv_file).is_file()
 
     # check mp7 output files exist
-    assert (ws / mp7_pathline_file).is_file()
+    assert (mp7_ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
-    plf = PathlineFile(ws / mp7_pathline_file)
+    plf = PathlineFile(mp7_ws / mp7_pathline_file)
     mp7_pls = pd.DataFrame(
         plf.get_destination_pathline_data(range(mg.nnodes), to_recarray=True)
     )
@@ -243,7 +251,7 @@ def test_mf6model(name, function_tmpdir, targets):
     mp7_pls["k"] = mp7_pls["k"] + 1
 
     # load mf6 pathline results
-    mf6_pls = pd.read_csv(ws / prt_track_csv_file)
+    mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file)
 
     # if STOP_AT_WEAK_SINK disabled, check for an extra datum when particle exited weak sink
     wksk_irsn = get_ireason_code("WEAKSINK")
@@ -262,17 +270,19 @@ def test_mf6model(name, function_tmpdir, targets):
     assert all_equal(mf6_pls["iprp"], 1)
 
     # check budget data were written to mf6 prt list file
-    check_budget_data(ws / f"{name}_prt.lst", ctx.perlen, ctx.nper)
+    check_budget_data(
+        prt_ws / f"{name}_prt.lst", BasicDisCase.perlen, BasicDisCase.nper
+    )
 
     # check mf6 prt particle track data were written to binary/CSV files
     check_track_data(
-        track_bin=ws / prt_track_file,
-        track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
-        track_csv=ws / prt_track_csv_file,
+        track_bin=prt_ws / prt_track_file,
+        track_hdr=prt_ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
+        track_csv=prt_ws / prt_track_csv_file,
     )
 
     # extract head, budget, and specific discharge results from GWF model
-    hds = HeadFile(ws / gwf_head_file).get_data()
+    hds = HeadFile(gwf_ws / gwf_head_file).get_data()
     bud = gwf.output.budget()
     spdis = bud.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
@@ -331,7 +341,7 @@ def test_mf6model(name, function_tmpdir, targets):
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{simname}.png")
+    plt.savefig(gwf_ws / f"test_{simname}.png")
 
     # convert mf6 pathlines to mp7 format
     mf6_pls = to_mp7_pathlines(mf6_pls)
@@ -359,3 +369,16 @@ def test_mf6model(name, function_tmpdir, targets):
     # compare mf6 / mp7 pathline data
     assert mf6_pls.shape == mp7_pls.shape
     assert np.allclose(mf6_pls, mp7_pls, atol=1e-3)
+
+
+@pytest.mark.parametrize("idx, name", enumerate(cases))
+def test_mf6model(idx, name, function_tmpdir, targets):
+    test = TestFramework(
+        name=name,
+        workspace=function_tmpdir,
+        build=lambda t: build_models(idx, t),
+        check=lambda t: check_output(idx, t),
+        targets=targets,
+        compare=None,
+    )
+    test.run()

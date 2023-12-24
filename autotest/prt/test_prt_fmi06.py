@@ -28,8 +28,10 @@ from prt_test_utils import (
     plot_nodes_and_vertices,
 )
 
+from framework import TestFramework
+
 simname = "prtfmi06"
-ex = [f"{simname}", f"{simname}bprp"]
+cases = [f"{simname}", f"{simname}bprp"]
 
 # model info
 nlay = 1
@@ -69,12 +71,8 @@ releasepts_mp7 = [
 ]
 
 
-def build_gwf_sim(idx, dir, mf6):
-    # model name
-    gwfname = f"{ex[idx]}_gwf"
-
-    # build MODFLOW 6 files
-    ws = dir
+def build_gwf_sim(idx, ws, mf6):
+    gwfname = f"{cases[idx]}_gwf"
     sim = flopy.mf6.MFSimulation(
         sim_name=gwfname, version="mf6", exe_name=mf6, sim_ws=ws
     )
@@ -157,14 +155,14 @@ def build_gwf_sim(idx, dir, mf6):
     return sim
 
 
-def build_prt_sim(idx, ws, mf6):
+def build_prt_sim(idx, gwf_ws, prt_ws, mf6):
     # create simulation
-    name = ex[idx]
+    name = cases[idx]
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
         exe_name=mf6,
         version="mf6",
-        sim_ws=ws,
+        sim_ws=prt_ws,
     )
 
     # create tdis package
@@ -173,7 +171,7 @@ def build_prt_sim(idx, ws, mf6):
     )
 
     # create prt model
-    prtname = f"{ex[idx]}_prt"
+    prtname = f"{cases[idx]}_prt"
     prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
 
     # create prt discretization
@@ -216,9 +214,9 @@ def build_prt_sim(idx, ws, mf6):
     )
 
     # create the flow model interface
-    gwfname = f"{ex[idx]}_gwf"
-    gwf_budget_file = f"{gwfname}.cbc"
-    gwf_head_file = f"{gwfname}.hds"
+    gwfname = f"{cases[idx]}_gwf"
+    gwf_budget_file = gwf_ws / f"{gwfname}.cbc"
+    gwf_head_file = gwf_ws / f"{gwfname}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -239,11 +237,8 @@ def build_prt_sim(idx, ws, mf6):
 
 
 def build_mp7_sim(idx, ws, mp7, gwf):
-    # convert mp7 particledata to prt release points
     partdata = get_partdata(gwf.modelgrid, releasepts_mp7)
-
-    # create modpath 7 simulation
-    mp7name = f"{ex[idx]}_mp7"
+    mp7name = f"{cases[idx]}_mp7"
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
         particledata=partdata,
@@ -271,47 +266,38 @@ def build_mp7_sim(idx, ws, mp7, gwf):
     return mp
 
 
-@pytest.mark.parametrize("idx, name", list(enumerate(ex)))
-def test_mf6model(idx, name, function_tmpdir, targets):
-    # workspace
-    ws = function_tmpdir
+def build_models(idx, test):
+    gwfsim = build_gwf_sim(idx, test.workspace, test.targets.mf6)
+    prtsim = build_prt_sim(
+        idx, test.workspace, test.workspace / "prt", test.targets.mf6
+    )
+    return gwfsim, prtsim
 
-    # test case name
-    name = ex[idx]
 
-    # model names
-    gwfname = f"{ex[idx]}_gwf"
-    prtname = f"{ex[idx]}_prt"
-    mp7name = f"{ex[idx]}_mp7"
+def check_output(idx, test):
+    name = test.name
+    gwf_ws = test.workspace
+    prt_ws = test.workspace / "prt"
+    mp7_ws = test.workspace / "mp7"
+    gwfname = f"{name}_gwf"
+    prtname = f"{name}_prt"
+    mp7name = f"{name}_mp7"
 
-    # build mf6 models
-    gwfsim = build_gwf_sim(idx, ws, targets.mf6)
-    prtsim = build_prt_sim(idx, ws, targets.mf6)
-
-    # run gwf model
-    gwfsim.write_simulation()
-    success, buff = gwfsim.run_simulation(report=True)
-    assert success, pformat(buff)
-
-    # run prt model
-    prtsim.write_simulation()
-    success, buff = prtsim.run_simulation(report=True)
+    # if invalid release points, check for error message
     if "bprp" in name:
-        assert not success, pformat(buff)
+        buff = test.buffs[1]
         assert any("Error: release point" in l for l in buff)
         return
-    else:
-        assert success, pformat(buff)
 
-    # extract mf6 models
+    # extract mf6 simulations/models and grid
+    gwfsim = test.sims[0]
+    prtsim = test.sims[1]
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
-
-    # extract model grid
     mg = gwf.modelgrid
 
     # todo build mp7 model
-    mp7sim = build_mp7_sim(idx, ws, targets.mp7, gwf)
+    mp7sim = build_mp7_sim(idx, mp7_ws, test.targets.mp7, gwf)
 
     # todo run mp7 model
     mp7sim.write_input()
@@ -325,19 +311,19 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     prt_track_csv_file = f"{prtname}.trk.csv"
     prp_track_file = f"{prtname}.prp.trk"
     prp_track_csv_file = f"{prtname}.prp.trk.csv"
-    assert (ws / gwf_budget_file).is_file()
-    assert (ws / gwf_head_file).is_file()
-    assert (ws / prt_track_file).is_file()
-    assert (ws / prt_track_csv_file).is_file()
-    assert (ws / prp_track_file).is_file()
-    assert (ws / prp_track_csv_file).is_file()
+    assert (gwf_ws / gwf_budget_file).is_file()
+    assert (gwf_ws / gwf_head_file).is_file()
+    assert (prt_ws / prt_track_file).is_file()
+    assert (prt_ws / prt_track_csv_file).is_file()
+    assert (prt_ws / prp_track_file).is_file()
+    assert (prt_ws / prp_track_csv_file).is_file()
 
     # check mp7 output files exist
     mp7_pathline_file = f"{mp7name}.mppth"
-    assert (ws / mp7_pathline_file).is_file()
+    assert (mp7_ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
-    plf = PathlineFile(ws / mp7_pathline_file)
+    plf = PathlineFile(mp7_ws / mp7_pathline_file)
     mp7_pls = pd.DataFrame(
         plf.get_destination_pathline_data(range(mg.nnodes), to_recarray=True)
     )
@@ -347,7 +333,7 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     mp7_pls["k"] = mp7_pls["k"] + 1
 
     # load mf6 pathline results
-    mf6_pls = pd.read_csv(ws / prt_track_csv_file, na_filter=False)
+    mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
     # make sure pathline df has "name" (boundname) column and default values
     assert "name" in mf6_pls
@@ -358,13 +344,13 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     assert all_equal(mf6_pls["iprp"], 1)
 
     # check budget data were written to mf6 prt list file
-    check_budget_data(ws / f"{name}_prt.lst", perlen, nper, nstp)
+    check_budget_data(prt_ws / f"{name}_prt.lst", perlen, nper, nstp)
 
     # check mf6 prt particle track data were written to binary/CSV files
     # and that different formats are equal
     for track_bin, track_csv in zip(
-        [ws / prt_track_file, ws / prp_track_file],
-        [ws / prt_track_csv_file, ws / prp_track_csv_file],
+        [prt_ws / prt_track_file, prt_ws / prp_track_file],
+        [prt_ws / prt_track_csv_file, prt_ws / prp_track_csv_file],
     ):
         check_track_data(
             track_bin=track_bin,
@@ -373,7 +359,7 @@ def test_mf6model(idx, name, function_tmpdir, targets):
         )
 
     # extract head, budget, and specific discharge results from GWF model
-    hds = HeadFile(ws / gwf_head_file).get_data()
+    hds = HeadFile(gwf_ws / gwf_head_file).get_data()
     bud = gwf.output.budget()
     spdis = bud.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
@@ -423,7 +409,7 @@ def test_mf6model(idx, name, function_tmpdir, targets):
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{simname}.png")
+    plt.savefig(gwf_ws / f"test_{simname}.png")
 
     # convert mf6 pathlines to mp7 format
     mf6_pls = to_mp7_pathlines(mf6_pls)
@@ -447,7 +433,19 @@ def test_mf6model(idx, name, function_tmpdir, targets):
     del mp7_pls["node"]
 
     # compare mf6 / mp7 pathline data
-    # import pdb
-    # pdb.set_trace()
     assert mf6_pls.shape == mp7_pls.shape
     assert np.allclose(mf6_pls, mp7_pls, atol=1e-3)
+
+
+@pytest.mark.parametrize("idx, name", enumerate(cases))
+def test_mf6model(idx, name, function_tmpdir, targets):
+    test = TestFramework(
+        name=name,
+        workspace=function_tmpdir,
+        build=lambda t: build_models(idx, t),
+        check=lambda t: check_output(idx, t),
+        targets=targets,
+        compare=None,
+        xfail=[False, "bprp" in name],
+    )
+    test.run()
