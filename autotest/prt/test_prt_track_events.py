@@ -1,32 +1,30 @@
 """
-Test cases exercising release timing, 1st via
-package-level RELEASETIME option, & then with
-period-block config STEPS 1 and FRACTION 0.5.
-The model is setup to release halfway through
-the first and only time step of the first and
-only stress period, with duration 1 time unit,
-so the same value of 0.5 can be used for both
-RELEASETIME and FRACTION.
+This test exercises TRACKEVENT options to check
+that tracking event selection works as expected.
 
-Period-block FRACTION should work with FIRST
-and ALL, but flopy hangs with either option.
-Todo: debug and enable corresponding cases.
+GWF and PRT models run in separate simulations.
 
 The grid is a 10x10 square with a single layer,
-the same flow system shown on the FloPy readme.
+the same flow system shown on the FloPy readme,
+except for 2 inactive cells in the bottom left
+and top right corners.
+
+The flow system is similar to test_prt_fmi01.py.
+Particles are split across two release packages,
+and the grid has an inactive region this time,
+to check cell numbers recorded in pathline data
+are converted from reduced to user node numbers.
+This is verified with FloPy by intersecting path
+points with the grid then computing node numbers.
 
 Particles are released from the top left cell.
 
-Results are compared against a MODPATH 7 model.
-Telease time 0.5 could be configured, but mp7
-reports relative times, so there is no reason
-& mp7 results are converted before comparison.
+Pathlines are compared with a MODPATH 7 model.
 """
 
 
 from pathlib import Path
 from pprint import pformat
-from typing import Optional
 
 import flopy
 import matplotlib.cm as cm
@@ -39,46 +37,74 @@ from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 from prt_test_utils import (
     BasicDisCase,
-    all_equal,
     check_budget_data,
     check_track_data,
     get_model_name,
-    get_partdata,
 )
 
 from framework import TestFramework
 
-simname = "prtfmi05"
+simname = "prtfmi02"
 cases = [
-    # options block options
-    f"{simname}relt",  # RELEASETIME 0.5
-    # period block options
-    # f"{simname}all",  # ALL FRACTION 0.5      # todo debug flopy hanging
-    # f"{simname}frst", # FIRST FRACTION 0.5    # todo debug flopy hanging
-    f"{simname}stps",  # STEPS 1 FRACTION 0.5
+    f"{simname}all",
+    f"{simname}rel",
+    f"{simname}trst",
+    f"{simname}tstp",
+    f"{simname}wksk",
 ]
+releasepts_prt = {
+    "a": [
+        # index, k, i, j, x, y, z
+        [i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5]
+        for i in range(4)
+    ],
+    "b": [
+        # index, k, i, j, x, y, z
+        [i, 0, 0, 0, float(f"0.{i + 5}"), float(f"9.{i + 5}"), 0.5]
+        for i in range(5)
+    ],
+}
+releasepts_mp7 = {
+    "a": [
+        # node number, localx, localy, localz
+        (0, float(f"0.{i + 1}"), float(f"0.{i + 1}"), 0.5)
+        for i in range(4)
+    ],
+    "b": [
+        # node number, localx, localy, localz
+        (0, float(f"0.{i + 5}"), float(f"0.{i + 5}"), 0.5)
+        for i in range(5)
+    ],
+}
 
 
-def get_perioddata(name, periods=1, fraction=None) -> Optional[dict]:
-    if "relt" in name:
-        return None
-    opt = [
-        "FIRST"
-        if "frst" in name
-        else "ALL"
-        if "all" in name
-        else ("STEPS", 1)
-        if "stps" in name
-        else None
-    ]
-    if opt[0] is None:
-        raise ValueError(f"Invalid period option: {name}")
-    if fraction is not None:
-        opt.append(("FRACTION", fraction))
-    return {i: opt for i in range(periods)}
+def get_output_event(case_name):
+    return (
+        "ALL"
+        if "all" in case_name
+        else "RELEASE"
+        if "rel" in case_name
+        else "TRANSIT"
+        if "trst" in case_name
+        else "TIMESTEP"
+        if "tstp" in case_name
+        else "WEAKSINK"
+        if "wksk" in case_name
+        else "TERMINATE"
+        if "terminate" in case_name
+        else "ALL"  # default
+    )
 
 
-def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
+# function to create idomain from grid dimensions
+def create_idomain(nlay, nrow, ncol):
+    idmn = np.ones((nlay, nrow, ncol), dtype=int)
+    idmn[0, 0, 9] = 0
+    idmn[0, 9, 0] = 0
+    return idmn
+
+
+def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
@@ -109,37 +135,29 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
         nlay=BasicDisCase.nlay,
         nrow=BasicDisCase.nrow,
         ncol=BasicDisCase.ncol,
+        idomain=create_idomain(
+            BasicDisCase.nlay, BasicDisCase.nrow, BasicDisCase.ncol
+        ),
     )
 
     # create mip package
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=BasicDisCase.porosity)
 
-    # convert mp7 particledata to prt release points
-    partdata = get_partdata(prt.modelgrid, BasicDisCase.releasepts_mp7)
-    releasepts = list(partdata.to_prp(prt.modelgrid))
-
-    # check release points match expectation
-    assert np.allclose(BasicDisCase.releasepts_prt, releasepts)
-
-    # create prp package
-    prp_track_file = f"{prtname}.prp.trk"
-    prp_track_csv_file = f"{prtname}.prp.trk.csv"
-    pdat = get_perioddata(prtname, fraction=fraction)
-    # fraction 0.5 equiv. to release time 0.5 since 1 period 1 step with length 1
-    trelease = fraction if "relt" in prtname else None
-    flopy.mf6.ModflowPrtprp(
-        prt,
-        pname="prp1",
-        filename=f"{prtname}_1.prp",
-        nreleasepts=len(releasepts),
-        packagedata=releasepts,
-        perioddata=pdat,
-        track_filerecord=[prp_track_file],
-        trackcsv_filerecord=[prp_track_csv_file],
-        releasetime=trelease,
-    )
+    # create a prp package for groups a and b
+    prps = [
+        flopy.mf6.ModflowPrtprp(
+            prt,
+            pname=f"prp_{grp}",
+            filename=f"{prtname}_{grp}.prp",
+            nreleasepts=len(releasepts_prt[grp]),
+            packagedata=releasepts_prt[grp],
+            perioddata={0: ["FIRST"]},
+        )
+        for grp in ["a", "b"]
+    ]
 
     # create output control package
+    event = get_output_event(name)
     prt_track_file = f"{prtname}.trk"
     prt_track_csv_file = f"{prtname}.trk.csv"
     flopy.mf6.ModflowPrtoc(
@@ -147,6 +165,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
         pname="oc",
         track_filerecord=[prt_track_file],
         trackcsv_filerecord=[prt_track_csv_file],
+        trackevent=event,
     )
 
     # create the flow model interface
@@ -173,13 +192,23 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
 
 
 def build_mp7_sim(name, ws, mp7, gwf):
-    partdata = get_partdata(gwf.modelgrid, BasicDisCase.releasepts_mp7)
     mp7name = get_model_name(name, "mp7")
-    pg = flopy.modpath.ParticleGroup(
-        particlegroupname="G1",
-        particledata=partdata,
-        filename=f"{mp7name}.sloc",
-    )
+    mp7_pathline_file = f"{mp7name}.mppth"
+    pgs = [
+        flopy.modpath.ParticleGroup(
+            particlegroupname=f"group_{grp}",
+            particledata=flopy.modpath.ParticleData(
+                partlocs=[p[0] for p in releasepts_mp7[grp]],
+                localx=[p[1] for p in releasepts_mp7[grp]],
+                localy=[p[2] for p in releasepts_mp7[grp]],
+                localz=[p[3] for p in releasepts_mp7[grp]],
+                timeoffset=0,
+                drape=0,
+            ),
+            filename=f"{mp7name}_{grp}.sloc",
+        )
+        for grp in ["a", "b"]
+    ]
     mp = flopy.modpath.Modpath7(
         modelname=mp7name,
         flowmodel=gwf,
@@ -196,37 +225,43 @@ def build_mp7_sim(name, ws, mp7, gwf):
         trackingdirection="forward",
         budgetoutputoption="summary",
         stoptimeoption="extend",
-        particlegroups=[pg],
+        particlegroups=pgs,
     )
 
     return mp
 
 
-def build_models(idx, test, fraction):
-    # build mf6 models
+def build_models(idx, test):
+    # build gwf model
     gwfsim = BasicDisCase.get_gwf_sim(
         test.name, test.workspace, test.targets.mf6
     )
+    # add idomain
+    gwf = gwfsim.get_model()
+    dis = gwf.get_package("DIS")
+    dis.idomain = create_idomain(
+        BasicDisCase.nlay, BasicDisCase.nrow, BasicDisCase.ncol
+    )
+
+    # build prt model
     prtsim = build_prt_sim(
-        test.name,
-        test.workspace,
-        test.workspace / "prt",
-        test.targets.mf6,
-        fraction,
+        test.name, test.workspace, test.workspace / "prt", test.targets.mf6
     )
     return gwfsim, prtsim
 
 
-def check_output(idx, test, fraction):
+def check_output(idx, test):
     name = test.name
-    ws = test.workspace
+    gwf_ws = test.workspace
     prt_ws = test.workspace / "prt"
     mp7_ws = test.workspace / "mp7"
+
+    # model names
     gwfname = get_model_name(name, "gwf")
     prtname = get_model_name(name, "prt")
     mp7name = get_model_name(name, "mp7")
 
-    # extract mf6 simulations/models and grid
+    # extract models
     gwfsim = test.sims[0]
     prtsim = test.sims[1]
     gwf = gwfsim.get_model(gwfname)
@@ -248,17 +283,13 @@ def check_output(idx, test, fraction):
     gwf_head_file = f"{gwfname}.hds"
     prt_track_file = f"{prtname}.trk"
     prt_track_csv_file = f"{prtname}.trk.csv"
-    prp_track_file = f"{prtname}.prp.trk"
-    prp_track_csv_file = f"{prtname}.prp.trk.csv"
-    assert (ws / gwf_budget_file).is_file()
-    assert (ws / gwf_head_file).is_file()
+    mp7_pathline_file = f"{mp7name}.mppth"
+    assert (gwf_ws / gwf_budget_file).is_file()
+    assert (gwf_ws / gwf_head_file).is_file()
     assert (prt_ws / prt_track_file).is_file()
     assert (prt_ws / prt_track_csv_file).is_file()
-    assert (prt_ws / prp_track_file).is_file()
-    assert (prt_ws / prp_track_csv_file).is_file()
 
     # check mp7 output files exist
-    mp7_pathline_file = f"{mp7name}.mppth"
     assert (mp7_ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
@@ -266,24 +297,50 @@ def check_output(idx, test, fraction):
     mp7_pls = pd.DataFrame(
         plf.get_destination_pathline_data(range(mg.nnodes), to_recarray=True)
     )
-    # convert zero-based to one-based indexing in mp7 results
+    # convert zero-based to one-based
     mp7_pls["particlegroup"] = mp7_pls["particlegroup"] + 1
     mp7_pls["node"] = mp7_pls["node"] + 1
     mp7_pls["k"] = mp7_pls["k"] + 1
 
-    # apply reference time to mp7 results (mp7 reports relative times)
-    mp7_pls["time"] = mp7_pls["time"] + fraction
-
     # load mf6 pathline results
-    mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
+    mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file)
 
-    # make sure pathline df has "name" (boundname) column and empty values
-    assert "name" in mf6_pls
-    assert (mf6_pls["name"] == "").all()
+    # if event is ALL, output should be the same as MODPATH 7,
+    # so continue with comparisons.
+    # if event is RELEASE, expect 1 location for each particle.
+    # if event is TRANSIT, expect full results minus start loc.
+    # if event is TIMESTEP or WEAKSINK, output should be empty.
+    # in either case, return early and skip MP7 comparison.
+    event = get_output_event(name)
+    if event == "RELEASE" or event == "TERMINATE":
+        assert len(mf6_pls) == len(releasepts_prt["a"]) + len(
+            releasepts_prt["b"]
+        )
+        return
+    elif event == "TRANSIT":
+        assert len(mf6_pls) == (
+            len(mp7_pls)
+            - 2 * (len(releasepts_prt["a"]) + len(releasepts_prt["b"]))
+        )
+        return
+    elif event == "TIMESTEP" or event == "WEAKSINK":
+        assert len(mf6_pls) == 0
+        return
 
-    # make sure all mf6 pathline data have correct model and PRP index (1)
+    # make sure mf6 pathline data have correct
+    #   - model index (1)
+    #   - PRP index (1 or 2, depending on release point index)
+    def all_equal(col, val):
+        a = col.to_numpy()
+        return a[0] == val and (a[0] == a).all()
+
     assert all_equal(mf6_pls["imdl"], 1)
-    assert all_equal(mf6_pls["iprp"], 1)
+    assert set(mf6_pls[mf6_pls["iprp"] == 1]["irpt"].unique()) == set(
+        range(1, 5)
+    )
+    assert set(mf6_pls[mf6_pls["iprp"] == 2]["irpt"].unique()) == set(
+        range(1, 6)
+    )
 
     # check budget data were written to mf6 prt list file
     check_budget_data(
@@ -291,20 +348,17 @@ def check_output(idx, test, fraction):
     )
 
     # check mf6 prt particle track data were written to binary/CSV files
-    # and that different formats are equal
-    for track_csv in [
-        prt_ws / prt_track_csv_file,
-        prt_ws / prp_track_csv_file,
-    ]:
-        check_track_data(
-            track_bin=prt_ws / prt_track_file,
-            track_hdr=prt_ws
-            / Path(prt_track_file.replace(".trk", ".trk.hdr")),
-            track_csv=track_csv,
-        )
+    check_track_data(
+        track_bin=prt_ws / prt_track_file,
+        track_hdr=prt_ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
+        track_csv=prt_ws / prt_track_csv_file,
+    )
 
-    # extract head, budget, and specific discharge results from GWF model
-    hds = HeadFile(ws / gwf_head_file).get_data()
+    # check that particle names are particle indices
+    # assert len(mf6_pldata) == len(mf6_pldata[mf6_pldata['irpt'].astype(str).eq(mf6_pldata['name'])])
+
+    # get head, budget, and spdis results from GWF model
+    hds = HeadFile(gwf_ws / gwf_head_file).get_data()
     bud = gwf.output.budget()
     spdis = bud.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
@@ -350,14 +404,32 @@ def check_output(idx, test, fraction):
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{simname}.png")
+    plt.savefig(gwf_ws / f"test_{simname}.png")
+
+    # check that cell numbers are correct
+    for i, row in list(mf6_pls.iterrows()):
+        # todo debug final cell number disagreement
+        if row.ireason == 3:  # termination
+            continue
+
+        x, y, z, t, ilay, icell = (
+            row.x,
+            row.y,
+            row.z,
+            row.t,
+            row.ilay,
+            row.icell,
+        )
+        k, i, j = mg.intersect(x, y, z)
+        nn = mg.get_node([k, i, j]) + 1
+        neighbors = mg.neighbors(nn)
+        assert np.isclose(nn, icell, atol=1) or any(
+            (nn - 1) == n for n in neighbors
+        ), f"nn comparison failed: expected {nn}, got {icell}"
+        assert ilay == (k + 1) == 1
 
     # convert mf6 pathlines to mp7 format
     mf6_pls = to_mp7_pathlines(mf6_pls)
-
-    # sort both dataframes by particleid and time
-    mf6_pls.sort_values(by=["particleid", "time"], inplace=True)
-    mp7_pls.sort_values(by=["particleid", "time"], inplace=True)
 
     # drop columns for which there is no direct correspondence between mf6 and mp7
     del mf6_pls["sequencenumber"]
@@ -371,19 +443,23 @@ def check_output(idx, test, fraction):
     del mp7_pls["yloc"]
     del mp7_pls["zloc"]
 
+    # sort both dataframes
+    cols = ["x", "y", "z", "time"]
+    mf6_pls = mf6_pls.sort_values(by=cols)
+    mp7_pls = mp7_pls.sort_values(by=cols)
+
     # compare mf6 / mp7 pathline data
     assert mf6_pls.shape == mp7_pls.shape
     assert np.allclose(mf6_pls, mp7_pls, atol=1e-3)
 
 
 @pytest.mark.parametrize("idx, name", enumerate(cases))
-@pytest.mark.parametrize("fraction", [0.5])
-def test_mf6model(idx, name, function_tmpdir, targets, fraction):
+def test_mf6model(idx, name, function_tmpdir, targets):
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
-        build=lambda t: build_models(idx, t, fraction),
-        check=lambda t: check_output(idx, t, fraction),
+        build=lambda t: build_models(idx, t),
+        check=lambda t: check_output(idx, t),
         targets=targets,
         compare=None,
     )
