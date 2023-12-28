@@ -37,14 +37,14 @@ def get_model_name(idx, mdl):
     return f"{cases[idx]}_{mdl}"
 
 
-def build_models(idx, test):
+def build_mf6_sim(idx, test):
     # create simulation
     name = cases[idx]
     sim = BasicDisCase.get_gwf_sim(name, test.workspace, test.targets.mf6)
 
     # create prt model
-    prtname = get_model_name(idx, "prt")
-    prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
+    prt_name = get_model_name(idx, "prt")
+    prt = flopy.mf6.ModflowPrt(sim, modelname=prt_name)
 
     # create prt discretization
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
@@ -67,7 +67,7 @@ def build_models(idx, test):
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp1",
-        filename=f"{prtname}_1.prp",
+        filename=f"{prt_name}_1.prp",
         nreleasepts=len(rpts),
         packagedata=rpts,
         perioddata={0: ["FIRST"]},
@@ -75,8 +75,8 @@ def build_models(idx, test):
     )
 
     # create output control package
-    prt_track_file = f"{prtname}.trk"
-    prt_track_csv_file = f"{prtname}.trk.csv"
+    prt_track_file = f"{prt_name}.trk"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
     flopy.mf6.ModflowPrtoc(
         prt,
         pname="oc",
@@ -95,23 +95,22 @@ def build_models(idx, test):
     # )
 
     # create exchange
-    gwfname = get_model_name(idx, "gwf")
+    gwf_name = get_model_name(idx, "gwf")
     flopy.mf6.ModflowGwfprt(
         sim,
         exgtype="GWF6-PRT6",
-        exgmnamea=gwfname,
-        exgmnameb=prtname,
-        filename=f"{gwfname}.gwfprt",
+        exgmnamea=gwf_name,
+        exgmnameb=prt_name,
+        filename=f"{gwf_name}.gwfprt",
     )
 
     # add explicit model solution
     ems = flopy.mf6.ModflowEms(
         sim,
         pname="ems",
-        filename=f"{prtname}.ems",
+        filename=f"{prt_name}.ems",
     )
     sim.register_solution_package(ems, [prt.name])
-
     return sim
 
 
@@ -124,17 +123,19 @@ def build_mp7_sim(idx, ws, mp7, gwf):
         timeoffset=0,
         drape=0,
     )
-    mp7name = get_model_name(idx, "mp7")
+    mp7_name = get_model_name(idx, "mp7")
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
         particledata=partdata,
-        filename=f"{mp7name}.sloc",
+        filename=f"{mp7_name}.sloc",
     )
     mp = flopy.modpath.Modpath7(
-        modelname=mp7name,
+        modelname=mp7_name,
         flowmodel=gwf,
         exe_name=mp7,
         model_ws=ws,
+        headfilename=f"{gwf.name}.hds",
+        budgetfilename=f"{gwf.name}.bud",
     )
     mpbas = flopy.modpath.Modpath7Bas(
         mp,
@@ -148,51 +149,51 @@ def build_mp7_sim(idx, ws, mp7, gwf):
         stoptimeoption="extend",
         particlegroups=[pg],
     )
-
     return mp
+
+
+def build_models(idx, test):
+    mf6sim = build_mf6_sim(idx, test)
+    gwf_name = get_model_name(idx, "gwf")
+    gwf = mf6sim.get_model(gwf_name)
+    mp7sim = build_mp7_sim(idx, test.workspace / "mp7", test.targets.mp7, gwf)
+    return mf6sim, mp7sim
 
 
 def check_output(idx, test):
     name = test.name
-    ws = Path(test.workspace)
+    gwf_ws = Path(test.workspace)
+    mp7_ws = gwf_ws / "mp7"
 
     # model names
-    gwfname = get_model_name(idx, "gwf")
-    prtname = get_model_name(idx, "prt")
-    mp7name = get_model_name(idx, "mp7")
+    gwf_name = get_model_name(idx, "gwf")
+    prt_name = get_model_name(idx, "prt")
+    mp7_name = get_model_name(idx, "mp7")
 
     # extract model objects
     sim = test.sims[0]
-    gwf = sim.get_model(gwfname)
-    prt = sim.get_model(prtname)
+    gwf = sim.get_model(gwf_name)
+    prt = sim.get_model(prt_name)
 
     # extract model grid
     mg = gwf.modelgrid
 
-    # build mp7 model
-    mp7sim = build_mp7_sim(idx, ws, test.targets.mp7, gwf)
-
-    # run mp7 model
-    mp7sim.write_input()
-    success, buff = mp7sim.run_model(report=True)
-    assert success, pformat(buff)
-
     # check mf6 output files exist
-    gwf_budget_file = f"{gwfname}.bud"
-    gwf_head_file = f"{gwfname}.hds"
-    prt_track_file = f"{prtname}.trk"
-    prt_track_csv_file = f"{prtname}.trk.csv"
-    assert (ws / gwf_budget_file).is_file()
-    assert (ws / gwf_head_file).is_file()
-    assert (ws / prt_track_file).is_file()
-    assert (ws / prt_track_csv_file).is_file()
+    gwf_budget_file = f"{gwf_name}.bud"
+    gwf_head_file = f"{gwf_name}.hds"
+    prt_track_file = f"{prt_name}.trk"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
+    assert (gwf_ws / gwf_budget_file).is_file()
+    assert (gwf_ws / gwf_head_file).is_file()
+    assert (gwf_ws / prt_track_file).is_file()
+    assert (gwf_ws / prt_track_csv_file).is_file()
 
     # check mp7 output files exist
-    mp7_pathline_file = f"{mp7name}.mppth"
-    assert (ws / mp7_pathline_file).is_file()
+    mp7_pathline_file = f"{mp7_name}.mppth"
+    assert (mp7_ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
-    plf = PathlineFile(ws / mp7_pathline_file)
+    plf = PathlineFile(mp7_ws / mp7_pathline_file)
     mp7_pls = pd.DataFrame(
         plf.get_destination_pathline_data(range(mg.nnodes), to_recarray=True)
     )
@@ -202,7 +203,7 @@ def check_output(idx, test):
     mp7_pls["k"] = mp7_pls["k"] + 1
 
     # load mf6 pathline results
-    mf6_pls = pd.read_csv(ws / prt_track_csv_file).replace(
+    mf6_pls = pd.read_csv(gwf_ws / prt_track_csv_file).replace(
         r"^\s*$", np.nan, regex=True
     )
 
@@ -221,19 +222,19 @@ def check_output(idx, test):
 
     # check budget data were written to mf6 prt list file
     check_budget_data(
-        ws / f"{name}_prt.lst", BasicDisCase.perlen, BasicDisCase.nper
+        gwf_ws / f"{name}_prt.lst", BasicDisCase.perlen, BasicDisCase.nper
     )
 
     # check mf6 prt particle track data were written to binary/CSV files
     check_track_data(
-        track_bin=ws / prt_track_file,
-        track_hdr=ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
-        track_csv=ws / prt_track_csv_file,
+        track_bin=gwf_ws / prt_track_file,
+        track_hdr=gwf_ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
+        track_csv=gwf_ws / prt_track_csv_file,
     )
 
     # extract head, budget, and specific discharge results from GWF model
-    gwf = sim.get_model(gwfname)
-    hds = HeadFile(ws / gwf_head_file).get_data()
+    gwf = sim.get_model(gwf_name)
+    hds = HeadFile(gwf_ws / gwf_head_file).get_data()
     bud = gwf.output.budget()
     spdis = bud.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
@@ -279,7 +280,7 @@ def check_output(idx, test):
 
     # view/save plot
     # plt.show()
-    plt.savefig(ws / f"test_{name}.png")
+    plt.savefig(gwf_ws / f"test_{name}.png")
 
     # convert mf6 pathlines to mp7 format
     mf6_pls = to_mp7_pathlines(mf6_pls)

@@ -89,7 +89,7 @@ def test_notebooks(notebook, function_tmpdir, targets):
     simname = Path(notebook).stem.replace("ex-prt-", "")
     gwfname = f"{simname}-gwf"
     prtname = f"{simname}-prt"
-    mp7name = f"{simname}-mp7"
+    mp7_name = f"{simname}-mp7"
 
     # if example working directory doesn't exist, return early
     example_ws = function_tmpdir.parent / "examples" / notebook.stem
@@ -162,7 +162,7 @@ def test_notebooks(notebook, function_tmpdir, targets):
 
     # check mp7 pathline output file(s)
     if isinstance(mp7ws, Path):
-        mp7_pathline_file = mp7ws / f"{mp7name}.mppth"
+        mp7_pathline_file = mp7ws / f"{mp7_name}.mppth"
         assert mp7_pathline_file.is_file()
         mp7_pls = pd.DataFrame.from_records(
             PathlineFile(mp7_pathline_file).get_destination_pathline_data(
@@ -172,8 +172,8 @@ def test_notebooks(notebook, function_tmpdir, targets):
     else:
         for ws in mp7ws:
             ll = ws.stem[-1]
-            mp7_pathline_file = ws / f"{mp7name}{ll}.mppth"
-            mp7_endpoint_file = ws / f"{mp7name}{ll}.mpend"
+            mp7_pathline_file = ws / f"{mp7_name}{ll}.mppth"
+            mp7_endpoint_file = ws / f"{mp7_name}{ll}.mpend"
             assert mp7_pathline_file.is_file() or mp7_endpoint_file.is_file()
 
             # if multiple mp7 dirs & pathline files, concatenate them into a single dataframe
