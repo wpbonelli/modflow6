@@ -90,7 +90,6 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
     ! local
-    doubleprecision :: vx1, vx2, vy1, vy2, vz1, vz2
     doubleprecision :: vx, dvxdx, vy, dvydy, vz, dvzdz
     doubleprecision :: dtexitx, dtexity, dtexitz, dtexit, texit, dt, t
     doubleprecision :: x, y, z
@@ -106,20 +105,12 @@ contains
     initialY = particle%y / subcell%dy
     initialZ = particle%z / subcell%dz
 
-    ! -- Make local copies of face velocities for convenience
-    vx1 = subcell%vx1
-    vx2 = subcell%vx2
-    vy1 = subcell%vy1
-    vy2 = subcell%vy2
-    vz1 = subcell%vz1
-    vz2 = subcell%vz2
-
     ! -- Compute time of travel to each possible exit face
-    statusVX = calculate_dt(vx1, vx2, subcell%dx, initialX, vx, dvxdx, &
+    statusVX = calculate_dt(subcell%vx1, subcell%vx2, subcell%dx, initialX, vx, dvxdx, &
                             dtexitx)
-    statusVY = calculate_dt(vy1, vy2, subcell%dy, initialY, vy, dvydy, &
+    statusVY = calculate_dt(subcell%vy1, subcell%vy2, subcell%dy, initialY, vy, dvydy, &
                             dtexity)
-    statusVZ = calculate_dt(vz1, vz2, subcell%dz, initialZ, vz, dvzdz, &
+    statusVZ = calculate_dt(subcell%vz1, subcell%vz2, subcell%dz, initialZ, vz, dvzdz, &
                             dtexitz)
 
     ! -- Check for no exit face
@@ -177,9 +168,9 @@ contains
       ! -- calculate particle location at that final time.
       t = tmax
       dt = t - particle%ttrack
-      x = new_x(vx, dvxdx, vx1, vx2, dt, initialX, subcell%dx, statusVX == 1)
-      y = new_x(vy, dvydy, vy1, vy2, dt, initialY, subcell%dy, statusVY == 1)
-      z = new_x(vz, dvzdz, vz1, vz2, dt, initialZ, subcell%dz, statusVZ == 1)
+      x = new_x(vx, dvxdx, subcell%vx1, subcell%vx2, dt, initialX, subcell%dx, statusVX == 1)
+      y = new_x(vy, dvydy, subcell%vy1, subcell%vy2, dt, initialY, subcell%dy, statusVY == 1)
+      z = new_x(vz, dvzdz, subcell%vz1, subcell%vz2, dt, initialZ, subcell%dz, statusVZ == 1)
       exitFace = 0
       particle%istatus = 1
       particle%advancing = .false.
@@ -192,17 +183,17 @@ contains
       dt = dtexit
       if ((exitFace .eq. 1) .or. (exitFace .eq. 2)) then
         x = 0d0
-        y = new_x(vy, dvydy, vy1, vy2, dt, initialY, subcell%dy, statusVY == 1)
-        z = new_x(vz, dvzdz, vz1, vz2, dt, initialZ, subcell%dz, statusVZ == 1)
+        y = new_x(vy, dvydy, subcell%vy1, subcell%vy2, dt, initialY, subcell%dy, statusVY == 1)
+        z = new_x(vz, dvzdz, subcell%vz1, subcell%vz2, dt, initialZ, subcell%dz, statusVZ == 1)
         if (exitFace .eq. 2) x = 1.0d0
       else if ((exitFace .eq. 3) .or. (exitFace .eq. 4)) then
-        x = new_x(vx, dvxdx, vx1, vx2, dt, initialX, subcell%dx, statusVX == 1)
+        x = new_x(vx, dvxdx, subcell%vx1, subcell%vx2, dt, initialX, subcell%dx, statusVX == 1)
         y = 0d0
-        z = new_x(vz, dvzdz, vz1, vz2, dt, initialZ, subcell%dz, statusVZ == 1)
+        z = new_x(vz, dvzdz, subcell%vz1, subcell%vz2, dt, initialZ, subcell%dz, statusVZ == 1)
         if (exitFace .eq. 4) y = 1.0d0
       else if ((exitFace .eq. 5) .or. (exitFace .eq. 6)) then
-        x = new_x(vx, dvxdx, vx1, vx2, dt, initialX, subcell%dx, statusVX == 1)
-        y = new_x(vy, dvydy, vy1, vy2, dt, initialY, subcell%dy, statusVY == 1)
+        x = new_x(vx, dvxdx, subcell%vx1, subcell%vx2, dt, initialX, subcell%dx, statusVX == 1)
+        y = new_x(vy, dvydy, subcell%vy1, subcell%vy2, dt, initialY, subcell%dy, statusVY == 1)
         z = 0d0
         if (exitFace .eq. 6) z = 1.0d0
       else
