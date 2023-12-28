@@ -106,12 +106,12 @@ contains
     initialZ = particle%z / subcell%dz
 
     ! -- Compute time of travel to each possible exit face
-    statusVX = calculate_dt(subcell%vx1, subcell%vx2, subcell%dx, initialX, vx, dvxdx, &
-                            dtexitx)
-    statusVY = calculate_dt(subcell%vy1, subcell%vy2, subcell%dy, initialY, vy, dvydy, &
-                            dtexity)
-    statusVZ = calculate_dt(subcell%vz1, subcell%vz2, subcell%dz, initialZ, vz, dvzdz, &
-                            dtexitz)
+    statusVX = calculate_dt(subcell%vx1, subcell%vx2, subcell%dx, &
+                            initialX, vx, dvxdx, dtexitx)
+    statusVY = calculate_dt(subcell%vy1, subcell%vy2, subcell%dy, &
+                            initialY, vy, dvydy, dtexity)
+    statusVZ = calculate_dt(subcell%vz1, subcell%vz2, subcell%dz, &
+                            initialZ, vz, dvzdz, dtexitz)
 
     ! -- Check for no exit face
     if ((statusVX .eq. 3) .and. (statusVY .eq. 3) .and. (statusVZ .eq. 3)) then
@@ -168,9 +168,12 @@ contains
       ! -- calculate particle location at that final time.
       t = tmax
       dt = t - particle%ttrack
-      x = new_x(vx, dvxdx, subcell%vx1, subcell%vx2, dt, initialX, subcell%dx, statusVX == 1)
-      y = new_x(vy, dvydy, subcell%vy1, subcell%vy2, dt, initialY, subcell%dy, statusVY == 1)
-      z = new_x(vz, dvzdz, subcell%vz1, subcell%vz2, dt, initialZ, subcell%dz, statusVZ == 1)
+      x = new_x(vx, dvxdx, subcell%vx1, subcell%vx2, &
+                dt, initialX, subcell%dx, statusVX == 1)
+      y = new_x(vy, dvydy, subcell%vy1, subcell%vy2, &
+                dt, initialY, subcell%dy, statusVY == 1)
+      z = new_x(vz, dvzdz, subcell%vz1, subcell%vz2, &
+                dt, initialZ, subcell%dz, statusVZ == 1)
       exitFace = 0
       particle%istatus = 1
       particle%advancing = .false.
@@ -183,17 +186,23 @@ contains
       dt = dtexit
       if ((exitFace .eq. 1) .or. (exitFace .eq. 2)) then
         x = 0d0
-        y = new_x(vy, dvydy, subcell%vy1, subcell%vy2, dt, initialY, subcell%dy, statusVY == 1)
-        z = new_x(vz, dvzdz, subcell%vz1, subcell%vz2, dt, initialZ, subcell%dz, statusVZ == 1)
+        y = new_x(vy, dvydy, subcell%vy1, subcell%vy2, &
+                  dt, initialY, subcell%dy, statusVY == 1)
+        z = new_x(vz, dvzdz, subcell%vz1, subcell%vz2, &
+                  dt, initialZ, subcell%dz, statusVZ == 1)
         if (exitFace .eq. 2) x = 1.0d0
       else if ((exitFace .eq. 3) .or. (exitFace .eq. 4)) then
-        x = new_x(vx, dvxdx, subcell%vx1, subcell%vx2, dt, initialX, subcell%dx, statusVX == 1)
+        x = new_x(vx, dvxdx, subcell%vx1, subcell%vx2, dt, &
+                  initialX, subcell%dx, statusVX == 1)
         y = 0d0
-        z = new_x(vz, dvzdz, subcell%vz1, subcell%vz2, dt, initialZ, subcell%dz, statusVZ == 1)
+        z = new_x(vz, dvzdz, subcell%vz1, subcell%vz2, dt, &
+                  initialZ, subcell%dz, statusVZ == 1)
         if (exitFace .eq. 4) y = 1.0d0
       else if ((exitFace .eq. 5) .or. (exitFace .eq. 6)) then
-        x = new_x(vx, dvxdx, subcell%vx1, subcell%vx2, dt, initialX, subcell%dx, statusVX == 1)
-        y = new_x(vy, dvydy, subcell%vy1, subcell%vy2, dt, initialY, subcell%dy, statusVY == 1)
+        x = new_x(vx, dvxdx, subcell%vx1, subcell%vx2, &
+                  dt, initialX, subcell%dx, statusVX == 1)
+        y = new_x(vy, dvydy, subcell%vy1, subcell%vy2, &
+                  dt, initialY, subcell%dy, statusVY == 1)
         z = 0d0
         if (exitFace .eq. 6) z = 1.0d0
       else
