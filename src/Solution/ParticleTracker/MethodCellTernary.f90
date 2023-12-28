@@ -149,10 +149,9 @@ contains
       ! -- Return early if particle is done advancing
       if (.not. particle%advancing) return
 
-      ! -- If the particle is above the top of the cell (which is presumed to
-      ! -- represent a water table above the cell bottom), pass the particle
-      ! -- vertically and instantaneously to the cell top elevation and save
-      ! -- the particle state to output file(s).
+      ! -- If the particle is above the top of the cell (presumed water table)
+      ! -- pass it vertically and instantaneously to the cell top and save the
+      ! -- particle state to file
       if (particle%z > cell%defn%top) then
         particle%z = cell%defn%top
         call this%trackctl%save(particle, kper=kper, &
@@ -160,7 +159,6 @@ contains
       end if
 
       npolyverts = cell%defn%npolyverts
-
       xsum = DZERO
       ysum = DZERO
       vxsum = DZERO

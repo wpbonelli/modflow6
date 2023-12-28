@@ -1,4 +1,4 @@
-!> @brief Particle tracking methods (strategy pattern)
+!> @brief Particle tracking strategies
 module MethodModule
 
   use KindModule, only: DP, I4B, LGP
