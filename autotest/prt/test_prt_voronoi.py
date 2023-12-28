@@ -21,7 +21,6 @@ filters these but mf6 probably should too)
 from pathlib import Path
 
 import flopy
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -82,7 +81,7 @@ def get_grid(workspace, targets):
 
 def build_gwf_sim(name, ws, targets):
     ws = Path(ws)
-    gwfname = get_model_name(name, "gwf")
+    gwf_name = get_model_name(name, "gwf")
 
     # create grid
     grid = get_grid(ws / "grid", targets)
@@ -119,7 +118,7 @@ def build_gwf_sim(name, ws, targets):
     tdis = flopy.mf6.ModflowTdis(
         sim, time_units="DAYS", perioddata=[[1.0, 1, 1.0]]
     )
-    gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
+    gwf = flopy.mf6.ModflowGwf(sim, modelname=gwf_name, save_flows=True)
     ims = flopy.mf6.ModflowIms(
         sim,
         print_option="SUMMARY",
@@ -158,8 +157,8 @@ def build_gwf_sim(name, ws, targets):
     chd = flopy.mf6.ModflowGwfchd(gwf, stress_period_data=chdlist)
     oc = flopy.mf6.ModflowGwfoc(
         gwf,
-        budget_filerecord=f"{gwfname}.bud",
-        head_filerecord=f"{gwfname}.hds",
+        budget_filerecord=f"{gwf_name}.bud",
+        head_filerecord=f"{gwf_name}.hds",
         saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
         printrecord=[("HEAD", "LAST"), ("BUDGET", "LAST")],
     )
@@ -168,8 +167,8 @@ def build_gwf_sim(name, ws, targets):
 
 def build_prt_sim(name, gwf_ws, prt_ws, targets):
     prt_ws = Path(prt_ws)
-    gwfname = get_model_name(name, "gwf")
-    prtname = get_model_name(name, "prt")
+    gwf_name = get_model_name(name, "gwf")
+    prt_name = get_model_name(name, "prt")
 
     # create grid
     grid = get_grid(prt_ws / "grid", targets)
@@ -201,7 +200,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
     tdis = flopy.mf6.ModflowTdis(
         sim, time_units="DAYS", perioddata=[[1.0, 1, 1.0]]
     )
-    prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
+    prt = flopy.mf6.ModflowPrt(sim, modelname=prt_name)
     disv = flopy.mf6.ModflowGwfdisv(
         prt, nlay=nlay, **grid.get_disv_gridprops(), top=top, botm=botm
     )
@@ -212,12 +211,12 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
         (i, (0, vgrid.intersect(p[0], p[1])), p[0], p[1], p[2])
         for i, p in enumerate(rpts)
     ]
-    prp_track_file = f"{prtname}.prp.trk"
-    prp_track_csv_file = f"{prtname}.prp.trk.csv"
+    prp_track_file = f"{prt_name}.prp.trk"
+    prp_track_csv_file = f"{prt_name}.prp.trk.csv"
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp1",
-        filename=f"{prtname}_1.prp",
+        filename=f"{prt_name}_1.prp",
         nreleasepts=len(prpdata),
         packagedata=prpdata,
         perioddata={0: ["FIRST"]},
@@ -226,16 +225,16 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
         boundnames=True,
         stop_at_weak_sink=True,  # currently required for this problem
     )
-    prt_track_file = f"{prtname}.trk"
-    prt_track_csv_file = f"{prtname}.trk.csv"
+    prt_track_file = f"{prt_name}.trk"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
     flopy.mf6.ModflowPrtoc(
         prt,
         pname="oc",
         track_filerecord=[prt_track_file],
         trackcsv_filerecord=[prt_track_csv_file],
     )
-    gwf_budget_file = gwf_ws / f"{gwfname}.bud"
-    gwf_head_file = gwf_ws / f"{gwfname}.hds"
+    gwf_budget_file = gwf_ws / f"{gwf_name}.bud"
+    gwf_head_file = gwf_ws / f"{gwf_name}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -246,31 +245,25 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
     ems = flopy.mf6.ModflowEms(
         sim,
         pname="ems",
-        filename=f"{prtname}.ems",
+        filename=f"{prt_name}.ems",
     )
     sim.register_solution_package(ems, [prt.name])
     return sim
 
 
 def build_models(idx, test):
-    gwfsim = build_gwf_sim(test.name, test.workspace, test.targets)
-    prtsim = build_prt_sim(
+    gwf_sim = build_gwf_sim(test.name, test.workspace, test.targets)
+    prt_sim = build_prt_sim(
         test.name, test.workspace, test.workspace / "prt", test.targets
     )
-    return gwfsim, prtsim
+    return gwf_sim, prt_sim
 
 
 def check_output(idx, test):
     name = test.name
-    gwf_ws = test.workspace
     prt_ws = test.workspace / "prt"
-    gwfname = get_model_name(name, "gwf")
-    prtname = get_model_name(name, "prt")
-    mp7name = get_model_name(name, "mp7")
-
-    # extract mf6 simulations/models and grid
+    prt_name = get_model_name(name, "prt")
     gwfsim = test.sims[0]
-    prtsim = test.sims[1]
 
     # get gwf output
     gwf = gwfsim.get_model()
@@ -280,7 +273,7 @@ def check_output(idx, test):
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
     # get prt output
-    prt_track_csv_file = f"{prtname}.prp.trk.csv"
+    prt_track_csv_file = f"{prt_name}.prp.trk.csv"
     pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
     plot_debug = False
