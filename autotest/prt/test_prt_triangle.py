@@ -204,38 +204,31 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
 
 
 def build_models(idx, test):
-    gwfsim = build_gwf_sim(test.name, test.workspace, test.targets)
-    prtsim = build_prt_sim(
+    gwf_sim = build_gwf_sim(test.name, test.workspace, test.targets)
+    prt_sim = build_prt_sim(
         test.name, test.workspace, test.workspace / "prt", test.targets
     )
-    return gwfsim, prtsim
+    return gwf_sim, prt_sim
 
 
 def check_output(idx, test):
     name = test.name
-    gwf_ws = test.workspace
     prt_ws = test.workspace / "prt"
-    gwfname = get_model_name(name, "gwf")
-    prtname = get_model_name(name, "prt")
-    drape = "drp" in name
-
-    # extract mf6 simulations/models and grid
-    gwfsim = test.sims[0]
-    prtsim = test.sims[1]
-    gwf = gwfsim.get_model(gwfname)
-    prt = prtsim.get_model(prtname)
-    mg = gwf.modelgrid
+    gwf_name = get_model_name(name, "gwf")
+    prt_name = get_model_name(name, "prt")
+    gwf_sim = test.sims[0]
+    gwf = gwf_sim.get_model(gwf_name)
 
     # get gwf output
-    gwf = gwfsim.get_model()
+    gwf = gwf_sim.get_model()
     head = gwf.output.head().get_data()
     bdobj = gwf.output.budget()
     spdis = bdobj.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
     # get prt output
-    prtname = get_model_name(name, "prt")
-    prt_track_csv_file = f"{prtname}.prp.trk.csv"
+    prt_name = get_model_name(name, "prt")
+    prt_track_csv_file = f"{prt_name}.prp.trk.csv"
     pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
     endpts = (
         pls.sort_values("t")

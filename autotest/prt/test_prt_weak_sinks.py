@@ -35,13 +35,8 @@ import pytest
 from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
-from prt_test_utils import (
-    BasicDisCase,
-    check_budget_data,
-    check_track_data,
-    get_ireason_code,
-    get_model_name,
-)
+from prt_test_utils import (BasicDisCase, check_budget_data, check_track_data,
+                            get_ireason_code, get_model_name)
 
 from framework import TestFramework
 
@@ -131,7 +126,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
 
 
 def build_mp7_sim(name, ws, mp7, gwf):
-    mp7name = f"{name}_mp7"
+    mp7_name = f"{name}_mp7"
     partdata = flopy.modpath.ParticleData(
         partlocs=[p[0] for p in BasicDisCase.releasepts_mp7],
         localx=[p[1] for p in BasicDisCase.releasepts_mp7],
@@ -143,13 +138,15 @@ def build_mp7_sim(name, ws, mp7, gwf):
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
         particledata=partdata,
-        filename=f"{mp7name}.sloc",
+        filename=f"{mp7_name}.sloc",
     )
     mp = flopy.modpath.Modpath7(
-        modelname=mp7name,
+        modelname=mp7_name,
         flowmodel=gwf,
         exe_name=mp7,
         model_ws=ws,
+        headfilename=f"{gwf.name}.hds",
+        budgetfilename=f"{gwf.name}.bud",
     )
     mpbas = flopy.modpath.Modpath7Bas(
         mp,
@@ -177,11 +174,11 @@ def get_different_rows(source_df, new_df):
 
 def build_models(idx, test):
     # build gwf model
-    gwfsim = BasicDisCase.get_gwf_sim(
+    gwf_sim = BasicDisCase.get_gwf_sim(
         test.name, test.workspace, test.targets.mf6
     )
     # add wel package
-    gwf = gwfsim.get_model()
+    gwf = gwf_sim.get_model()
     wells = [
         # k, i, j, q
         (0, 4, 4, -0.1),
@@ -194,10 +191,15 @@ def build_models(idx, test):
     )
 
     # build prt model
-    prtsim = build_prt_sim(
+    prt_sim = build_prt_sim(
         test.name, test.workspace, test.workspace / "prt", test.targets.mf6
     )
-    return gwfsim, prtsim
+
+    # build mp7 model
+    mp7_sim = build_mp7_sim(
+        test.name, test.workspace / "mp7", test.targets.mp7, gwf
+    )
+    return gwf_sim, prt_sim, mp7_sim
 
 
 def check_output(idx, test):
@@ -205,33 +207,19 @@ def check_output(idx, test):
     gwf_ws = test.workspace
     prt_ws = test.workspace / "prt"
     mp7_ws = test.workspace / "mp7"
-
-    # model names
-    gwfname = get_model_name(name, "gwf")
-    prtname = get_model_name(name, "prt")
-    mp7name = get_model_name(name, "mp7")
-
-    # extract mf6 models and grid
-    gwfsim = test.sims[0]
-    prtsim = test.sims[1]
-    gwf = gwfsim.get_model(gwfname)
-    prt = prtsim.get_model(prtname)
+    gwf_name = get_model_name(name, "gwf")
+    prt_name = get_model_name(name, "prt")
+    mp7_name = get_model_name(name, "mp7")
+    gwf_sim = test.sims[0]
+    gwf = gwf_sim.get_model(gwf_name)
     mg = gwf.modelgrid
 
-    # build mp7 model
-    mp7sim = build_mp7_sim(name, mp7_ws, test.targets.mp7, gwf)
-
-    # run mp7 model
-    mp7sim.write_input()
-    success, buff = mp7sim.run_model(report=True)
-    assert success, pformat(buff)
-
     # check mf6 output files exist
-    gwf_budget_file = f"{gwfname}.bud"
-    gwf_head_file = f"{gwfname}.hds"
-    prt_track_file = f"{prtname}.trk"
-    prt_track_csv_file = f"{prtname}.trk.csv"
-    mp7_pathline_file = f"{mp7name}.mppth"
+    gwf_budget_file = f"{gwf_name}.bud"
+    gwf_head_file = f"{gwf_name}.hds"
+    prt_track_file = f"{prt_name}.trk"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
+    mp7_pathline_file = f"{mp7_name}.mppth"
     assert (gwf_ws / gwf_budget_file).is_file()
     assert (gwf_ws / gwf_head_file).is_file()
     assert (prt_ws / prt_track_file).is_file()
