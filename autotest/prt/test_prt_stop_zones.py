@@ -1,29 +1,28 @@
 """
-This test is similar to test_prt_fmi01.py, except
-particles are split across two release packages,
-and the grid has an inactive region. This tests
-that cell numbers recorded in pathline data have
-been converted from reduced to user node numbers.
-This is verified by using FloPy to intersect path
-points with the grid, then compute node numbers.
+This test exercises stop zones defined in the
+model input package (MIP), i.e. particles are
+terminated when they enter the selected zone.
+
+The grid is a 10x10 square, based on the flow
+system from the FloPy readme. Two test cases
+are defined with 1 and 2 layers respectively
+(to test zone data can be read as 2D or 3D).
+
+There are two stop zones in the top right and
+bottom left of the grid.
+
+Particles are released from the top left cell
+and are either captured by either of the stop
+zones, or continue to the bottom right cell.
 
 GWF and PRT models run in separate simulations
 via flow model interface.
 
-The grid is a 10x10 square with a single layer,
-the same flow system shown on the FloPy readme,
-except for 2 inactive cells in the bottom left
-and top right corners.
-
-Particles are released from the top left cell.
-
 Results are compared against a MODPATH 7 model.
-
-A case is defined for each TRACKEVENT optional
-value to check that events can be selected.
 """
 
 
+from itertools import repeat
 from pathlib import Path
 from pprint import pformat
 
@@ -36,6 +35,7 @@ import pytest
 from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
+from matplotlib.collections import LineCollection
 from prt_test_utils import (
     BasicDisCase,
     check_budget_data,
@@ -45,64 +45,16 @@ from prt_test_utils import (
 
 from framework import TestFramework
 
-simname = "prtfmi02"
-cases = [
-    f"{simname}all",
-    f"{simname}rel",
-    f"{simname}trst",
-    f"{simname}tstp",
-    f"{simname}wksk",
-]
-releasepts_prt = {
-    "a": [
-        # index, k, i, j, x, y, z
-        [i, 0, 0, 0, float(f"0.{i + 1}"), float(f"9.{i + 1}"), 0.5]
-        for i in range(4)
-    ],
-    "b": [
-        # index, k, i, j, x, y, z
-        [i, 0, 0, 0, float(f"0.{i + 5}"), float(f"9.{i + 5}"), 0.5]
-        for i in range(5)
-    ],
-}
-releasepts_mp7 = {
-    "a": [
-        # node number, localx, localy, localz
-        (0, float(f"0.{i + 1}"), float(f"0.{i + 1}"), 0.5)
-        for i in range(4)
-    ],
-    "b": [
-        # node number, localx, localy, localz
-        (0, float(f"0.{i + 5}"), float(f"0.{i + 5}"), 0.5)
-        for i in range(5)
-    ],
-}
+simname = "prtfmi03"
+cases = [f"{simname}_l1", f"{simname}_l2"]
+stopzone_cells = [(0, 1, 8), (0, 8, 1)]
 
 
-def get_output_event(case_name):
-    return (
-        "ALL"
-        if "all" in case_name
-        else "RELEASE"
-        if "rel" in case_name
-        else "TRANSIT"
-        if "trst" in case_name
-        else "TIMESTEP"
-        if "tstp" in case_name
-        else "WEAKSINK"
-        if "wksk" in case_name
-        else "TERMINATE"
-        if "terminate" in case_name
-        else "ALL"  # default
-    )
-
-
-# function to create idomain from grid dimensions
-def create_idomain(nlay, nrow, ncol):
-    idmn = np.ones((nlay, nrow, ncol), dtype=int)
-    idmn[0, 0, 9] = 0
-    idmn[0, 9, 0] = 0
-    return idmn
+def create_izone(nlay, nrow, ncol):
+    izone = np.zeros((nlay, nrow, ncol), dtype=int)
+    for iz in stopzone_cells:
+        izone[iz] = 1
+    return izone
 
 
 def build_prt_sim(name, gwf_ws, prt_ws, mf6):
@@ -130,35 +82,39 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
 
     # create prt discretization
+    nlay = int(name[-1])
+    botm = [BasicDisCase.top - (k + 1) for k in range(nlay)]
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
         prt,
         pname="dis",
-        nlay=BasicDisCase.nlay,
+        nlay=nlay,
         nrow=BasicDisCase.nrow,
         ncol=BasicDisCase.ncol,
-        idomain=create_idomain(
-            BasicDisCase.nlay, BasicDisCase.nrow, BasicDisCase.ncol
-        ),
+        top=BasicDisCase.top,
+        botm=botm,
     )
 
     # create mip package
-    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=BasicDisCase.porosity)
+    izone = create_izone(nlay, BasicDisCase.nrow, BasicDisCase.ncol)
+    flopy.mf6.ModflowPrtmip(
+        prt,
+        pname="mip",
+        porosity=BasicDisCase.porosity,
+        izone=izone,
+    )
 
-    # create a prp package for groups a and b
-    prps = [
-        flopy.mf6.ModflowPrtprp(
-            prt,
-            pname=f"prp_{grp}",
-            filename=f"{prtname}_{grp}.prp",
-            nreleasepts=len(releasepts_prt[grp]),
-            packagedata=releasepts_prt[grp],
-            perioddata={0: ["FIRST"]},
-        )
-        for grp in ["a", "b"]
-    ]
+    # create prp package
+    flopy.mf6.ModflowPrtprp(
+        prt,
+        pname="prp1",
+        filename=f"{prtname}_1.prp",
+        nreleasepts=len(BasicDisCase.releasepts_prt),
+        packagedata=BasicDisCase.releasepts_prt,
+        perioddata={0: ["FIRST"]},
+        istopzone=1,
+    )
 
     # create output control package
-    event = get_output_event(name)
     prt_track_file = f"{prtname}.trk"
     prt_track_csv_file = f"{prtname}.trk.csv"
     flopy.mf6.ModflowPrtoc(
@@ -166,7 +122,6 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
         pname="oc",
         track_filerecord=[prt_track_file],
         trackcsv_filerecord=[prt_track_csv_file],
-        trackevent=event,
     )
 
     # create the flow model interface
@@ -193,23 +148,20 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
 
 
 def build_mp7_sim(name, ws, mp7, gwf):
+    partdata = flopy.modpath.ParticleData(
+        partlocs=[p[0] for p in BasicDisCase.releasepts_mp7],
+        localx=[p[1] for p in BasicDisCase.releasepts_mp7],
+        localy=[p[2] for p in BasicDisCase.releasepts_mp7],
+        localz=[p[3] for p in BasicDisCase.releasepts_mp7],
+        timeoffset=0,
+        drape=0,
+    )
     mp7name = get_model_name(name, "mp7")
-    mp7_pathline_file = f"{mp7name}.mppth"
-    pgs = [
-        flopy.modpath.ParticleGroup(
-            particlegroupname=f"group_{grp}",
-            particledata=flopy.modpath.ParticleData(
-                partlocs=[p[0] for p in releasepts_mp7[grp]],
-                localx=[p[1] for p in releasepts_mp7[grp]],
-                localy=[p[2] for p in releasepts_mp7[grp]],
-                localz=[p[3] for p in releasepts_mp7[grp]],
-                timeoffset=0,
-                drape=0,
-            ),
-            filename=f"{mp7name}_{grp}.sloc",
-        )
-        for grp in ["a", "b"]
-    ]
+    pg = flopy.modpath.ParticleGroup(
+        particlegroupname="G1",
+        particledata=partdata,
+        filename=f"{mp7name}.sloc",
+    )
     mp = flopy.modpath.Modpath7(
         modelname=mp7name,
         flowmodel=gwf,
@@ -220,31 +172,36 @@ def build_mp7_sim(name, ws, mp7, gwf):
         mp,
         porosity=BasicDisCase.porosity,
     )
+    nlay = int(name[-1])
+    izone = create_izone(nlay, BasicDisCase.nrow, BasicDisCase.ncol)
     mpsim = flopy.modpath.Modpath7Sim(
         mp,
         simulationtype="pathline",
         trackingdirection="forward",
         budgetoutputoption="summary",
         stoptimeoption="extend",
-        particlegroups=pgs,
+        stopzone=1,
+        zones=izone,
+        zonedataoption="on",
+        particlegroups=[pg],
     )
 
     return mp
 
 
 def build_models(idx, test):
-    # build gwf model
     gwfsim = BasicDisCase.get_gwf_sim(
         test.name, test.workspace, test.targets.mf6
     )
-    # add idomain
     gwf = gwfsim.get_model()
     dis = gwf.get_package("DIS")
-    dis.idomain = create_idomain(
-        BasicDisCase.nlay, BasicDisCase.nrow, BasicDisCase.ncol
-    )
-
-    # build prt model
+    nlay = int(test.name[-1])
+    botm = [BasicDisCase.top - (k + 1) for k in range(nlay)]
+    botm_data = np.array(
+        [list(repeat(b, BasicDisCase.nrow * BasicDisCase.ncol)) for b in botm]
+    ).reshape((nlay, BasicDisCase.nrow, BasicDisCase.ncol))
+    dis.nlay = nlay
+    dis.botm.set_data(botm_data)
     prtsim = build_prt_sim(
         test.name, test.workspace, test.workspace / "prt", test.targets.mf6
     )
@@ -262,13 +219,11 @@ def check_output(idx, test):
     prtname = get_model_name(name, "prt")
     mp7name = get_model_name(name, "mp7")
 
-    # extract models
+    # extract mf6 simulations/models and grid
     gwfsim = test.sims[0]
     prtsim = test.sims[1]
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
-
-    # extract model grid
     mg = gwf.modelgrid
 
     # build mp7 model
@@ -284,13 +239,13 @@ def check_output(idx, test):
     gwf_head_file = f"{gwfname}.hds"
     prt_track_file = f"{prtname}.trk"
     prt_track_csv_file = f"{prtname}.trk.csv"
-    mp7_pathline_file = f"{mp7name}.mppth"
     assert (gwf_ws / gwf_budget_file).is_file()
     assert (gwf_ws / gwf_head_file).is_file()
     assert (prt_ws / prt_track_file).is_file()
     assert (prt_ws / prt_track_csv_file).is_file()
 
     # check mp7 output files exist
+    mp7_pathline_file = f"{mp7name}.mppth"
     assert (mp7_ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
@@ -306,43 +261,6 @@ def check_output(idx, test):
     # load mf6 pathline results
     mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file)
 
-    # if event is ALL, output should be the same as MODPATH 7,
-    # so continue with comparisons.
-    # if event is RELEASE, expect 1 location for each particle.
-    # if event is TRANSIT, expect full results minus start loc.
-    # if event is TIMESTEP or WEAKSINK, output should be empty.
-    # in either case, return early and skip MP7 comparison.
-    event = get_output_event(name)
-    if event == "RELEASE" or event == "TERMINATE":
-        assert len(mf6_pls) == len(releasepts_prt["a"]) + len(
-            releasepts_prt["b"]
-        )
-        return
-    elif event == "TRANSIT":
-        assert len(mf6_pls) == (
-            len(mp7_pls)
-            - 2 * (len(releasepts_prt["a"]) + len(releasepts_prt["b"]))
-        )
-        return
-    elif event == "TIMESTEP" or event == "WEAKSINK":
-        assert len(mf6_pls) == 0
-        return
-
-    # make sure mf6 pathline data have correct
-    #   - model index (1)
-    #   - PRP index (1 or 2, depending on release point index)
-    def all_equal(col, val):
-        a = col.to_numpy()
-        return a[0] == val and (a[0] == a).all()
-
-    assert all_equal(mf6_pls["imdl"], 1)
-    assert set(mf6_pls[mf6_pls["iprp"] == 1]["irpt"].unique()) == set(
-        range(1, 5)
-    )
-    assert set(mf6_pls[mf6_pls["iprp"] == 2]["irpt"].unique()) == set(
-        range(1, 6)
-    )
-
     # check budget data were written to mf6 prt list file
     check_budget_data(
         prt_ws / f"{name}_prt.lst", BasicDisCase.perlen, BasicDisCase.nper
@@ -355,16 +273,13 @@ def check_output(idx, test):
         track_csv=prt_ws / prt_track_csv_file,
     )
 
-    # check that particle names are particle indices
-    # assert len(mf6_pldata) == len(mf6_pldata[mf6_pldata['irpt'].astype(str).eq(mf6_pldata['name'])])
-
     # get head, budget, and spdis results from GWF model
     hds = HeadFile(gwf_ws / gwf_head_file).get_data()
     bud = gwf.output.budget()
     spdis = bud.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
-    # setup plot
+    # setup map view plot
     fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 10))
     for a in ax:
         a.set_aspect("equal")
@@ -403,9 +318,51 @@ def check_output(idx, test):
             color=cm.plasma(ipl / len(mp7_plines)),
         )
 
+    def sort_square_verts(verts):
+        """Sort 4 or more points on a square in clockwise order, starting with the top-left point"""
+
+        # sort by y coordinate
+        verts.sort(key=lambda v: v[1], reverse=True)
+
+        # separate top and bottom rows
+        y0 = verts[0][1]
+        t = [v for v in verts if v[1] == y0]
+        b = verts[len(t) :]
+
+        # sort top and bottom rows by x coordinate
+        t.sort(key=lambda v: v[0])
+        b.sort(key=lambda v: v[0])
+
+        # return vertices in clockwise order
+        return t + list(reversed(b))
+
+    def plot_stop_zone(nn, ax):
+        ifaces = []
+        iverts = mg.iverts[nn]
+
+        # sort vertices of well cell in clockwise order
+        verts = [tuple(mg.verts[v]) for v in iverts]
+        sorted_verts = sort_square_verts(list(set(verts.copy())))
+        for i in range(len(sorted_verts) - 1):
+            if i == 0:
+                p0 = sorted_verts[-1]
+                p1 = sorted_verts[i]
+                ifaces.append([p0, p1])
+            p0 = sorted_verts[i]
+            p1 = sorted_verts[(i + 1)]
+            ifaces.append([p0, p1])
+
+        lc = LineCollection(ifaces, color="red", lw=4)
+        ax.add_collection(lc)
+
+    # plot stop zones
+    for iz in stopzone_cells:
+        for a in ax:
+            plot_stop_zone(mg.get_node([iz])[0], a)
+
     # view/save plot
     # plt.show()
-    plt.savefig(gwf_ws / f"test_{simname}.png")
+    plt.savefig(gwf_ws / f"test_{name}_map.png")
 
     # check that cell numbers are correct
     for i, row in list(mf6_pls.iterrows()):
@@ -426,28 +383,28 @@ def check_output(idx, test):
         neighbors = mg.neighbors(nn)
         assert np.isclose(nn, icell, atol=1) or any(
             (nn - 1) == n for n in neighbors
-        ), f"nn comparison failed: expected {nn}, got {icell}"
-        assert ilay == (k + 1) == 1
+        )
 
     # convert mf6 pathlines to mp7 format
     mf6_pls = to_mp7_pathlines(mf6_pls)
 
     # drop columns for which there is no direct correspondence between mf6 and mp7
-    del mf6_pls["particleid"]
     del mf6_pls["sequencenumber"]
     del mf6_pls["particleidloc"]
     del mf6_pls["xloc"]
     del mf6_pls["yloc"]
     del mf6_pls["zloc"]
-    del mp7_pls["particleid"]
     del mp7_pls["sequencenumber"]
     del mp7_pls["particleidloc"]
     del mp7_pls["xloc"]
     del mp7_pls["yloc"]
     del mp7_pls["zloc"]
 
-    # sort both dataframes
-    cols = ["x", "y", "z", "time"]
+    # drop duplicates and sort both dataframes
+    # todo debug why necessary to drop dupes
+    cols = ["particleid", "time"]
+    mp7_pls = mp7_pls.drop_duplicates(subset=cols)
+    mf6_pls = mf6_pls.drop_duplicates(subset=cols)
     mf6_pls = mf6_pls.sort_values(by=cols)
     mp7_pls = mp7_pls.sort_values(by=cols)
 

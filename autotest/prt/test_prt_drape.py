@@ -222,7 +222,9 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
 
 def build_models(idx, test):
     gwfsim = build_gwf_sim(test.name, test.workspace, test.targets.mf6)
-    prtsim = build_prt_sim(test.name, test.workspace, test.workspace / "prt", test.targets.mf6)
+    prtsim = build_prt_sim(
+        test.name, test.workspace, test.workspace / "prt", test.targets.mf6
+    )
     return gwfsim, prtsim
 
 
@@ -267,10 +269,14 @@ def check_output(idx, test):
 
     # check mf6 prt particle track data were written to binary/CSV files
     # and that different formats are equal
-    for track_csv in [prt_ws / prt_track_csv_file, prt_ws / prp_track_csv_file]:
+    for track_csv in [
+        prt_ws / prt_track_csv_file,
+        prt_ws / prp_track_csv_file,
+    ]:
         check_track_data(
             track_bin=prt_ws / prt_track_file,
-            track_hdr=prt_ws / Path(prt_track_file.replace(".trk", ".trk.hdr")),
+            track_hdr=prt_ws
+            / Path(prt_track_file.replace(".trk", ".trk.hdr")),
             track_csv=track_csv,
         )
 

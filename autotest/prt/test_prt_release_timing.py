@@ -1,6 +1,16 @@
 """
-Tests ability to run a GWF model then a PRT model
-in separate simulations via flow model interface.
+Test cases exercising release timing, 1st via
+package-level RELEASETIME option, & then with
+period-block config STEPS 1 and FRACTION 0.5.
+The model is setup to release halfway through
+the first and only time step of the first and
+only stress period, with duration 1 time unit,
+so the same value of 0.5 can be used for both
+RELEASETIME and FRACTION.
+
+Period-block FRACTION should work with FIRST
+and ALL, but flopy hangs with either option.
+Todo: debug and enable corresponding cases.
 
 The grid is a 10x10 square with a single layer,
 the same flow system shown on the FloPy readme.
@@ -8,24 +18,15 @@ the same flow system shown on the FloPy readme.
 Particles are released from the top left cell.
 
 Results are compared against a MODPATH 7 model.
-
-Two test cases are defined, one with the particle
-release (PRP) package option STOP_AT_WEAK_SINK on
-and one with the option off. No effect on results
-is expected, because the model has no weak sinks.
-(Motivated by an old bug in which particles were
-tracked improperly when this option was enabled,
-even with no weak sink cells in the vicinity.)
-
-This test also specifies `boundnames=True` for
-the PRP package, but does not provide boundnames
-values, and checks that the "name" column in the
-track output files contain the expected defaults.
+Telease time 0.5 could be configured, but mp7
+reports relative times, so there is no reason
+& mp7 results are converted before comparison.
 """
 
 
 from pathlib import Path
 from pprint import pformat
+from typing import Optional
 
 import flopy
 import matplotlib.cm as cm
@@ -43,16 +44,41 @@ from prt_test_utils import (
     check_track_data,
     get_model_name,
     get_partdata,
-    has_default_boundnames,
 )
 
 from framework import TestFramework
 
-simname = "prtfmi01"
-cases = [simname, f"{simname}saws"]
+simname = "prtfmi05"
+cases = [
+    # options block options
+    f"{simname}relt",  # RELEASETIME 0.5
+    # period block options
+    # f"{simname}all",  # ALL FRACTION 0.5      # todo debug flopy hanging
+    # f"{simname}frst", # FIRST FRACTION 0.5    # todo debug flopy hanging
+    f"{simname}stps",  # STEPS 1 FRACTION 0.5
+]
 
 
-def build_prt_sim(name, gwf_ws, prt_ws, mf6):
+def get_perioddata(name, periods=1, fraction=None) -> Optional[dict]:
+    if "relt" in name:
+        return None
+    opt = [
+        "FIRST"
+        if "frst" in name
+        else "ALL"
+        if "all" in name
+        else ("STEPS", 1)
+        if "stps" in name
+        else None
+    ]
+    if opt[0] is None:
+        raise ValueError(f"Invalid period option: {name}")
+    if fraction is not None:
+        opt.append(("FRACTION", fraction))
+    return {i: opt for i in range(periods)}
+
+
+def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
@@ -88,26 +114,29 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     # create mip package
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=BasicDisCase.porosity)
 
-    # convert mp7 to prt release points and check against expectation
+    # convert mp7 particledata to prt release points
     partdata = get_partdata(prt.modelgrid, BasicDisCase.releasepts_mp7)
-    coords = partdata.to_coords(prt.modelgrid)
-    releasepts = [(i, 0, 0, 0, c[0], c[1], c[2]) for i, c in enumerate(coords)]
+    releasepts = list(partdata.to_prp(prt.modelgrid))
+
+    # check release points match expectation
     assert np.allclose(BasicDisCase.releasepts_prt, releasepts)
 
     # create prp package
     prp_track_file = f"{prtname}.prp.trk"
     prp_track_csv_file = f"{prtname}.prp.trk.csv"
+    pdat = get_perioddata(prtname, fraction=fraction)
+    # fraction 0.5 equiv. to release time 0.5 since 1 period 1 step with length 1
+    trelease = fraction if "relt" in prtname else None
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp1",
         filename=f"{prtname}_1.prp",
         nreleasepts=len(releasepts),
         packagedata=releasepts,
-        perioddata={0: ["FIRST"]},
+        perioddata=pdat,
         track_filerecord=[prp_track_file],
         trackcsv_filerecord=[prp_track_csv_file],
-        stop_at_weak_sink="saws" in prtname,
-        boundnames=True,
+        releasetime=trelease,
     )
 
     # create output control package
@@ -173,17 +202,23 @@ def build_mp7_sim(name, ws, mp7, gwf):
     return mp
 
 
-def build_models(idx, test):
-    gwfsim = BasicDisCase.get_gwf_sim(test.name, test.workspace, test.targets.mf6)
+def build_models(idx, test, fraction):
+    gwfsim = BasicDisCase.get_gwf_sim(
+        test.name, test.workspace, test.targets.mf6
+    )
     prtsim = build_prt_sim(
-        test.name, test.workspace, test.workspace / "prt", test.targets.mf6
+        test.name,
+        test.workspace,
+        test.workspace / "prt",
+        test.targets.mf6,
+        fraction,
     )
     return gwfsim, prtsim
 
 
-def check_output(idx, test):
+def check_output(idx, test, fraction):
     name = test.name
-    gwf_ws = test.workspace
+    ws = test.workspace
     prt_ws = test.workspace / "prt"
     mp7_ws = test.workspace / "mp7"
     gwfname = get_model_name(name, "gwf")
@@ -195,10 +230,11 @@ def check_output(idx, test):
     prtsim = test.sims[1]
     gwf = gwfsim.get_model(gwfname)
     prt = prtsim.get_model(prtname)
+
+    # extract model grid
     mg = gwf.modelgrid
 
-    # build/run mp7 model... can't run within framework as
-    # flopy needs gwf output files to write mp7 input files
+    # build mp7 model
     mp7sim = build_mp7_sim(name, mp7_ws, test.targets.mp7, gwf)
 
     # run mp7 model
@@ -213,8 +249,8 @@ def check_output(idx, test):
     prt_track_csv_file = f"{prtname}.trk.csv"
     prp_track_file = f"{prtname}.prp.trk"
     prp_track_csv_file = f"{prtname}.prp.trk.csv"
-    assert (gwf_ws / gwf_budget_file).is_file()
-    assert (gwf_ws / gwf_head_file).is_file()
+    assert (ws / gwf_budget_file).is_file()
+    assert (ws / gwf_head_file).is_file()
     assert (prt_ws / prt_track_file).is_file()
     assert (prt_ws / prt_track_csv_file).is_file()
     assert (prt_ws / prp_track_file).is_file()
@@ -234,12 +270,15 @@ def check_output(idx, test):
     mp7_pls["node"] = mp7_pls["node"] + 1
     mp7_pls["k"] = mp7_pls["k"] + 1
 
+    # apply reference time to mp7 results (mp7 reports relative times)
+    mp7_pls["time"] = mp7_pls["time"] + fraction
+
     # load mf6 pathline results
     mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
-    # make sure pathline df has "name" (boundname) column and default values
+    # make sure pathline df has "name" (boundname) column and empty values
     assert "name" in mf6_pls
-    assert has_default_boundnames(mf6_pls)
+    assert (mf6_pls["name"] == "").all()
 
     # make sure all mf6 pathline data have correct model and PRP index (1)
     assert all_equal(mf6_pls["imdl"], 1)
@@ -264,7 +303,7 @@ def check_output(idx, test):
         )
 
     # extract head, budget, and specific discharge results from GWF model
-    hds = HeadFile(gwf_ws / gwf_head_file).get_data()
+    hds = HeadFile(ws / gwf_head_file).get_data()
     bud = gwf.output.budget()
     spdis = bud.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
@@ -310,7 +349,7 @@ def check_output(idx, test):
 
     # view/save plot
     # plt.show()
-    plt.savefig(gwf_ws / f"test_{simname}.png")
+    plt.savefig(ws / f"test_{simname}.png")
 
     # convert mf6 pathlines to mp7 format
     mf6_pls = to_mp7_pathlines(mf6_pls)
@@ -337,12 +376,13 @@ def check_output(idx, test):
 
 
 @pytest.mark.parametrize("idx, name", enumerate(cases))
-def test_mf6model(idx, name, function_tmpdir, targets):
+@pytest.mark.parametrize("fraction", [0.5])
+def test_mf6model(idx, name, function_tmpdir, targets, fraction):
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
-        build=lambda t: build_models(idx, t),
-        check=lambda t: check_output(idx, t),
+        build=lambda t: build_models(idx, t, fraction),
+        check=lambda t: check_output(idx, t, fraction),
         targets=targets,
         compare=None,
     )
