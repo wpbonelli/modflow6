@@ -50,11 +50,11 @@ releasepts = [
 
 def build_gwf_sim(name, ws, mf6):
     ws = Path(ws)
-    gwfname = get_model_name(name, "gwf")
+    gwf_name = get_model_name(name, "gwf")
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=gwfname, version="mf6", exe_name=mf6, sim_ws=ws
+        sim_name=gwf_name, version="mf6", exe_name=mf6, sim_ws=ws
     )
     # create tdis package
     tdis = flopy.mf6.ModflowTdis(
@@ -62,8 +62,8 @@ def build_gwf_sim(name, ws, mf6):
     )
 
     # set ims csv files
-    csv0 = f"{gwfname}.outer.ims.csv"
-    csv1 = f"{gwfname}.inner.ims.csv"
+    csv0 = f"{gwf_name}.outer.ims.csv"
+    csv1 = f"{gwf_name}.inner.ims.csv"
 
     # create iterative model solution and register the gwf model with it
     ims = flopy.mf6.ModflowIms(
@@ -84,7 +84,7 @@ def build_gwf_sim(name, ws, mf6):
     )
 
     # create gwf model
-    gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
+    gwf = flopy.mf6.ModflowGwf(sim, modelname=gwf_name, save_flows=True)
 
     dis = flopy.mf6.ModflowGwfdis(
         gwf,
@@ -126,12 +126,12 @@ def build_gwf_sim(name, ws, mf6):
     # output control
     oc = flopy.mf6.ModflowGwfoc(
         gwf,
-        budget_filerecord=f"{gwfname}.cbc",
-        head_filerecord=f"{gwfname}.hds",
+        budget_filerecord=f"{gwf_name}.cbc",
+        head_filerecord=f"{gwf_name}.hds",
         headprintrecord=[("COLUMNS", 10, "WIDTH", 15, "DIGITS", 6, "GENERAL")],
         saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
         printrecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
-        filename=f"{gwfname}.oc",
+        filename=f"{gwf_name}.oc",
     )
 
     return sim
@@ -139,12 +139,12 @@ def build_gwf_sim(name, ws, mf6):
 
 def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     prt_ws = Path(prt_ws)
-    gwfname = get_model_name(name, "gwf")
-    prtname = get_model_name(name, "prt")
+    gwf_name = get_model_name(name, "gwf")
+    prt_name = get_model_name(name, "prt")
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=prtname,
+        sim_name=prt_name,
         exe_name=mf6,
         version="mf6",
         sim_ws=prt_ws,
@@ -156,7 +156,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     )
 
     # create prt model
-    prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
+    prt = flopy.mf6.ModflowPrt(sim, modelname=prt_name)
 
     # create prt discretization
     dis = flopy.mf6.ModflowGwfdis(
@@ -174,12 +174,12 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
 
     # create prp package
-    prp_track_file = f"{prtname}.prp.trk"
-    prp_track_csv_file = f"{prtname}.prp.trk.csv"
+    prp_track_file = f"{prt_name}.prp.trk"
+    prp_track_csv_file = f"{prt_name}.prp.trk.csv"
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp1",
-        filename=f"{prtname}_1.prp",
+        filename=f"{prt_name}_1.prp",
         nreleasepts=len(releasepts),
         packagedata=releasepts,
         perioddata={0: ["FIRST"]},
@@ -189,8 +189,8 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     )
 
     # create output control package
-    prt_track_file = f"{prtname}.trk"
-    prt_track_csv_file = f"{prtname}.trk.csv"
+    prt_track_file = f"{prt_name}.trk"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
     flopy.mf6.ModflowPrtoc(
         prt,
         pname="oc",
@@ -199,8 +199,8 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     )
 
     # create the flow model interface
-    gwf_budget_file = gwf_ws / f"{gwfname}.cbc"
-    gwf_head_file = gwf_ws / f"{gwfname}.hds"
+    gwf_budget_file = gwf_ws / f"{gwf_name}.cbc"
+    gwf_head_file = gwf_ws / f"{gwf_name}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -213,7 +213,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
     ems = flopy.mf6.ModflowEms(
         sim,
         pname="ems",
-        filename=f"{prtname}.ems",
+        filename=f"{prt_name}.ems",
     )
     sim.register_solution_package(ems, [prt.name])
 
@@ -221,35 +221,31 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
 
 
 def build_models(idx, test):
-    gwfsim = build_gwf_sim(test.name, test.workspace, test.targets.mf6)
-    prtsim = build_prt_sim(
+    gwf_sim = build_gwf_sim(test.name, test.workspace, test.targets.mf6)
+    prt_sim = build_prt_sim(
         test.name, test.workspace, test.workspace / "prt", test.targets.mf6
     )
-    return gwfsim, prtsim
+    return gwf_sim, prt_sim
 
 
 def check_output(idx, test):
     name = test.name
     gwf_ws = test.workspace
     prt_ws = test.workspace / "prt"
-    gwfname = get_model_name(name, "gwf")
-    prtname = get_model_name(name, "prt")
+    gwf_name = get_model_name(name, "gwf")
+    prt_name = get_model_name(name, "prt")
+    gwf_sim = test.sims[0]
+    gwf = gwf_sim.get_model(gwf_name)
+    mg = gwf.modelgrid
     drape = "drp" in name
 
-    # extract mf6 simulations/models and grid
-    gwfsim = test.sims[0]
-    prtsim = test.sims[1]
-    gwf = gwfsim.get_model(gwfname)
-    prt = prtsim.get_model(prtname)
-    mg = gwf.modelgrid
-
     # check mf6 output files exist
-    gwf_budget_file = f"{gwfname}.cbc"
-    gwf_head_file = f"{gwfname}.hds"
-    prt_track_file = f"{prtname}.trk"
-    prt_track_csv_file = f"{prtname}.trk.csv"
-    prp_track_file = f"{prtname}.prp.trk"
-    prp_track_csv_file = f"{prtname}.prp.trk.csv"
+    gwf_budget_file = f"{gwf_name}.cbc"
+    gwf_head_file = f"{gwf_name}.hds"
+    prt_track_file = f"{prt_name}.trk"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
+    prp_track_file = f"{prt_name}.prp.trk"
+    prp_track_csv_file = f"{prt_name}.prp.trk.csv"
     assert (gwf_ws / gwf_budget_file).is_file()
     assert (gwf_ws / gwf_head_file).is_file()
     assert (prt_ws / prt_track_file).is_file()

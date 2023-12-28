@@ -37,14 +37,8 @@ import pytest
 from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
-from prt_test_utils import (
-    BasicDisCase,
-    all_equal,
-    check_budget_data,
-    check_track_data,
-    get_model_name,
-    get_partdata,
-)
+from prt_test_utils import (BasicDisCase, all_equal, check_budget_data,
+                            check_track_data, get_model_name, get_partdata)
 
 from framework import TestFramework
 
@@ -99,8 +93,8 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
     )
 
     # create prt model
-    prtname = get_model_name(name, "prt")
-    prt = flopy.mf6.ModflowPrt(sim, modelname=prtname)
+    prt_name = get_model_name(name, "prt")
+    prt = flopy.mf6.ModflowPrt(sim, modelname=prt_name)
 
     # create prt discretization
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
@@ -122,15 +116,15 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
     assert np.allclose(BasicDisCase.releasepts_prt, releasepts)
 
     # create prp package
-    prp_track_file = f"{prtname}.prp.trk"
-    prp_track_csv_file = f"{prtname}.prp.trk.csv"
-    pdat = get_perioddata(prtname, fraction=fraction)
+    prp_track_file = f"{prt_name}.prp.trk"
+    prp_track_csv_file = f"{prt_name}.prp.trk.csv"
+    pdat = get_perioddata(prt_name, fraction=fraction)
     # fraction 0.5 equiv. to release time 0.5 since 1 period 1 step with length 1
-    trelease = fraction if "relt" in prtname else None
+    trelease = fraction if "relt" in prt_name else None
     flopy.mf6.ModflowPrtprp(
         prt,
         pname="prp1",
-        filename=f"{prtname}_1.prp",
+        filename=f"{prt_name}_1.prp",
         nreleasepts=len(releasepts),
         packagedata=releasepts,
         perioddata=pdat,
@@ -140,8 +134,8 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
     )
 
     # create output control package
-    prt_track_file = f"{prtname}.trk"
-    prt_track_csv_file = f"{prtname}.trk.csv"
+    prt_track_file = f"{prt_name}.trk"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
     flopy.mf6.ModflowPrtoc(
         prt,
         pname="oc",
@@ -150,9 +144,9 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
     )
 
     # create the flow model interface
-    gwfname = get_model_name(name, "gwf")
-    gwf_budget_file = gwf_ws / f"{gwfname}.bud"
-    gwf_head_file = gwf_ws / f"{gwfname}.hds"
+    gwf_name = get_model_name(name, "gwf")
+    gwf_budget_file = gwf_ws / f"{gwf_name}.bud"
+    gwf_head_file = gwf_ws / f"{gwf_name}.hds"
     flopy.mf6.ModflowPrtfmi(
         prt,
         packagedata=[
@@ -165,7 +159,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
     ems = flopy.mf6.ModflowEms(
         sim,
         pname="ems",
-        filename=f"{prtname}.ems",
+        filename=f"{prt_name}.ems",
     )
     sim.register_solution_package(ems, [prt.name])
 
@@ -174,17 +168,19 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, fraction=None):
 
 def build_mp7_sim(name, ws, mp7, gwf):
     partdata = get_partdata(gwf.modelgrid, BasicDisCase.releasepts_mp7)
-    mp7name = get_model_name(name, "mp7")
+    mp7_name = get_model_name(name, "mp7")
     pg = flopy.modpath.ParticleGroup(
         particlegroupname="G1",
         particledata=partdata,
-        filename=f"{mp7name}.sloc",
+        filename=f"{mp7_name}.sloc",
     )
     mp = flopy.modpath.Modpath7(
-        modelname=mp7name,
+        modelname=mp7_name,
         flowmodel=gwf,
         exe_name=mp7,
         model_ws=ws,
+        headfilename=f"{gwf.name}.hds",
+        budgetfilename=f"{gwf.name}.bud",
     )
     mpbas = flopy.modpath.Modpath7Bas(
         mp,
@@ -203,17 +199,23 @@ def build_mp7_sim(name, ws, mp7, gwf):
 
 
 def build_models(idx, test, fraction):
-    gwfsim = BasicDisCase.get_gwf_sim(
+    gwf_sim = BasicDisCase.get_gwf_sim(
         test.name, test.workspace, test.targets.mf6
     )
-    prtsim = build_prt_sim(
+    prt_sim = build_prt_sim(
         test.name,
         test.workspace,
         test.workspace / "prt",
         test.targets.mf6,
         fraction,
     )
-    return gwfsim, prtsim
+    mp7_sim = build_mp7_sim(
+        test.name,
+        test.workspace / "mp7",
+        test.targets.mp7,
+        gwf_sim.get_model(),
+    )
+    return gwf_sim, prt_sim, mp7_sim
 
 
 def check_output(idx, test, fraction):
@@ -221,34 +223,20 @@ def check_output(idx, test, fraction):
     ws = test.workspace
     prt_ws = test.workspace / "prt"
     mp7_ws = test.workspace / "mp7"
-    gwfname = get_model_name(name, "gwf")
-    prtname = get_model_name(name, "prt")
-    mp7name = get_model_name(name, "mp7")
-
-    # extract mf6 simulations/models and grid
-    gwfsim = test.sims[0]
-    prtsim = test.sims[1]
-    gwf = gwfsim.get_model(gwfname)
-    prt = prtsim.get_model(prtname)
-
-    # extract model grid
+    gwf_name = get_model_name(name, "gwf")
+    prt_name = get_model_name(name, "prt")
+    mp7_name = get_model_name(name, "mp7")
+    gwf_sim = test.sims[0]
+    gwf = gwf_sim.get_model(gwf_name)
     mg = gwf.modelgrid
 
-    # build mp7 model
-    mp7sim = build_mp7_sim(name, mp7_ws, test.targets.mp7, gwf)
-
-    # run mp7 model
-    mp7sim.write_input()
-    success, buff = mp7sim.run_model(report=True)
-    assert success, pformat(buff)
-
     # check mf6 output files exist
-    gwf_budget_file = f"{gwfname}.bud"
-    gwf_head_file = f"{gwfname}.hds"
-    prt_track_file = f"{prtname}.trk"
-    prt_track_csv_file = f"{prtname}.trk.csv"
-    prp_track_file = f"{prtname}.prp.trk"
-    prp_track_csv_file = f"{prtname}.prp.trk.csv"
+    gwf_budget_file = f"{gwf_name}.bud"
+    gwf_head_file = f"{gwf_name}.hds"
+    prt_track_file = f"{prt_name}.trk"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
+    prp_track_file = f"{prt_name}.prp.trk"
+    prp_track_csv_file = f"{prt_name}.prp.trk.csv"
     assert (ws / gwf_budget_file).is_file()
     assert (ws / gwf_head_file).is_file()
     assert (prt_ws / prt_track_file).is_file()
@@ -257,7 +245,7 @@ def check_output(idx, test, fraction):
     assert (prt_ws / prp_track_csv_file).is_file()
 
     # check mp7 output files exist
-    mp7_pathline_file = f"{mp7name}.mppth"
+    mp7_pathline_file = f"{mp7_name}.mppth"
     assert (mp7_ws / mp7_pathline_file).is_file()
 
     # load mp7 pathline results
