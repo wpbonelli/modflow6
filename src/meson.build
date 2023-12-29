@@ -1,3 +1,14 @@
+# preprocessing 
+command = [
+  'fypp',
+  meson.project_source_root() / 'src' / 'ModelsCreate.fypp',
+  meson.project_source_root() / 'src' / 'ModelsCreate.f90'
+]
+configure_file(
+  command: command,
+  input: 'ModelsCreate.fypp',
+  output: 'ModelsCreate.f90')
+
 external_libraries = files(
     'Utilities' / 'Libraries' / 'daglib' / 'dag_module.f90',
     'Utilities' / 'Libraries' / 'rcm' / 'rcm.f90',
@@ -259,6 +270,7 @@ modflow_sources = files(
     'mf6core.f90',
     'mf6lists.f90',
     'simnamidm.f90',
+    'ModelsCreate.f90',
     'SimulationCreate.f90',
     'RunControl.f90',
     'RunControlFactory.F90'
