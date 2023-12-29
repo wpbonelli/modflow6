@@ -293,7 +293,7 @@ contains
     !DIR$ ATTRIBUTES DLLEXPORT :: get_grid_face_count
     ! -- modules
     use ListsModule, only: basemodellist
-    use NumericalModelModule, only: NumericalModelType, GetNumericalModelFromList
+    use NumericalModelModule, only: NumericalModelType, get_numerical_model_from_list
     ! -- dummy variables
     integer(kind=c_int), intent(in) :: grid_id
     integer(kind=c_int), intent(out) :: count
@@ -309,7 +309,7 @@ contains
 
     model_name = get_model_name(grid_id)
     do i = 1, basemodellist%Count()
-      numericalModel => GetNumericalModelFromList(basemodellist, i)
+      numericalModel => get_numerical_model_from_list(basemodellist, i)
       if (numericalModel%name == model_name) then
         count = numericalModel%dis%nodes
       end if

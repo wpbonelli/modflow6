@@ -7,8 +7,8 @@ module ExplicitSolutionModule
   use MemoryHelperModule, only: create_mem_path
   use BaseModelModule, only: BaseModelType
   use ExplicitModelModule, only: ExplicitModelType, &
-                                 AddExplicitModelToList, &
-                                 GetExplicitModelFromList
+                                 add_explicit_model_to_list, &
+                                 get_explicit_model_from_list
   use BaseExchangeModule, only: BaseExchangeType
   use BaseSolutionModule, only: BaseSolutionType, AddBaseSolutionToList
   use ListModule, only: ListType
@@ -200,7 +200,7 @@ contains
       line = 'mode="validation" -- Skipping assembly and solution.'
       fmt = "(/,1x,a,/)"
       do im = 1, this%modellist%Count()
-        mp => GetExplicitModelFromList(this%modellist, im)
+        mp => get_explicit_model_from_list(this%modellist, im)
         call mp%model_message(line, fmt=fmt)
       end do
     case (MNORMAL)
@@ -224,7 +224,7 @@ contains
 
     ! -- Model advance
     do im = 1, this%modellist%Count()
-      mp => GetExplicitModelFromList(this%modellist, im)
+      mp => get_explicit_model_from_list(this%modellist, im)
       call mp%model_ad()
     end do
 
@@ -244,7 +244,7 @@ contains
 
     call code_timer(0, ttsoln, this%ttsoln)
     do im = 1, this%modellist%Count()
-      mp => GetExplicitModelFromList(this%modellist, im)
+      mp => get_explicit_model_from_list(this%modellist, im)
       call mp%model_solve()
     end do
     call code_timer(1, ttsoln, this%ttsoln)
@@ -264,13 +264,13 @@ contains
 
     ! -- Calculate flow for each model
     do im = 1, this%modellist%Count()
-      mp => GetExplicitModelFromList(this%modellist, im)
+      mp => get_explicit_model_from_list(this%modellist, im)
       call mp%model_cq(this%icnvg, isuppress_output)
     end do
 
     ! -- Budget terms for each model
     do im = 1, this%modellist%Count()
-      mp => GetExplicitModelFromList(this%modellist, im)
+      mp => get_explicit_model_from_list(this%modellist, im)
       call mp%model_bd(this%icnvg, isuppress_output)
     end do
   end subroutine finalizeSolve
@@ -303,7 +303,7 @@ contains
     select type (mp)
     class is (ExplicitModelType)
       m => mp
-      call AddExplicitModelToList(this%modellist, m)
+      call add_explicit_model_to_list(this%modellist, m)
     end select
   end subroutine add_model
 

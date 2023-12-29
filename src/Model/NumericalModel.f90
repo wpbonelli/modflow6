@@ -12,28 +12,28 @@ module NumericalModelModule
 
   implicit none
   private
-  public :: NumericalModelType, AddNumericalModelToList, &
-            GetNumericalModelFromList
+  public :: NumericalModelType, add_numerical_model_to_list, &
+            get_numerical_model_from_list
 
   type, extends(BaseModelType) :: NumericalModelType
-    character(len=LINELENGTH), pointer :: filename => null() !input file name
-    integer(I4B), pointer :: neq => null() !number of equations
-    integer(I4B), pointer :: nja => null() !number of connections
-    integer(I4B), pointer :: moffset => null() !offset of this model in the solution
-    integer(I4B), pointer :: icnvg => null() !convergence flag
-    integer(I4B), dimension(:), pointer, contiguous :: ia => null() !csr row pointer
-    integer(I4B), dimension(:), pointer, contiguous :: ja => null() !csr columns
-    real(DP), dimension(:), pointer, contiguous :: x => null() !dependent variable (head, conc, etc)
-    real(DP), dimension(:), pointer, contiguous :: rhs => null() !right-hand side vector
-    real(DP), dimension(:), pointer, contiguous :: cond => null() !conductance matrix
-    integer(I4B), dimension(:), pointer, contiguous :: idxglo => null() !pointer to position in solution matrix
-    real(DP), dimension(:), pointer, contiguous :: xold => null() !dependent variable for previous timestep
-    real(DP), dimension(:), pointer, contiguous :: flowja => null() !intercell flows
-    integer(I4B), dimension(:), pointer, contiguous :: ibound => null() !ibound array
+    character(len=LINELENGTH), pointer :: filename => null() !< input file name
+    integer(I4B), pointer :: neq => null() !< number of equations
+    integer(I4B), pointer :: nja => null() !< number of connections
+    integer(I4B), pointer :: moffset => null() !< offset of this model in the solution
+    integer(I4B), pointer :: icnvg => null() !< convergence flag
+    integer(I4B), dimension(:), pointer, contiguous :: ia => null() !< csr row pointer
+    integer(I4B), dimension(:), pointer, contiguous :: ja => null() !< csr columns
+    real(DP), dimension(:), pointer, contiguous :: x => null() !< dependent variable (head, conc, etc)
+    real(DP), dimension(:), pointer, contiguous :: rhs => null() !< right-hand side vector
+    real(DP), dimension(:), pointer, contiguous :: cond => null() !< conductance matrix
+    integer(I4B), dimension(:), pointer, contiguous :: idxglo => null() !< pointer to position in solution matrix
+    real(DP), dimension(:), pointer, contiguous :: xold => null() !< dependent variable for previous timestep
+    real(DP), dimension(:), pointer, contiguous :: flowja => null() !< intercell flows
+    integer(I4B), dimension(:), pointer, contiguous :: ibound => null() !< ibound array
     !
     ! -- Derived types
-    type(ListType), pointer :: bndlist => null() !array of boundary packages for this model
-    class(DisBaseType), pointer :: dis => null() !discretization object
+    type(ListType), pointer :: bndlist => null() !< array of boundary packages for this model
+    class(DisBaseType), pointer :: dis => null() !< discretization object
 
   contains
     !
@@ -67,7 +67,7 @@ module NumericalModelModule
     procedure :: allocate_scalars
     procedure :: allocate_arrays
     procedure :: set_moffset
-    procedure :: set_idsoln
+    procedure :: set_soln_id
     procedure :: set_xptr
     procedure :: set_rhsptr
     procedure :: set_iboundptr
@@ -260,11 +260,11 @@ contains
     mend = mstart + this%neq - 1
   end subroutine get_mrange
 
-  subroutine set_idsoln(this, id)
+  subroutine set_soln_id(this, id)
     class(NumericalModelType) :: this
     integer(I4B), intent(in) :: id
     this%idsoln = id
-  end subroutine set_idsoln
+  end subroutine set_soln_id
 
   subroutine allocate_scalars(this, modelname)
     use MemoryManagerModule, only: mem_allocate
@@ -416,7 +416,7 @@ contains
     iasym = 0
   end function get_iasym
 
-  function CastAsNumericalModelClass(obj) result(res)
+  function as_numerical_model(obj) result(res)
     implicit none
     class(*), pointer, intent(inout) :: obj
     class(NumericalModelType), pointer :: res
@@ -428,11 +428,9 @@ contains
     class is (NumericalModelType)
       res => obj
     end select
-    return
-  end function CastAsNumericalModelClass
+  end function as_numerical_model
 
-  subroutine AddNumericalModelToList(list, model)
-    implicit none
+  subroutine add_numerical_model_to_list(list, model)
     ! -- dummy
     type(ListType), intent(inout) :: list
     class(NumericalModelType), pointer, intent(inout) :: model
@@ -441,12 +439,10 @@ contains
     !
     obj => model
     call list%Add(obj)
-    !
-    return
-  end subroutine AddNumericalModelToList
 
-  function GetNumericalModelFromList(list, idx) result(res)
-    implicit none
+  end subroutine add_numerical_model_to_list
+
+  function get_numerical_model_from_list(list, idx) result(res)
     ! -- dummy
     type(ListType), intent(inout) :: list
     integer(I4B), intent(in) :: idx
@@ -455,9 +451,8 @@ contains
     class(*), pointer :: obj
     !
     obj => list%GetItem(idx)
-    res => CastAsNumericalModelClass(obj)
-    !
-    return
-  end function GetNumericalModelFromList
+    res => as_numerical_model(obj)
+
+  end function get_numerical_model_from_list
 
 end module NumericalModelModule

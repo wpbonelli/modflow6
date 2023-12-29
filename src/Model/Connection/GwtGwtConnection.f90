@@ -179,7 +179,7 @@ contains
     call this%gwtInterfaceModel%gwtifmod_cr(imName, &
                                             this%iout, &
                                             this%ig_builder)
-    call this%gwtInterfaceModel%set_idsoln(this%gwtModel%idsoln)
+    call this%gwtInterfaceModel%set_soln_id(this%gwtModel%idsoln)
     this%gwtInterfaceModel%iAdvScheme = this%iIfaceAdvScheme
     this%gwtInterfaceModel%ixt3d = this%iIfaceXt3d
     call this%gwtInterfaceModel%model_df()

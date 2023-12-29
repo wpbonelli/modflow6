@@ -11,9 +11,9 @@ module ExplicitModelModule
   implicit none
   private
   public :: ExplicitModelType, &
-            CastAsExplicitModelClass, &
-            AddExplicitModelToList, &
-            GetExplicitModelFromList
+            as_explicit_model, &
+            add_explicit_model_to_list, &
+            get_explicit_model_from_list
 
   !> @brief Base type for models that solve themselves.
   !!
@@ -35,7 +35,7 @@ module ExplicitModelModule
     ! -- Utility methods
     procedure :: allocate_scalars
     procedure :: allocate_arrays
-    procedure :: set_idsoln
+    procedure :: set_soln_id
   end type ExplicitModelType
 
 contains
@@ -117,7 +117,7 @@ contains
 
   !> @ brief Cast a generic object into an explicit model
   !<
-  function CastAsExplicitModelClass(obj) result(res)
+  function as_explicit_model(obj) result(res)
     class(*), pointer, intent(inout) :: obj
     class(ExplicitModelType), pointer :: res
 
@@ -128,11 +128,11 @@ contains
     class is (ExplicitModelType)
       res => obj
     end select
-  end function CastAsExplicitModelClass
+  end function as_explicit_model
 
   !> @ brief Add explicit model to a generic list
   !<
-  subroutine AddExplicitModelToList(list, model)
+  subroutine add_explicit_model_to_list(list, model)
     ! -- dummy
     type(ListType), intent(inout) :: list
     class(ExplicitModelType), pointer, intent(inout) :: model
@@ -141,11 +141,11 @@ contains
 
     obj => model
     call list%Add(obj)
-  end subroutine AddExplicitModelToList
+  end subroutine add_explicit_model_to_list
 
   !> @ brief Get generic object from list and return as explicit model
   !<
-  function GetExplicitModelFromList(list, idx) result(res)
+  function get_explicit_model_from_list(list, idx) result(res)
     ! -- dummy
     type(ListType), intent(inout) :: list
     integer(I4B), intent(in) :: idx
@@ -154,15 +154,15 @@ contains
     class(*), pointer :: obj
 
     obj => list%GetItem(idx)
-    res => CastAsExplicitModelClass(obj)
-  end function GetExplicitModelFromList
+    res => as_explicit_model(obj)
+  end function get_explicit_model_from_list
 
   !> @brief Set the solution ID
   !<
-  subroutine set_idsoln(this, id)
+  subroutine set_soln_id(this, id)
     class(ExplicitModelType) :: this
     integer(I4B), intent(in) :: id
     this%idsoln = id
-  end subroutine set_idsoln
+  end subroutine set_soln_id
 
 end module ExplicitModelModule

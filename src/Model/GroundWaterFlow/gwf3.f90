@@ -37,32 +37,32 @@ module GwfModule
 
   type, extends(NumericalModelType) :: GwfModelType
 
-    type(GwfIcType), pointer :: ic => null() ! initial conditions package
-    type(GwfNpfType), pointer :: npf => null() ! node property flow package
-    type(Xt3dType), pointer :: xt3d => null() ! xt3d option for npf
-    type(GwfBuyType), pointer :: buy => null() ! buoyancy package
-    type(GwfVscType), pointer :: vsc => null() ! viscosity package
-    type(GwfStoType), pointer :: sto => null() ! storage package
-    type(GwfCsubType), pointer :: csub => null() ! subsidence package
-    type(GwfOcType), pointer :: oc => null() ! output control package
-    type(GhostNodeType), pointer :: gnc => null() ! ghost node correction package
-    type(GwfHfbType), pointer :: hfb => null() ! horizontal flow barrier package
-    type(GwfMvrType), pointer :: mvr => null() ! water mover package
-    type(GwfObsType), pointer :: obs => null() ! observation package
-    type(BudgetType), pointer :: budget => null() ! budget object
-    integer(I4B), pointer :: inic => null() ! unit number IC
-    integer(I4B), pointer :: inoc => null() ! unit number OC
-    integer(I4B), pointer :: innpf => null() ! NPF enabled flag
-    integer(I4B), pointer :: inbuy => null() ! unit number BUY
-    integer(I4B), pointer :: invsc => null() ! unit number VSC
-    integer(I4B), pointer :: insto => null() ! unit number STO
-    integer(I4B), pointer :: incsub => null() ! unit number CSUB
-    integer(I4B), pointer :: inmvr => null() ! unit number MVR
-    integer(I4B), pointer :: inhfb => null() ! unit number HFB
-    integer(I4B), pointer :: ingnc => null() ! unit number GNC
-    integer(I4B), pointer :: inobs => null() ! unit number OBS
-    integer(I4B), pointer :: iss => null() ! steady state flag
-    integer(I4B), pointer :: inewtonur => null() ! newton under relaxation flag
+    type(GwfIcType), pointer :: ic => null() !< initial conditions package
+    type(GwfNpfType), pointer :: npf => null() !< node property flow package
+    type(Xt3dType), pointer :: xt3d => null() !< xt3d option for npf
+    type(GwfBuyType), pointer :: buy => null() !< buoyancy package
+    type(GwfVscType), pointer :: vsc => null() !< viscosity package
+    type(GwfStoType), pointer :: sto => null() !< storage package
+    type(GwfCsubType), pointer :: csub => null() !< subsidence package
+    type(GwfOcType), pointer :: oc => null() !< output control package
+    type(GhostNodeType), pointer :: gnc => null() !< ghost node correction package
+    type(GwfHfbType), pointer :: hfb => null() !< horizontal flow barrier package
+    type(GwfMvrType), pointer :: mvr => null() !< water mover package
+    type(GwfObsType), pointer :: obs => null() !< observation package
+    type(BudgetType), pointer :: budget => null() !< budget object
+    integer(I4B), pointer :: inic => null() !< unit number IC
+    integer(I4B), pointer :: inoc => null() !< unit number OC
+    integer(I4B), pointer :: innpf => null() !< NPF enabled flag
+    integer(I4B), pointer :: inbuy => null() !< unit number BUY
+    integer(I4B), pointer :: invsc => null() !< unit number VSC
+    integer(I4B), pointer :: insto => null() !< unit number STO
+    integer(I4B), pointer :: incsub => null() !< unit number CSUB
+    integer(I4B), pointer :: inmvr => null() !< unit number MVR
+    integer(I4B), pointer :: inhfb => null() !< unit number HFB
+    integer(I4B), pointer :: ingnc => null() !< unit number GNC
+    integer(I4B), pointer :: inobs => null() !< unit number OBS
+    integer(I4B), pointer :: iss => null() !< steady state flag
+    integer(I4B), pointer :: inewtonur => null() !< newton under relaxation flag
 
   contains
 
@@ -98,7 +98,7 @@ module GwfModule
     procedure, private :: create_lstfile
     procedure, private :: log_namfile_options
     procedure, private :: steady_period_check
-    !
+
   end type GwfModelType
 
   !> @brief GWF base package array descriptors
@@ -157,8 +157,6 @@ contains
     character(len=LENMEMPATH) :: input_mempath
     character(len=LINELENGTH) :: lst_fname
     type(GwfNamParamFoundType) :: found
-    ! -- format
-! ------------------------------------------------------------------------------
     !
     ! -- Allocate a new GWF Model (this) and add it to basemodellist
     allocate (this)
@@ -208,9 +206,7 @@ contains
     !
     ! -- create model packages
     call this%create_packages()
-    !
-    ! -- return
-    return
+
   end subroutine gwf_cr
 
   !> @brief Define packages of the model
@@ -220,13 +216,11 @@ contains
   !!
   !<
   subroutine gwf_df(this)
-    ! -- modules
     ! -- dummy
     class(GwfModelType) :: this
     ! -- local
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Define packages and utility objects
     call this%dis%dis_df()
@@ -255,9 +249,7 @@ contains
     !
     ! -- Store information needed for observations
     call this%obs%obs_df(this%iout, this%name, 'GWF', this%dis)
-    !
-    ! -- return
-    return
+
   end subroutine gwf_df
 
   !> @brief Add the internal connections of this model to the sparse matrix
@@ -270,7 +262,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- Add the primary grid connections of this model to sparse
     call this%dis%dis_ac(this%moffset, sparse)
@@ -286,9 +277,7 @@ contains
     !
     ! -- If GNC is active, then add the gnc connections to sparse
     if (this%ingnc > 0) call this%gnc%gnc_ac(sparse)
-    !
-    ! -- return
-    return
+
   end subroutine gwf_ac
 
   !> @brief Map the positions of this models connections in the
@@ -301,7 +290,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- Find the position of each connection in the global ia, ja structure
     !    and store them in idxglo.
@@ -319,9 +307,7 @@ contains
     ! -- For implicit gnc, need to store positions of gnc connections
     !    in solution matrix connection
     if (this%ingnc > 0) call this%gnc%gnc_mc(matrix_sln)
-    !
-    ! -- return
-    return
+
   end subroutine gwf_mc
 
   !> @brief GroundWater Flow Model Allocate and Read
@@ -336,7 +322,6 @@ contains
     ! -- locals
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Allocate and read modules attached to model
     if (this%inic > 0) call this%ic%ic_ar(this%x)
@@ -368,9 +353,7 @@ contains
       if (this%inbuy > 0) call this%buy%buy_ar_bnd(packobj, this%x)
       if (this%invsc > 0) call this%vsc%vsc_ar_bnd(packobj)
     end do
-    !
-    ! -- return
-    return
+
   end subroutine gwf_ar
 
   !> @brief GroundWater Flow Model Read and Prepare
@@ -386,7 +369,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- Check with TDIS on whether or not it is time to RP
     if (.not. readnewdata) return
@@ -408,9 +390,7 @@ contains
     !
     ! -- Check for steady state period
     call this%steady_period_check()
-    !
-    ! -- Return
-    return
+
   end subroutine gwf_rp
 
   !> @brief GroundWater Flow Model Time Step Advance
@@ -427,7 +407,6 @@ contains
     ! -- local
     integer(I4B) :: irestore
     integer(I4B) :: ip, n
-! ------------------------------------------------------------------------------
     !
     ! -- Reset state variable
     irestore = 0
@@ -465,9 +444,7 @@ contains
     !
     ! -- Push simulated values to preceding time/subtime step
     call this%obs%obs_ad()
-    !
-    ! -- return
-    return
+
   end subroutine gwf_ad
 
   !> @brief GroundWater Flow Model calculate coefficients
@@ -478,7 +455,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- Call package cf routines
     if (this%innpf > 0) call this%npf%npf_cf(kiter, this%dis%nodes, this%x)
@@ -488,9 +464,7 @@ contains
       call packobj%bnd_cf()
       if (this%inbuy > 0) call this%buy%buy_cf_bnd(packobj, this%x)
     end do
-    !
-    ! -- return
-    return
+
   end subroutine gwf_cf
 
   !> @brief GroundWater Flow Model fill coefficients
@@ -504,7 +478,6 @@ contains
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
     integer(I4B) :: inwt, inwtsto, inwtcsub, inwtpak
-! ------------------------------------------------------------------------------
     !
     ! -- newton flags
     inwt = inwtflag
@@ -584,9 +557,7 @@ contains
         call packobj%bnd_fn(this%rhs, this%ia, this%idxglo, matrix_sln)
       end if
     end do
-    !
-    ! -- return
-    return
+
   end subroutine gwf_fc
 
   !> @brief GroundWater Flow Model Final Convergence Check for Boundary Packages
@@ -607,8 +578,6 @@ contains
     ! -- local
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-    ! -- formats
-! ------------------------------------------------------------------------------
     !
     ! -- If mover is on, then at least 2 outers required
     if (this%inmvr > 0) then
@@ -627,9 +596,7 @@ contains
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_cc(innertot, kiter, iend, icnvgmod, cpak, ipak, dpak)
     end do
-    !
-    ! -- return
-    return
+
   end subroutine gwf_cc
 
   !> @brief check if pseudo-transient continuation factor should be used
@@ -641,7 +608,7 @@ contains
     ! -- dummy
     class(GwfModelType) :: this
     integer(I4B), intent(inout) :: iptc
-! ------------------------------------------------------------------------------
+    !
     ! -- determine if pseudo-transient continuation should be applied to this
     !    model - pseudo-transient continuation only applied to problems that
     !    use the Newton-Raphson formulation during steady-state stress periods
@@ -653,9 +620,7 @@ contains
         iptc = this%npf%inewton
       end if
     end if
-    !
-    ! -- return
-    return
+
   end subroutine gwf_ptcchk
 
   !> @brief calculate maximum pseudo-transient continuation factor
@@ -726,9 +691,7 @@ contains
     if (iptc == 0) then
       if (iptct > 0) iptc = 1
     end if
-    !
-    ! -- return
-    return
+
   end subroutine gwf_ptc
 
   !> @brief under-relaxation
@@ -739,7 +702,7 @@ contains
   !!
   !<
   subroutine gwf_nur(this, neqmod, x, xtemp, dx, inewtonur, dxmax, locmax)
-    ! modules
+    ! -- modules
     use ConstantsModule, only: DONE, DP9
     ! -- dummy
     class(GwfModelType) :: this
@@ -755,7 +718,6 @@ contains
     integer(I4B) :: i1
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- apply Newton-Raphson under-relaxation if model is using
     !    the Newton-Raphson formulation and this Newton-Raphson
@@ -777,9 +739,7 @@ contains
         end if
       end do
     end if
-    !
-    ! -- return
-    return
+
   end subroutine gwf_nur
 
   !> @brief Groundwater flow model calculate flow
@@ -788,7 +748,6 @@ contains
   !!
   !<
   subroutine gwf_cq(this, icnvg, isuppress_output)
-    ! -- modules
     ! -- dummy
     class(GwfModelType) :: this
     integer(I4B), intent(in) :: icnvg
@@ -797,7 +756,6 @@ contains
     integer(I4B) :: i
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Construct the flowja array.  Flowja is calculated each time, even if
     !    output is suppressed.  (flowja is positive into a cell.)  The diagonal
@@ -825,9 +783,7 @@ contains
       if (this%inbuy > 0) call this%buy%buy_cf_bnd(packobj, this%x)
       call packobj%bnd_cq(this%x, this%flowja)
     end do
-    !
-    ! -- Return
-    return
+
   end subroutine gwf_cq
 
   !> @brief GroundWater Flow Model Budget
@@ -845,7 +801,6 @@ contains
     ! -- local
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Finalize calculation of flowja by adding face flows to the diagonal.
     !    This results in the flow residual being stored in the diagonal
@@ -875,9 +830,7 @@ contains
         call this%npf%calc_spdis(this%flowja)
       end if
     end if
-    !
-    ! -- Return
-    return
+
   end subroutine gwf_bd
 
   !> @brief GroundWater Flow Model Output
@@ -897,7 +850,6 @@ contains
     character(len=*), parameter :: fmtnocnvg = &
       "(1X,/9X,'****FAILED TO MEET SOLVER CONVERGENCE CRITERIA IN TIME STEP ', &
       &I0,' OF STRESS PERIOD ',I0,'****')"
-! ------------------------------------------------------------------------------
     !
     ! -- Set write and print flags
     idvsave = 0
@@ -935,9 +887,7 @@ contains
     if (this%icnvg == 0) then
       write (this%iout, fmtnocnvg) kstp, kper
     end if
-    !
-    ! -- Return
-    return
+
   end subroutine gwf_ot
 
   subroutine gwf_ot_obs(this)
@@ -1042,9 +992,7 @@ contains
     !
     ! -- save head and print head
     call this%oc%oc_ot(ipflag)
-    !
-    ! -- Return
-    return
+
   end subroutine gwf_ot_dv
 
   subroutine gwf_ot_bdsummary(this, ibudfl, ipflag)
@@ -1055,7 +1003,6 @@ contains
     class(BndType), pointer :: packobj
     integer(I4B) :: ip
 
-    !
     ! -- Package budget summary
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
@@ -1080,18 +1027,15 @@ contains
 
   !> @brief Final processing
   subroutine gwf_fp(this)
-    ! -- modules
     ! -- dummy
     class(GwfModelType) :: this
     ! -- local
-! ------------------------------------------------------------------------------
     !
     ! -- csub final processing
     if (this%incsub > 0) then
       call this%csub%csub_fp()
     end if
-    !
-    return
+
   end subroutine gwf_fp
 
   !> @brief Deallocate
@@ -1105,7 +1049,6 @@ contains
     ! -- local
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Deallocate idm memory
     call memorylist_remove(this%name, 'NAM', idm_context)
@@ -1167,9 +1110,7 @@ contains
     !
     ! -- NumericalModelType
     call this%NumericalModelType%model_da()
-    !
-    ! -- return
-    return
+
   end subroutine gwf_da
 
   !> @brief GroundWater Flow Model Budget Entry
@@ -1189,12 +1130,9 @@ contains
     real(DP), dimension(:, :), intent(in) :: budterm
     character(len=LENBUDTXT), dimension(:), intent(in) :: budtxt
     character(len=*), intent(in) :: rowlabel
-! ------------------------------------------------------------------------------
     !
     call this%budget%addentry(budterm, delt, budtxt, rowlabel=rowlabel)
-    !
-    ! -- return
-    return
+
   end subroutine gwf_bdentry
 
   !> @brief return 1 if any package causes the matrix to be asymmetric.
@@ -1206,7 +1144,6 @@ contains
     integer(I4B) :: iasym
     integer(I4B) :: ip
     class(BndType), pointer :: packobj
-! ------------------------------------------------------------------------------
     !
     ! -- Start by setting iasym to zero
     iasym = 0
@@ -1227,9 +1164,7 @@ contains
       packobj => GetBndFromList(this%bndlist, ip)
       if (packobj%iasym /= 0) iasym = 1
     end do
-    !
-    ! -- return
-    return
+
   end function gwf_get_iasym
 
   !> @brief Allocate memory for non-allocatable members
@@ -1239,7 +1174,6 @@ contains
     ! -- dummy
     class(GwfModelType) :: this
     character(len=*), intent(in) :: modelname
-! ------------------------------------------------------------------------------
     !
     ! -- allocate members from parent class
     call this%NumericalModelType%allocate_scalars(modelname)
@@ -1272,9 +1206,7 @@ contains
     this%inobs = 0
     this%iss = 1 !default is steady-state (i.e., no STO package)
     this%inewtonur = 0 !default is to not use newton bottom head dampening
-    !
-    ! -- return
-    return
+
   end subroutine allocate_scalars
 
   !> @brief Create boundary condition packages for this model
@@ -1314,7 +1246,6 @@ contains
     class(BndType), pointer :: packobj
     class(BndType), pointer :: packobj2
     integer(I4B) :: ip
-! ------------------------------------------------------------------------------
     !
     ! -- This part creates the package object
     select case (filtyp)
@@ -1365,9 +1296,7 @@ contains
       end if
     end do
     call AddBndToList(this%bndlist, packobj)
-    !
-    ! -- return
-    return
+
   end subroutine package_create
 
   !> @brief Check to make sure required input files have been specified
@@ -1380,7 +1309,6 @@ contains
     integer(I4B), intent(in) :: indis
     ! -- local
     character(len=LINELENGTH) :: errmsg
-! ------------------------------------------------------------------------------
     !
     ! -- Check for IC8, DIS(u), and NPF. Stop if not present.
     if (this%inic == 0) then
@@ -1404,9 +1332,7 @@ contains
       call store_error(errmsg)
       call store_error_filename(this%filename)
     end if
-    !
-    ! -- return
-    return
+
   end subroutine ftype_check
 
   !> @brief Cast to GWF model
@@ -1422,7 +1348,6 @@ contains
     class is (GwfModelType)
       gwfModel => model
     end select
-    return
 
   end function CastAsGwfModel
 
@@ -1478,9 +1403,7 @@ contains
       ! -- cleanup
       deallocate (bndpkgs)
     end if
-    !
-    ! -- return
-    return
+
   end subroutine create_bndpkgs
 
   !> @brief Source package info and begin to process
@@ -1609,9 +1532,7 @@ contains
     call this%ftype_check(indis)
     !
     call this%create_bndpkgs(bndpkgs, pkgtypes, pkgnames, mempaths, inunits)
-    !
-    ! -- return
-    return
+
   end subroutine create_packages
 
   subroutine create_lstfile(this, lst_fname, model_fname, defined)
@@ -1657,9 +1578,7 @@ contains
     !
     ! -- write list file header
     call write_listfile_header(this%iout, 'GROUNDWATER FLOW MODEL (GWF)')
-    !
-    ! -- return
-    return
+
   end subroutine create_lstfile
 
   !> @brief Write model namfile options to list file
@@ -1723,7 +1642,6 @@ contains
         call store_warning(warnmsg)
       end if
     end if
-    return
   end subroutine steady_period_check
 
 end module GwfModule

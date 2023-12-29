@@ -272,7 +272,7 @@ contains
     use MemoryHelperModule, only: create_mem_path
     use MemoryManagerModule, only: mem_setptr, mem_allocate
     use SimVariablesModule, only: idm_context, iparamlog
-    use SimulationCreateModule, only: create_load_mask
+    use ModelsCreateModule, only: create_load_mask
     ! -- dummy
     ! -- locals
     character(len=LENMEMPATH) :: input_mempath

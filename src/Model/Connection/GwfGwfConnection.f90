@@ -155,7 +155,7 @@ contains
       write (imName, '(a,i0)') 'GWFIM2_', this%gwfExchange%id
     end if
     call this%gwfInterfaceModel%gwfifm_cr(imName, this%iout, this%ig_builder)
-    call this%gwfInterfaceModel%set_idsoln(this%gwfModel%idsoln)
+    call this%gwfInterfaceModel%set_soln_id(this%gwfModel%idsoln)
     this%gwfInterfaceModel%npf%satomega = this%gwfModel%npf%satomega
     this%gwfInterfaceModel%npf%ixt3d = this%iXt3dOnExchange
     call this%gwfInterfaceModel%model_df()

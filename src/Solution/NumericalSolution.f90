@@ -23,8 +23,8 @@ module NumericalSolutionModule
   use ListsModule, only: basesolutionlist
   use InputOutputModule, only: getunit, append_processor_id
   use NumericalModelModule, only: NumericalModelType, &
-                                  AddNumericalModelToList, &
-                                  GetNumericalModelFromList
+                                  add_numerical_model_to_list, &
+                                  get_numerical_model_from_list
   use NumericalExchangeModule, only: NumericalExchangeType, &
                                      AddNumericalExchangeToList, &
                                      GetNumericalExchangeFromList
@@ -403,7 +403,7 @@ contains
     ieq = 1
     this%convmodstart(1) = ieq
     do i = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, i)
+      mp => get_numerical_model_from_list(this%modellist, i)
       ieq = ieq + mp%neq
       this%convmodstart(i + 1) = ieq
     end do
@@ -436,8 +436,8 @@ contains
     !
     ! -- set sol id and determine nr. of equation in this solution
     do i = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, i)
-      call mp%set_idsoln(this%id)
+      mp => get_numerical_model_from_list(this%modellist, i)
+      call mp%set_soln_id(this%id)
       this%neq = this%neq + mp%neq
     end do
     !
@@ -468,7 +468,7 @@ contains
     mod_offset = irow_start - 1
     this%matrix_offset = irow_start - 1
     do i = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, i)
+      mp => get_numerical_model_from_list(this%modellist, i)
       call mp%set_moffset(mod_offset)
       mod_offset = mod_offset + mp%neq
     end do
@@ -483,7 +483,7 @@ contains
     !
     ! -- Go through each model and point x, ibound, and rhs to solution
     do i = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, i)
+      mp => get_numerical_model_from_list(this%modellist, i)
       call mp%set_xptr(this%x, this%matrix_offset, 'X', this%name)
       call mp%set_rhsptr(this%rhs, this%matrix_offset, 'RHS', this%name)
       call mp%set_iboundptr(this%active, this%matrix_offset, 'IBOUND', this%name)
@@ -936,7 +936,7 @@ contains
       !
       ! -- Models
       do i = 1, this%modellist%Count()
-        mp => GetNumericalModelFromList(this%modellist, i)
+        mp => get_numerical_model_from_list(this%modellist, i)
         if (mp%get_iasym() /= 0) then
           write (errmsg, fmterrasym) 'MODEL', trim(adjustl(mp%name))
           call store_error(errmsg)
@@ -1306,7 +1306,7 @@ contains
       line = 'mode="validation" -- Skipping matrix assembly and solution.'
       fmt = "(/,1x,a,/)"
       do im = 1, this%modellist%Count()
-        mp => GetNumericalModelFromList(this%modellist, im)
+        mp => get_numerical_model_from_list(this%modellist, im)
         call mp%model_message(line, fmt=fmt)
       end do
     case (MNORMAL)
@@ -1373,7 +1373,7 @@ contains
       ! -- check for more than one model - ims only
       if (this%linsolver == IMS_SOLVER .and. this%convnmod > 1) then
         do im = 1, this%modellist%Count()
-          mp => GetNumericalModelFromList(this%modellist, im)
+          mp => get_numerical_model_from_list(this%modellist, im)
           write (this%icsvinnerout, '(*(G0,:,","))', advance='NO') &
             '', trim(adjustl(mp%name))//'_inner_dvmax', &
             trim(adjustl(mp%name))//'_inner_dvmax_node', &
@@ -1419,7 +1419,7 @@ contains
       end if
 
       if (iallowptc > 0) then
-        mp => GetNumericalModelFromList(this%modellist, im)
+        mp => get_numerical_model_from_list(this%modellist, im)
         call mp%model_ptcchk(iptc)
       else
         iptc = 0
@@ -1463,7 +1463,7 @@ contains
 
     ! -- Model advance
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_ad()
     end do
 
@@ -1586,7 +1586,7 @@ contains
     !
     ! -- Add model Newton-Raphson terms to solution
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_nr(kiter, this%system_matrix, 1)
     end do
     call code_timer(1, ttform, this%ttform)
@@ -1668,7 +1668,7 @@ contains
     ipak = 0
     dpak = DZERO
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%get_mcellid(0, cmod)
       call mp%model_cc(this%itertot_sim, kiter, iend, icnvgmod, &
                        cpak, ipak, dpak)
@@ -1728,7 +1728,7 @@ contains
       dxmax_nur = DZERO
       locmax_nur = 0
       do im = 1, this%modellist%Count()
-        mp => GetNumericalModelFromList(this%modellist, im)
+        mp => get_numerical_model_from_list(this%modellist, im)
         i0 = mp%moffset + 1 - this%matrix_offset
         i1 = i0 + mp%neq - 1
         call mp%model_nur(mp%neq, this%x(i0:i1), this%xtemp(i0:i1), &
@@ -1867,7 +1867,7 @@ contains
       !
       ! -- write summary for each model
       do im = 1, this%modellist%Count()
-        mp => GetNumericalModelFromList(this%modellist, im)
+        mp => get_numerical_model_from_list(this%modellist, im)
         call this%convergence_summary(mp%iout, im, this%itertot_timestep)
       end do
       !
@@ -1881,7 +1881,7 @@ contains
     !
     ! -- Calculate flow for each model
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_cq(this%icnvg, isuppress_output)
     end do
     !
@@ -1893,7 +1893,7 @@ contains
     !
     ! -- Budget terms for each model
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_bd(this%icnvg, isuppress_output)
     end do
     !
@@ -1920,7 +1920,7 @@ contains
 
     ! reset models
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_reset()
     end do
 
@@ -1936,7 +1936,7 @@ contains
     !
     ! -- Calculate the matrix terms for each model
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_cf(kiter)
     end do
 
@@ -1952,7 +1952,7 @@ contains
     !
     ! -- Add model coefficients to the solution
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_fc(kiter, this%system_matrix, inewton)
     end do
 
@@ -2229,7 +2229,7 @@ contains
     select type (mp)
     class is (NumericalModelType)
       m => mp
-      call AddNumericalModelToList(this%modellist, m)
+      call add_numerical_model_to_list(this%modellist, m)
     end select
     !
     ! -- return
@@ -2306,7 +2306,7 @@ contains
     !
     ! -- Add internal model connections to sparse
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_ac(this%sparse)
     end do
     !
@@ -2329,7 +2329,7 @@ contains
     ! -- that each row has the diagonal in the first position,
     ! -- however, rows do not need to be sorted.
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_mc(this%system_matrix)
     end do
     !
@@ -2911,7 +2911,7 @@ contains
 
     ! determine ptc
     do im = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, im)
+      mp => get_numerical_model_from_list(this%modellist, im)
       call mp%model_ptc(vec_resid, iptc, ptcf)
     end do
 
@@ -3213,7 +3213,7 @@ contains
     !
     ! -- calculate and set offsets
     do i = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, i)
+      mp => get_numerical_model_from_list(this%modellist, i)
       istart = 0
       iend = 0
       call mp%get_mrange(istart, iend)
@@ -3251,7 +3251,7 @@ contains
     !
     ! -- calculate and set offsets
     do i = 1, this%modellist%Count()
-      mp => GetNumericalModelFromList(this%modellist, i)
+      mp => get_numerical_model_from_list(this%modellist, i)
       istart = 0
       iend = 0
       call mp%get_mrange(istart, iend)

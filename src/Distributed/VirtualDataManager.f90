@@ -13,7 +13,7 @@ module VirtualDataManagerModule
   use ListsModule, only: basesolutionlist
   use NumericalSolutionModule, only: NumericalSolutionType, &
                                      CastAsNumericalSolutionClass
-  use NumericalModelModule, only: NumericalModelType, GetNumericalModelFromList
+  use NumericalModelModule, only: NumericalModelType, get_numerical_model_from_list
   use NumericalExchangeModule, only: NumericalExchangeType, &
                                      GetNumericalExchangeFromList
   use DisConnExchangeModule, only: DisConnExchangeType, &
@@ -108,7 +108,7 @@ contains
 
     ! 1) adding all local models with a virtual model counterpart from the solution
     do im = 1, num_sol%modellist%Count()
-      num_mod => GetNumericalModelFromList(num_sol%modellist, im)
+      num_mod => get_numerical_model_from_list(num_sol%modellist, im)
       found = .false.
       do i = 1, virtual_model_list%Count()
         vdc => get_virtual_model_from_list(virtual_model_list, i)

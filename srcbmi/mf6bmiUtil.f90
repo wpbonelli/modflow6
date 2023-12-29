@@ -238,7 +238,7 @@ contains
   subroutine get_grid_type_model(model_name, grid_type_f)
     ! -- modules
     use ListsModule, only: basemodellist
-    use NumericalModelModule, only: NumericalModelType, GetNumericalModelFromList
+    use NumericalModelModule, only: NumericalModelType, get_numerical_model_from_list
     ! -- dummy variables
     character(len=LENMODELNAME) :: model_name
     character(len=LENGRIDTYPE) :: grid_type_f
@@ -247,7 +247,7 @@ contains
     class(NumericalModelType), pointer :: numericalModel
 
     do i = 1, basemodellist%Count()
-      numericalModel => GetNumericalModelFromList(basemodellist, i)
+      numericalModel => get_numerical_model_from_list(basemodellist, i)
       if (numericalModel%name == model_name) then
         call numericalModel%dis%get_dis_type(grid_type_f)
       end if
