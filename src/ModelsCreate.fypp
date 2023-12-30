@@ -16,12 +16,15 @@ module ModelsCreateModule
 
 contains
 
-  subroutine add_gwf_model(n, fname)
+  #:set NUMERICAL_MODELS = ['gwf', 'gwt']
+  #:for mtype in NUMERICAL_MODELS
+  subroutine add_${mtype}$_model(n, fname)
     ! -- modules
     use NumericalModelModule, only: NumericalModelType, &
                                     get_numerical_model_from_list
-    use VirtualGwfModelModule, only: add_virtual_gwf_model
-    use GwfModule, only: gwf_cr
+    #:set mtype_camel = mtype[0].upper() + mtype[1:]
+    use ${mtype_camel}$Module, only: ${mtype}$_cr
+    use Virtual${mtype_camel}$ModelModule, only: add_virtual_${mtype}$_model
     ! -- dummy
     integer(I4B), intent(in) :: n
     character(len=*), intent(in) :: fname
@@ -30,39 +33,46 @@ contains
 
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
-      write (iout, '(4x,2a,i0,a)') 'GWF6', ' model ', &
+      write (iout, '(4x,2a,i0,a)') '${mtype.upper() + '6'}$', ' model ', &
         n, ' will be created'
-      call gwf_cr(fname, n, model_names(n))
+      call ${mtype}$_cr(fname, n, model_names(n))
       model => get_numerical_model_from_list(basemodellist, n)
       model_loc_idx(n) = n
     end if
-    call add_virtual_gwf_model(n, model_names(n), model)
+    call add_virtual_${mtype}$_model(n, model_names(n), model)
 
-  end subroutine add_gwf_model
+  end subroutine add_${mtype}$_model
 
-  subroutine add_gwt_model(n, fname)
+  #:endfor
+
+  #:set EXPLICIT_MODELS = []
+  #:for mtype in EXPLICIT_MODELS
+  subroutine add_${mtype}$_model(n, fname)
     ! -- modules
-    use NumericalModelModule, only: NumericalModelType, &
-                                    get_numerical_model_from_list
-    use VirtualGwtModelModule, only: add_virtual_gwt_model
-    use GwtModule, only: gwt_cr
+    use ExplicitModelModule, only: ExplicitModelType, &
+                                    get_explicit_model_from_list
+    #:set mtype_camel = mtype[0].upper() + mtype[1:]
+    use ${mtype[0].upper() + mtype[1:]}$Module, only: ${mtype}$_cr
+    use Virtual${mtype_camel}$ModelModule, only: add_virtual_${mtype}$_model 
     ! -- dummy
     integer(I4B), intent(in) :: n
     character(len=*), intent(in) :: fname
     ! -- local
-    class(NumericalModelType), pointer :: model
+    class(ExplicitModelType), pointer :: model
 
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
-      write (iout, '(4x,2a,i0,a)') 'GWT6', ' model ', &
+      write (iout, '(4x,2a,i0,a)') '${mtype.upper() + '6'}$', ' model ', &
         n, ' will be created'
-      call gwt_cr(fname, n, model_names(n))
+      call ${mtype}$_cr(fname, n, model_names(n))
       model => get_numerical_model_from_list(basemodellist, n)
       model_loc_idx(n) = n
     end if
-    call add_virtual_gwt_model(n, model_names(n), model)
+    call add_virtual_${mtype}$_model(n, model_names(n), model)
 
-  end subroutine add_gwt_model
+  end subroutine add_${mtype}$_model
+  
+  #:endfor
 
   !> @brief Check that the model name is valid
   !<
@@ -158,7 +168,7 @@ contains
     call mem_setptr(emnames_a, 'EXGMNAMEA', input_mempath)
     call mem_setptr(emnames_b, 'EXGMNAMEB', input_mempath)
 
-    ! count flow models
+    ! count models
     nr_models = size(mnames)
     nr_gwf_models = 0
     nr_gwt_models = 0
@@ -281,12 +291,11 @@ contains
       !
       ! -- add a new (local or global) model
       select case (model_type)
-      case ('GWF6')
-        call add_gwf_model(n, fname)
+      #:for mtype in NUMERICAL_MODELS + EXPLICIT_MODELS
+      case ('${mtype.upper() + '6'}$')
+        call add_${mtype}$_model(n, fname)
         im = im + 1
-      case ('GWT6')
-        call add_gwt_model(n, fname)
-        im = im + 1
+      #:endfor
       case default
         write (errmsg, '(a,a)') &
           'Unknown simulation model type: ', trim(model_type)

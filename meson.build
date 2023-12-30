@@ -216,16 +216,6 @@ if is_extended_build and build_machine.system() == 'windows'
                                 include_directories: petsc_incdir)  
 endif
 
-# preprocessing
-# models = ['gwf', 'gwt']
-# is_extended_build = get_option('extended')
-# configure_file(
-#   command: [
-#     'fypp',
-#    'src/ModelCreate.fypp',
-#    '-DMODELS=' + ','.join(models)],
-#   output: 'src/ModelCreate.f90')
-
 # build mf6 and libmf6
 buildname = get_option('buildname')
 subdir('src')

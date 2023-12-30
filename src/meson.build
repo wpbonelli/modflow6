@@ -1,3 +1,14 @@
+# preprocessing 
+command = [
+  'fypp',
+  meson.project_source_root() / 'src' / 'ModelsCreate.fypp',
+  meson.project_source_root() / 'src' / 'ModelsCreate.f90'
+]
+configure_file(
+  command: command,
+  input: 'ModelsCreate.fypp',
+  output: 'ModelsCreate.f90')
+
 external_libraries = files(
     'Utilities' / 'Libraries' / 'daglib' / 'dag_module.f90',
     'Utilities' / 'Libraries' / 'rcm' / 'rcm.f90',

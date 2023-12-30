@@ -138,3 +138,6 @@ unittests/
 .github/compat/*.md
 
 **.DS_Store
+
+# preprocessed files
+src/ModelsCreate.f90
