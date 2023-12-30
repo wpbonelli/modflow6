@@ -13,7 +13,8 @@ module VirtualDataManagerModule
   use ListsModule, only: basesolutionlist
   use NumericalSolutionModule, only: NumericalSolutionType, &
                                      CastAsNumericalSolutionClass
-  use NumericalModelModule, only: NumericalModelType, get_numerical_model_from_list
+  use NumericalModelModule, only: NumericalModelType, &
+                                  get_numerical_model_from_list
   use NumericalExchangeModule, only: NumericalExchangeType, &
                                      GetNumericalExchangeFromList
   use DisConnExchangeModule, only: DisConnExchangeType, &

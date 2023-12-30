@@ -293,7 +293,8 @@ contains
     !DIR$ ATTRIBUTES DLLEXPORT :: get_grid_face_count
     ! -- modules
     use ListsModule, only: basemodellist
-    use NumericalModelModule, only: NumericalModelType, get_numerical_model_from_list
+    use NumericalModelModule, only: NumericalModelType, &
+                                    get_numerical_model_from_list
     ! -- dummy variables
     integer(kind=c_int), intent(in) :: grid_id
     integer(kind=c_int), intent(out) :: count

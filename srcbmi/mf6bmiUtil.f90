@@ -238,7 +238,8 @@ contains
   subroutine get_grid_type_model(model_name, grid_type_f)
     ! -- modules
     use ListsModule, only: basemodellist
-    use NumericalModelModule, only: NumericalModelType, get_numerical_model_from_list
+    use NumericalModelModule, only: NumericalModelType, &
+                                    get_numerical_model_from_list
     ! -- dummy variables
     character(len=LENMODELNAME) :: model_name
     character(len=LENGRIDTYPE) :: grid_type_f
