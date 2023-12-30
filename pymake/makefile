@@ -295,7 +295,7 @@ $(OBJDIR)/GwfGwfConnection.o \
 $(OBJDIR)/GwtGwtConnection.o \
 $(OBJDIR)/ConnectionBuilder.o \
 $(OBJDIR)/GwfGwtExchange.o \
-$(OBJDIR)/SimulationCreate.o \
+$(OBJDIR)/Simulation.o \
 $(OBJDIR)/mf6core.o \
 $(OBJDIR)/mf6.o
 

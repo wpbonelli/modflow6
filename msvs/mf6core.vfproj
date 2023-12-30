@@ -426,6 +426,8 @@
 				<Tool Name="VFFortranCompilerTool" Preprocess="preprocessYes"/></FileConfiguration>
 			<FileConfiguration Name="Release|Win32">
 				<Tool Name="VFFortranCompilerTool" Preprocess="preprocessYes"/></FileConfiguration></File>
+		<File RelativePath="..\src\ModelFactory.f90"/>
+		<File RelativePath="..\src\ExchangeFactory.f90"/>
 		<File RelativePath="..\src\simnamidm.f90"/>
-		<File RelativePath="..\src\SimulationCreate.f90"/></Filter></Files>
+		<File RelativePath="..\src\Simulation.f90"/></Filter></Files>
 	<Globals/></VisualStudioProject>

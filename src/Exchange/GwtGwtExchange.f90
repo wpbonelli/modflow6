@@ -34,7 +34,7 @@ module GwtGwtExchangeModule
 
   private
   public :: GwtExchangeType
-  public :: gwtexchange_create
+  public :: gwtgwt_cr
   public :: GetGwtExchangeFromList
   public :: CastAsGwtExchange
 
@@ -106,18 +106,18 @@ contains
   !!
   !! Create a new GWT to GWT exchange object.
   !<
-  subroutine gwtexchange_create(filename, name, id, m1_id, m2_id, input_mempath)
+  subroutine gwtgwt_cr(filename, name, id, m1_id, m2_id, input_mempath)
     ! -- modules
     use BaseModelModule, only: BaseModelType
     use ListsModule, only: baseexchangelist
     use ObsModule, only: obs_cr
     use MemoryHelperModule, only: create_mem_path
     ! -- dummy
-    character(len=*), intent(in) :: filename !< filename for reading
-    integer(I4B), intent(in) :: id !< id for the exchange
-    character(len=*) :: name !< the exchange name
-    integer(I4B), intent(in) :: m1_id !< id for model 1
-    integer(I4B), intent(in) :: m2_id !< id for model 2
+    character(len=*), intent(in) :: filename !< filename to read
+    character(len=*) :: name !< exchange name
+    integer(I4B), intent(in) :: id !< exchange id
+    integer(I4B), intent(in) :: m1_id !< model 1 id
+    integer(I4B), intent(in) :: m2_id !< model 2 id
     character(len=*), intent(in) :: input_mempath
     ! -- local
     type(GwtExchangeType), pointer :: exchange
@@ -188,7 +188,7 @@ contains
     !
     ! -- Return
     return
-  end subroutine gwtexchange_create
+  end subroutine gwtgwt_cr
 
   !> @ brief Define GWT GWT exchange
   !!

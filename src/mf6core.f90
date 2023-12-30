@@ -69,7 +69,7 @@ contains
   subroutine Mf6Initialize()
     ! -- modules
     use RunControlFactoryModule, only: create_run_control
-    use SimulationCreateModule, only: simulation_cr
+    use SimulationModule, only: simulation_cr
 
     ! -- get the run controller for sequential or parallel builds
     run_ctrl => create_run_control()
@@ -128,7 +128,7 @@ contains
     ! -- modules
     use, intrinsic :: iso_fortran_env, only: output_unit
     use ListsModule, only: lists_da
-    use SimulationCreateModule, only: simulation_da
+    use SimulationModule, only: simulation_da
     use TdisModule, only: tdis_da
     use IdmLoadModule, only: idm_da
     use SimVariablesModule, only: iout
@@ -272,7 +272,7 @@ contains
     use MemoryHelperModule, only: create_mem_path
     use MemoryManagerModule, only: mem_setptr, mem_allocate
     use SimVariablesModule, only: idm_context, iparamlog
-    use ModelsCreateModule, only: create_load_mask
+    use SimulationModule, only: create_load_mask
     ! -- dummy
     ! -- locals
     character(len=LENMEMPATH) :: input_mempath

@@ -43,18 +43,20 @@ contains
 
   !> @brief Create a new GWF to GWT exchange object
   !<
-  subroutine gwfgwt_cr(filename, id, m1_id, m2_id)
+  subroutine gwfgwt_cr(filename, name, id, m1_id, m2_id, input_mempath)
     ! -- modules
     use SimVariablesModule, only: model_loc_idx
+    use MemoryHelperModule, only: create_mem_path
     ! -- dummy
-    character(len=*), intent(in) :: filename
-    integer(I4B), intent(in) :: id
-    integer(I4B), intent(in) :: m1_id
-    integer(I4B), intent(in) :: m2_id
+    character(len=*), intent(in) :: filename !< filename to read
+    character(len=*) :: name !< exchange name
+    integer(I4B), intent(in) :: id !< exchange id
+    integer(I4B), intent(in) :: m1_id !< model 1 id
+    integer(I4B), intent(in) :: m2_id !< model 2 id
+    character(len=*), intent(in) :: input_mempath
     ! -- local
     class(BaseExchangeType), pointer :: baseexchange => null()
     type(GwfGwtExchangeType), pointer :: exchange => null()
-    character(len=20) :: cint
     !
     ! -- Create a new exchange and add it to the baseexchangelist container
     allocate (exchange)
@@ -63,9 +65,9 @@ contains
     !
     ! -- Assign id and name
     exchange%id = id
-    write (cint, '(i0)') id
-    exchange%name = 'GWF-GWT_'//trim(adjustl(cint))
-    exchange%memoryPath = exchange%name
+    exchange%name = name
+    exchange%memoryPath = create_mem_path(exchange%name)
+    exchange%input_mempath = input_mempath
     !
     ! -- allocate scalars
     call exchange%allocate_scalars()

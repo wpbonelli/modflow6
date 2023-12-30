@@ -1,13 +1,30 @@
-# preprocessing 
-command = [
-  'fypp',
-  meson.project_source_root() / 'src' / 'ModelsCreate.fypp',
-  meson.project_source_root() / 'src' / 'ModelsCreate.f90'
-]
-configure_file(
-  command: command,
-  input: 'ModelsCreate.fypp',
-  output: 'ModelsCreate.f90')
+# if fypp is available models and exchanges can be configured with meson
+fypp = find_program('fypp', required : false)
+if fypp.found()
+  numerical_models = get_option('numerical-models')
+  explicit_models = get_option('explicit-models')
+  exchanges = get_option('exchanges')
+  src = meson.project_source_root() / 'src'
+  foreach f : ['Model', 'Exchange']
+    input = f'@f@Factory.fypp'
+    output = f'@f@Factory.f90'
+    configure_file(
+      command: [
+        fypp,
+        src / input,
+        src / output,
+        # fypp interprets variables as Python so we can pass a list directly
+        # but comma-sep string converted to list in fypp file may be easier
+        '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
+        '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+        '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
+      ],
+      input: input,
+      output: output)
+  endforeach
+else
+  debug('Can\'t find fypp, model/exchange selection disabled')
+endif
 
 external_libraries = files(
     'Utilities' / 'Libraries' / 'daglib' / 'dag_module.f90',
@@ -270,10 +287,11 @@ modflow_sources = files(
     'mf6core.f90',
     'mf6lists.f90',
     'simnamidm.f90',
-    'ModelsCreate.f90',
-    'SimulationCreate.f90',
+    'Simulation.f90',
     'RunControl.f90',
-    'RunControlFactory.F90'
+    'RunControlFactory.F90',
+    'ModelFactory.f90',
+    'ExchangeFactory.f90',
 )
 
 modflow_petsc_sources = files(

@@ -1,4 +1,4 @@
-module VirtualGwtExchangeModule
+module VirtualGwtGwtExchangeModule
   use KindModule, only: I4B
   use SimStagesModule
   use VirtualBaseModule
@@ -8,9 +8,9 @@ module VirtualGwtExchangeModule
   implicit none
   private
 
-  public :: add_virtual_gwt_exchange
+  public :: add_virtual_gwtgwt_exchange
 
-  type, public, extends(VirtualExchangeType) :: VirtualGwtExchangeType
+  type, public, extends(VirtualExchangeType) :: VirtualGwtGwtExchangeType
     type(VirtualDbl1dType), pointer :: gwfsimvals => null()
   contains
     procedure :: create => vtx_create
@@ -20,19 +20,19 @@ module VirtualGwtExchangeModule
     procedure, private :: init_virtual_data
     procedure, private :: allocate_data
     procedure, private :: deallocate_data
-  end type VirtualGwtExchangeType
+  end type VirtualGwtGwtExchangeType
 
 contains
 
 !> @brief Add a virtual GWT-GWT exchange to the simulation
 !<
-  subroutine add_virtual_gwt_exchange(name, exchange_id, model1_id, model2_id)
+  subroutine add_virtual_gwtgwt_exchange(name, exchange_id, model1_id, model2_id)
     character(len=*) :: name
     integer(I4B) :: exchange_id
     integer(I4B) :: model1_id
     integer(I4B) :: model2_id
     ! local
-    class(VirtualGwtExchangeType), pointer :: v_exg
+    class(VirtualGwtGwtExchangeType), pointer :: v_exg
     class(*), pointer :: obj_ptr
 
     allocate (v_exg)
@@ -41,12 +41,12 @@ contains
     obj_ptr => v_exg
     call virtual_exchange_list%Add(obj_ptr)
 
-  end subroutine add_virtual_gwt_exchange
+  end subroutine add_virtual_gwtgwt_exchange
 
 !> @brief Create a virtual GWT-GWT exchange
 !<
   subroutine vtx_create(this, name, exg_id, m1_id, m2_id)
-    class(VirtualGwtExchangeType) :: this
+    class(VirtualGwtGwtExchangeType) :: this
     character(len=*) :: name
     integer(I4B) :: exg_id
     integer(I4B) :: m1_id
@@ -62,14 +62,14 @@ contains
   end subroutine vtx_create
 
   subroutine init_virtual_data(this)
-    class(VirtualGwtExchangeType) :: this
+    class(VirtualGwtGwtExchangeType) :: this
 
     call this%set(this%gwfsimvals%base(), 'GWFSIMVALS', '', MAP_ALL_TYPE)
 
   end subroutine init_virtual_data
 
   subroutine vtx_prepare_stage(this, stage)
-    class(VirtualGwtExchangeType) :: this
+    class(VirtualGwtGwtExchangeType) :: this
     integer(I4B) :: stage
     ! local
     integer(I4B) :: nexg
@@ -85,7 +85,7 @@ contains
   end subroutine vtx_prepare_stage
 
   subroutine vtx_destroy(this)
-    class(VirtualGwtExchangeType) :: this
+    class(VirtualGwtGwtExchangeType) :: this
 
     call this%VirtualExchangeType%destroy()
     call this%deallocate_data()
@@ -93,17 +93,17 @@ contains
   end subroutine vtx_destroy
 
   subroutine allocate_data(this)
-    class(VirtualGwtExchangeType) :: this
+    class(VirtualGwtGwtExchangeType) :: this
 
     allocate (this%gwfsimvals)
 
   end subroutine allocate_data
 
   subroutine deallocate_data(this)
-    class(VirtualGwtExchangeType) :: this
+    class(VirtualGwtGwtExchangeType) :: this
 
     deallocate (this%gwfsimvals)
 
   end subroutine deallocate_data
 
-end module VirtualGwtExchangeModule
+end module VirtualGwtGwtExchangeModule

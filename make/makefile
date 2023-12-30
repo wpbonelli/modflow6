@@ -6,35 +6,36 @@ include ./makedefaults
 # Define the source file directories
 SOURCEDIR1=../src
 SOURCEDIR2=../src/Exchange
-SOURCEDIR3=../src/Model
-SOURCEDIR4=../src/Model/Geometry
-SOURCEDIR5=../src/Model/TransportModel
-SOURCEDIR6=../src/Model/ModelUtilities
-SOURCEDIR7=../src/Model/Connection
-SOURCEDIR8=../src/Model/GroundWaterTransport
-SOURCEDIR9=../src/Model/GroundWaterFlow
-SOURCEDIR10=../src/Distributed
-SOURCEDIR11=../src/Solution
-SOURCEDIR12=../src/Solution/PETSc
-SOURCEDIR13=../src/Solution/LinearMethods
-SOURCEDIR14=../src/Timing
-SOURCEDIR15=../src/Utilities
-SOURCEDIR16=../src/Utilities/TimeSeries
+SOURCEDIR3=../src/Distributed
+SOURCEDIR4=../src/Solution
+SOURCEDIR5=../src/Solution/LinearMethods
+SOURCEDIR6=../src/Solution/ParticleTracker
+SOURCEDIR7=../src/Solution/PETSc
+SOURCEDIR8=../src/Timing
+SOURCEDIR9=../src/Utilities
+SOURCEDIR10=../src/Utilities/Idm
+SOURCEDIR11=../src/Utilities/Idm/selector
+SOURCEDIR12=../src/Utilities/Idm/mf6blockfile
+SOURCEDIR13=../src/Utilities/TimeSeries
+SOURCEDIR14=../src/Utilities/Memory
+SOURCEDIR15=../src/Utilities/OutputControl
+SOURCEDIR16=../src/Utilities/ArrayRead
 SOURCEDIR17=../src/Utilities/Libraries
 SOURCEDIR18=../src/Utilities/Libraries/rcm
-SOURCEDIR19=../src/Utilities/Libraries/sparsekit
+SOURCEDIR19=../src/Utilities/Libraries/blas
 SOURCEDIR20=../src/Utilities/Libraries/sparskit2
-SOURCEDIR21=../src/Utilities/Libraries/blas
-SOURCEDIR22=../src/Utilities/Libraries/daglib
-SOURCEDIR23=../src/Utilities/Idm
-SOURCEDIR24=../src/Utilities/Idm/selector
-SOURCEDIR25=../src/Utilities/Idm/mf6blockfile
-SOURCEDIR26=../src/Utilities/Matrix
-SOURCEDIR27=../src/Utilities/Vector
-SOURCEDIR28=../src/Utilities/Observation
-SOURCEDIR29=../src/Utilities/OutputControl
-SOURCEDIR30=../src/Utilities/Memory
-SOURCEDIR31=../src/Utilities/ArrayRead
+SOURCEDIR21=../src/Utilities/Libraries/daglib
+SOURCEDIR22=../src/Utilities/Libraries/sparsekit
+SOURCEDIR23=../src/Utilities/Vector
+SOURCEDIR24=../src/Utilities/Matrix
+SOURCEDIR25=../src/Utilities/Observation
+SOURCEDIR26=../src/Model
+SOURCEDIR27=../src/Model/Connection
+SOURCEDIR28=../src/Model/GroundWaterTransport
+SOURCEDIR29=../src/Model/ModelUtilities
+SOURCEDIR30=../src/Model/GroundWaterFlow
+SOURCEDIR31=../src/Model/TransportModel
+SOURCEDIR32=../src/Model/Geometry
 
 VPATH = \
 ${SOURCEDIR1} \
@@ -67,7 +68,8 @@ ${SOURCEDIR27} \
 ${SOURCEDIR28} \
 ${SOURCEDIR29} \
 ${SOURCEDIR30} \
-${SOURCEDIR31} 
+${SOURCEDIR31} \
+${SOURCEDIR32} 
 
 .SUFFIXES: .f90 .F90 .o
 
@@ -193,7 +195,6 @@ $(OBJDIR)/gwf3lak8.o \
 $(OBJDIR)/GwfVscInputData.o \
 $(OBJDIR)/gwf3ghb8.o \
 $(OBJDIR)/gwf3drn8.o \
-$(OBJDIR)/IndexMap.o \
 $(OBJDIR)/VirtualModel.o \
 $(OBJDIR)/BaseExchange.o \
 $(OBJDIR)/tsp1fmi1.o \
@@ -206,11 +207,7 @@ $(OBJDIR)/Xt3dInterface.o \
 $(OBJDIR)/gwf3tvk8.o \
 $(OBJDIR)/gwf3vsc8.o \
 $(OBJDIR)/GwfNpfOptions.o \
-$(OBJDIR)/InterfaceMap.o \
-$(OBJDIR)/SeqVector.o \
-$(OBJDIR)/ImsLinearSettings.o \
-$(OBJDIR)/ConvergenceSummary.o \
-$(OBJDIR)/ArrayReaderBase.o \
+$(OBJDIR)/IndexMap.o \
 $(OBJDIR)/CellWithNbrs.o \
 $(OBJDIR)/NumericalExchange.o \
 $(OBJDIR)/tsp1ssm1.o \
@@ -232,12 +229,11 @@ $(OBJDIR)/Mover.o \
 $(OBJDIR)/GwfMvrPeriodData.o \
 $(OBJDIR)/ims8misc.o \
 $(OBJDIR)/GwfBuyInputData.o \
-$(OBJDIR)/VirtualSolution.o \
-$(OBJDIR)/SparseMatrix.o \
-$(OBJDIR)/LinearSolverBase.o \
-$(OBJDIR)/ims8reordering.o \
-$(OBJDIR)/ModflowInput.o \
-$(OBJDIR)/Integer2dReader.o \
+$(OBJDIR)/InterfaceMap.o \
+$(OBJDIR)/SeqVector.o \
+$(OBJDIR)/ImsLinearSettings.o \
+$(OBJDIR)/ConvergenceSummary.o \
+$(OBJDIR)/ArrayReaderBase.o \
 $(OBJDIR)/VirtualExchange.o \
 $(OBJDIR)/GridSorting.o \
 $(OBJDIR)/DisConnExchange.o \
@@ -264,6 +260,16 @@ $(OBJDIR)/gwf3buy8.o \
 $(OBJDIR)/GhostNode.o \
 $(OBJDIR)/gwf3evt8.o \
 $(OBJDIR)/gwf3chd8.o \
+$(OBJDIR)/VirtualSolution.o \
+$(OBJDIR)/SparseMatrix.o \
+$(OBJDIR)/LinearSolverBase.o \
+$(OBJDIR)/ims8reordering.o \
+$(OBJDIR)/ModflowInput.o \
+$(OBJDIR)/Integer2dReader.o \
+$(OBJDIR)/GridConnection.o \
+$(OBJDIR)/DistributedVariable.o \
+$(OBJDIR)/gwt1.o \
+$(OBJDIR)/gwf3.o \
 $(OBJDIR)/RouterBase.o \
 $(OBJDIR)/ImsLinearSolver.o \
 $(OBJDIR)/ims8base.o \
@@ -274,10 +280,11 @@ $(OBJDIR)/InputLoadType.o \
 $(OBJDIR)/Integer1dReader.o \
 $(OBJDIR)/Double2dReader.o \
 $(OBJDIR)/Double1dReader.o \
-$(OBJDIR)/GridConnection.o \
-$(OBJDIR)/DistributedVariable.o \
-$(OBJDIR)/gwt1.o \
-$(OBJDIR)/gwf3.o \
+$(OBJDIR)/SpatialModelConnection.o \
+$(OBJDIR)/GwtInterfaceModel.o \
+$(OBJDIR)/GwtGwtExchange.o \
+$(OBJDIR)/GwfInterfaceModel.o \
+$(OBJDIR)/GwfGwfExchange.o \
 $(OBJDIR)/SerialRouter.o \
 $(OBJDIR)/Timer.o \
 $(OBJDIR)/LinearSolverFactory.o \
@@ -288,11 +295,8 @@ $(OBJDIR)/BoundInputContext.o \
 $(OBJDIR)/AsciiInputLoadType.o \
 $(OBJDIR)/LayeredArrayReader.o \
 $(OBJDIR)/ExplicitModel.o \
-$(OBJDIR)/SpatialModelConnection.o \
-$(OBJDIR)/GwtInterfaceModel.o \
-$(OBJDIR)/GwtGwtExchange.o \
-$(OBJDIR)/GwfInterfaceModel.o \
-$(OBJDIR)/GwfGwfExchange.o \
+$(OBJDIR)/GwtGwtConnection.o \
+$(OBJDIR)/GwfGwfConnection.o \
 $(OBJDIR)/RouterFactory.o \
 $(OBJDIR)/NumericalSolution.o \
 $(OBJDIR)/MappedMemory.o \
@@ -300,23 +304,23 @@ $(OBJDIR)/StressListInput.o \
 $(OBJDIR)/StressGridInput.o \
 $(OBJDIR)/LoadMf6File.o \
 $(OBJDIR)/ExplicitSolution.o \
-$(OBJDIR)/GwtGwtConnection.o \
-$(OBJDIR)/GwfGwfConnection.o \
+$(OBJDIR)/VirtualGwtModel.o \
+$(OBJDIR)/VirtualGwfModel.o \
+$(OBJDIR)/VirtualGwtExchange.o \
+$(OBJDIR)/VirtualGwfExchange.o \
+$(OBJDIR)/GwfGwtExchange.o \
 $(OBJDIR)/VirtualDataManager.o \
 $(OBJDIR)/Mapper.o \
 $(OBJDIR)/IdmMf6File.o \
 $(OBJDIR)/ModelPackageInput.o \
-$(OBJDIR)/VirtualGwtModel.o \
-$(OBJDIR)/VirtualGwtExchange.o \
-$(OBJDIR)/VirtualGwfModel.o \
-$(OBJDIR)/VirtualGwfExchange.o \
 $(OBJDIR)/SolutionGroup.o \
 $(OBJDIR)/SolutionFactory.o \
-$(OBJDIR)/GwfGwtExchange.o \
+$(OBJDIR)/ModelFactory.o \
+$(OBJDIR)/ExchangeFactory.o \
 $(OBJDIR)/RunControl.o \
 $(OBJDIR)/SourceLoad.o \
 $(OBJDIR)/ModelPackageInputs.o \
-$(OBJDIR)/SimulationCreate.o \
+$(OBJDIR)/Simulation.o \
 $(OBJDIR)/RunControlFactory.o \
 $(OBJDIR)/IdmLoad.o \
 $(OBJDIR)/ConnectionBuilder.o \
