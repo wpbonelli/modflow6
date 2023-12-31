@@ -24,8 +24,10 @@ contains
     ! -- dummy
     character(len=LINELENGTH), intent(in) :: fname
     integer(I4B), intent(in) :: exg_id
-    logical(LGP), intent(in) :: both_remote, both_local
-    integer(I4B), intent(in) :: m1_id, m2_id
+    logical(LGP), intent(in) :: both_local
+    logical(LGP), intent(in) :: both_remote
+    integer(I4B), intent(in) :: m1_id
+    integer(I4B), intent(in) :: m2_id
     character(len=LENMEMPATH), intent(in) :: exg_mempath
     ! -- local
     character(len=LENEXCHANGENAME) :: exg_name
@@ -47,8 +49,10 @@ contains
     ! -- dummy
     character(len=LINELENGTH), intent(in) :: fname
     integer(I4B), intent(in) :: exg_id
-    logical(LGP), intent(in) :: both_remote, both_local
-    integer(I4B), intent(in) :: m1_id, m2_id
+    logical(LGP), intent(in) :: both_local
+    logical(LGP), intent(in) :: both_remote
+    integer(I4B), intent(in) :: m1_id
+    integer(I4B), intent(in) :: m2_id
     character(len=LENMEMPATH), intent(in) :: exg_mempath
     ! -- local
     character(len=LENEXCHANGENAME) :: exg_name
@@ -69,8 +73,10 @@ contains
     ! -- dummy
     character(len=LINELENGTH), intent(in) :: fname
     integer(I4B), intent(in) :: exg_id
-    logical(LGP), intent(in) :: both_remote, both_local
-    integer(I4B), intent(in) :: m1_id, m2_id
+    logical(LGP), intent(in) :: both_local
+    logical(LGP), intent(in) :: both_remote
+    integer(I4B), intent(in) :: m1_id
+    integer(I4B), intent(in) :: m2_id
     character(len=LENMEMPATH), intent(in) :: exg_mempath
     ! -- local
     character(len=LENEXCHANGENAME) :: exg_name

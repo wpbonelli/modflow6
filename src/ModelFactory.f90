@@ -15,7 +15,7 @@ module ModelFactoryModule
 
 contains
 
-  subroutine add_gwf_model(n, fname)
+  subroutine add_gwf_model(n, im, fname)
     ! -- modules
     use NumericalModelModule, only: NumericalModelType, &
                                     GetNumericalModelFromList
@@ -23,23 +23,25 @@ contains
     use VirtualGwfModelModule, only: add_virtual_gwf_model
     ! -- dummy
     integer(I4B), intent(in) :: n
+    integer(I4B), intent(inout) :: im
     character(len=*), intent(in) :: fname
     ! -- local
     class(NumericalModelType), pointer :: model
 
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
+      im = im + 1
       write (iout, '(4x,2a,i0,a)') 'GWF6', ' model ', &
         n, ' will be created'
       call gwf_cr(fname, n, model_names(n))
-      model => GetNumericalModelFromList(basemodellist, n)
-      model_loc_idx(n) = n
+      model => GetNumericalModelFromList(basemodellist, im)
+      model_loc_idx(n) = im
     end if
     call add_virtual_gwf_model(n, model_names(n), model)
 
   end subroutine add_gwf_model
 
-  subroutine add_gwt_model(n, fname)
+  subroutine add_gwt_model(n, im, fname)
     ! -- modules
     use NumericalModelModule, only: NumericalModelType, &
                                     GetNumericalModelFromList
@@ -47,17 +49,19 @@ contains
     use VirtualGwtModelModule, only: add_virtual_gwt_model
     ! -- dummy
     integer(I4B), intent(in) :: n
+    integer(I4B), intent(inout) :: im
     character(len=*), intent(in) :: fname
     ! -- local
     class(NumericalModelType), pointer :: model
 
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
+      im = im + 1
       write (iout, '(4x,2a,i0,a)') 'GWT6', ' model ', &
         n, ' will be created'
       call gwt_cr(fname, n, model_names(n))
-      model => GetNumericalModelFromList(basemodellist, n)
-      model_loc_idx(n) = n
+      model => GetNumericalModelFromList(basemodellist, im)
+      model_loc_idx(n) = im
     end if
     call add_virtual_gwt_model(n, model_names(n), model)
 
@@ -124,11 +128,9 @@ contains
       ! -- add a new (local or global) model
       select case (model_type)
       case ('GWF6')
-        call add_gwf_model(n, fname)
-        im = im + 1
+        call add_gwf_model(n, im, fname)
       case ('GWT6')
-        call add_gwt_model(n, fname)
-        im = im + 1
+        call add_gwt_model(n, im, fname)
       case default
         write (errmsg, '(a,a)') &
           'Unknown simulation model type: ', trim(model_type)

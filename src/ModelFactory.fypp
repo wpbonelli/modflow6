@@ -16,7 +16,7 @@ module ModelFactoryModule
 contains
 
   #:for mtype in NUMERICAL_MODELS
-  subroutine add_${mtype}$_model(n, fname)
+  subroutine add_${mtype}$_model(n, im, fname)
     ! -- modules
     use NumericalModelModule, only: NumericalModelType, &
                                     GetNumericalModelFromList
@@ -25,17 +25,19 @@ contains
     use Virtual${mtype_camel}$ModelModule, only: add_virtual_${mtype}$_model
     ! -- dummy
     integer(I4B), intent(in) :: n
+    integer(I4B), intent(inout) :: im
     character(len=*), intent(in) :: fname
     ! -- local
     class(NumericalModelType), pointer :: model
   
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
+      im = im + 1
       write (iout, '(4x,2a,i0,a)') '${mtype.upper() + '6'}$', ' model ', &
         n, ' will be created'
       call ${mtype}$_cr(fname, n, model_names(n))
-      model => GetNumericalModelFromList(basemodellist, n)
-      model_loc_idx(n) = n
+      model => GetNumericalModelFromList(basemodellist, im)
+      model_loc_idx(n) = im
     end if
     call add_virtual_${mtype}$_model(n, model_names(n), model)
   
@@ -43,7 +45,7 @@ contains
 
   #:endfor
   #:for mtype in EXPLICIT_MODELS
-  subroutine add_${mtype}$_model(n, fname)
+  subroutine add_${mtype}$_model(n, im, fname)
     ! -- modules
     use ExplicitModelModule, only: ExplicitModelType, &
                                     GetExplicitModelFromList
@@ -52,17 +54,19 @@ contains
     use Virtual${mtype_camel}$ModelModule, only: add_virtual_${mtype}$_model 
     ! -- dummy
     integer(I4B), intent(in) :: n
+    integer(I4B), intent(inout) :: im
     character(len=*), intent(in) :: fname
     ! -- local
     class(ExplicitModelType), pointer :: model
   
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
+      im = im + 1
       write (iout, '(4x,2a,i0,a)') '${mtype.upper() + '6'}$', ' model ', &
         n, ' will be created'
       call ${mtype}$_cr(fname, n, model_names(n))
-      model => GetExplicitModelFromList(basemodellist, n)
-      model_loc_idx(n) = n
+      model => GetExplicitModelFromList(basemodellist, im)
+      model_loc_idx(n) = im
     end if
     call add_virtual_${mtype}$_model(n, model_names(n), model)
   
@@ -131,8 +135,7 @@ contains
       select case (model_type)
       #:for mtype in NUMERICAL_MODELS + EXPLICIT_MODELS
       case ('${mtype.upper() + '6'}$')
-        call add_${mtype}$_model(n, fname)
-        im = im + 1
+        call add_${mtype}$_model(n, im, fname)
       #:endfor
       case default
         write (errmsg, '(a,a)') &
