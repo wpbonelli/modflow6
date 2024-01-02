@@ -7,8 +7,8 @@ module IdmDfnSelectorModule
                                    InputBlockDefinitionType
   use IdmSimDfnSelectorModule
   use IdmGwfDfnSelectorModule
-  use IdmExgDfnSelectorModule
   use IdmGwtDfnSelectorModule
+  use IdmExgDfnSelectorModule
 
   implicit none
   private
@@ -31,10 +31,10 @@ contains
       input_definition => sim_param_definitions(subcomponent)
     case ('GWF')
       input_definition => gwf_param_definitions(subcomponent)
-    case ('EXG')
-      input_definition => exg_param_definitions(subcomponent)
     case ('GWT')
       input_definition => gwt_param_definitions(subcomponent)
+    case ('EXG')
+      input_definition => exg_param_definitions(subcomponent)
     case default
     end select
     return
@@ -50,10 +50,10 @@ contains
       input_definition => sim_aggregate_definitions(subcomponent)
     case ('GWF')
       input_definition => gwf_aggregate_definitions(subcomponent)
-    case ('EXG')
-      input_definition => exg_aggregate_definitions(subcomponent)
     case ('GWT')
       input_definition => gwt_aggregate_definitions(subcomponent)
+    case ('EXG')
+      input_definition => exg_aggregate_definitions(subcomponent)
     case default
     end select
     return
@@ -69,10 +69,10 @@ contains
       input_definition => sim_block_definitions(subcomponent)
     case ('GWF')
       input_definition => gwf_block_definitions(subcomponent)
-    case ('EXG')
-      input_definition => exg_block_definitions(subcomponent)
     case ('GWT')
       input_definition => gwt_block_definitions(subcomponent)
+    case ('EXG')
+      input_definition => exg_block_definitions(subcomponent)
     case default
     end select
     return
@@ -87,10 +87,10 @@ contains
       multi_package = sim_idm_multi_package(subcomponent)
     case ('GWF')
       multi_package = gwf_idm_multi_package(subcomponent)
-    case ('EXG')
-      multi_package = exg_idm_multi_package(subcomponent)
     case ('GWT')
       multi_package = gwt_idm_multi_package(subcomponent)
+    case ('EXG')
+      multi_package = exg_idm_multi_package(subcomponent)
     case default
       call store_error('Idm selector component not found; '//&
                        &'component="'//trim(component)//&
@@ -109,10 +109,10 @@ contains
       integrated = sim_idm_integrated(subcomponent)
     case ('GWF')
       integrated = gwf_idm_integrated(subcomponent)
-    case ('EXG')
-      integrated = exg_idm_integrated(subcomponent)
     case ('GWT')
       integrated = gwt_idm_integrated(subcomponent)
+    case ('EXG')
+      integrated = exg_idm_integrated(subcomponent)
     case default
     end select
     return
@@ -127,9 +127,9 @@ contains
       integrated = .true.
     case ('GWF')
       integrated = .true.
-    case ('EXG')
-      integrated = .true.
     case ('GWT')
+      integrated = .true.
+    case ('EXG')
       integrated = .true.
     case default
     end select

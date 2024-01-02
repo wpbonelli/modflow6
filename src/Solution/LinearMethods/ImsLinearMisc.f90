@@ -9,10 +9,10 @@ MODULE IMSLinearMisc
 CONTAINS
 
   !> @brief Tridiagonal solve using the Thomas algorithm
-    !!
-    !! Subroutine to solve tridiagonal linear equations using the
-    !! Thomas algorithm.
-    !!
+  !!
+  !! Subroutine to solve tridiagonal linear equations using the
+  !! Thomas algorithm.
+  !!
   !<
   subroutine ims_misc_thomas(n, tl, td, tu, b, x, w)
     implicit none

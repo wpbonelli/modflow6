@@ -1,51 +1,15 @@
-# top-level source folder
-src = meson.project_source_root() / 'src'
+fs = import('fs')
 
-# supported model/exchange options
+# define some paths
+root_path = meson.project_source_root()
+src_path = root_path / 'src'
+dfn_path = root_path / 'doc' / 'mf6io' / 'mf6ivar' / 'dfn'
+
+# configurable model and exchange selection
 numerical_models = get_option('numerical-models')
 explicit_models = get_option('explicit-models')
 models = numerical_models + explicit_models
 exchanges = get_option('exchanges')
-
-# regenerate IDM source files from DFN files
-py = find_program('python', required : true) 
-if py.found()
-  args = [src / 'utils' / 'idmloader' / 'scripts' / 'dfn2f90.py']
-  foreach m : models
-    args += ['--models', m]
-  endforeach
-  generator(
-    py,
-    output: '@BASENAME@.f90',
-    arguments: args)
-  # todo: use generator as input for mf6core build target
-else
-  error('Can\'t find python, not regenerating IDM source files from DFNs')
-endif
-
-# if fypp is available, regenerate model/exchange factories from templates
-fypp = find_program('fypp', required : false)
-if fypp.found()
-  foreach f : ['Model', 'Exchange']
-    input = f'@f@Factory.fypp'
-    output = f'@f@Factory.f90'
-    configure_file(
-      command: [
-        fypp,
-        src / input,
-        src / output,
-        # fypp interprets variables as Python so we can pass a list directly
-        # but comma-sep string converted to list in fypp file may be easier?
-        '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-        '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
-        '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
-      ],
-      input: input,
-      output: output)
-  endforeach
-else
-  warning('Can\'t find fypp, not regenerating model/exchange factories')
-endif
 
 # external source files
 external_libraries = files(
@@ -101,25 +65,25 @@ modflow_sources = files(
     'Model' / 'ModelUtilities' / 'UzfCellGroup.f90',
     'Model' / 'ModelUtilities' / 'Xt3dAlgorithm.f90',
     'Model' / 'ModelUtilities' / 'Xt3dInterface.f90',
-    'Model' / 'TransportModel' / 'tsp1.f90',
-    'Model' / 'TransportModel' / 'tsp1adv1.f90',
-    'Model' / 'TransportModel' / 'tsp1apt1.f90',
-    'Model' / 'TransportModel' / 'tsp1fmi1.f90',
-    'Model' / 'TransportModel' / 'tsp1ic1.f90',
-    'Model' / 'TransportModel' / 'tsp1obs1.f90',
-    'Model' / 'TransportModel' / 'tsp1oc1.f90',
-    'Model' / 'TransportModel' / 'tsp1mvt1.f90',
-    'Model' / 'TransportModel' / 'tsp1ssm1.f90',
+    'Model' / 'TransportModel' / 'tsp.f90',
+    'Model' / 'TransportModel' / 'tsp-adv.f90',
+    'Model' / 'TransportModel' / 'tsp-apt.f90',
+    'Model' / 'TransportModel' / 'tsp-fmi.f90',
+    'Model' / 'TransportModel' / 'tsp-ic.f90',
+    'Model' / 'TransportModel' / 'tsp-obs.f90',
+    'Model' / 'TransportModel' / 'tsp-oc.f90',
+    'Model' / 'TransportModel' / 'tsp-mvt.f90',
+    'Model' / 'TransportModel' / 'tsp-ssm.f90',
     'Model' / 'BaseModel.f90',
     'Model' / 'ExplicitModel.f90',
     'Model' / 'NumericalModel.f90',
     'Model' / 'NumericalPackage.f90',
     'Solution' / 'ConvergenceSummary.f90',
     'Solution' / 'LinearMethods' / 'ImsLinearSettings.f90',
-    'Solution' / 'LinearMethods' / 'ims8base.f90',
-    'Solution' / 'LinearMethods' / 'ims8linear.f90',
-    'Solution' / 'LinearMethods' / 'ims8reordering.f90',
-    'Solution' / 'LinearMethods' / 'ims8misc.f90',
+    'Solution' / 'LinearMethods' / 'ImsLinearBase.f90',
+    'Solution' / 'LinearMethods' / 'ImsLinear.f90',
+    'Solution' / 'LinearMethods' / 'ImsReordering.f90',
+    'Solution' / 'LinearMethods' / 'ImsLinearMisc.f90',
     'Solution' / 'LinearMethods' / 'ImsLinearSolver.f90',
     'Solution' / 'BaseSolution.f90',
     'Solution' / 'ExplicitSolution.f90',
@@ -136,6 +100,23 @@ modflow_sources = files(
     'Utilities' / 'ArrayRead' / 'Integer1dReader.f90',
     'Utilities' / 'ArrayRead' / 'Integer2dReader.f90',
     'Utilities' / 'ArrayRead' / 'LayeredArrayReader.f90',
+    'Utilities' / 'IDM' / 'BoundInputContext.f90',
+    'Utilities' / 'IDM' / 'DefinitionSelect.f90',
+    'Utilities' / 'IDM' / 'IdmLoad.f90',
+    'Utilities' / 'IDM' / 'IdmLogger.f90',
+    'Utilities' / 'IDM' / 'InputDefinition.f90',
+    'Utilities' / 'IDM' / 'InputLoadType.f90',
+    'Utilities' / 'IDM' / 'ModelPackageInputs.f90',
+    'Utilities' / 'IDM' / 'ModflowInput.f90',
+    'Utilities' / 'IDM' / 'SourceCommon.f90',
+    'Utilities' / 'IDM' / 'SourceLoad.F90',
+    'Utilities' / 'IDM' / 'mf6blockfile' / 'AsciiInputLoadType.f90',
+    'Utilities' / 'IDM' / 'mf6blockfile' / 'IdmMf6File.f90',
+    'Utilities' / 'IDM' / 'mf6blockfile' / 'LoadMf6File.f90',
+    'Utilities' / 'IDM' / 'mf6blockfile' / 'StressGridInput.f90',
+    'Utilities' / 'IDM' / 'mf6blockfile' / 'StressListInput.f90',
+    'Utilities' / 'IDM' / 'mf6blockfile' / 'StructArray.f90',
+    'Utilities' / 'IDM' / 'mf6blockfile' / 'StructVector.f90',
     'Utilities' / 'Matrix' / 'MatrixBase.f90',
     'Utilities' / 'Matrix' / 'SparseMatrix.f90',
     'Utilities' / 'Memory' / 'Memory.f90',
@@ -144,7 +125,7 @@ modflow_sources = files(
     'Utilities' / 'Memory' / 'MemoryManager.f90',
     'Utilities' / 'Memory' / 'MemoryManagerExt.f90',
     'Utilities' / 'Memory' / 'MemorySetHandler.f90',
-    'Utilities' / 'Observation' / 'Obs3.f90',
+    'Utilities' / 'Observation' / 'Obs.f90',
     'Utilities' / 'Observation' / 'ObsContainer.f90',
     'Utilities' / 'Observation' / 'Observe.f90',
     'Utilities' / 'Observation' / 'ObsOutput.f90',
@@ -205,23 +186,41 @@ modflow_sources = files(
     'Utilities' / 'version.f90',
     'mf6core.f90',
     'mf6lists.f90',
-    'simnamidm.f90',
     'Simulation.f90',
     'RunControl.f90',
     'RunControlFactory.F90',
-    'ModelFactory.f90',
-    'ExchangeFactory.f90',
 )
 
-# IDM source files
-subdir('IDM')
+# template preprocessing
+fypp = find_program('fypp', required : false)
+if fypp.found()
+  # generate factories for configurable mf6 components
+  foreach f : ['Model', 'Exchange']
+    input = f'@f@Factory.fypp'
+    output = f'@f@Factory.f90'
+    args = [
+      src_path / input,
+      '@BUILD_DIR@' / output,
+      '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
+      '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+      '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
+    ]
+    gen = generator(fypp, output: '@BASENAME@.f90', arguments: args)
+    modflow_sources += gen.process(input)
+  endforeach
+else
+  error('Can\'t find fypp, can\'t generate source from templates')
+endif
 
 # model source files
 foreach m : models
   subdir(m.to_upper())
 endforeach
 
-# PETSc source files
+# IDM source files
+subdir('IDM')
+
+# PETSc-related source files
 if with_petsc
   modflow_sources += files(
     'Utilities' / 'Vector' / 'PetscVector.F90',
@@ -232,7 +231,7 @@ if with_petsc
   )  
 endif
 
-# MPI source files
+# MPI-related source files
 if with_mpi
   modflow_sources += files(
     'Distributed' / 'MpiMessageBuilder.f90',
