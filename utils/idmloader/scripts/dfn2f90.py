@@ -1,11 +1,16 @@
+import argparse
 import sys
 from pathlib import Path
+import textwrap
+import yaml
 
 MF6_LENVARNAME = 16
 F90_LINELEN = 82
 PROJ_ROOT = Path(__file__).parents[3]
+DEFAULT_DFNS_PATH = Path(__file__).parent / "dfns.yaml"
 DFN_PATH = PROJ_ROOT / "doc" / "mf6io" / "mf6ivar" / "dfn"
 SRC_PATH = PROJ_ROOT / "src"
+IDM_PATH = SRC_PATH / "IDM"
 
 
 class Dfn2F90:
@@ -535,7 +540,7 @@ class IdmDfnSelector:
         self._write_master()
 
     def _write_master(self):
-        ofspec = SRC_PATH / "Utilities" / "Idm" / "selector" / "IdmDfnSelector.f90"
+        ofspec = IDM_PATH / "selector" / "IdmDfnSelector.f90"
         with open(ofspec, "w") as fh:
             self._write_master_decl(fh)
             self._write_master_defn(fh, defn="param", dtype="param")
@@ -549,9 +554,7 @@ class IdmDfnSelector:
     def _write_selectors(self):
         for c in self._d:
             ofspec = (
-                SRC_PATH
-                / "Utilities"
-                / "Idm"
+                IDM_PATH
                 / "selector"
                 / f"Idm{c.title()}DfnSelector.f90"
             )
@@ -855,119 +858,36 @@ class IdmDfnSelector:
 
 
 if __name__ == "__main__":
-    dfns = [
-        # ** Add a new dfn parameter set to MODFLOW 6 by adding a new entry to this list **
-        # [relative path of input dnf, relative path of output f90 definition file]
-        [
-            DFN_PATH / "gwf-chd.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3chd8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-dis.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3dis8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-disu.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3disu8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-disv.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3disv8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-drn.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3drn8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-evt.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3evt8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-evta.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3evta8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-ghb.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3ghb8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-ic.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3ic8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-npf.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3npf8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-rch.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3rch8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-rcha.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3rcha8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-riv.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3riv8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-wel.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3wel8idm.f90",
-        ],
-        [
-            DFN_PATH / "gwt-dis.dfn",
-            SRC_PATH / "Model" / "GroundWaterTransport" / "gwt1dis1idm.f90",
-        ],
-        [
-            DFN_PATH / "gwt-disu.dfn",
-            SRC_PATH / "Model" / "GroundWaterTransport" / "gwt1disu1idm.f90",
-        ],
-        [
-            DFN_PATH / "gwt-disv.dfn",
-            SRC_PATH / "Model" / "GroundWaterTransport" / "gwt1disv1idm.f90",
-        ],
-        [
-            DFN_PATH / "gwt-dsp.dfn",
-            SRC_PATH / "Model" / "GroundWaterTransport" / "gwt1dsp1idm.f90",
-        ],
-        [
-            DFN_PATH / "gwt-cnc.dfn",
-            SRC_PATH / "Model" / "GroundWaterTransport" / "gwt1cnc1idm.f90",
-        ],
-        [
-            DFN_PATH / "gwt-ic.dfn",
-            SRC_PATH / "Model" / "GroundWaterTransport" / "gwt1ic1idm.f90",
-        ],
-        [
-            DFN_PATH / "gwf-nam.dfn",
-            SRC_PATH / "Model" / "GroundWaterFlow" / "gwf3idm.f90",
-        ],
-        [
-            DFN_PATH / "gwt-nam.dfn",
-            SRC_PATH / "Model" / "GroundWaterTransport" / "gwt1idm.f90",
-        ],
-        [
-            DFN_PATH / "exg-gwfgwf.dfn",
-            SRC_PATH / "Exchange" / "gwfgwfidm.f90",
-        ],
-        [
-            DFN_PATH / "exg-gwfgwt.dfn",
-            SRC_PATH / "Exchange" / "gwfgwtidm.f90",
-        ],
-        [
-            DFN_PATH / "exg-gwtgwt.dfn",
-            SRC_PATH / "Exchange" / "gwtgwtidm.f90",
-        ],
-        [
-            DFN_PATH / "sim-nam.dfn",
-            SRC_PATH / "simnamidm.f90",
-        ],
-    ]
+    parser = argparse.ArgumentParser(
+        prog="Convert LaTeX docs to PDFs",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent(
+            """\
+            Generate Fortran source code from DFN files. This script
+            converts definition (DFN) files to Fortran source files,
+            each representing a parameter set for a particular input
+            definition. Fortran files generated by this tool provide
+            support for simulations, models or packages described by
+            the given DFN files.
+            """
+        ),
+    )
+    parser.add_argument(
+        '-d',
+        '--dfns',
+        required=False,
+        default=DEFAULT_DFNS_PATH,
+        help="Path to the file specifying supported DFNs"
+    )
+
+    args = parser.parse_args()
+    with open(args.dfns, "r") as f:
+        dfns = yaml.safe_load(f)
 
     dfn_d = {}
     for dfn in dfns:
-        converter = Dfn2F90(dfnfspec=dfn[0])
-        converter.write_f90(ofspec=dfn[1])
+        converter = Dfn2F90(dfnfspec=DFN_PATH / dfn["dfn"])
+        converter.write_f90(ofspec=SRC_PATH / dfn["src"])
         converter.warn()
         converter.add_dfn_entry(dfn_d=dfn_d)
 

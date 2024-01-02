@@ -1,9 +1,10 @@
-# if fypp is available models and exchanges can be configured with meson
+numerical_models = get_option('numerical-models')
+explicit_models = get_option('explicit-models')
+exchanges = get_option('exchanges')
+
+# if fypp is available, regenerate model/exchange factories from templates
 fypp = find_program('fypp', required : false)
 if fypp.found()
-  numerical_models = get_option('numerical-models')
-  explicit_models = get_option('explicit-models')
-  exchanges = get_option('exchanges')
   src = meson.project_source_root() / 'src'
   foreach f : ['Model', 'Exchange']
     input = f'@f@Factory.fypp'
@@ -23,7 +24,7 @@ if fypp.found()
       output: output)
   endforeach
 else
-  debug('Can\'t find fypp, model/exchange selection disabled')
+  warning('Can\'t find fypp, not regenerating model/exchange factories')
 endif
 
 # external source files
