@@ -553,11 +553,7 @@ class IdmDfnSelector:
 
     def _write_selectors(self):
         for c in self._d:
-            ofspec = (
-                IDM_PATH
-                / "selector"
-                / f"Idm{c.title()}DfnSelector.f90"
-            )
+            ofspec = IDM_PATH / "selector" / f"Idm{c.title()}DfnSelector.f90"
             with open(ofspec, "w") as fh:
                 self._write_selector_decl(fh, component=c, sc_list=self._d[c])
                 self._write_selector_helpers(fh)
@@ -873,16 +869,29 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
-        '-d',
-        '--dfns',
+        "-d",
+        "--dfns",
         required=False,
         default=DEFAULT_DFNS_PATH,
-        help="Path to the file specifying supported DFNs"
+        help="Path to the file specifying supported DFNs",
     )
-
+    parser.add_argument(
+        "-m",
+        "--models",
+        required=False,
+        action="append",
+        default=["gwf", "gwt"],
+        help="Filter models to generate source files for"
+    )
     args = parser.parse_args()
-    with open(args.dfns, "r") as f:
-        dfns = yaml.safe_load(f)
+    dfnpth = Path(args.dfns)
+    models = args.models
+    with open(dfnpth, "r") as f:
+
+        def filter(dfn, m):
+            return "sim" in dfn["dfn"] or m in dfn["dfn"] or m in dfn["src"]
+
+        dfns = [dfn for dfn in yaml.safe_load(f) if any(filter(dfn, m) for m in models)]
 
     dfn_d = {}
     for dfn in dfns:
