@@ -1,11 +1,31 @@
+# top-level source folder
+src = meson.project_source_root() / 'src'
+
+# supported model/exchange options
 numerical_models = get_option('numerical-models')
 explicit_models = get_option('explicit-models')
+models = numerical_models + explicit_models
 exchanges = get_option('exchanges')
+
+# regenerate IDM source files from DFN files
+py = find_program('python', required : true) 
+if py.found()
+  args = [src / 'utils' / 'idmloader' / 'scripts' / 'dfn2f90.py']
+  foreach m : models
+    args += ['--models', m]
+  endforeach
+  generator(
+    py,
+    output: '@BASENAME@.f90',
+    arguments: args)
+  # todo: use generator as input for mf6core build target
+else
+  error('Can\'t find python, not regenerating IDM source files from DFNs')
+endif
 
 # if fypp is available, regenerate model/exchange factories from templates
 fypp = find_program('fypp', required : false)
 if fypp.found()
-  src = meson.project_source_root() / 'src'
   foreach f : ['Model', 'Exchange']
     input = f'@f@Factory.fypp'
     output = f'@f@Factory.f90'
@@ -197,8 +217,8 @@ modflow_sources = files(
 subdir('IDM')
 
 # model source files
-foreach mdl : numerical_models + explicit_models
-  subdir(mdl.to_upper())
+foreach m : models
+  subdir(m.to_upper())
 endforeach
 
 # PETSc source files

@@ -1,3 +1,4 @@
+# todo: use generator() for IDM-generated files
 modflow_sources += files(
   'gwf3.f90',
   'gwf3api8.f90',

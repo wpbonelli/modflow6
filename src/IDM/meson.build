@@ -1,3 +1,4 @@
+# IDM framework files (not auto-generated)
 modflow_sources += files(
     'BoundInputContext.f90',
     'DefinitionSelect.f90',
@@ -16,12 +17,14 @@ modflow_sources += files(
     'mf6blockfile' / 'StressListInput.f90',
     'mf6blockfile' / 'StructArray.f90',
     'mf6blockfile' / 'StructVector.f90',
+    # todo: include DFN selector files with generator instead?
     'selector' / 'IdmDfnSelector.f90',
     'selector' / 'IdmExgDfnSelector.f90',
     'selector' / 'IdmSimDfnSelector.f90',
 )
 
-foreach m : numerical_models + explicit_models
+
+foreach m : models
     mcc = m[0].to_upper() + m.substring(1, 3)  # camel case
     modflow_sources += files(
         'selector' / f'Idm@mcc@DfnSelector.f90',
