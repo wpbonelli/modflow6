@@ -128,7 +128,7 @@ contains
       end if
       if (.not. associated(this%mvrbudobj) .and. inmvr > 0) then
         write (errmsg, '(a)') 'GWF water mover terms are not available &
-          &but the GWT MVT package has been activated.  Activate GWF-GWT &
+          &but the GWT MVT package has been activated.  Activate GWT-GWG &
           &exchange or specify GWFMOVER in FMI PACKAGEDATA.'
         call store_error(errmsg, terminate=.TRUE.)
       end if

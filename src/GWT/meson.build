@@ -9,6 +9,7 @@ modflow_sources += files(
   'gwt-sft.f90',
   'gwt-src.f90',
   'gwt-uzt.f90',
+  'gwt-spc.f90',
   'exg-gwfgwt.f90',
   'exg-gwtgwt.f90',
   'VirtualGwtExchange.f90',
@@ -18,5 +19,4 @@ modflow_sources += files(
   'GwtGwtConnection.f90',
   'GwtInterfaceModel.f90',
   'GwtDspOptions.f90',
-  'gwt-spc.f90',
 )

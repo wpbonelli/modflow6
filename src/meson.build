@@ -5,6 +5,10 @@ root_path = meson.project_source_root()
 src_path = root_path / 'src'
 dfn_path = root_path / 'doc' / 'mf6io' / 'mf6ivar' / 'dfn'
 
+# locate some programs
+py = find_program('python', required : true) 
+fypp = find_program('fypp', required : false)
+
 # configurable model and exchange selection
 numerical_models = get_option('numerical-models')
 explicit_models = get_option('explicit-models')
@@ -191,34 +195,74 @@ modflow_sources = files(
     'RunControlFactory.F90',
 )
 
-# template preprocessing
-fypp = find_program('fypp', required : false)
-if fypp.found()
-  # generate factories for configurable mf6 components
-  foreach f : ['Model', 'Exchange']
-    input = f'@f@Factory.fypp'
-    output = f'@f@Factory.f90'
-    args = [
-      src_path / input,
-      '@BUILD_DIR@' / output,
-      '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-      '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
-      '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
-    ]
-    gen = generator(fypp, output: '@BASENAME@.f90', arguments: args)
-    modflow_sources += gen.process(input)
-  endforeach
-else
-  error('Can\'t find fypp, can\'t generate source from templates')
-endif
+# generate factories for configurable mf6 components
+foreach f : ['Model', 'Exchange']
+  input = f'@f@Factory.fypp'
+  output = f'@f@Factory.f90'
+  args = [
+    src_path / input,
+    '@BUILD_DIR@' / output,
+    '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
+    '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+    '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
+  ]
+  gen = generator(fypp, output: '@BASENAME@.f90', arguments: args)
+  modflow_sources += gen.process(input)
+endforeach
 
 # model source files
 foreach m : models
   subdir(m.to_upper())
 endforeach
 
-# IDM source files
-subdir('IDM')
+# IDM definition files
+# todo: once IDM fully integrated, autodiscover DFNs instead of listing explicitly?
+lines = fs.read(root_path / 'utils' / 'idmloader' / 'dfns.txt').split('\n')
+args = [
+  root_path / 'utils' / 'idmloader' / 'scripts' / 'dfn2f90.py',
+  '-d', '@INPUT@', '-o', '@BUILD_DIR@',
+  '-v'  # uncomment for verbose
+]
+gen = generator(py, output: '@BASENAME@idm.f90', arguments: args)
+packages = []
+foreach l : lines
+  l = l.strip()
+  if l.startswith('#') or not l.endswith('.dfn')
+    continue  # skip comments and blank lines
+  endif
+  # add simulation-level DFN file
+  if l.startswith('sim')
+    modflow_sources += gen.process(dfn_path / l)
+  elif l.startswith('exg')
+    foreach e : exchanges
+      if l.contains(e.replace('-', ''))
+        modflow_sources += gen.process(dfn_path / l)
+      endif
+    endforeach
+  else
+    # filter model-level DFN files
+    foreach m : models
+      if l.startswith(m)
+        modflow_sources += gen.process(dfn_path / l)
+        packages += l.replace('.dfn', '')  # track pkgs for selector
+      endif
+    endforeach
+  endif
+endforeach
+
+# IDM selector file
+input = 'IdmDfnSelector.fypp'
+output = 'IdmDfnSelector.f90'
+args = [
+  src_path / input,
+  '@BUILD_DIR@' / output,
+  '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
+  '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+  '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]'),
+  '-DPACKAGES=' + (packages.length() > 0 ? ('["' + '", "'.join(packages) + '"]') : '[]')
+]
+gen = generator(fypp, output: '@BASENAME@.f90', arguments: args)
+modflow_sources += gen.process(input)
 
 # PETSc-related source files
 if with_petsc

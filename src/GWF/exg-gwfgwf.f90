@@ -1288,13 +1288,13 @@ contains
     use InputOutputModule, only: getunit, openfile
     use MemoryManagerExtModule, only: mem_set_value
     use CharacterStringModule, only: CharacterStringType
-    use ExgGwfgwfInputModule, only: ExgGwfgwfParamFoundType
+    use ExgGwfGwfInputModule, only: ExgGwfGwfParamFoundType
     use SourceCommonModule, only: filein_fname
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
     integer(I4B), intent(in) :: iout
     ! -- local
-    type(ExgGwfgwfParamFoundType) :: found
+    type(ExgGwfGwfParamFoundType) :: found
     character(len=LENVARNAME), dimension(3) :: cellavg_method = &
       &[character(len=LENVARNAME) :: 'HARMONIC', 'LOGARITHMIC', 'AMT-LMK']
     character(len=LINELENGTH) :: gnc_fname, mvr_fname

@@ -14,9 +14,9 @@ module ModflowInputModule
   use MemoryHelperModule, only: create_mem_path
   use InputDefinitionModule, only: InputParamDefinitionType, &
                                    InputBlockDefinitionType
-  use IdmDfnSelectorModule, only: block_definitions, &
-                                  aggregate_definitions, &
-                                  param_definitions
+  use IdmDfnSelectorModule, only: idm_block_definitions, &
+                                  idm_aggregate_definitions, &
+                                  idm_param_definitions
   use SimVariablesModule, only: idm_context
 
   implicit none
@@ -82,12 +82,15 @@ contains
                                                   context=idm_context)
 
     ! -- set input definitions
-    mf6_input%block_dfns => block_definitions(mf6_input%component_type, &
-                                              mf6_input%subcomponent_type)
-    mf6_input%aggregate_dfns => aggregate_definitions(mf6_input%component_type, &
-                                                      mf6_input%subcomponent_type)
-    mf6_input%param_dfns => param_definitions(mf6_input%component_type, &
-                                              mf6_input%subcomponent_type)
+    mf6_input%block_dfns => idm_block_definitions( &
+                            mf6_input%component_type, &
+                            mf6_input%subcomponent_type)
+    mf6_input%aggregate_dfns => idm_aggregate_definitions( &
+                                mf6_input%component_type, &
+                                mf6_input%subcomponent_type)
+    mf6_input%param_dfns => idm_param_definitions( &
+                            mf6_input%component_type, &
+                            mf6_input%subcomponent_type)
   end function getModflowInput
 
   function update_sc_type(filetype, filename, component_type, subcomponent_type) &

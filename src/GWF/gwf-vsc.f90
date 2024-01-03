@@ -351,7 +351,7 @@ contains
     character(len=*), parameter :: fmtc = &
       "('Viscosity Package does not have a concentration set &
        &for species ',i0,'. One or more model names may be specified &
-       &incorrectly in the PACKAGEDATA block or a GWF-GWT exchange may need &
+       &incorrectly in the PACKAGEDATA block or a GWT-GWG exchange may need &
        &to be activated.')"
     !
     ! -- Check to make sure all concentration pointers have been set

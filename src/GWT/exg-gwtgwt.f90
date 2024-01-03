@@ -703,13 +703,13 @@ contains
     use InputOutputModule, only: getunit, openfile
     use MemoryManagerExtModule, only: mem_set_value
     use CharacterStringModule, only: CharacterStringType
-    use ExgGwtgwtInputModule, only: ExgGwtgwtParamFoundType
+    use ExgGwtGwtInputModule, only: ExgGwtGwtParamFoundType
     use SourceCommonModule, only: filein_fname
     ! -- dummy
     class(GwtExchangeType) :: this !<  GwtExchangeType
     integer(I4B), intent(in) :: iout
     ! -- local
-    type(ExgGwtgwtParamFoundType) :: found
+    type(ExgGwtGwtParamFoundType) :: found
     character(len=LENVARNAME), dimension(3) :: adv_scheme = &
       &[character(len=LENVARNAME) :: 'UPSTREAM', 'CENTRAL', 'TVD']
     character(len=LINELENGTH) :: mvt_fname
