@@ -1,19 +1,19 @@
 fs = import('fs')
 
-# define some paths
+# define paths
 root_path = meson.project_source_root()
 src_path = root_path / 'src'
 dfn_path = root_path / 'doc' / 'mf6io' / 'mf6ivar' / 'dfn'
 
-# locate some programs
+# locate programs
 py = find_program('python', required : true) 
 fypp = find_program('fypp', required : false)
 
-# configurable model and exchange selection
-numerical_models = get_option('numerical-models')
-explicit_models = get_option('explicit-models')
-models = numerical_models + explicit_models
+# model and exchange selection
+models = get_option('models')
 exchanges = get_option('exchanges')
+message(f'Selected models: @models@')
+message(f'Selected exchanges: @exchanges@')
 
 # external source files
 external_libraries = files(
@@ -204,8 +204,7 @@ foreach f : ['Model', 'Exchange']
       fypp,
       src_path / input,
       src_path / output,
-      '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-      '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+      '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
       '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
     ],
     input: input,
@@ -216,8 +215,7 @@ foreach f : ['Model', 'Exchange']
   # args = [
   #   src_path / input,
   #   '@BUILD_DIR@' / output,
-  #   '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-  #   '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+  #   '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
   #   '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
   # ]
   # gen = generator(fypp, output: '@BASENAME@.f90', arguments: args)
@@ -282,8 +280,7 @@ configure_file(
     fypp,
     src_path / input,
     src_path / output,
-    '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-    '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+    '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
     '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]'),
     '-DPACKAGES=' + (packages.length() > 0 ? ('["' + '", "'.join(packages) + '"]') : '[]')
   ],
@@ -295,8 +292,7 @@ modflow_sources += files(output)
 # args = [
 #   src_path / input,
 #   '@BUILD_DIR@' / output,
-#   '-DNUMERICAL_MODELS=' + (numerical_models.length() > 0 ? ('["' + '", "'.join(numerical_models) + '"]') : '[]'),
-#   '-DEXPLICIT_MODELS=' + (explicit_models.length() > 0 ? ('["' + '", "'.join(explicit_models) + '"]') : '[]'),
+#   '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
 #   '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]'),
 #   '-DPACKAGES=' + (packages.length() > 0 ? ('["' + '", "'.join(packages) + '"]') : '[]')
 # ]

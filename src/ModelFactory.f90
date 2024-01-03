@@ -17,8 +17,8 @@ contains
 
   subroutine add_gwf_model(n, im, fname)
     ! -- modules
-    use NumericalModelModule, only: NumericalModelType, &
-                                    GetNumericalModelFromList
+    use BaseModelModule, only: BaseModelType, &
+                               GetBaseModelFromList
     use GwfModule, only: gwf_cr
     use VirtualGwfModelModule, only: add_virtual_gwf_model
     ! -- dummy
@@ -26,7 +26,7 @@ contains
     integer(I4B), intent(inout) :: im
     character(len=*), intent(in) :: fname
     ! -- local
-    class(NumericalModelType), pointer :: model
+    class(BaseModelType), pointer :: model
 
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
@@ -34,7 +34,7 @@ contains
       write (iout, '(4x,2a,i0,a)') 'GWF6', ' model ', &
         n, ' will be created'
       call gwf_cr(fname, n, model_names(n))
-      model => GetNumericalModelFromList(basemodellist, im)
+      model => GetBaseModelFromList(basemodellist, im)
       model_loc_idx(n) = im
     end if
     call add_virtual_gwf_model(n, model_names(n), model)
@@ -43,8 +43,8 @@ contains
 
   subroutine add_gwt_model(n, im, fname)
     ! -- modules
-    use NumericalModelModule, only: NumericalModelType, &
-                                    GetNumericalModelFromList
+    use BaseModelModule, only: BaseModelType, &
+                               GetBaseModelFromList
     use GwtModule, only: gwt_cr
     use VirtualGwtModelModule, only: add_virtual_gwt_model
     ! -- dummy
@@ -52,7 +52,7 @@ contains
     integer(I4B), intent(inout) :: im
     character(len=*), intent(in) :: fname
     ! -- local
-    class(NumericalModelType), pointer :: model
+    class(BaseModelType), pointer :: model
 
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
@@ -60,7 +60,7 @@ contains
       write (iout, '(4x,2a,i0,a)') 'GWT6', ' model ', &
         n, ' will be created'
       call gwt_cr(fname, n, model_names(n))
-      model => GetNumericalModelFromList(basemodellist, im)
+      model => GetBaseModelFromList(basemodellist, im)
       model_loc_idx(n) = im
     end if
     call add_virtual_gwt_model(n, model_names(n), model)

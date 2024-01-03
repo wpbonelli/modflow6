@@ -15,11 +15,11 @@ module ModelFactoryModule
 
 contains
 
-  #:for mtype in NUMERICAL_MODELS
+  #:for mtype in MODELS
   subroutine add_${mtype}$_model(n, im, fname)
     ! -- modules
-    use NumericalModelModule, only: NumericalModelType, &
-                                    GetNumericalModelFromList
+    use BaseModelModule, only: BaseModelType, &
+                               GetBaseModelFromList
     #:set mtype_camel = mtype[0].upper() + mtype[1:]
     use ${mtype_camel}$Module, only: ${mtype}$_cr
     use Virtual${mtype_camel}$ModelModule, only: add_virtual_${mtype}$_model
@@ -28,7 +28,7 @@ contains
     integer(I4B), intent(inout) :: im
     character(len=*), intent(in) :: fname
     ! -- local
-    class(NumericalModelType), pointer :: model
+    class(BaseModelType), pointer :: model
   
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
@@ -36,36 +36,7 @@ contains
       write (iout, '(4x,2a,i0,a)') '${mtype.upper() + '6'}$', ' model ', &
         n, ' will be created'
       call ${mtype}$_cr(fname, n, model_names(n))
-      model => GetNumericalModelFromList(basemodellist, im)
-      model_loc_idx(n) = im
-    end if
-    call add_virtual_${mtype}$_model(n, model_names(n), model)
-  
-  end subroutine add_${mtype}$_model
-
-  #:endfor
-  #:for mtype in EXPLICIT_MODELS
-  subroutine add_${mtype}$_model(n, im, fname)
-    ! -- modules
-    use ExplicitModelModule, only: ExplicitModelType, &
-                                    GetExplicitModelFromList
-    #:set mtype_camel = mtype[0].upper() + mtype[1:]
-    use ${mtype[0].upper() + mtype[1:]}$Module, only: ${mtype}$_cr
-    use Virtual${mtype_camel}$ModelModule, only: add_virtual_${mtype}$_model 
-    ! -- dummy
-    integer(I4B), intent(in) :: n
-    integer(I4B), intent(inout) :: im
-    character(len=*), intent(in) :: fname
-    ! -- local
-    class(ExplicitModelType), pointer :: model
-  
-    model => null() ! can be null for remote models
-    if (model_ranks(n) == proc_id) then
-      im = im + 1
-      write (iout, '(4x,2a,i0,a)') '${mtype.upper() + '6'}$', ' model ', &
-        n, ' will be created'
-      call ${mtype}$_cr(fname, n, model_names(n))
-      model => GetExplicitModelFromList(basemodellist, im)
+      model => GetBaseModelFromList(basemodellist, im)
       model_loc_idx(n) = im
     end if
     call add_virtual_${mtype}$_model(n, model_names(n), model)
@@ -133,7 +104,7 @@ contains
 
       ! -- add a new (local or global) model
       select case (model_type)
-      #:for mtype in NUMERICAL_MODELS + EXPLICIT_MODELS
+      #:for mtype in MODELS
       case ('${mtype.upper() + '6'}$')
         call add_${mtype}$_model(n, im, fname)
       #:endfor
