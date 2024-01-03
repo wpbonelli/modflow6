@@ -27,7 +27,7 @@ contains
     character(len=*), intent(in) :: fname
     ! -- local
     class(NumericalModelType), pointer :: model
-  
+
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
       im = im + 1
@@ -38,7 +38,7 @@ contains
       model_loc_idx(n) = im
     end if
     call add_virtual_gwf_model(n, model_names(n), model)
-  
+
   end subroutine add_gwf_model
 
   subroutine add_gwt_model(n, im, fname)
@@ -53,7 +53,7 @@ contains
     character(len=*), intent(in) :: fname
     ! -- local
     class(NumericalModelType), pointer :: model
-  
+
     model => null() ! can be null for remote models
     if (model_ranks(n) == proc_id) then
       im = im + 1
@@ -64,7 +64,7 @@ contains
       model_loc_idx(n) = im
     end if
     call add_virtual_gwt_model(n, model_names(n), model)
-  
+
   end subroutine add_gwt_model
 
   !> @brief Check that the model name is valid
@@ -148,4 +148,3 @@ contains
   end subroutine
 
 end module ModelFactoryModule
-  

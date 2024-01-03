@@ -51,58 +51,58 @@ module IdmDfnSelectorModule
 
 contains
 
-  function idm_param_definitions(component, subcomponent) result(input_definition)
+  function idm_param_definitions(component, subcomponent) result(def)
     character(len=*), intent(in) :: component
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (component)
     case ('SIM')
-      input_definition => sim_param_definitions(subcomponent)
+      def => sim_param_definitions(subcomponent)
     #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
     case ('${m.upper()}$')
-      input_definition => ${m}$_param_definitions(subcomponent)
+      def => ${m}$_param_definitions(subcomponent)
     #:endfor
     case ('EXG')
-      input_definition => exg_param_definitions(subcomponent)
+      def => exg_param_definitions(subcomponent)
     case default
     end select
     return
   end function idm_param_definitions
 
-  function idm_aggregate_definitions(component, subcomponent) result(input_definition)
+  function idm_aggregate_definitions(component, subcomponent) result(def)
     character(len=*), intent(in) :: component
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (component)
     case ('SIM')
-      input_definition => sim_aggregate_definitions(subcomponent)
+      def => sim_aggregate_definitions(subcomponent)
     #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
     case ('${m.upper()}$')
-      input_definition => ${m}$_aggregate_definitions(subcomponent)
+      def => ${m}$_aggregate_definitions(subcomponent)
     #:endfor
     case ('EXG')
-      input_definition => exg_aggregate_definitions(subcomponent)
+      def => exg_aggregate_definitions(subcomponent)
     case default
     end select
     return
   end function idm_aggregate_definitions
 
-  function idm_block_definitions(component, subcomponent) result(input_definition)
+  function idm_block_definitions(component, subcomponent) result(def)
     character(len=*), intent(in) :: component
     character(len=*), intent(in) :: subcomponent
-    type(InputBlockDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (component)
     case ('SIM')
-      input_definition => sim_block_definitions(subcomponent)
+      def => sim_block_definitions(subcomponent)
     #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
     case ('${m.upper()}$')
-      input_definition => ${m}$_block_definitions(subcomponent)
+      def => ${m}$_block_definitions(subcomponent)
     #:endfor
     case ('EXG')
-      input_definition => exg_block_definitions(subcomponent)
+      def => exg_block_definitions(subcomponent)
     case default
     end select
     return
@@ -178,48 +178,48 @@ contains
     input_dfn => input_dfn_target
   end subroutine exg_set_block_pointer
 
-  function exg_param_definitions(subcomponent) result(input_definition)
+  function exg_param_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     #:for e in EXCHANGES
     #:set l = e.split('-')[0]
     #:set r = e.split('-')[1]
     case ('${l.upper()}$${r.upper()}$')
-      call exg_set_param_pointer(input_definition, exg_${l}$${r}$_param_definitions)
+      call exg_set_param_pointer(def, exg_${l}$${r}$_param_definitions)
     #:endfor
     case default
     end select
     return
   end function exg_param_definitions
 
-  function exg_aggregate_definitions(subcomponent) result(input_definition)
+  function exg_aggregate_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     #:for e in EXCHANGES
     #:set l = e.split('-')[0]
     #:set r = e.split('-')[1]
     case ('${l.upper()}$${r.upper()}$')
-      call exg_set_param_pointer(input_definition, exg_${l}$${r}$_aggregate_definitions)
+      call exg_set_param_pointer(def, exg_${l}$${r}$_aggregate_definitions)
     #:endfor
     case default
     end select
     return
   end function exg_aggregate_definitions
 
-  function exg_block_definitions(subcomponent) result(input_definition)
+  function exg_block_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputBlockDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     #:for e in EXCHANGES
     #:set l = e.split('-')[0]
     #:set r = e.split('-')[1]
     case ('${l.upper()}$${r.upper()}$')
-      call exg_set_block_pointer(input_definition, exg_${l}$${r}$_block_definitions)
+      call exg_set_block_pointer(def, exg_${l}$${r}$_block_definitions)
     #:endfor
     case default
     end select
@@ -272,37 +272,37 @@ contains
     input_dfn => input_dfn_target
   end subroutine sim_set_block_pointer
 
-  function sim_param_definitions(subcomponent) result(input_definition)
+  function sim_param_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call sim_set_param_pointer(input_definition, sim_nam_param_definitions)
+      call sim_set_param_pointer(def, sim_nam_param_definitions)
     case default
     end select
     return
   end function sim_param_definitions
 
-  function sim_aggregate_definitions(subcomponent) result(input_definition)
+  function sim_aggregate_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call sim_set_param_pointer(input_definition, sim_nam_aggregate_definitions)
+      call sim_set_param_pointer(def, sim_nam_aggregate_definitions)
     case default
     end select
     return
   end function sim_aggregate_definitions
 
-  function sim_block_definitions(subcomponent) result(input_definition)
+  function sim_block_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputBlockDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call sim_set_block_pointer(input_definition, sim_nam_block_definitions)
+      call sim_set_block_pointer(def, sim_nam_block_definitions)
     case default
     end select
     return
@@ -351,14 +351,14 @@ contains
   #:endfor
 
   #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
-  function ${m}$_param_definitions(subcomponent) result(input_definition)
+  function ${m}$_param_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     #:for p in [pkg for pkg in PACKAGES if pkg.startswith(m)]
     case ('${p.replace('-', '').replace(m, '').upper()}$')
-      call ${m}$_set_param_pointer(input_definition, ${p.replace('-', '_')}$_param_definitions)
+      call ${m}$_set_param_pointer(def, ${p.replace('-', '_')}$_param_definitions)
     #:endfor
     case default
     end select
@@ -367,14 +367,14 @@ contains
   #:endfor
 
   #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
-  function ${m}$_aggregate_definitions(subcomponent) result(input_definition)
+  function ${m}$_aggregate_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     #:for p in [pkg for pkg in PACKAGES if pkg.startswith(m)]
     case ('${p.replace('-', '').replace(m, '').upper()}$')
-      call ${m}$_set_param_pointer(input_definition, ${p.replace('-', '_')}$_aggregate_definitions)
+      call ${m}$_set_param_pointer(def, ${p.replace('-', '_')}$_aggregate_definitions)
     #:endfor
     case default
     end select
@@ -383,14 +383,14 @@ contains
   #:endfor
 
   #:for m in NUMERICAL_MODELS + EXPLICIT_MODELS
-  function ${m}$_block_definitions(subcomponent) result(input_definition)
+  function ${m}$_block_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputBlockDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     #:for p in [pkg for pkg in PACKAGES if pkg.startswith(m)]
     case ('${p.replace('-', '').replace(m, '').upper()}$')
-      call ${m}$_set_block_pointer(input_definition, ${p.replace('-', '_')}$_block_definitions)
+      call ${m}$_set_block_pointer(def, ${p.replace('-', '_')}$_block_definitions)
     #:endfor
     case default
     end select

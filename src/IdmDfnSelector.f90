@@ -4,7 +4,7 @@ module IdmDfnSelectorModule
   use SimModule, only: store_error
   use InputDefinitionModule, only: InputParamDefinitionType, &
                                    InputBlockDefinitionType
-  
+
   use SimNamInputModule
 
   use ExggwfgwfInputModule
@@ -69,58 +69,58 @@ module IdmDfnSelectorModule
 
 contains
 
-  function idm_param_definitions(component, subcomponent) result(input_definition)
+  function idm_param_definitions(component, subcomponent) result(def)
     character(len=*), intent(in) :: component
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (component)
     case ('SIM')
-      input_definition => sim_param_definitions(subcomponent)
+      def => sim_param_definitions(subcomponent)
     case ('GWF')
-      input_definition => gwf_param_definitions(subcomponent)
+      def => gwf_param_definitions(subcomponent)
     case ('GWT')
-      input_definition => gwt_param_definitions(subcomponent)
+      def => gwt_param_definitions(subcomponent)
     case ('EXG')
-      input_definition => exg_param_definitions(subcomponent)
+      def => exg_param_definitions(subcomponent)
     case default
     end select
     return
   end function idm_param_definitions
 
-  function idm_aggregate_definitions(component, subcomponent) result(input_definition)
+  function idm_aggregate_definitions(component, subcomponent) result(def)
     character(len=*), intent(in) :: component
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (component)
     case ('SIM')
-      input_definition => sim_aggregate_definitions(subcomponent)
+      def => sim_aggregate_definitions(subcomponent)
     case ('GWF')
-      input_definition => gwf_aggregate_definitions(subcomponent)
+      def => gwf_aggregate_definitions(subcomponent)
     case ('GWT')
-      input_definition => gwt_aggregate_definitions(subcomponent)
+      def => gwt_aggregate_definitions(subcomponent)
     case ('EXG')
-      input_definition => exg_aggregate_definitions(subcomponent)
+      def => exg_aggregate_definitions(subcomponent)
     case default
     end select
     return
   end function idm_aggregate_definitions
 
-  function idm_block_definitions(component, subcomponent) result(input_definition)
+  function idm_block_definitions(component, subcomponent) result(def)
     character(len=*), intent(in) :: component
     character(len=*), intent(in) :: subcomponent
-    type(InputBlockDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (component)
     case ('SIM')
-      input_definition => sim_block_definitions(subcomponent)
+      def => sim_block_definitions(subcomponent)
     case ('GWF')
-      input_definition => gwf_block_definitions(subcomponent)
+      def => gwf_block_definitions(subcomponent)
     case ('GWT')
-      input_definition => gwt_block_definitions(subcomponent)
+      def => gwt_block_definitions(subcomponent)
     case ('EXG')
-      input_definition => exg_block_definitions(subcomponent)
+      def => exg_block_definitions(subcomponent)
     case default
     end select
     return
@@ -196,49 +196,49 @@ contains
     input_dfn => input_dfn_target
   end subroutine exg_set_block_pointer
 
-  function exg_param_definitions(subcomponent) result(input_definition)
+  function exg_param_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('GWFGWF')
-      call exg_set_param_pointer(input_definition, exg_gwfgwf_param_definitions)
+      call exg_set_param_pointer(def, exg_gwfgwf_param_definitions)
     case ('GWTGWT')
-      call exg_set_param_pointer(input_definition, exg_gwtgwt_param_definitions)
+      call exg_set_param_pointer(def, exg_gwtgwt_param_definitions)
     case ('GWFGWT')
-      call exg_set_param_pointer(input_definition, exg_gwfgwt_param_definitions)
+      call exg_set_param_pointer(def, exg_gwfgwt_param_definitions)
     case default
     end select
     return
   end function exg_param_definitions
 
-  function exg_aggregate_definitions(subcomponent) result(input_definition)
+  function exg_aggregate_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('GWFGWF')
-      call exg_set_param_pointer(input_definition, exg_gwfgwf_aggregate_definitions)
+      call exg_set_param_pointer(def, exg_gwfgwf_aggregate_definitions)
     case ('GWTGWT')
-      call exg_set_param_pointer(input_definition, exg_gwtgwt_aggregate_definitions)
+      call exg_set_param_pointer(def, exg_gwtgwt_aggregate_definitions)
     case ('GWFGWT')
-      call exg_set_param_pointer(input_definition, exg_gwfgwt_aggregate_definitions)
+      call exg_set_param_pointer(def, exg_gwfgwt_aggregate_definitions)
     case default
     end select
     return
   end function exg_aggregate_definitions
 
-  function exg_block_definitions(subcomponent) result(input_definition)
+  function exg_block_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputBlockDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('GWFGWF')
-      call exg_set_block_pointer(input_definition, exg_gwfgwf_block_definitions)
+      call exg_set_block_pointer(def, exg_gwfgwf_block_definitions)
     case ('GWTGWT')
-      call exg_set_block_pointer(input_definition, exg_gwtgwt_block_definitions)
+      call exg_set_block_pointer(def, exg_gwtgwt_block_definitions)
     case ('GWFGWT')
-      call exg_set_block_pointer(input_definition, exg_gwfgwt_block_definitions)
+      call exg_set_block_pointer(def, exg_gwfgwt_block_definitions)
     case default
     end select
     return
@@ -290,37 +290,37 @@ contains
     input_dfn => input_dfn_target
   end subroutine sim_set_block_pointer
 
-  function sim_param_definitions(subcomponent) result(input_definition)
+  function sim_param_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call sim_set_param_pointer(input_definition, sim_nam_param_definitions)
+      call sim_set_param_pointer(def, sim_nam_param_definitions)
     case default
     end select
     return
   end function sim_param_definitions
 
-  function sim_aggregate_definitions(subcomponent) result(input_definition)
+  function sim_aggregate_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call sim_set_param_pointer(input_definition, sim_nam_aggregate_definitions)
+      call sim_set_param_pointer(def, sim_nam_aggregate_definitions)
     case default
     end select
     return
   end function sim_aggregate_definitions
 
-  function sim_block_definitions(subcomponent) result(input_definition)
+  function sim_block_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputBlockDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call sim_set_block_pointer(input_definition, sim_nam_block_definitions)
+      call sim_set_block_pointer(def, sim_nam_block_definitions)
     case default
     end select
     return
@@ -374,190 +374,190 @@ contains
     input_dfn => input_dfn_target
   end subroutine gwt_set_block_pointer
 
-  function gwf_param_definitions(subcomponent) result(input_definition)
+  function gwf_param_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call gwf_set_param_pointer(input_definition, gwf_nam_param_definitions)
+      call gwf_set_param_pointer(def, gwf_nam_param_definitions)
     case ('CHD')
-      call gwf_set_param_pointer(input_definition, gwf_chd_param_definitions)
+      call gwf_set_param_pointer(def, gwf_chd_param_definitions)
     case ('DIS')
-      call gwf_set_param_pointer(input_definition, gwf_dis_param_definitions)
+      call gwf_set_param_pointer(def, gwf_dis_param_definitions)
     case ('DISU')
-      call gwf_set_param_pointer(input_definition, gwf_disu_param_definitions)
+      call gwf_set_param_pointer(def, gwf_disu_param_definitions)
     case ('DISV')
-      call gwf_set_param_pointer(input_definition, gwf_disv_param_definitions)
+      call gwf_set_param_pointer(def, gwf_disv_param_definitions)
     case ('DRN')
-      call gwf_set_param_pointer(input_definition, gwf_drn_param_definitions)
+      call gwf_set_param_pointer(def, gwf_drn_param_definitions)
     case ('EVT')
-      call gwf_set_param_pointer(input_definition, gwf_evt_param_definitions)
+      call gwf_set_param_pointer(def, gwf_evt_param_definitions)
     case ('EVTA')
-      call gwf_set_param_pointer(input_definition, gwf_evta_param_definitions)
+      call gwf_set_param_pointer(def, gwf_evta_param_definitions)
     case ('GHB')
-      call gwf_set_param_pointer(input_definition, gwf_ghb_param_definitions)
+      call gwf_set_param_pointer(def, gwf_ghb_param_definitions)
     case ('IC')
-      call gwf_set_param_pointer(input_definition, gwf_ic_param_definitions)
+      call gwf_set_param_pointer(def, gwf_ic_param_definitions)
     case ('NPF')
-      call gwf_set_param_pointer(input_definition, gwf_npf_param_definitions)
+      call gwf_set_param_pointer(def, gwf_npf_param_definitions)
     case ('RCH')
-      call gwf_set_param_pointer(input_definition, gwf_rch_param_definitions)
+      call gwf_set_param_pointer(def, gwf_rch_param_definitions)
     case ('RCHA')
-      call gwf_set_param_pointer(input_definition, gwf_rcha_param_definitions)
+      call gwf_set_param_pointer(def, gwf_rcha_param_definitions)
     case ('RIV')
-      call gwf_set_param_pointer(input_definition, gwf_riv_param_definitions)
+      call gwf_set_param_pointer(def, gwf_riv_param_definitions)
     case ('WEL')
-      call gwf_set_param_pointer(input_definition, gwf_wel_param_definitions)
+      call gwf_set_param_pointer(def, gwf_wel_param_definitions)
     case default
     end select
     return
   end function gwf_param_definitions
-  function gwt_param_definitions(subcomponent) result(input_definition)
+  function gwt_param_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call gwt_set_param_pointer(input_definition, gwt_nam_param_definitions)
+      call gwt_set_param_pointer(def, gwt_nam_param_definitions)
     case ('DIS')
-      call gwt_set_param_pointer(input_definition, gwt_dis_param_definitions)
+      call gwt_set_param_pointer(def, gwt_dis_param_definitions)
     case ('DISU')
-      call gwt_set_param_pointer(input_definition, gwt_disu_param_definitions)
+      call gwt_set_param_pointer(def, gwt_disu_param_definitions)
     case ('DISV')
-      call gwt_set_param_pointer(input_definition, gwt_disv_param_definitions)
+      call gwt_set_param_pointer(def, gwt_disv_param_definitions)
     case ('DSP')
-      call gwt_set_param_pointer(input_definition, gwt_dsp_param_definitions)
+      call gwt_set_param_pointer(def, gwt_dsp_param_definitions)
     case ('CNC')
-      call gwt_set_param_pointer(input_definition, gwt_cnc_param_definitions)
+      call gwt_set_param_pointer(def, gwt_cnc_param_definitions)
     case ('IC')
-      call gwt_set_param_pointer(input_definition, gwt_ic_param_definitions)
+      call gwt_set_param_pointer(def, gwt_ic_param_definitions)
     case default
     end select
     return
   end function gwt_param_definitions
 
-  function gwf_aggregate_definitions(subcomponent) result(input_definition)
+  function gwf_aggregate_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call gwf_set_param_pointer(input_definition, gwf_nam_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_nam_aggregate_definitions)
     case ('CHD')
-      call gwf_set_param_pointer(input_definition, gwf_chd_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_chd_aggregate_definitions)
     case ('DIS')
-      call gwf_set_param_pointer(input_definition, gwf_dis_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_dis_aggregate_definitions)
     case ('DISU')
-      call gwf_set_param_pointer(input_definition, gwf_disu_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_disu_aggregate_definitions)
     case ('DISV')
-      call gwf_set_param_pointer(input_definition, gwf_disv_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_disv_aggregate_definitions)
     case ('DRN')
-      call gwf_set_param_pointer(input_definition, gwf_drn_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_drn_aggregate_definitions)
     case ('EVT')
-      call gwf_set_param_pointer(input_definition, gwf_evt_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_evt_aggregate_definitions)
     case ('EVTA')
-      call gwf_set_param_pointer(input_definition, gwf_evta_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_evta_aggregate_definitions)
     case ('GHB')
-      call gwf_set_param_pointer(input_definition, gwf_ghb_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_ghb_aggregate_definitions)
     case ('IC')
-      call gwf_set_param_pointer(input_definition, gwf_ic_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_ic_aggregate_definitions)
     case ('NPF')
-      call gwf_set_param_pointer(input_definition, gwf_npf_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_npf_aggregate_definitions)
     case ('RCH')
-      call gwf_set_param_pointer(input_definition, gwf_rch_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_rch_aggregate_definitions)
     case ('RCHA')
-      call gwf_set_param_pointer(input_definition, gwf_rcha_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_rcha_aggregate_definitions)
     case ('RIV')
-      call gwf_set_param_pointer(input_definition, gwf_riv_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_riv_aggregate_definitions)
     case ('WEL')
-      call gwf_set_param_pointer(input_definition, gwf_wel_aggregate_definitions)
+      call gwf_set_param_pointer(def, gwf_wel_aggregate_definitions)
     case default
     end select
     return
   end function gwf_aggregate_definitions
-  function gwt_aggregate_definitions(subcomponent) result(input_definition)
+  function gwt_aggregate_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputParamDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call gwt_set_param_pointer(input_definition, gwt_nam_aggregate_definitions)
+      call gwt_set_param_pointer(def, gwt_nam_aggregate_definitions)
     case ('DIS')
-      call gwt_set_param_pointer(input_definition, gwt_dis_aggregate_definitions)
+      call gwt_set_param_pointer(def, gwt_dis_aggregate_definitions)
     case ('DISU')
-      call gwt_set_param_pointer(input_definition, gwt_disu_aggregate_definitions)
+      call gwt_set_param_pointer(def, gwt_disu_aggregate_definitions)
     case ('DISV')
-      call gwt_set_param_pointer(input_definition, gwt_disv_aggregate_definitions)
+      call gwt_set_param_pointer(def, gwt_disv_aggregate_definitions)
     case ('DSP')
-      call gwt_set_param_pointer(input_definition, gwt_dsp_aggregate_definitions)
+      call gwt_set_param_pointer(def, gwt_dsp_aggregate_definitions)
     case ('CNC')
-      call gwt_set_param_pointer(input_definition, gwt_cnc_aggregate_definitions)
+      call gwt_set_param_pointer(def, gwt_cnc_aggregate_definitions)
     case ('IC')
-      call gwt_set_param_pointer(input_definition, gwt_ic_aggregate_definitions)
+      call gwt_set_param_pointer(def, gwt_ic_aggregate_definitions)
     case default
     end select
     return
   end function gwt_aggregate_definitions
 
-  function gwf_block_definitions(subcomponent) result(input_definition)
+  function gwf_block_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputBlockDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call gwf_set_block_pointer(input_definition, gwf_nam_block_definitions)
+      call gwf_set_block_pointer(def, gwf_nam_block_definitions)
     case ('CHD')
-      call gwf_set_block_pointer(input_definition, gwf_chd_block_definitions)
+      call gwf_set_block_pointer(def, gwf_chd_block_definitions)
     case ('DIS')
-      call gwf_set_block_pointer(input_definition, gwf_dis_block_definitions)
+      call gwf_set_block_pointer(def, gwf_dis_block_definitions)
     case ('DISU')
-      call gwf_set_block_pointer(input_definition, gwf_disu_block_definitions)
+      call gwf_set_block_pointer(def, gwf_disu_block_definitions)
     case ('DISV')
-      call gwf_set_block_pointer(input_definition, gwf_disv_block_definitions)
+      call gwf_set_block_pointer(def, gwf_disv_block_definitions)
     case ('DRN')
-      call gwf_set_block_pointer(input_definition, gwf_drn_block_definitions)
+      call gwf_set_block_pointer(def, gwf_drn_block_definitions)
     case ('EVT')
-      call gwf_set_block_pointer(input_definition, gwf_evt_block_definitions)
+      call gwf_set_block_pointer(def, gwf_evt_block_definitions)
     case ('EVTA')
-      call gwf_set_block_pointer(input_definition, gwf_evta_block_definitions)
+      call gwf_set_block_pointer(def, gwf_evta_block_definitions)
     case ('GHB')
-      call gwf_set_block_pointer(input_definition, gwf_ghb_block_definitions)
+      call gwf_set_block_pointer(def, gwf_ghb_block_definitions)
     case ('IC')
-      call gwf_set_block_pointer(input_definition, gwf_ic_block_definitions)
+      call gwf_set_block_pointer(def, gwf_ic_block_definitions)
     case ('NPF')
-      call gwf_set_block_pointer(input_definition, gwf_npf_block_definitions)
+      call gwf_set_block_pointer(def, gwf_npf_block_definitions)
     case ('RCH')
-      call gwf_set_block_pointer(input_definition, gwf_rch_block_definitions)
+      call gwf_set_block_pointer(def, gwf_rch_block_definitions)
     case ('RCHA')
-      call gwf_set_block_pointer(input_definition, gwf_rcha_block_definitions)
+      call gwf_set_block_pointer(def, gwf_rcha_block_definitions)
     case ('RIV')
-      call gwf_set_block_pointer(input_definition, gwf_riv_block_definitions)
+      call gwf_set_block_pointer(def, gwf_riv_block_definitions)
     case ('WEL')
-      call gwf_set_block_pointer(input_definition, gwf_wel_block_definitions)
+      call gwf_set_block_pointer(def, gwf_wel_block_definitions)
     case default
     end select
     return
   end function gwf_block_definitions
-  function gwt_block_definitions(subcomponent) result(input_definition)
+  function gwt_block_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
-    type(InputBlockDefinitionType), dimension(:), pointer :: input_definition
-    nullify (input_definition)
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
     select case (subcomponent)
     case ('NAM')
-      call gwt_set_block_pointer(input_definition, gwt_nam_block_definitions)
+      call gwt_set_block_pointer(def, gwt_nam_block_definitions)
     case ('DIS')
-      call gwt_set_block_pointer(input_definition, gwt_dis_block_definitions)
+      call gwt_set_block_pointer(def, gwt_dis_block_definitions)
     case ('DISU')
-      call gwt_set_block_pointer(input_definition, gwt_disu_block_definitions)
+      call gwt_set_block_pointer(def, gwt_disu_block_definitions)
     case ('DISV')
-      call gwt_set_block_pointer(input_definition, gwt_disv_block_definitions)
+      call gwt_set_block_pointer(def, gwt_disv_block_definitions)
     case ('DSP')
-      call gwt_set_block_pointer(input_definition, gwt_dsp_block_definitions)
+      call gwt_set_block_pointer(def, gwt_dsp_block_definitions)
     case ('CNC')
-      call gwt_set_block_pointer(input_definition, gwt_cnc_block_definitions)
+      call gwt_set_block_pointer(def, gwt_cnc_block_definitions)
     case ('IC')
-      call gwt_set_block_pointer(input_definition, gwt_ic_block_definitions)
+      call gwt_set_block_pointer(def, gwt_ic_block_definitions)
     case default
     end select
     return
