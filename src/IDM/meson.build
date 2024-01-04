@@ -25,4 +25,9 @@ modflow_sources += files(
   'gwf-disvidm.f90',
   'gwf-npfidm.f90',
   'gwt-disuidm.f90',
+  'prt-disidm.f90',
+  'prt-disvidm.f90',
+  'prt-mipidm.f90',
+  'prt-namidm.f90',
+  'exg-gwfprtidm.f90'
 )

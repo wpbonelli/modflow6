@@ -4,12 +4,13 @@ module IdmDfnSelectorModule
   use SimModule, only: store_error
   use InputDefinitionModule, only: InputParamDefinitionType, &
                                    InputBlockDefinitionType
-
+  
   use SimNamInputModule
 
   use ExggwfgwfInputModule
   use ExggwtgwtInputModule
   use ExggwfgwtInputModule
+  use ExggwfprtInputModule
 
   use gwfnamInputModule
   use gwfchdInputModule
@@ -33,6 +34,10 @@ module IdmDfnSelectorModule
   use gwtdspInputModule
   use gwtcncInputModule
   use gwticInputModule
+  use prtnamInputModule
+  use prtmipInputModule
+  use prtdisInputModule
+  use prtdisvInputModule
 
   implicit none
   private
@@ -66,6 +71,11 @@ module IdmDfnSelectorModule
   public :: gwt_block_definitions
   public :: gwt_idm_multi_package
   public :: gwt_idm_integrated
+  public :: prt_param_definitions
+  public :: prt_aggregate_definitions
+  public :: prt_block_definitions
+  public :: prt_idm_multi_package
+  public :: prt_idm_integrated
 
 contains
 
@@ -81,6 +91,8 @@ contains
       def => gwf_param_definitions(subcomponent)
     case ('GWT')
       def => gwt_param_definitions(subcomponent)
+    case ('PRT')
+      def => prt_param_definitions(subcomponent)
     case ('EXG')
       def => exg_param_definitions(subcomponent)
     case default
@@ -100,6 +112,8 @@ contains
       def => gwf_aggregate_definitions(subcomponent)
     case ('GWT')
       def => gwt_aggregate_definitions(subcomponent)
+    case ('PRT')
+      def => prt_aggregate_definitions(subcomponent)
     case ('EXG')
       def => exg_aggregate_definitions(subcomponent)
     case default
@@ -119,6 +133,8 @@ contains
       def => gwf_block_definitions(subcomponent)
     case ('GWT')
       def => gwt_block_definitions(subcomponent)
+    case ('PRT')
+      def => prt_block_definitions(subcomponent)
     case ('EXG')
       def => exg_block_definitions(subcomponent)
     case default
@@ -137,6 +153,8 @@ contains
       multi_package = gwf_idm_multi_package(subcomponent)
     case ('GWT')
       multi_package = gwt_idm_multi_package(subcomponent)
+    case ('PRT')
+      multi_package = prt_idm_multi_package(subcomponent)
     case ('EXG')
       multi_package = exg_idm_multi_package(subcomponent)
     case default
@@ -159,6 +177,8 @@ contains
       integrated = gwf_idm_integrated(subcomponent)
     case ('GWT')
       integrated = gwt_idm_integrated(subcomponent)
+    case ('PRT')
+      integrated = prt_idm_integrated(subcomponent)
     case ('EXG')
       integrated = exg_idm_integrated(subcomponent)
     case default
@@ -176,6 +196,8 @@ contains
     case ('GWF')
       integrated = .true.
     case ('GWT')
+      integrated = .true.
+    case ('PRT')
       integrated = .true.
     case ('EXG')
       integrated = .true.
@@ -207,6 +229,8 @@ contains
       call exg_set_param_pointer(def, exg_gwtgwt_param_definitions)
     case ('GWFGWT')
       call exg_set_param_pointer(def, exg_gwfgwt_param_definitions)
+    case ('GWFPRT')
+      call exg_set_param_pointer(def, exg_gwfprt_param_definitions)
     case default
     end select
     return
@@ -223,6 +247,8 @@ contains
       call exg_set_param_pointer(def, exg_gwtgwt_aggregate_definitions)
     case ('GWFGWT')
       call exg_set_param_pointer(def, exg_gwfgwt_aggregate_definitions)
+    case ('GWFPRT')
+      call exg_set_param_pointer(def, exg_gwfprt_aggregate_definitions)
     case default
     end select
     return
@@ -239,6 +265,8 @@ contains
       call exg_set_block_pointer(def, exg_gwtgwt_block_definitions)
     case ('GWFGWT')
       call exg_set_block_pointer(def, exg_gwfgwt_block_definitions)
+    case ('GWFPRT')
+      call exg_set_block_pointer(def, exg_gwfprt_block_definitions)
     case default
     end select
     return
@@ -254,6 +282,8 @@ contains
       multi_package = exg_gwtgwt_multi_package
     case ('GWFGWT')
       multi_package = exg_gwfgwt_multi_package
+    case ('GWFPRT')
+      multi_package = exg_gwfprt_multi_package
     case default
       call store_error('Idm selector subcomponent not found; '//&
                        &'component="EXG"'//&
@@ -272,6 +302,8 @@ contains
     case ('GWTGWT')
       integrated = .true.
     case ('GWFGWT')
+      integrated = .true.
+    case ('GWFPRT')
       integrated = .true.
     case default
     end select
@@ -362,6 +394,11 @@ contains
     type(InputParamDefinitionType), dimension(:), target :: input_dfn_target
     input_dfn => input_dfn_target
   end subroutine gwt_set_param_pointer
+  subroutine prt_set_param_pointer(input_dfn, input_dfn_target)
+    type(InputParamDefinitionType), dimension(:), pointer :: input_dfn
+    type(InputParamDefinitionType), dimension(:), target :: input_dfn_target
+    input_dfn => input_dfn_target
+  end subroutine prt_set_param_pointer
 
   subroutine gwf_set_block_pointer(input_dfn, input_dfn_target)
     type(InputBlockDefinitionType), dimension(:), pointer :: input_dfn
@@ -373,6 +410,11 @@ contains
     type(InputBlockDefinitionType), dimension(:), target :: input_dfn_target
     input_dfn => input_dfn_target
   end subroutine gwt_set_block_pointer
+  subroutine prt_set_block_pointer(input_dfn, input_dfn_target)
+    type(InputBlockDefinitionType), dimension(:), pointer :: input_dfn
+    type(InputBlockDefinitionType), dimension(:), target :: input_dfn_target
+    input_dfn => input_dfn_target
+  end subroutine prt_set_block_pointer
 
   function gwf_param_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
@@ -436,6 +478,23 @@ contains
     end select
     return
   end function gwt_param_definitions
+  function prt_param_definitions(subcomponent) result(def)
+    character(len=*), intent(in) :: subcomponent
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
+    select case (subcomponent)
+    case ('NAM')
+      call prt_set_param_pointer(def, prt_nam_param_definitions)
+    case ('MIP')
+      call prt_set_param_pointer(def, prt_mip_param_definitions)
+    case ('DIS')
+      call prt_set_param_pointer(def, prt_dis_param_definitions)
+    case ('DISV')
+      call prt_set_param_pointer(def, prt_disv_param_definitions)
+    case default
+    end select
+    return
+  end function prt_param_definitions
 
   function gwf_aggregate_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
@@ -499,6 +558,23 @@ contains
     end select
     return
   end function gwt_aggregate_definitions
+  function prt_aggregate_definitions(subcomponent) result(def)
+    character(len=*), intent(in) :: subcomponent
+    type(InputParamDefinitionType), dimension(:), pointer :: def
+    nullify (def)
+    select case (subcomponent)
+    case ('NAM')
+      call prt_set_param_pointer(def, prt_nam_aggregate_definitions)
+    case ('MIP')
+      call prt_set_param_pointer(def, prt_mip_aggregate_definitions)
+    case ('DIS')
+      call prt_set_param_pointer(def, prt_dis_aggregate_definitions)
+    case ('DISV')
+      call prt_set_param_pointer(def, prt_disv_aggregate_definitions)
+    case default
+    end select
+    return
+  end function prt_aggregate_definitions
 
   function gwf_block_definitions(subcomponent) result(def)
     character(len=*), intent(in) :: subcomponent
@@ -562,6 +638,23 @@ contains
     end select
     return
   end function gwt_block_definitions
+  function prt_block_definitions(subcomponent) result(def)
+    character(len=*), intent(in) :: subcomponent
+    type(InputBlockDefinitionType), dimension(:), pointer :: def
+    nullify (def)
+    select case (subcomponent)
+    case ('NAM')
+      call prt_set_block_pointer(def, prt_nam_block_definitions)
+    case ('MIP')
+      call prt_set_block_pointer(def, prt_mip_block_definitions)
+    case ('DIS')
+      call prt_set_block_pointer(def, prt_dis_block_definitions)
+    case ('DISV')
+      call prt_set_block_pointer(def, prt_disv_block_definitions)
+    case default
+    end select
+    return
+  end function prt_block_definitions
 
   function gwf_idm_multi_package(subcomponent) result(multi_package)
     character(len=*), intent(in) :: subcomponent
@@ -629,6 +722,25 @@ contains
     end select
     return
   end function gwt_idm_multi_package
+  function prt_idm_multi_package(subcomponent) result(multi_package)
+    character(len=*), intent(in) :: subcomponent
+    logical :: multi_package
+    select case (subcomponent)
+    case ('NAM')
+      multi_package = prt_nam_multi_package
+    case ('MIP')
+      multi_package = prt_mip_multi_package
+    case ('DIS')
+      multi_package = prt_dis_multi_package
+    case ('DISV')
+      multi_package = prt_disv_multi_package
+    case default
+      call store_error('Idm selector subcomponent not found; '//&
+                       &'component="GWF"'//&
+                       &', subcomponent="'//trim(subcomponent)//'".', .true.)
+    end select
+    return
+  end function prt_idm_multi_package
 
   function gwf_idm_integrated(subcomponent) result(integrated)
     character(len=*), intent(in) :: subcomponent
@@ -692,5 +804,22 @@ contains
     end select
     return
   end function gwt_idm_integrated
+  function prt_idm_integrated(subcomponent) result(integrated)
+    character(len=*), intent(in) :: subcomponent
+    logical :: integrated
+    integrated = .false.
+    select case (subcomponent)
+    case ('NAM')
+      integrated = .true.
+    case ('MIP')
+      integrated = .true.
+    case ('DIS')
+      integrated = .true.
+    case ('DISV')
+      integrated = .true.
+    case default
+    end select
+    return
+  end function prt_idm_integrated
 
 end module IdmDfnSelectorModule

@@ -15,9 +15,9 @@ module ExchangeFactoryModule
 contains
 
   subroutine create_gwfgwf_exchange(fname, exg_id, &
-                                    both_local, both_remote, &
-                                    m1_id, m2_id, &
-                                    exg_mempath)
+      both_local, both_remote, &
+      m1_id, m2_id, &
+      exg_mempath)
     ! -- modules
     use GwfGwfExchangeModule, only: gwfgwf_cr
     use VirtualGwfGwfExchangeModule, only: add_virtual_gwfgwf_exchange
@@ -31,18 +31,18 @@ contains
     character(len=LENMEMPATH), intent(in) :: exg_mempath
     ! -- local
     character(len=LENEXCHANGENAME) :: exg_name
-
+    
     write (exg_name, '(a,i0)') 'GWF-GWF_', exg_id
     if (.not. both_remote) &
       call gwfgwf_cr(fname, exg_name, exg_id, m1_id, m2_id, &
-                     exg_mempath)
+                         exg_mempath)
     call add_virtual_gwfgwf_exchange(exg_name, exg_id, m1_id, m2_id)
   end subroutine create_gwfgwf_exchange
 
   subroutine create_gwtgwt_exchange(fname, exg_id, &
-                                    both_local, both_remote, &
-                                    m1_id, m2_id, &
-                                    exg_mempath)
+      both_local, both_remote, &
+      m1_id, m2_id, &
+      exg_mempath)
     ! -- modules
     use GwtGwtExchangeModule, only: gwtgwt_cr
     use VirtualGwtGwtExchangeModule, only: add_virtual_gwtgwt_exchange
@@ -56,18 +56,18 @@ contains
     character(len=LENMEMPATH), intent(in) :: exg_mempath
     ! -- local
     character(len=LENEXCHANGENAME) :: exg_name
-
+    
     write (exg_name, '(a,i0)') 'GWT-GWT_', exg_id
     if (.not. both_remote) &
       call gwtgwt_cr(fname, exg_name, exg_id, m1_id, m2_id, &
-                     exg_mempath)
+                         exg_mempath)
     call add_virtual_gwtgwt_exchange(exg_name, exg_id, m1_id, m2_id)
   end subroutine create_gwtgwt_exchange
 
   subroutine create_gwfgwt_exchange(fname, exg_id, &
-                                    both_local, both_remote, &
-                                    m1_id, m2_id, &
-                                    exg_mempath)
+      both_local, both_remote, &
+      m1_id, m2_id, &
+      exg_mempath)
     ! -- modules
     use GwfGwtExchangeModule, only: gwfgwt_cr
     ! -- dummy
@@ -80,12 +80,35 @@ contains
     character(len=LENMEMPATH), intent(in) :: exg_mempath
     ! -- local
     character(len=LENEXCHANGENAME) :: exg_name
-
+    
     write (exg_name, '(a,i0)') 'GWF-GWT_', exg_id
     if (both_local) &
       call gwfgwt_cr(fname, exg_name, exg_id, m1_id, m2_id, &
-                     exg_mempath)
+                         exg_mempath)
   end subroutine create_gwfgwt_exchange
+
+  subroutine create_gwfprt_exchange(fname, exg_id, &
+      both_local, both_remote, &
+      m1_id, m2_id, &
+      exg_mempath)
+    ! -- modules
+    use GwfPrtExchangeModule, only: gwfprt_cr
+    ! -- dummy
+    character(len=LINELENGTH), intent(in) :: fname
+    integer(I4B), intent(in) :: exg_id
+    logical(LGP), intent(in) :: both_local
+    logical(LGP), intent(in) :: both_remote
+    integer(I4B), intent(in) :: m1_id
+    integer(I4B), intent(in) :: m2_id
+    character(len=LENMEMPATH), intent(in) :: exg_mempath
+    ! -- local
+    character(len=LENEXCHANGENAME) :: exg_name
+    
+    write (exg_name, '(a,i0)') 'GWF-PRT_', exg_id
+    if (both_local) &
+      call gwfprt_cr(fname, exg_name, exg_id, m1_id, m2_id, &
+                         exg_mempath)
+  end subroutine create_gwfprt_exchange
 
   subroutine create_exchanges(etypes, efiles, emnames_a, emnames_b, emempaths)
     ! -- dummy
@@ -144,19 +167,24 @@ contains
       select case (exgtype)
       case ('GWF6-GWF6')
         call create_gwfgwf_exchange(fname, exg_id, &
-                                    both_local, both_remote, &
-                                    m1_id, m2_id, &
-                                    exg_mempath)
+                                        both_local, both_remote, &
+                                        m1_id, m2_id, &
+                                        exg_mempath)
       case ('GWT6-GWT6')
         call create_gwtgwt_exchange(fname, exg_id, &
-                                    both_local, both_remote, &
-                                    m1_id, m2_id, &
-                                    exg_mempath)
+                                        both_local, both_remote, &
+                                        m1_id, m2_id, &
+                                        exg_mempath)
       case ('GWF6-GWT6')
         call create_gwfgwt_exchange(fname, exg_id, &
-                                    both_local, both_remote, &
-                                    m1_id, m2_id, &
-                                    exg_mempath)
+                                        both_local, both_remote, &
+                                        m1_id, m2_id, &
+                                        exg_mempath)
+      case ('GWF6-PRT6')
+        call create_gwfprt_exchange(fname, exg_id, &
+                                        both_local, both_remote, &
+                                        m1_id, m2_id, &
+                                        exg_mempath)
       case default
         write (errmsg, '(a,a)') &
           'Unknown simulation exchange type: ', trim(exgtype)

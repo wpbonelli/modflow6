@@ -814,8 +814,10 @@ contains
     class(PrtModelType) :: this
     integer(I4B) :: n
 
-    ! -- Allocate arrays in parent type
-    call this%ExplicitModelType%allocate_arrays()
+    call mem_allocate(this%ibound, this%dis%nodes, 'IBOUND', this%memoryPath)
+    do n = 1, this%dis%nodes
+      this%ibound(n) = 1 ! active by default
+    end do
 
     ! -- Allocate and initialize arrays
     call mem_allocate(this%flowja, this%dis%nja, &

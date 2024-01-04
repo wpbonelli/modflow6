@@ -31,7 +31,14 @@ gwt-dsp.dfn
 gwt-cnc.dfn
 gwt-ic.dfn
 
+# prt model
+prt-nam.dfn
+prt-mip.dfn
+prt-dis.dfn
+prt-disv.dfn
+
 # exchanges
 exg-gwfgwf.dfn
 exg-gwfgwt.dfn
 exg-gwtgwt.dfn
+exg-gwfprt.dfn

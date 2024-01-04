@@ -36,18 +36,20 @@ module GwfPrtExchangeModule
 contains
 
   !> @brief Create a new GWF to PRT exchange object
-  subroutine gwfprt_cr(filename, id, m1id, m2id)
+  subroutine gwfprt_cr(filename, name, id, m1id, m2id, input_mempath)
     ! -- modules
     use SimVariablesModule, only: model_loc_idx
+    use MemoryHelperModule, only: create_mem_path
     ! -- dummy
     character(len=*), intent(in) :: filename
+    character(len=*) :: name !< exchange name
     integer(I4B), intent(in) :: id
     integer(I4B), intent(in) :: m1id
     integer(I4B), intent(in) :: m2id
+    character(len=*), intent(in) :: input_mempath
     ! -- local
     class(BaseExchangeType), pointer :: baseexchange => null()
     type(GwfPrtExchangeType), pointer :: exchange => null()
-    character(len=20) :: cint
     !
     ! -- Create a new exchange and add it to the baseexchangelist container
     allocate (exchange)
@@ -56,9 +58,9 @@ contains
     !
     ! -- Assign id and name
     exchange%id = id
-    write (cint, '(i0)') id
-    exchange%name = 'GWF-PRT_'//trim(adjustl(cint))
-    exchange%memoryPath = exchange%name
+    exchange%name = name
+    exchange%memoryPath = create_mem_path(exchange%name)
+    exchange%input_mempath = input_mempath
     !
     ! -- allocate scalars
     call exchange%allocate_scalars()

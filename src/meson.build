@@ -60,13 +60,11 @@ modflow_sources = files(
     'Model' / 'ModelUtilities' / 'DiscretizationBase.f90',
     'Model' / 'ModelUtilities' / 'DisvGeom.f90',
     'Model' / 'ModelUtilities' / 'FlowModelInterface.f90',
-    'Model' / 'ModelUtilities' / 'ModelPackageInput.f90',
     'Model' / 'ModelUtilities' / 'Mover.f90',
     'Model' / 'ModelUtilities' / 'PackageMover.f90',
     'Model' / 'ModelUtilities' / 'SfrCrossSectionManager.f90',
     'Model' / 'ModelUtilities' / 'SfrCrossSectionUtils.f90',
     'Model' / 'ModelUtilities' / 'TspAdvOptions.f90',
-    'Model' / 'ModelUtilities' / 'TrackData.f90',
     'Model' / 'ModelUtilities' / 'UzfCellGroup.f90',
     'Model' / 'ModelUtilities' / 'Xt3dAlgorithm.f90',
     'Model' / 'ModelUtilities' / 'Xt3dInterface.f90',
@@ -97,29 +95,6 @@ modflow_sources = files(
     'Solution' / 'NumericalSolution.f90',
     'Solution' / 'SolutionFactory.F90',
     'Solution' / 'SolutionGroup.f90',
-    'Solution' / 'ParticleTracker' / 'Cell.f90',
-    'Solution' / 'ParticleTracker' / 'CellDefn.f90',
-    'Solution' / 'ParticleTracker' / 'CellPoly.f90',
-    'Solution' / 'ParticleTracker' / 'CellRect.f90',
-    'Solution' / 'ParticleTracker' / 'CellRectQuad.f90',
-    'Solution' / 'ParticleTracker' / 'CellUtil.f90',
-    'Solution' / 'ParticleTracker' / 'Method.f90',
-    'Solution' / 'ParticleTracker' / 'MethodCellPollock.f90',
-    'Solution' / 'ParticleTracker' / 'MethodCellPollockQuad.f90',
-    'Solution' / 'ParticleTracker' / 'MethodCellPool.f90',
-    'Solution' / 'ParticleTracker' / 'MethodCellTernary.f90',
-    'Solution' / 'ParticleTracker' / 'MethodDis.f90',
-    'Solution' / 'ParticleTracker' / 'MethodDisv.f90',
-    'Solution' / 'ParticleTracker' / 'MethodPool.f90',
-    'Solution' / 'ParticleTracker' / 'MethodCellPassToBot.f90',
-    'Solution' / 'ParticleTracker' / 'MethodSubcellPollock.f90',
-    'Solution' / 'ParticleTracker' / 'MethodSubcellPool.f90',
-    'Solution' / 'ParticleTracker' / 'MethodSubcellTernary.f90',
-    'Solution' / 'ParticleTracker' / 'Particle.f90',
-    'Solution' / 'ParticleTracker' / 'Subcell.f90',
-    'Solution' / 'ParticleTracker' / 'SubcellRect.f90',
-    'Solution' / 'ParticleTracker' / 'SubcellTri.f90',
-    'Solution' / 'ParticleTracker' / 'TernarySolveTrack.f90',
     'Solution' / 'BaseSolution.f90',
     'Solution' / 'ExplicitSolution.f90',
     'Timing' / 'ats.f90',
@@ -290,6 +265,21 @@ subdir('IDM')
 #     endforeach
 #   endif
 # endforeach
+
+# generate IDM model package input file
+input = 'IdmModelPackageInput.fypp'
+output = 'IdmModelPackageInput.f90'
+configure_file(
+  command: [
+    fypp,
+    src_path / input,
+    src_path / output,
+    '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
+  ],
+  input: input,
+  output: output
+)
+modflow_sources += files(output)
 
 # generate IDM selector file
 packages = []
