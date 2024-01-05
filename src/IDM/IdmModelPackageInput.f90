@@ -5,11 +5,11 @@ module ModelPackageInputModule
   use ConstantsModule, only: LENFTYPE, LENPACKAGETYPE
   use SimModule, only: store_error, store_error_filename
   use gwfModule, only: GWF_NBASEPKG, GWF_NMULTIPKG, &
-                         GWF_BASEPKG, GWF_MULTIPKG
+                       GWF_BASEPKG, GWF_MULTIPKG
   use gwtModule, only: GWT_NBASEPKG, GWT_NMULTIPKG, &
-                         GWT_BASEPKG, GWT_MULTIPKG
+                       GWT_BASEPKG, GWT_MULTIPKG
   use prtModule, only: PRT_NBASEPKG, PRT_NMULTIPKG, &
-                         PRT_BASEPKG, PRT_MULTIPKG
+                       PRT_BASEPKG, PRT_MULTIPKG
 
   implicit none
   private

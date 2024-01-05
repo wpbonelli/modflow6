@@ -1,33 +1,75 @@
-modflow_sources += files(
-  'exg-gwfgwfidm.f90',
-  'gwf-drnidm.f90',
-  'gwf-rchaidm.f90',
-  'gwt-disvidm.f90',
-  'exg-gwfgwtidm.f90',
-  'gwf-evtaidm.f90',
-  'gwf-rchidm.f90',
-  'gwt-dspidm.f90',
-  'exg-gwtgwtidm.f90',
-  'gwf-evtidm.f90',
-  'gwf-rividm.f90',
-  'gwt-icidm.f90',
-  'gwf-chdidm.f90',
-  'gwf-ghbidm.f90',
-  'gwf-welidm.f90',
-  'gwt-namidm.f90',
-  'gwf-disidm.f90',
-  'gwf-icidm.f90',
-  'gwt-cncidm.f90',
-  'gwf-disuidm.f90',
-  'gwf-namidm.f90',
-  'gwt-disidm.f90',
-  'sim-namidm.f90',
-  'gwf-disvidm.f90',
-  'gwf-npfidm.f90',
-  'gwt-disuidm.f90',
-  'prt-disidm.f90',
-  'prt-disvidm.f90',
-  'prt-mipidm.f90',
-  'prt-namidm.f90',
-  'exg-gwfprtidm.f90'
+# definition files
+foreach l : fs.read(root_path / 'utils' / 'idmloader' / 'dfns.txt').split('\n')
+  l = l.strip()
+  # skip comments and blank lines
+  if l.startswith('#') or not l.endswith('.dfn')
+    continue  
+  endif
+  # simulation files
+  args = [
+    py,
+    root_path / 'utils' / 'idmloader' / 'scripts' / 'dfn2f90.py',
+  ]
+  if l.startswith('sim')
+    args += ['-d', dfn_path / l, '-o', idm_path,]
+    out = l.replace('.dfn', 'idm.f90')
+    configure_file(command: args, input: dfn_path / l, output: out)
+    modflow_sources += files(out)
+  elif l.startswith('exg')
+    # exchange files
+    foreach e : exchanges
+      if l.contains(e.replace('-', ''))
+        args += ['-d', dfn_path / l, '-o', idm_path,]
+        out = l.replace('.dfn', 'idm.f90')
+        configure_file(command: args, input: dfn_path / l, output: out)
+        modflow_sources += files(out)
+      endif
+    endforeach
+  else
+    # model files
+    foreach m : models
+      if l.startswith(m)
+        args += ['-d', dfn_path / l, '-o', idm_path,]
+        out = l.replace('.dfn', 'idm.f90')
+        configure_file(command: args, input: dfn_path / l, output: out)
+        modflow_sources += files(out)
+      endif
+    endforeach
+  endif
+endforeach
+
+# model package input file
+input = 'IdmModelPackageInput.fypp'
+output = 'IdmModelPackageInput.f90'
+configure_file(
+  command: [
+    fypp, idm_path / input, idm_path / output,
+    '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
+  ],
+  input: input,
+  output: output
 )
+modflow_sources += files(output)
+
+# selector file
+packages = []
+foreach l : fs.read(root_path / 'utils' / 'idmloader' / 'dfns.txt').split('\n')
+  foreach m : models
+    if l.startswith(m)
+      packages += l.replace('.dfn', '')  # track pkgs for selector
+    endif
+  endforeach
+endforeach
+input = 'IdmDfnSelector.fypp'
+output = 'IdmDfnSelector.f90'
+configure_file(
+  command: [
+    fypp, idm_path / input, idm_path / output,
+    '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
+    '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]'),
+    '-DPACKAGES=' + (packages.length() > 0 ? ('["' + '", "'.join(packages) + '"]') : '[]')
+  ],
+  input: input,
+  output: output
+)
+modflow_sources += files(output)

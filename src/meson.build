@@ -1,12 +1,14 @@
 fs = import('fs')
+pymod = import('python')
 
 # define paths
 root_path = meson.project_source_root()
 src_path = root_path / 'src'
+idm_path = src_path / 'IDM'
 dfn_path = root_path / 'doc' / 'mf6io' / 'mf6ivar' / 'dfn'
 
 # locate programs
-py = find_program('python', required : true) 
+py = pymod.find_installation()
 fypp = find_program('fypp', required : false)
 
 # model and exchange selection
@@ -213,15 +215,6 @@ foreach f : ['Model', 'Exchange']
     output: output
   )
   modflow_sources += files(output)
-  # uncomment below to generate at build time
-  # args = [
-  #   src_path / input,
-  #   '@BUILD_DIR@' / output,
-  #   '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
-  #   '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]')
-  # ]
-  # gen = generator(fypp, output: '@BASENAME@.f90', arguments: args)
-  # modflow_sources += gen.process(input)
 endforeach
 
 # model source files
@@ -231,90 +224,6 @@ endforeach
 
 # IDM definition files
 subdir('IDM')
-
-# uncomment below to autogenerate IDM definition files at build time
-# args = [
-#   root_path / 'utils' / 'idmloader' / 'scripts' / 'dfn2f90.py',
-#   '-d', '@INPUT@', '-o', '@BUILD_DIR@',
-#   '-v'  # uncomment for verbose
-# ]
-# gen = generator(py, output: '@BASENAME@idm.f90', arguments: args)
-# packages = []
-# lines = fs.read(root_path / 'utils' / 'idmloader' / 'dfns.txt').split('\n')
-# foreach l : lines
-#   l = l.strip()
-#   if l.startswith('#') or not l.endswith('.dfn')
-#     continue  # skip comments and blank lines
-#   endif
-#   # add simulation-level DFN file
-#   if l.startswith('sim')
-#     modflow_sources += gen.process(dfn_path / l)
-#   elif l.startswith('exg')
-#     foreach e : exchanges
-#       if l.contains(e.replace('-', ''))
-#         modflow_sources += gen.process(dfn_path / l)
-#       endif
-#     endforeach
-#   else
-#     # filter model-level DFN files
-#     foreach m : models
-#       if l.startswith(m)
-#         modflow_sources += gen.process(dfn_path / l)
-#         packages += l.replace('.dfn', '')  # track pkgs for selector
-#       endif
-#     endforeach
-#   endif
-# endforeach
-
-# generate IDM model package input file
-input = 'IdmModelPackageInput.fypp'
-output = 'IdmModelPackageInput.f90'
-configure_file(
-  command: [
-    fypp,
-    src_path / input,
-    src_path / output,
-    '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
-  ],
-  input: input,
-  output: output
-)
-modflow_sources += files(output)
-
-# generate IDM selector file
-packages = []
-foreach l : fs.read(root_path / 'utils' / 'idmloader' / 'dfns.txt').split('\n')
-  foreach m : models
-    if l.startswith(m)
-      packages += l.replace('.dfn', '')  # track pkgs for selector
-    endif
-  endforeach
-endforeach
-input = 'IdmDfnSelector.fypp'
-output = 'IdmDfnSelector.f90'
-configure_file(
-  command: [
-    fypp,
-    src_path / input,
-    src_path / output,
-    '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
-    '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]'),
-    '-DPACKAGES=' + (packages.length() > 0 ? ('["' + '", "'.join(packages) + '"]') : '[]')
-  ],
-  input: input,
-  output: output
-)
-modflow_sources += files(output)
-# uncomment below to generate DFN selector at build time
-# args = [
-#   src_path / input,
-#   '@BUILD_DIR@' / output,
-#   '-DMODELS=' + (models.length() > 0 ? ('["' + '", "'.join(models) + '"]') : '[]'),
-#   '-DEXCHANGES=' + (exchanges.length() > 0 ? ('["' + '", "'.join(exchanges) + '"]') : '[]'),
-#   '-DPACKAGES=' + (packages.length() > 0 ? ('["' + '", "'.join(packages) + '"]') : '[]')
-# ]
-# gen = generator(fypp, output: '@BASENAME@.f90', arguments: args)
-# modflow_sources += gen.process(input)
 
 # PETSc-related source files
 if with_petsc

@@ -4,7 +4,7 @@ module IdmDfnSelectorModule
   use SimModule, only: store_error
   use InputDefinitionModule, only: InputParamDefinitionType, &
                                    InputBlockDefinitionType
-  
+
   use SimNamInputModule
 
   use ExggwfgwfInputModule
