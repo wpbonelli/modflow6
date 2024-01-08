@@ -43,7 +43,7 @@ module NumericalModelModule
     procedure :: model_fp
     procedure :: model_da
     !
-    ! -- Methods specific to a numerical model
+    ! -- Model methods
     procedure :: model_ac
     procedure :: model_mc
     procedure :: model_rp
@@ -62,6 +62,7 @@ module NumericalModelModule
     procedure :: model_bdsave
     procedure :: model_ot
     procedure :: model_bdentry
+    procedure :: model_solve
     !
     ! -- Utility methods
     procedure :: allocate_scalars
@@ -245,6 +246,11 @@ contains
     ! -- Return
     return
   end subroutine model_da
+
+  !> @brief Routine for explicit models to override to solve themselves.
+  subroutine model_solve(this)
+    class(NumericalModelType) :: this
+  end subroutine model_solve
 
   subroutine set_moffset(this, moffset)
     class(NumericalModelType) :: this
