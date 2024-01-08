@@ -219,7 +219,6 @@ contains
     use GwtModule, only: gwt_cr
     use PrtModule, only: prt_cr
     use NumericalModelModule, only: NumericalModelType, GetNumericalModelFromList
-    use ExplicitModelModule, only: ExplicitModelType, GetExplicitModelFromList
     use VirtualGwfModelModule, only: add_virtual_gwf_model
     use VirtualGwtModelModule, only: add_virtual_gwt_model
     ! use VirtualPrtModelModule, only: add_virtual_prt_model
@@ -305,6 +304,7 @@ contains
         im = im + 1
         model_loc_idx(n) = im
         call prt_cr(fname, n, model_names(n))
+        num_model => GetNumericalModelFromList(basemodellist, im)
       case default
         write (errmsg, '(a,a)') &
           'Unknown simulation model type: ', trim(model_type)

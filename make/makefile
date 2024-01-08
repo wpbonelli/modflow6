@@ -1,4 +1,4 @@
-# makefile created by pymake (version 1.2.8) for the 'mf6' executable.
+# makefile created by pymake (version 1.2.9.dev0) for the 'mf6' executable.
 
 
 include ./makedefaults
@@ -326,7 +326,6 @@ $(OBJDIR)/prt1oc1.o \
 $(OBJDIR)/prt1obs1.o \
 $(OBJDIR)/prt1mip.o \
 $(OBJDIR)/MethodPool.o \
-$(OBJDIR)/ExplicitModel.o \
 $(OBJDIR)/SpatialModelConnection.o \
 $(OBJDIR)/GwtInterfaceModel.o \
 $(OBJDIR)/GwtGwtExchange.o \

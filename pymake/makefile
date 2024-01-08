@@ -197,7 +197,6 @@ $(OBJDIR)/LayeredArrayReader.o \
 $(OBJDIR)/TimeArray.o \
 $(OBJDIR)/NumericalPackage.o \
 $(OBJDIR)/LoadMf6File.o \
-$(OBJDIR)/ExplicitModel.o \
 $(OBJDIR)/BaseSolution.o \
 $(OBJDIR)/gwf3disu8.o \
 $(OBJDIR)/TimeArraySeries.o \

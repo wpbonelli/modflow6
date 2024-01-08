@@ -1,6 +1,6 @@
 module NumericalModelModule
 
-  use KindModule, only: DP, I4B
+  use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: LINELENGTH, LENBUDTXT, LENPAKLOC
   use BaseModelModule, only: BaseModelType
   use BaseDisModule, only: DisBaseType
@@ -43,7 +43,7 @@ module NumericalModelModule
     procedure :: model_fp
     procedure :: model_da
     !
-    ! -- Methods specific to a numerical model
+    ! -- Model methods
     procedure :: model_ac
     procedure :: model_mc
     procedure :: model_rp
@@ -62,6 +62,7 @@ module NumericalModelModule
     procedure :: model_bdsave
     procedure :: model_ot
     procedure :: model_bdentry
+    procedure :: model_solve
     !
     ! -- Utility methods
     procedure :: allocate_scalars
@@ -246,6 +247,11 @@ contains
     return
   end subroutine model_da
 
+  !> @brief Routine for explicit models to override to solve themselves.
+  subroutine model_solve(this)
+    class(NumericalModelType) :: this
+  end subroutine model_solve
+
   subroutine set_moffset(this, moffset)
     class(NumericalModelType) :: this
     integer(I4B), intent(in) :: moffset
@@ -292,23 +298,38 @@ contains
     return
   end subroutine allocate_scalars
 
-  subroutine allocate_arrays(this)
+  subroutine allocate_arrays(this, ibound)
+    ! -- modules
     use ConstantsModule, only: DZERO
     use MemoryManagerModule, only: mem_allocate
+    ! -- dummy
     class(NumericalModelType) :: this
+    logical(LGP), intent(in), optional :: ibound
+    ! -- local
     integer(I4B) :: i
+    logical(LGP) :: libound
+    !
+    if (present(ibound)) then
+      libound = ibound
+    else
+      libound = .false.
+    end if
     !
     call mem_allocate(this%xold, this%neq, 'XOLD', this%memoryPath)
     call mem_allocate(this%flowja, this%nja, 'FLOWJA', this%memoryPath)
     call mem_allocate(this%idxglo, this%nja, 'IDXGLO', this%memoryPath)
+    if (libound) then
+      call mem_allocate(this%ibound, this%dis%nodes, 'IBOUND', this%memoryPath)
+      do i = 1, this%dis%nodes
+        this%ibound(i) = 1 ! active by default
+      end do
+    end if
     !
     ! -- initialize
     do i = 1, size(this%flowja)
       this%flowja(i) = DZERO
     end do
-    !
-    ! -- return
-    return
+
   end subroutine allocate_arrays
 
   subroutine set_xptr(this, xsln, sln_offset, varNameTgt, memPathTgt)
