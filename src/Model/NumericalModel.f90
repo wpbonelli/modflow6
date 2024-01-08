@@ -43,7 +43,7 @@ module NumericalModelModule
     procedure :: model_fp
     procedure :: model_da
     !
-    ! -- Methods specific to a numerical model
+    ! -- Model methods
     procedure :: model_ac
     procedure :: model_mc
     procedure :: model_rp
@@ -62,6 +62,7 @@ module NumericalModelModule
     procedure :: model_bdsave
     procedure :: model_ot
     procedure :: model_bdentry
+    procedure :: model_solve
     !
     ! -- Utility methods
     procedure :: allocate_scalars
@@ -236,6 +237,7 @@ contains
     ! -- nullify pointers
     call mem_deallocate(this%x, 'X', this%memoryPath)
     call mem_deallocate(this%rhs, 'RHS', this%memoryPath)
+    ! if (associated(this%ibound)) &
     call mem_deallocate(this%ibound, 'IBOUND', this%memoryPath)
     !
     ! -- BaseModelType
@@ -245,6 +247,11 @@ contains
     ! -- Return
     return
   end subroutine model_da
+
+  !> @brief Routine for explicit models to override to solve themselves.
+  subroutine model_solve(this)
+    class(NumericalModelType) :: this
+  end subroutine model_solve
 
   subroutine set_moffset(this, moffset)
     class(NumericalModelType) :: this
@@ -298,11 +305,18 @@ contains
     class(NumericalModelType) :: this
     integer(I4B) :: i
     !
+    ! -- allocate
     call mem_allocate(this%xold, this%neq, 'XOLD', this%memoryPath)
     call mem_allocate(this%flowja, this%nja, 'FLOWJA', this%memoryPath)
     call mem_allocate(this%idxglo, this%nja, 'IDXGLO', this%memoryPath)
+    call mem_allocate(this%ibound, this%dis%nodes, 'IBOUND', this%memoryPath)
     !
-    ! -- initialize
+    ! -- initialize ibound
+    do i = 1, this%dis%nodes
+      this%ibound(i) = 1 ! active by default
+    end do
+    !
+    ! -- initialize flowja
     do i = 1, size(this%flowja)
       this%flowja(i) = DZERO
     end do

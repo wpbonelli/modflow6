@@ -245,7 +245,8 @@ contains
     this%ja => this%dis%con%ja
     !
     ! -- Allocate model arrays, now that neq and nja are known
-    call this%allocate_arrays()
+    call this%NumericalModelType%allocate_arrays()
+    ! call this%allocate_arrays()
     !
     ! -- Define packages and assign iout for time series managers
     do ip = 1, this%bndlist%Count()

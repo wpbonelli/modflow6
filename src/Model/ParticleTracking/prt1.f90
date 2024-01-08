@@ -6,7 +6,7 @@ module PrtModule
                              LENPAKLOC, LENPACKAGETYPE, LENBUDTXT, MNORMAL, &
                              LINELENGTH
   use VersionModule, only: write_listfile_header
-  use ExplicitModelModule, only: ExplicitModelType
+  use NumericalModelModule, only: NumericalModelType
   use BaseModelModule, only: BaseModelType
   use BndModule, only: BndType, AddBndToList, GetBndFromList
   use GwfDisModule, only: GwfDisType
@@ -37,7 +37,7 @@ module PrtModule
   data budtxt/'         STORAGE'/
 
   !> @brief Particle tracking (PRT) model
-  type, extends(ExplicitModelType) :: PrtModelType
+  type, extends(NumericalModelType) :: PrtModelType
     type(PrtFmiType), pointer :: fmi => null() ! flow model interface
     type(PrtMipType), pointer :: mip => null() ! model input package
     type(PrtOcType), pointer :: oc => null() ! output control package
@@ -55,7 +55,6 @@ module PrtModule
     integer(I4B), pointer :: inoc => null() ! unit number OC
     integer(I4B), pointer :: inobs => null() ! unit number OBS
     integer(I4B), pointer :: nprp => null() ! number of PRP packages in the model
-    real(DP), dimension(:), pointer, contiguous :: flowja => null() !< intercell particle mass flows
     real(DP), dimension(:), pointer, contiguous :: masssto => null() !< particle mass storage in cells, new value
     real(DP), dimension(:), pointer, contiguous :: massstoold => null() !< particle mass storage in cells, old value
     real(DP), dimension(:), pointer, contiguous :: ratesto => null() !< particle mass storage rate in cells
@@ -763,7 +762,6 @@ contains
     call mem_deallocate(this%nprp)
 
     ! -- Arrays
-    call mem_deallocate(this%flowja)
     call mem_deallocate(this%masssto)
     call mem_deallocate(this%massstoold)
     call mem_deallocate(this%ratesto)
@@ -772,7 +770,7 @@ contains
     deallocate (this%trackctl)
 
     ! -- Parent type
-    call this%ExplicitModelType%model_da()
+    call this%NumericalModelType%model_da()
   end subroutine prt_da
 
   !> @brief Allocate memory for non-allocatable members
@@ -782,7 +780,7 @@ contains
     character(len=*), intent(in) :: modelname
 
     ! -- allocate members from parent class
-    call this%ExplicitModelType%allocate_scalars(modelname)
+    call this%NumericalModelType%allocate_scalars(modelname)
 
     ! -- allocate members that are part of model class
     call mem_allocate(this%infmi, 'INFMI', this%memoryPath)
@@ -815,20 +813,15 @@ contains
     integer(I4B) :: n
 
     ! -- Allocate arrays in parent type
-    call this%ExplicitModelType%allocate_arrays()
+    call this%NumericalModelType%allocate_arrays()
 
     ! -- Allocate and initialize arrays
-    call mem_allocate(this%flowja, this%dis%nja, &
-                      'FLOWJA', this%memoryPath)
     call mem_allocate(this%masssto, this%dis%nodes, &
                       'MASSSTO', this%memoryPath)
     call mem_allocate(this%massstoold, this%dis%nodes, &
                       'MASSSTOOLD', this%memoryPath)
     call mem_allocate(this%ratesto, this%dis%nodes, &
                       'RATESTO', this%memoryPath)
-    do n = 1, size(this%flowja)
-      this%flowja(n) = DZERO
-    end do
     do n = 1, this%dis%nodes
       this%masssto(n) = DZERO
       this%massstoold(n) = DZERO

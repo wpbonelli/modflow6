@@ -6,9 +6,9 @@ module ExplicitSolutionModule
                              MNORMAL, LINELENGTH, DZERO
   use MemoryHelperModule, only: create_mem_path
   use BaseModelModule, only: BaseModelType
-  use ExplicitModelModule, only: ExplicitModelType, &
-                                 AddExplicitModelToList, &
-                                 GetExplicitModelFromList
+  use NumericalModelModule, only: NumericalModelType, &
+                                 AddNumericalModelToList, &
+                                 GetNumericalModelFromList
   use BaseExchangeModule, only: BaseExchangeType
   use BaseSolutionModule, only: BaseSolutionType, AddBaseSolutionToList
   use ListModule, only: ListType
@@ -187,7 +187,7 @@ contains
     integer(I4B), intent(inout) :: isgcnvg !< solution group convergence flag
     integer(I4B), intent(in) :: isuppress_output !< flag for suppressing output
     ! -- local variables
-    class(ExplicitModelType), pointer :: mp => null()
+    class(NumericalModelType), pointer :: mp => null()
     character(len=LINELENGTH) :: line
     character(len=LINELENGTH) :: fmt
     integer(I4B) :: im
@@ -200,7 +200,7 @@ contains
       line = 'mode="validation" -- Skipping assembly and solution.'
       fmt = "(/,1x,a,/)"
       do im = 1, this%modellist%Count()
-        mp => GetExplicitModelFromList(this%modellist, im)
+        mp => GetNumericalModelFromList(this%modellist, im)
         call mp%model_message(line, fmt=fmt)
       end do
     case (MNORMAL)
@@ -220,11 +220,11 @@ contains
     class(ExplicitSolutionType) :: this !< ExplicitSolutionType instance
     ! -- local variables
     integer(I4B) :: im
-    class(ExplicitModelType), pointer :: mp => null()
+    class(NumericalModelType), pointer :: mp => null()
 
     ! -- Model advance
     do im = 1, this%modellist%Count()
-      mp => GetExplicitModelFromList(this%modellist, im)
+      mp => GetNumericalModelFromList(this%modellist, im)
       call mp%model_ad()
     end do
 
@@ -238,13 +238,13 @@ contains
     ! -- dummy variables
     class(ExplicitSolutionType) :: this !< ExplicitSolutionType instance
     ! -- local variables
-    class(ExplicitModelType), pointer :: mp => null()
+    class(NumericalModelType), pointer :: mp => null()
     integer(I4B) :: im
     real(DP) :: ttsoln
 
     call code_timer(0, ttsoln, this%ttsoln)
     do im = 1, this%modellist%Count()
-      mp => GetExplicitModelFromList(this%modellist, im)
+      mp => GetNumericalModelFromList(this%modellist, im)
       call mp%model_solve()
     end do
     call code_timer(1, ttsoln, this%ttsoln)
@@ -260,17 +260,17 @@ contains
     integer(I4B), intent(in) :: isuppress_output !< flag for suppressing output
     ! -- local variables
     integer(I4B) :: im
-    class(ExplicitModelType), pointer :: mp => null()
+    class(NumericalModelType), pointer :: mp => null()
 
     ! -- Calculate flow for each model
     do im = 1, this%modellist%Count()
-      mp => GetExplicitModelFromList(this%modellist, im)
+      mp => GetNumericalModelFromList(this%modellist, im)
       call mp%model_cq(this%icnvg, isuppress_output)
     end do
 
     ! -- Budget terms for each model
     do im = 1, this%modellist%Count()
-      mp => GetExplicitModelFromList(this%modellist, im)
+      mp => GetNumericalModelFromList(this%modellist, im)
       call mp%model_bd(this%icnvg, isuppress_output)
     end do
   end subroutine finalizeSolve
@@ -297,13 +297,13 @@ contains
     class(ExplicitSolutionType) :: this !< ExplicitSolutionType instance
     class(BaseModelType), pointer, intent(in) :: mp !< model instance
     ! -- local variables
-    class(ExplicitModelType), pointer :: m => null()
+    class(NumericalModelType), pointer :: m => null()
 
     ! -- add a model
     select type (mp)
-    class is (ExplicitModelType)
+    class is (NumericalModelType)
       m => mp
-      call AddExplicitModelToList(this%modellist, m)
+      call AddNumericalModelToList(this%modellist, m)
     end select
   end subroutine add_model
 
