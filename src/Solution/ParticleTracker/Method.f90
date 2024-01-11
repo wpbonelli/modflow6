@@ -21,7 +21,7 @@ module MethodModule
   !! domain. A domain can be a model, cell in a model, or subcell in
   !! a cell. Tracking proceeds recursively, delegating to a possibly
   !! arbitrary number of subdomains (currently, only the three above
-  !! are recognized). A tracking method is responsible for advecting
+  !! are recognized). A tracking method is responsible for advancing
   !! a particle through a domain, delegating to subdomains as needed
   !! depending on cell geometry (implementing the strategy pattern).
   !<
