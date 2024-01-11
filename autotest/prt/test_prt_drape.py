@@ -221,9 +221,9 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
 
 
 def build_models(idx, test):
-    gwf_sim = build_gwf_sim(test.name, test.workspace, test.targets.mf6)
+    gwf_sim = build_gwf_sim(test.name, test.workspace, test.targets["mf6"])
     prt_sim = build_prt_sim(
-        test.name, test.workspace, test.workspace / "prt", test.targets.mf6
+        test.name, test.workspace, test.workspace / "prt", test.targets["mf6"]
     )
     return gwf_sim, prt_sim
 

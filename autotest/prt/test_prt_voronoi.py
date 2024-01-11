@@ -67,7 +67,7 @@ def get_grid(workspace, targets):
         maximum_area=area_max,
         angle=angle_min,
         model_ws=workspace,
-        exe_name=targets.triangle,
+        exe_name=targets["triangle"],
     )
     poly = np.array(((xmin, ymin), (xmax, ymin), (xmax, ymax), (xmin, ymax)))
     tri.add_polygon(poly)
@@ -113,7 +113,7 @@ def build_gwf_sim(name, ws, targets):
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name, version="mf6", exe_name=targets.mf6, sim_ws=ws
+        sim_name=name, version="mf6", exe_name=targets["mf6"], sim_ws=ws
     )
     tdis = flopy.mf6.ModflowTdis(
         sim, time_units="DAYS", perioddata=[[1.0, 1, 1.0]]
@@ -195,7 +195,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name, version="mf6", exe_name=targets.mf6, sim_ws=prt_ws
+        sim_name=name, version="mf6", exe_name=targets["mf6"], sim_ws=prt_ws
     )
     tdis = flopy.mf6.ModflowTdis(
         sim, time_units="DAYS", perioddata=[[1.0, 1, 1.0]]

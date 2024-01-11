@@ -264,12 +264,12 @@ def build_mp7_sim(idx, ws, mp7, gwf):
 
 
 def build_models(idx, test):
-    gwf_sim = build_gwf_sim(idx, test.workspace, test.targets.mf6)
+    gwf_sim = build_gwf_sim(idx, test.workspace, test.targets["mf6"])
     prt_sim = build_prt_sim(
-        idx, test.workspace, test.workspace / "prt", test.targets.mf6
+        idx, test.workspace, test.workspace / "prt", test.targets["mf6"]
     )
     mp7_sim = build_mp7_sim(
-        idx, test.workspace / "mp7", test.targets.mp7, gwf_sim.get_model()
+        idx, test.workspace / "mp7", test.targets["mp7"], gwf_sim.get_model()
     )
     return gwf_sim, prt_sim, mp7_sim
 

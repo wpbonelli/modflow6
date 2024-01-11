@@ -40,7 +40,7 @@ def get_model_name(idx, mdl):
 def build_mf6_sim(idx, test):
     # create simulation
     name = cases[idx]
-    sim = BasicDisCase.get_gwf_sim(name, test.workspace, test.targets.mf6)
+    sim = BasicDisCase.get_gwf_sim(name, test.workspace, test.targets["mf6"])
 
     # create prt model
     prt_name = get_model_name(idx, "prt")
@@ -156,7 +156,9 @@ def build_models(idx, test):
     mf6sim = build_mf6_sim(idx, test)
     gwf_name = get_model_name(idx, "gwf")
     gwf = mf6sim.get_model(gwf_name)
-    mp7sim = build_mp7_sim(idx, test.workspace / "mp7", test.targets.mp7, gwf)
+    mp7sim = build_mp7_sim(
+        idx, test.workspace / "mp7", test.targets["mp7"], gwf
+    )
     return mf6sim, mp7sim
 
 

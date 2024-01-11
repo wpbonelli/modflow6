@@ -8,13 +8,10 @@ from warnings import warn
 import numpy as np
 import pandas as pd
 import pytest
-from flaky import flaky
 from flopy.mf6 import MFSimulation
 from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
-from modflow_devtools.markers import excludes_platform
 from modflow_devtools.misc import run_cmd, set_env
-from numpy.lib.recfunctions import stack_arrays
 
 from conftest import project_root_path
 
@@ -50,9 +47,9 @@ def test_notebooks(notebook, function_tmpdir, targets):
     delim = ";" if system() == "Windows" else ":"
     path = (
         environ.get("PATH", "")
-        + f"{delim}{targets.mf6.parent}"
-        + f"{delim}{targets.mf6.parent / 'downloaded'}"
-        + f"{delim}{targets.mf6.parent / 'rebuilt'}"
+        + f"{delim}{targets['mf6'].parent}"
+        + f"{delim}{targets['mf6'].parent / 'downloaded'}"
+        + f"{delim}{targets['mf6'].parent / 'rebuilt'}"
     )
     with set_env(PATH=path):
         args = [

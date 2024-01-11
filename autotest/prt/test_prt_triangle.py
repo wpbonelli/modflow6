@@ -50,7 +50,7 @@ def get_tri(workspace, targets) -> Triangle:
         angle=angle,
         maximum_area=max_area,
         model_ws=workspace,
-        exe_name=targets.triangle,
+        exe_name=targets["triangle"],
     )
     tri.add_polygon(active_domain)
     tri.build()
@@ -61,7 +61,7 @@ def build_gwf_sim(name, ws, targets):
     ws = Path(ws)
     gwfname = get_model_name(name, "gwf")
     sim = flopy.mf6.MFSimulation(
-        sim_name=name, version="mf6", exe_name=targets.mf6, sim_ws=ws
+        sim_name=name, version="mf6", exe_name=targets["mf6"], sim_ws=ws
     )
     tdis = flopy.mf6.ModflowTdis(sim, time_units="DAYS", perioddata=tdis_rc)
     gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
@@ -136,7 +136,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
-        sim_name=name, version="mf6", exe_name=targets.mf6, sim_ws=prt_ws
+        sim_name=name, version="mf6", exe_name=targets["mf6"], sim_ws=prt_ws
     )
     tdis = flopy.mf6.ModflowTdis(
         sim, time_units="DAYS", perioddata=[[1.0, 1, 1.0]]

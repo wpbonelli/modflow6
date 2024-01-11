@@ -230,7 +230,7 @@ def build_mp7_sim(name, ws, mp7, gwf):
 def build_models(idx, test):
     # build gwf model
     gwf_sim = BasicDisCase.get_gwf_sim(
-        test.name, test.workspace, test.targets.mf6
+        test.name, test.workspace, test.targets["mf6"]
     )
     # add idomain
     gwf = gwf_sim.get_model()
@@ -241,11 +241,11 @@ def build_models(idx, test):
 
     # build prt model
     prt_sim = build_prt_sim(
-        test.name, test.workspace, test.workspace / "prt", test.targets.mf6
+        test.name, test.workspace, test.workspace / "prt", test.targets["mf6"]
     )
     # build mp7 model
     mp7_sim = build_mp7_sim(
-        test.name, test.workspace / "mp7", test.targets.mp7, gwf
+        test.name, test.workspace / "mp7", test.targets["mp7"], gwf
     )
     return gwf_sim, prt_sim, mp7_sim
 
