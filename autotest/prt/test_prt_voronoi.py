@@ -4,8 +4,9 @@ in Flopy's Voronoi example:
 
 https://flopy.readthedocs.io/en/latest/Notebooks/dis_voronoi_example.html
 
-Two variants are included, first with straight
-pathlines then with a well capturing particles.
+Three variants are included, first with straight
+left to right pathlines and no boundary conditions,
+then again with wells, first pumping, then injection.
 
 Particles are released from the x coordinate
 of the constant concentration cell from the
@@ -21,6 +22,7 @@ filters these but mf6 probably should too)
 from pathlib import Path
 
 import flopy
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -35,7 +37,11 @@ from shapely.geometry import LineString, Point
 from framework import TestFramework
 
 simname = "prtfmi08"
-cases = [simname, f"{simname}_wel"]
+cases = [
+    f"{simname}l2r",
+    f"{simname}welp",
+    f"{simname}weli"
+]
 xmin = 0.0
 xmax = 2000.0
 ymin = 0.0
@@ -50,15 +56,16 @@ ncol = xmax / delr
 nrow = ymax / delr
 nodes = ncol * nrow
 porosity = 0.1
-rpts = [
-    [500, 100, 0.5],
-    [500, 350, 0.5],
-    [500, 450, 0.5],
-    [500, 500, 0.5],
-    [500, 550, 0.5],
-    [500, 650, 0.5],
-    [500, 800, 0.5],
-]
+# rpts = [
+#     [500, 100, 0.5],
+#     [500, 350, 0.5],
+#     [500, 450, 0.5],
+#     [500, 500, 0.5],
+#     [500, 550, 0.5],
+#     [500, 650, 0.5],
+#     [500, 800, 0.5],
+# ]
+rpts = [[20, i, 0.5] for i in range(1, 999, 20)]
 
 
 def get_grid(workspace, targets):
@@ -73,10 +80,6 @@ def get_grid(workspace, targets):
     tri.add_polygon(poly)
     tri.build(verbose=False)
     return VoronoiGrid(tri)
-
-    # fig = plt.figure(figsize=(10, 10))
-    # ax = plt.subplot(1, 1, 1, aspect="equal")
-    # pc = tri.plot(ax=ax)
 
 
 def build_gwf_sim(name, ws, targets):
@@ -101,15 +104,24 @@ def build_gwf_sim(name, ws, targets):
     cells_right = np.array(list(cells_right))
     ibd[cells_right] = 2
 
+    # identify cells on bottom edge
+    line = LineString([(xmin, ymin), (xmax, ymin)])
+    cells_bottom = gi.intersect(line)["cellids"]
+    cells_bottom = np.array(list(cells_bottom))
+    ibd[cells_bottom] = 3
+
     # identify release cell
     point = Point((500, 500))
     cells2 = gi.intersect(point)["cellids"]
     cells2 = np.array(list(cells2))
-    # ibd[cells2] = 3
 
     # identify well cell
-    point = Point((1200, 500))
-    cell_wel = vgrid.intersect(point.x, point.y)
+    points = [
+        Point((1200, 500)),
+        Point((700, 200)),
+        Point((1600, 700))
+    ]
+    well_cells = [vgrid.intersect(p.x, p.y) for p in points]
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
@@ -130,9 +142,9 @@ def build_gwf_sim(name, ws, targets):
         gwf, nlay=nlay, **grid.get_disv_gridprops(), top=top, botm=botm
     )
     if "wel" in name:
+        # k, j, q
         wells = [
-            # k, j, q
-            (0, cell_wel, -0.5),
+            (0, c, 0.5 * (-1 if "welp" in name else 1)) for c in well_cells
         ]
         wel = flopy.mf6.ModflowGwfwel(
             gwf,
@@ -150,10 +162,18 @@ def build_gwf_sim(name, ws, targets):
     ic = flopy.mf6.ModflowGwfic(gwf)
 
     chdlist = []
+    icpl_seen = []
     for icpl in cells_left:
         chdlist.append([(0, icpl), 1.0])
+        icpl_seen.append(icpl)
     for icpl in cells_right:
         chdlist.append([(0, icpl), 0.0])
+        icpl_seen.append(icpl)
+    if "wel" in name:
+        for icpl in cells_bottom:
+            if icpl in icpl_seen:
+                continue
+            chdlist.append([(0, icpl), 0.8])
     chd = flopy.mf6.ModflowGwfchd(gwf, stress_period_data=chdlist)
     oc = flopy.mf6.ModflowGwfoc(
         gwf,
@@ -276,21 +296,39 @@ def check_output(idx, test):
     prt_track_csv_file = f"{prt_name}.prp.trk.csv"
     pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
-    plot_debug = False
-    if plot_debug:
+    plot_2d = True
+    if plot_2d:
         # plot in 2d with mpl
-        fig = plt.figure(figsize=(10, 10))
+        fig = plt.figure(figsize=(16, 10))
         ax = plt.subplot(1, 1, 1, aspect="equal")
         pmv = flopy.plot.PlotMapView(model=gwf, ax=ax)
-        pmv.plot_grid()
-        pmv.plot_array(head, cmap="Blues", alpha=0.25)
+        pmv.plot_grid(alpha=0.25)
+        pmv.plot_ibound(alpha=0.5)
+        headmesh = pmv.plot_array(head, alpha=0.25)
+        cv = pmv.contour_array(head, levels=np.linspace(0, 1, 9), colors="black")
+        plt.clabel(cv)
+        plt.colorbar(headmesh, shrink=0.25, ax=ax, label="Head", location="right")
+        handles = [
+            mpl.lines.Line2D([0], [0], marker='>', linestyle='', label="Specific discharge", color="grey", markerfacecolor='gray'),
+        ]
+        if "wel" in name:
+            handles.append(mpl.lines.Line2D([0], [0], marker='o', linestyle='', label="Well", markerfacecolor='red'),)
+        ax.legend(
+            handles=handles,
+            loc="lower right",
+        )
         pmv.plot_vector(qx, qy, normalize=True, alpha=0.25)
         if "wel" in name:
             pmv.plot_bc(ftype="WEL")
         mf6_plines = pls.groupby(["iprp", "irpt", "trelease"])
         for ipl, ((iprp, irpt, trelease), pl) in enumerate(mf6_plines):
+            title = "DISV voronoi grid particle tracks"
+            if "welp" in name:
+                title += ": pumping wells"
+            elif "weli" in name:
+                title += ": injection wells"
             pl.plot(
-                title=f"MF6 pathlines ({name})",
+                title=title,
                 kind="line",
                 x="x",
                 y="y",
@@ -298,8 +336,11 @@ def check_output(idx, test):
                 legend=False,
                 color="black",
             )
-        plt.show()
-
+        # plt.show()
+        plt.savefig(prt_ws / f"{name}.png")
+    
+    plot_3d = False
+    if plot_3d:
         # plot in 3d with pyvista (via vtk)
         import pyvista as pv
         from flopy.export.vtk import Vtk
