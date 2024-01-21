@@ -4,13 +4,9 @@ in Flopy's Voronoi example:
 
 https://flopy.readthedocs.io/en/latest/Notebooks/dis_voronoi_example.html
 
-Three variants are included, first with straight
-left to right pathlines and no boundary conditions,
-then again with wells, first pumping, then injection.
-
-Particles are released from the x coordinate
-of the constant concentration cell from the
-transport model, along a range of y coords.
+Particles are released from the center of the plume
+(i.e. the constant concentration cell) used in the
+transport model.
 
 TODO: support parallel adjacent cell faces,
 duplicated vertices as flopy.utils.voronoi
@@ -36,12 +32,8 @@ from shapely.geometry import LineString, Point
 
 from framework import TestFramework
 
-simname = "prtfmi08"
-cases = [
-    f"{simname}l2r",
-    f"{simname}welp",
-    f"{simname}weli"
-]
+simname = "prtvor02"
+cases = [simname]
 xmin = 0.0
 xmax = 2000.0
 ymin = 0.0
@@ -56,16 +48,6 @@ ncol = xmax / delr
 nrow = ymax / delr
 nodes = ncol * nrow
 porosity = 0.1
-# rpts = [
-#     [500, 100, 0.5],
-#     [500, 350, 0.5],
-#     [500, 450, 0.5],
-#     [500, 500, 0.5],
-#     [500, 550, 0.5],
-#     [500, 650, 0.5],
-#     [500, 800, 0.5],
-# ]
-rpts = [[20, i, 0.5] for i in range(1, 999, 20)]
 
 
 def get_grid(workspace, targets):
@@ -110,19 +92,6 @@ def build_gwf_sim(name, ws, targets):
     cells_bottom = np.array(list(cells_bottom))
     ibd[cells_bottom] = 3
 
-    # identify release cell
-    point = Point((500, 500))
-    cells2 = gi.intersect(point)["cellids"]
-    cells2 = np.array(list(cells2))
-
-    # identify well cell
-    points = [
-        Point((1200, 500)),
-        Point((700, 200)),
-        Point((1600, 700))
-    ]
-    well_cells = [vgrid.intersect(p.x, p.y) for p in points]
-
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name, version="mf6", exe_name=targets["mf6"], sim_ws=ws
@@ -141,17 +110,6 @@ def build_gwf_sim(name, ws, targets):
     disv = flopy.mf6.ModflowGwfdisv(
         gwf, nlay=nlay, **grid.get_disv_gridprops(), top=top, botm=botm
     )
-    if "wel" in name:
-        # k, j, q
-        wells = [
-            (0, c, 0.5 * (-1 if "welp" in name else 1)) for c in well_cells
-        ]
-        wel = flopy.mf6.ModflowGwfwel(
-            gwf,
-            maxbound=len(wells),
-            save_flows=True,
-            stress_period_data={0: wells},
-        )
     npf = flopy.mf6.ModflowGwfnpf(
         gwf,
         xt3doptions=[(True)],
@@ -169,11 +127,6 @@ def build_gwf_sim(name, ws, targets):
     for icpl in cells_right:
         chdlist.append([(0, icpl), 0.0])
         icpl_seen.append(icpl)
-    if "wel" in name:
-        for icpl in cells_bottom:
-            if icpl in icpl_seen:
-                continue
-            chdlist.append([(0, icpl), 0.8])
     chd = flopy.mf6.ModflowGwfchd(gwf, stress_period_data=chdlist)
     oc = flopy.mf6.ModflowGwfoc(
         gwf,
@@ -182,6 +135,75 @@ def build_gwf_sim(name, ws, targets):
         saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
         printrecord=[("HEAD", "LAST"), ("BUDGET", "LAST")],
     )
+    return sim
+
+
+def build_gwt_sim(name, gwf_ws, gwt_ws, targets):
+    ws = Path(gwt_ws)
+    gwf_name = get_model_name(name, "gwf")
+    gwt_name = get_model_name(name, "gwt")
+
+    # create grid
+    grid = get_grid(ws / "grid", targets)
+    vgrid = VertexGrid(**grid.get_gridprops_vertexgrid(), nlay=1)
+    ibd = np.zeros(vgrid.ncpl, dtype=int)
+    gi = GridIntersect(vgrid)
+
+    # identify release cell
+    point = Point((500, 500))
+    cells2 = gi.intersect(point)["cellids"]
+    cells2 = np.array(list(cells2))
+
+    sim = flopy.mf6.MFSimulation(
+        sim_name=name, version="mf6", exe_name="mf6", sim_ws=ws
+    )
+    tdis = flopy.mf6.ModflowTdis(
+        sim, time_units="DAYS", perioddata=[[100 * 365.0, 100, 1.0]]
+    )
+    gwt = flopy.mf6.ModflowGwt(sim, modelname=gwt_name, save_flows=True)
+    ims = flopy.mf6.ModflowIms(
+        sim,
+        print_option="SUMMARY",
+        complexity="simple",
+        linear_acceleration="bicgstab",
+        outer_dvclose=1.0e-6,
+        inner_dvclose=1.0e-6,
+    )
+    disv_gridprops = grid.get_disv_gridprops()
+    nlay = 1
+    top = 1.0
+    botm = [0.0]
+    disv = flopy.mf6.ModflowGwtdisv(
+        gwt, nlay=nlay, **disv_gridprops, top=top, botm=botm
+    )
+    ic = flopy.mf6.ModflowGwtic(gwt, strt=0.0)
+    sto = flopy.mf6.ModflowGwtmst(gwt, porosity=0.2)
+    adv = flopy.mf6.ModflowGwtadv(gwt, scheme="TVD")
+    dsp = flopy.mf6.ModflowGwtdsp(gwt, alh=5.0, ath1=0.5)
+    sourcerecarray = [()]
+    ssm = flopy.mf6.ModflowGwtssm(gwt, sources=sourcerecarray)
+    cnclist = [
+        [(0, cells2[0]), 1.0],
+    ]
+    cnc = flopy.mf6.ModflowGwtcnc(
+        gwt, maxbound=len(cnclist), stress_period_data=cnclist, pname="CNC-1"
+    )
+    gwf_budget_file = gwf_ws / f"{gwf_name}.bud"
+    gwf_head_file = gwf_ws / f"{gwf_name}.hds"
+    flopy.mf6.ModflowGwtfmi(
+        gwt,
+        packagedata=[
+            ("GWFHEAD", gwf_head_file),
+            ("GWFBUDGET", gwf_budget_file),
+        ],
+    )
+    oc = flopy.mf6.ModflowGwtoc(
+        gwt,
+        budget_filerecord=f"{name}.cbc",
+        concentration_filerecord=f"{name}.ucn",
+        saverecord=[("CONCENTRATION", "ALL"), ("BUDGET", "ALL")],
+    )
+
     return sim
 
 
@@ -209,9 +231,10 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
     cells1 = np.array(list(cells1))
     ibd[cells1] = 2
 
-    # identify well cell
-    point = Point((800, 500))
-    cell_wel = vgrid.intersect(point.x, point.y)
+    # identify release cell
+    point = Point((500, 500))
+    cells2 = gi.intersect(point)["cellids"]
+    cells2 = np.array(list(cells2))
 
     # create simulation
     sim = flopy.mf6.MFSimulation(
@@ -226,11 +249,32 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
     )
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
 
-    prpdata = [
-        # index, (layer, cell index), x, y, z
-        (i, (0, vgrid.intersect(p[0], p[1])), p[0], p[1], p[2])
-        for i, p in enumerate(rpts)
-    ]
+    # sddata = flopy.modpath.FaceDataType(
+    #     horizontaldivisions1=1,
+    #     verticaldivisions1=1,
+    #     horizontaldivisions2=1,
+    #     verticaldivisions2=1,
+    #     horizontaldivisions3=1,
+    #     verticaldivisions3=1,
+    #     horizontaldivisions4=1,
+    #     verticaldivisions4=1,
+    #     rowdivisions5=1,
+    #     columndivisions5=1,
+    #     rowdivisions6=1,
+    #     columndivisions6=1,
+    # )
+    sddata = flopy.modpath.CellDataType(
+        columncelldivisions=1,
+        rowcelldivisions=1
+    )
+    data = flopy.modpath.NodeParticleData(subdivisiondata=sddata, nodes=[cells2])
+    prpdata = list(data.to_prp(prt.modelgrid))
+    # rpts = [(point.x, point.y, 0.5)]
+    # prpdata = [
+    #     # index, (layer, cell index), x, y, z
+    #     (i, (0, vgrid.intersect(p[0], p[1])), p[0], p[1], p[2])
+    #     for i, p in enumerate(rpts)
+    # ]
     prp_track_file = f"{prt_name}.prp.trk"
     prp_track_csv_file = f"{prt_name}.prp.trk.csv"
     flopy.mf6.ModflowPrtprp(
@@ -273,17 +317,18 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
 
 def build_models(idx, test):
     gwf_sim = build_gwf_sim(test.name, test.workspace, test.targets)
+    gwt_sim = build_gwt_sim(test.name, test.workspace, test.workspace / "gwt", test.targets)
     prt_sim = build_prt_sim(
         test.name, test.workspace, test.workspace / "prt", test.targets
     )
-    return gwf_sim, prt_sim
+    return gwf_sim, gwt_sim, prt_sim
 
 
 def check_output(idx, test):
     name = test.name
     prt_ws = test.workspace / "prt"
     prt_name = get_model_name(name, "prt")
-    gwfsim = test.sims[0]
+    gwfsim, gwtsim, prtsim = test.sims
 
     # get gwf output
     gwf = gwfsim.get_model()
@@ -291,6 +336,10 @@ def check_output(idx, test):
     bdobj = gwf.output.budget()
     spdis = bdobj.get_data(text="DATA-SPDIS")[0]
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
+
+    # get gwt output
+    gwt = gwtsim.get_model()
+    conc = gwt.output.concentration().get_data()
 
     # get prt output
     prt_track_csv_file = f"{prt_name}.prp.trk.csv"
@@ -304,29 +353,26 @@ def check_output(idx, test):
         pmv = flopy.plot.PlotMapView(model=gwf, ax=ax)
         pmv.plot_grid(alpha=0.25)
         pmv.plot_ibound(alpha=0.5)
-        headmesh = pmv.plot_array(head, alpha=0.25)
-        cv = pmv.contour_array(head, levels=np.linspace(0, 1, 9), colors="black")
-        plt.clabel(cv)
-        plt.colorbar(headmesh, shrink=0.25, ax=ax, label="Head", location="right")
+        # headmesh = pmv.plot_array(head, alpha=0.25)
+        # headctr = pmv.contour_array(head, levels=np.linspace(0, 1, 9), colors="black")
+        # plt.clabel(headctr)
+        # plt.colorbar(headmesh, shrink=0.25, ax=ax, label="Head", location="right")
+        concmesh = pmv.plot_array(conc, cmap="jet")
+        concctr = pmv.contour_array(conc, levels=(0.0001, 0.001, 0.01, 0.1), colors="y")
+        plt.clabel(concctr)
+        plt.colorbar(concmesh, shrink=0.25, ax=ax, label="Concentration", location="right")
+        
         handles = [
             mpl.lines.Line2D([0], [0], marker='>', linestyle='', label="Specific discharge", color="grey", markerfacecolor='gray'),
         ]
-        if "wel" in name:
-            handles.append(mpl.lines.Line2D([0], [0], marker='o', linestyle='', label="Well", markerfacecolor='red'),)
         ax.legend(
             handles=handles,
             loc="lower right",
         )
         pmv.plot_vector(qx, qy, normalize=True, alpha=0.25)
-        if "wel" in name:
-            pmv.plot_bc(ftype="WEL")
         mf6_plines = pls.groupby(["iprp", "irpt", "trelease"])
         for ipl, ((iprp, irpt, trelease), pl) in enumerate(mf6_plines):
             title = "DISV voronoi grid particle tracks"
-            if "welp" in name:
-                title += ": pumping wells"
-            elif "weli" in name:
-                title += ": injection wells"
             pl.plot(
                 title=title,
                 kind="line",
@@ -336,7 +382,7 @@ def check_output(idx, test):
                 legend=False,
                 color="black",
             )
-        # plt.show()
+        plt.show()
         plt.savefig(prt_ws / f"{name}.png")
     
     plot_3d = False
