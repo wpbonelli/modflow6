@@ -249,32 +249,13 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
     )
     flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=porosity)
 
-    # sddata = flopy.modpath.FaceDataType(
-    #     horizontaldivisions1=1,
-    #     verticaldivisions1=1,
-    #     horizontaldivisions2=1,
-    #     verticaldivisions2=1,
-    #     horizontaldivisions3=1,
-    #     verticaldivisions3=1,
-    #     horizontaldivisions4=1,
-    #     verticaldivisions4=1,
-    #     rowdivisions5=1,
-    #     columndivisions5=1,
-    #     rowdivisions6=1,
-    #     columndivisions6=1,
-    # )
     sddata = flopy.modpath.CellDataType(
-        columncelldivisions=1,
-        rowcelldivisions=1
+        columncelldivisions=1, rowcelldivisions=1
     )
-    data = flopy.modpath.NodeParticleData(subdivisiondata=sddata, nodes=[cells2])
+    data = flopy.modpath.NodeParticleData(
+        subdivisiondata=sddata, nodes=[cells2]
+    )
     prpdata = list(data.to_prp(prt.modelgrid))
-    # rpts = [(point.x, point.y, 0.5)]
-    # prpdata = [
-    #     # index, (layer, cell index), x, y, z
-    #     (i, (0, vgrid.intersect(p[0], p[1])), p[0], p[1], p[2])
-    #     for i, p in enumerate(rpts)
-    # ]
     prp_track_file = f"{prt_name}.prp.trk"
     prp_track_csv_file = f"{prt_name}.prp.trk.csv"
     flopy.mf6.ModflowPrtprp(
@@ -317,7 +298,9 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
 
 def build_models(idx, test):
     gwf_sim = build_gwf_sim(test.name, test.workspace, test.targets)
-    gwt_sim = build_gwt_sim(test.name, test.workspace, test.workspace / "gwt", test.targets)
+    gwt_sim = build_gwt_sim(
+        test.name, test.workspace, test.workspace / "gwt", test.targets
+    )
     prt_sim = build_prt_sim(
         test.name, test.workspace, test.workspace / "prt", test.targets
     )
@@ -358,12 +341,28 @@ def check_output(idx, test):
         # plt.clabel(headctr)
         # plt.colorbar(headmesh, shrink=0.25, ax=ax, label="Head", location="right")
         concmesh = pmv.plot_array(conc, cmap="jet")
-        concctr = pmv.contour_array(conc, levels=(0.0001, 0.001, 0.01, 0.1), colors="y")
+        concctr = pmv.contour_array(
+            conc, levels=(0.0001, 0.001, 0.01, 0.1), colors="y"
+        )
         plt.clabel(concctr)
-        plt.colorbar(concmesh, shrink=0.25, ax=ax, label="Concentration", location="right")
-        
+        plt.colorbar(
+            concmesh,
+            shrink=0.25,
+            ax=ax,
+            label="Concentration",
+            location="right",
+        )
+
         handles = [
-            mpl.lines.Line2D([0], [0], marker='>', linestyle='', label="Specific discharge", color="grey", markerfacecolor='gray'),
+            mpl.lines.Line2D(
+                [0],
+                [0],
+                marker=">",
+                linestyle="",
+                label="Specific discharge",
+                color="grey",
+                markerfacecolor="gray",
+            ),
         ]
         ax.legend(
             handles=handles,
@@ -384,7 +383,7 @@ def check_output(idx, test):
             )
         plt.show()
         plt.savefig(prt_ws / f"{name}.png")
-    
+
     plot_3d = False
     if plot_3d:
         # plot in 3d with pyvista (via vtk)

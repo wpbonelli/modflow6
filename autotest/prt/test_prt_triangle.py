@@ -28,7 +28,7 @@ from shapely.geometry import LineString
 from framework import TestFramework
 
 simname = "prtfmi10"
-cases = [f"{simname}l2r", f"{simname}diag"]
+cases = [f"{simname}r2l", f"{simname}diag"]
 angle = 30
 max_area = 100
 active_domain = [(0, 0), (100, 0), (100, 100), (0, 100)]
@@ -99,7 +99,7 @@ def build_gwf_sim(name, ws, targets):
     leftcells = tri.get_edge_cells(4)
     rightcells = tri.get_edge_cells(2)
     botmcells = tri.get_edge_cells(3)
-    if "l2r" in name:
+    if "r2l" in name:
         cells = rightcells + leftcells
     elif "diag" in name:
         cells = leftcells + botmcells
@@ -257,7 +257,7 @@ def check_output(idx, test):
             )
         plt.show()
 
-    if "l2r" in name:
+    if "r2l" in name:
         assert pls.shape == (76, 16)
         assert (pls.z == 0.5).all()
         assert isclose(min(pls.x), 5.1145, rel_tol=1e-6)

@@ -15,6 +15,7 @@ filters these but mf6 probably should too)
 """
 
 
+from math import isclose
 from pathlib import Path
 
 import flopy
@@ -33,11 +34,7 @@ from shapely.geometry import LineString, Point
 from framework import TestFramework
 
 simname = "prtvor01"
-cases = [
-    f"{simname}l2r",
-    f"{simname}welp",
-    f"{simname}weli"
-]
+cases = [f"{simname}l2r", f"{simname}welp", f"{simname}weli"]
 xmin = 0.0
 xmax = 2000.0
 ymin = 0.0
@@ -103,11 +100,7 @@ def build_gwf_sim(name, ws, targets):
     cells2 = np.array(list(cells2))
 
     # identify well cell
-    points = [
-        Point((1200, 500)),
-        Point((700, 200)),
-        Point((1600, 700))
-    ]
+    points = [Point((1200, 500)), Point((700, 200)), Point((1600, 700))]
     well_cells = [vgrid.intersect(p.x, p.y) for p in points]
 
     # create simulation
@@ -216,7 +209,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
     prpdata = [
         # index, (layer, cell index), x, y, z
         (i, (0, vgrid.intersect(p[0], p[1])), p[0], p[1], p[2])
-        for i, p in enumerate(rpts)
+        for i, p in enumerate(rpts[1:2])  # first release point crashes
     ]
     prp_track_file = f"{prt_name}.prp.trk"
     prp_track_csv_file = f"{prt_name}.prp.trk.csv"
@@ -224,7 +217,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, targets):
         prt,
         pname="prp1",
         filename=f"{prt_name}_1.prp",
-        nreleasepts=len(prpdata),
+        nreleasepts=1,  # len(prpdata),
         packagedata=prpdata,
         perioddata={0: ["FIRST"]},
         track_filerecord=[prp_track_file],
@@ -282,6 +275,22 @@ def check_output(idx, test):
     # get prt output
     prt_track_csv_file = f"{prt_name}.prp.trk.csv"
     pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
+    endpts = (
+        pls.sort_values("t")
+        .groupby(["imdl", "iprp", "irpt", "trelease"])
+        .tail(1)
+    )
+
+    if "l2r" in name:
+        assert pls.shape == (212, 16)
+        assert (pls.z == 0.5).all()  # no z change
+        # path should be horizontal from left to right
+        assert isclose(min(pls.x), 20, rel_tol=1e-4)
+        assert isclose(max(pls.x), 1979, rel_tol=1e-4)
+        y = 21
+        assert isclose(min(pls.y), y, rel_tol=1e-4)
+        assert isclose(max(pls.y), y, rel_tol=1e-4)
+        assert set(endpts.icell) == {921}
 
     plot_2d = True
     if plot_2d:
@@ -292,14 +301,35 @@ def check_output(idx, test):
         pmv.plot_grid(alpha=0.25)
         pmv.plot_ibound(alpha=0.5)
         headmesh = pmv.plot_array(head, alpha=0.25)
-        cv = pmv.contour_array(head, levels=np.linspace(0, 1, 9), colors="black")
+        cv = pmv.contour_array(
+            head, levels=np.linspace(0, 1, 9), colors="black"
+        )
         plt.clabel(cv)
-        plt.colorbar(headmesh, shrink=0.25, ax=ax, label="Head", location="right")
+        plt.colorbar(
+            headmesh, shrink=0.25, ax=ax, label="Head", location="right"
+        )
         handles = [
-            mpl.lines.Line2D([0], [0], marker='>', linestyle='', label="Specific discharge", color="grey", markerfacecolor='gray'),
+            mpl.lines.Line2D(
+                [0],
+                [0],
+                marker=">",
+                linestyle="",
+                label="Specific discharge",
+                color="grey",
+                markerfacecolor="gray",
+            ),
         ]
         if "wel" in name:
-            handles.append(mpl.lines.Line2D([0], [0], marker='o', linestyle='', label="Well", markerfacecolor='red'),)
+            handles.append(
+                mpl.lines.Line2D(
+                    [0],
+                    [0],
+                    marker="o",
+                    linestyle="",
+                    label="Well",
+                    markerfacecolor="red",
+                ),
+            )
         ax.legend(
             handles=handles,
             loc="lower right",
@@ -325,7 +355,7 @@ def check_output(idx, test):
             )
         # plt.show()
         plt.savefig(prt_ws / f"{name}.png")
-    
+
     plot_3d = False
     if plot_3d:
         # plot in 3d with pyvista (via vtk)

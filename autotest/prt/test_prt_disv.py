@@ -19,9 +19,14 @@ from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 from flopy.utils.gridutil import get_disv_kwargs
-from prt_test_utils import (all_equal, check_budget_data, check_track_data,
-                            get_partdata, has_default_boundnames,
-                            plot_nodes_and_vertices)
+from prt_test_utils import (
+    all_equal,
+    check_budget_data,
+    check_track_data,
+    get_partdata,
+    has_default_boundnames,
+    plot_nodes_and_vertices,
+)
 
 from framework import TestFramework
 

@@ -36,9 +36,15 @@ import pytest
 from flopy.plot.plotutil import to_mp7_pathlines
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
-from prt_test_utils import (BasicDisCase, all_equal, check_budget_data,
-                            check_track_data, get_model_name, get_partdata,
-                            has_default_boundnames)
+from prt_test_utils import (
+    BasicDisCase,
+    all_equal,
+    check_budget_data,
+    check_track_data,
+    get_model_name,
+    get_partdata,
+    has_default_boundnames,
+)
 
 from framework import TestFramework
 
