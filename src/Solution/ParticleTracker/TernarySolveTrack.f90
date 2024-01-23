@@ -2,7 +2,7 @@ module TernarySolveTrack
 
   use KindModule, only: I4B, DP, LGP
   use GeomUtilModule, only: skew
-  use MathUtilModule, only: zeroch, zeroin, zerotest
+  use MathUtilModule, only: f1d, zeroch, zeroin, zerotest
   use ErrorUtilModule, only: pstop
   private
   public :: traverse_triangle
@@ -45,7 +45,7 @@ contains
     ! real(DP), intent(inout) :: s(2, 2) !< skew matrix
     ! real(DP), intent(inout) :: t(4, 2) !< triangle points
     ! logical(LGP), intent(in), optional :: bary !< barycentric coordinates
-    implicit double precision(a - h, o - z)
+    implicit real(DP) (a - h, o - z)
     logical :: bary
     intrinsic cpu_time
 
@@ -104,7 +104,7 @@ contains
     ! real(DP), intent(inout) :: s(2, 2) !< skew matrix
     ! real(DP), intent(inout) :: t(3, 2) !< triangle points
     ! logical(LGP), intent(in), optional :: bary !< barycentric coordinates
-    implicit double precision(a - h, o - z)
+    implicit real(DP) (a - h, o - z)
     logical :: bary
     real(DP) :: rot(2, 2), res(2)
 
@@ -213,7 +213,7 @@ contains
 
   !> @brief Compute analytical solution coefficients depending on case
   subroutine solve_coefs(alpi, beti)
-    implicit double precision(a - h, o - z)
+    implicit real(DP) (a - h, o - z)
 
     zerotol = 1d-10 ! kluge
     if (dabs(wbb) .gt. zerotol) then
@@ -275,7 +275,7 @@ contains
 
   !> @brief Step (evaluate) analytically depending on case
   subroutine step_analytical(t, alp, bet)
-    implicit double precision(a - h, o - z)
+    implicit real(DP) (a - h, o - z)
 
     if (icase .eq. 1) then
       alp = ca1 + ca2 * dexp(waa * t) + ca3 * dexp(wbb * t)
@@ -298,7 +298,7 @@ contains
 
   !> @brief Step (evaluate) numerically depending in case
   subroutine step_euler(nt, step, vziodz, az, alpi, beti, t, alp, bet)
-    implicit double precision(a - h, o - z)
+    implicit real(DP) (a - h, o - z)
 
     if (nt .eq. 0) then
       ! -- Initial location
@@ -349,8 +349,8 @@ contains
                             alp2, bet2, alpi, beti, rxx, rxy, &
                             ryx, ryy, tol, step, vziodz, az, &
                             texit, alpexit, betexit)
-    implicit double precision(a - h, o - z)
-    character facename(0:2) * 7, cfail * 60
+    implicit real(DP) (a - h, o - z)
+    character facename(0:2) * 7
     data(facename(itri), itri=0, 2)/"beta=0 ", "gamma=0", "alpha=0"/
     common / debug / ntdebug
 
@@ -362,13 +362,11 @@ contains
         ! -- Entrance face, so no exit. (Normal velocity is uniform along face 0,
         ! -- so it cannot be both an entrance and an exit.)
         texit = huge(1d0)
-        cfail = "entered on face beta=0 (no exit)"
       else
         ! -- Not the entrance face, so check for outflow
         if (cv0(2) .ge. 0d0) then
           ! -- Inflow or no flow, so no exit
           texit = huge(1d0)
-          cfail = "inflow or no flow on face beta=0 (no exit)"
         else
           ! -- Outflow, so check beta-velocity at the initial location,
           ! -- recognizing that it will never change sign along the
@@ -377,7 +375,6 @@ contains
           if (vbeti .ge. 0d0) then
             ! -- Can't exit along beta = 0
             texit = huge(1d0)
-            cfail = "cannot exit on face beta=0 (no exit)"
           else
             ! -- get alpt and check it
             call get_t_alpt(0d0, t, alpt)
@@ -390,7 +387,6 @@ contains
             else
               ! -- alpt not within the edge, so not an exit
               texit = huge(1d0)
-              cfail = "alpt not within face beta=0 (not an exit)"
             end if
           end if
         end if
@@ -410,7 +406,6 @@ contains
       if ((v1n .ge. 0d0) .and. (v2n .ge. 0d0)) then
         ! -- No outflow at vn1 and vn2 corners; no outflow interval, so no exit.
         texit = huge(1d0)
-        cfail = "no outflow interval (no exit)"
       else
         ! -- Find outflow interval
         call get_bet_outflow_bary(v1n, v2n, betoutlo, betouthi)
@@ -422,7 +417,6 @@ contains
           ! -- if not, no exit; if so, solve for t and alpha
           if ((beti .gt. betouthi) .or. (beti .lt. betoutlo)) then
             texit = huge(1d0)
-            cfail = "beta=const not within outflow interval (not an exit)"
           else
             ! -- Check alpha-velocity at the initial location,
             ! -- recognizing that it will never change sign along the
@@ -433,11 +427,9 @@ contains
             if ((itriface .eq. 1) .and. (valpi .le. 0d0)) then
               ! -- Can't exit along gamma = 0.
               texit = huge(1d0)
-              cfail = "cannot exit on face gamma=0 (no exit)"
             else if ((itriface .eq. 2) .and. (valpi .ge. 0d0)) then
               ! -- Can't exit along alpha = 0.
               texit = huge(1d0)
-              cfail = "cannot exit on face alpha=0 (no exit)"
             else
               ! -- get exit
               if (itriface .eq. 1) then
@@ -464,7 +456,6 @@ contains
           if (betlo .ge. bethi) then
             ! -- If bounds on bet leave no feasible interval, no exit
             texit = huge(1d0)
-            cfail = "No feasible interval for beta"
           else
             ! -- Check sign of function value at beta bounds
             call get_t_alpt(bethi, thi, alphi)
@@ -479,23 +470,22 @@ contains
             if (fax * fbx .gt. 0d0) then
               ! -- Root not bracketed; no exit
               texit = huge(1d0)
-              cfail = "Beta bounds betlo and bethi do not bracket a root"
             else
               if (isolv .eq. 1) then
                 ! -- Use Brent's method with initial bounds on beta of betlo and bethi,
                 ! -- assuming they bound the root
                 call soln_brent(itriface, betlo, bethi, tol, texit, &
-                                alpexit, betexit, cfail)
+                                alpexit, betexit)
               else if (isolv .eq. 2) then
                 ! -- Use Chandrupatla's method with initial bounds on beta of betlo and bethi,
                 ! -- assuming they bound the root
                 call soln_chand(itriface, betlo, bethi, tol, texit, &
-                                alpexit, betexit, cfail)
+                                alpexit, betexit)
               else if (isolv .eq. 3) then
                 ! -- Use a test method with initial bounds on beta of betlo and bethi,
                 ! -- assuming they bound the root
                 call soln_test(itriface, betlo, bethi, tol, texit, &
-                               alpexit, betexit, cfail)
+                               alpexit, betexit)
               else if (isolv .eq. -1) then
                 ! -- Use Euler integration to find exit
                 call soln_euler(itriface, alpi, beti, step, vziodz, az, &
@@ -520,26 +510,30 @@ contains
   end subroutine
 
   !> @brief Brent's method applied to canonical face 1 (gamma = 0)
-  double precision function fbary1(bet)
-    implicit double precision(a - h, o - z)
+  function fbary1(bet) result(fb)
+    implicit real(DP) (a - h, o - z)
+    real(DP), intent(in) :: bet
+    real(DP) :: fb
 
     ! -- Evaluate gamma{t{beta}} = 1. - alpha{t{beta}} - beta
     call get_t_alpt(bet, t, alpt)
-    fbary1 = 1d0 - alpt - bet
+    fb = 1d0 - alpt - bet
   end function
 
   !> @brief Brent's method applied to canonical face 2 (alpha = 0)
-  double precision function fbary2(bet)
-    implicit double precision(a - h, o - z)
+  function fbary2(bet) result(fb)
+    implicit real(DP) (a - h, o - z)
+    real(DP), intent(in) :: bet
+    real(DP) :: fb
 
     ! -- Evaluate alpha{t{beta}}
     call get_t_alpt(bet, t, alpt)
-    fbary2 = alpt
+    fb = alpt
   end function
 
   !> @brief Given beta evaluate t and alpha depending on case
   subroutine get_t_alpt(bet, t, alp)
-    implicit double precision(a - h, o - z)
+    implicit real(DP) (a - h, o - z)
 
     ! kluge note: assumes cb2<>0, wbb<>0 as appropriate
     zerotol = 1d-10 ! kluge
@@ -568,7 +562,7 @@ contains
 
   !> @brief Find outflow interval
   subroutine get_bet_outflow_bary(vn1, vn2, betoutlo, betouthi)
-    implicit double precision(a - h, o - z)
+    implicit real(DP) (a - h, o - z)
 
     vndiff = vn2 - vn1
     if (vn1 .lt. 0d0) then
@@ -597,7 +591,7 @@ contains
 
   !> @brief Find trend of and limits on beta from beta{t} solution
   subroutine get_bet_soln_limits(beti, betsollo, betsolhi, ibettrend)
-    implicit double precision(a - h, o - z)
+    implicit real(DP) (a - h, o - z)
 
     if (wbb .gt. 0d0) then
       betlim = -cv0(2) / wbb
@@ -649,9 +643,9 @@ contains
 
   !> @brief Use Brent's method with initial bounds on beta of betlo and bethi
   subroutine soln_brent(itriface, betlo, bethi, tol, &
-                        texit, alpexit, betexit, cfail)
-    implicit double precision(a - h, o - z)
-    character cfail * 60
+                        texit, alpexit, betexit)
+    implicit real(DP) (a - h, o - z)
+    procedure(f1d), pointer :: f
 
     ! -- assuming betlo and bethi bracket the root
     ! --
@@ -661,9 +655,11 @@ contains
     blo = betlo
     bhi = bethi
     if (itriface .eq. 1) then
-      betexit = zeroin(blo, bhi, fbary1, tol)
+      f => fbary1
+      betexit = zeroin(blo, bhi, f, tol)
     else
-      betexit = zeroin(blo, bhi, fbary2, tol)
+      f => fbary2
+      betexit = zeroin(blo, bhi, f, tol)
     end if
     call get_t_alpt(betexit, texit, alpexit)
 
@@ -671,9 +667,9 @@ contains
 
   !> @brief Use Chandrupatla's method with initial bounds on beta of betlo and bethi
   subroutine soln_chand(itriface, betlo, bethi, tol, &
-                        texit, alpexit, betexit, cfail)
-    implicit double precision(a - h, o - z)
-    character cfail * 60
+                        texit, alpexit, betexit)
+    implicit real(DP) (a - h, o - z)
+    procedure(f1d), pointer :: f
 
     ! -- note: assuming betlo and bethi bracket the root
     ! tol = 1d-7               ! kluge
@@ -682,9 +678,11 @@ contains
     blo = betlo
     bhi = bethi
     if (itriface .eq. 1) then
-      betexit = zeroch(blo, bhi, fbary1, tol)
+      f => fbary1
+      betexit = zeroch(blo, bhi, f, tol)
     else
-      betexit = zeroch(blo, bhi, fbary2, tol)
+      f => fbary2
+      betexit = zeroch(blo, bhi, f, tol)
     end if
     call get_t_alpt(betexit, texit, alpexit)
 
@@ -692,9 +690,9 @@ contains
 
   !> @brief Use a test method with initial bounds on beta of betlo and bethi
   subroutine soln_test(itriface, betlo, bethi, tol, &
-                       texit, alpexit, betexit, cfail)
-    implicit double precision(a - h, o - z)
-    character cfail * 60
+                       texit, alpexit, betexit)
+    implicit real(DP) (a - h, o - z)
+    procedure(f1d), pointer :: f
 
     ! -- assuming betlo and bethi bracket the root
     ! tol = 1d-7               ! kluge
@@ -703,9 +701,11 @@ contains
     blo = betlo
     bhi = bethi
     if (itriface .eq. 1) then
-      betexit = zerotest(blo, bhi, fbary1, tol)
+      f => fbary1
+      betexit = zerotest(blo, bhi, f, tol)
     else
-      betexit = zerotest(blo, bhi, fbary2, tol)
+      f => fbary2
+      betexit = zerotest(blo, bhi, f, tol)
     end if
     call get_t_alpt(betexit, texit, alpexit)
 
@@ -714,7 +714,7 @@ contains
   !> @brief Use Euler integration to find exit
   subroutine soln_euler(itriface, alpi, beti, step, vziodz, &
                         az, texit, alpexit, betexit)
-    implicit double precision(a - h, o - z)
+    implicit real(DP) (a - h, o - z)
     common / debug / ntdebug ! kluge debug
 
     t = 0d0
