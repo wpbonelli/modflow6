@@ -328,7 +328,7 @@ def check_output(idx, test):
     prt_track_csv_file = f"{prt_name}.prp.trk.csv"
     pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
-    plot_2d = True
+    plot_2d = False
     if plot_2d:
         # plot in 2d with mpl
         fig = plt.figure(figsize=(16, 10))

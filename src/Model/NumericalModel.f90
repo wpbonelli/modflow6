@@ -49,6 +49,7 @@ module NumericalModelModule
     procedure :: model_rp
     procedure :: model_ad
     procedure :: model_reset
+    procedure :: model_solve
     procedure :: model_cf
     procedure :: model_fc
     procedure :: model_ptcchk
@@ -120,6 +121,10 @@ contains
     end do
 
   end subroutine model_reset
+
+  subroutine model_solve(this)
+    class(NumericalModelType) :: this
+  end subroutine model_solve
 
   subroutine model_cf(this, kiter)
     class(NumericalModelType) :: this

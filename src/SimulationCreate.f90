@@ -219,7 +219,6 @@ contains
     use GwtModule, only: gwt_cr
     use PrtModule, only: prt_cr
     use NumericalModelModule, only: NumericalModelType, GetNumericalModelFromList
-    use ExplicitModelModule, only: ExplicitModelType, GetExplicitModelFromList
     use VirtualGwfModelModule, only: add_virtual_gwf_model
     use VirtualGwtModelModule, only: add_virtual_gwt_model
     ! use VirtualPrtModelModule, only: add_virtual_prt_model
@@ -300,11 +299,14 @@ contains
         end if
         call add_virtual_gwt_model(n, model_names(n), num_model)
       case ('PRT6')
+        im = im + 1
+        write (iout, '(4x,2a,i0,a)') trim(model_type), ' model ', &
+          n, ' will be created'
+        call prt_cr(fname, n, model_names(n))
         call dev_feature("PRT is still under development, install the' &
            &nightly build or compile from source with IDEVELOPMODE = 1.")
-        im = im + 1
+        num_model => GetNumericalModelFromList(basemodellist, im)
         model_loc_idx(n) = im
-        call prt_cr(fname, n, model_names(n))
       case default
         write (errmsg, '(a,a)') &
           'Unknown simulation model type: ', trim(model_type)
