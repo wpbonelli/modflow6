@@ -82,7 +82,7 @@ contains
     double precision :: dt, t, dtexitxy, texit, x, y, z
     integer :: izstatus, itopbotexit
     integer :: ntmax, nsave, isolv, itrifaceenter, itrifaceexit
-    double precision :: diff, rdiff, tol, step, dtexit, alpexit, betexit
+    double precision :: tol, step, dtexit, alpexit, betexit
     integer :: ntdebug ! kluge
     integer :: reason
 
