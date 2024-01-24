@@ -143,12 +143,10 @@ contains
     ! kluge note: can probably avoid calculating alpexit
     ! here in many cases and wait to calculate it later,
     ! once the final trajectory time is known
-    call traverse_triangle(ntmax, nsave, diff, rdiff, &
-                           isolv, tol, step, &
+    call traverse_triangle(isolv, tol, step, &
                            dtexitxy, alpexit, betexit, &
                            itrifaceenter, itrifaceexit, &
                            rxx, rxy, ryx, ryy, &
-                           sxx, sxy, syy, &
                            alp0, bet0, alp1, bet1, alp2, bet2, alpi, beti, &
                            vziodz, az, lbary)
 

@@ -4,6 +4,7 @@ module TernarySolveTrack
   use GeomUtilModule, only: skew
   use MathUtilModule, only: f1d, zeroch, zeroin, zerotest
   use ErrorUtilModule, only: pstop
+
   private
   public :: traverse_triangle
   public :: canonical
@@ -30,24 +31,28 @@ module TernarySolveTrack
 contains
 
   !> @brief Traverse triangular cell
-  subroutine traverse_triangle(ntmax, nsave, diff, rdiff, &
-                               isolv, tol, step, texit, &
+  subroutine traverse_triangle(isolv, tol, step, texit, &
                                alpexit, betexit, &
                                itrifaceenter, itrifaceexit, &
                                rxx, rxy, ryx, ryy, &
-                               sxx, sxy, syy, &
                                alp0, bet0, alp1, bet1, alp2, bet2, alpi, beti, &
                                vziodz, az, &
                                bary)
-    ! real(DP), intent(inout) :: pexit(2) !< ??
-    ! real(DP), intent(inout) :: itrifaceenter, itrifaceexit !< ??
-    ! real(DP), intent(inout) :: r(2, 2) !< rotation matrix
-    ! real(DP), intent(inout) :: s(2, 2) !< skew matrix
-    ! real(DP), intent(inout) :: t(4, 2) !< triangle points
-    ! logical(LGP), intent(in), optional :: bary !< barycentric coordinates
-    implicit real(DP) (a - h, o - z)
-    logical :: bary
-    intrinsic cpu_time
+    ! -- dummy
+    integer(I4B), intent(in) :: isolv !< solution method
+    real(DP), intent(in) :: tol !< solution tolerance
+    real(DP), intent(in) :: step !< stepsize for numerical methods (e.g. euler)
+    real(DP), intent(out) :: texit !< time particle exits the cell
+    real(DP), intent(inout) :: alpexit, betexit !< alpha and beta coefficients
+    integer(I4B), intent(inout) :: itrifaceenter, itrifaceexit !< entry and exit faces
+    real(DP), intent(inout) :: rxx, rxy, ryx, ryy !< rotation matrix
+    real(DP), intent(inout) :: alp0, bet0, alp1, bet1, alp2, bet2, alpi, beti !< alpha and beta coefficients
+    real(DP), intent(in) :: vziodz, az
+    logical(LGP), intent(in) :: bary !< whether to use barycentric coordinates
+    ! -- local
+    real(DP) :: texit0, alpexit0, betexit0
+    real(DP) :: texit1, alpexit1, betexit1
+    real(DP) :: texit2, alpexit2, betexit2
 
     ! -- Compute elements of matrix W
     call get_w(alp1, bet1, alp2, bet2, waa, wab, wba, wbb, bary)
@@ -56,17 +61,17 @@ contains
     call solve_coefs(alpi, beti)
 
     ! -- Compute exit time (travel time to exit) and exit location
-    call find_exit_bary(isolv, 0, itrifaceenter, alp0, bet0, &
-                        alp1, bet1, alpi, beti, &
-                        rxx, rxy, ryx, ryy, tol, step, vziodz, az, &
+    call find_exit_bary(isolv, 0, itrifaceenter, &
+                        alpi, beti, &
+                        tol, step, vziodz, az, &
                         texit0, alpexit0, betexit0)
-    call find_exit_bary(isolv, 1, itrifaceenter, alp1, bet1, &
-                        alp2, bet2, alpi, beti, &
-                        rxx, rxy, ryx, ryy, tol, step, vziodz, az, &
+    call find_exit_bary(isolv, 1, itrifaceenter, &
+                        alpi, beti, &
+                        tol, step, vziodz, az, &
                         texit1, alpexit1, betexit1)
-    call find_exit_bary(isolv, 2, itrifaceenter, alp2, bet2, &
-                        alp0, bet0, alpi, beti, &
-                        rxx, rxy, ryx, ryy, tol, step, vziodz, az, &
+    call find_exit_bary(isolv, 2, itrifaceenter, &
+                        alpi, beti, &
+                        tol, step, vziodz, az, &
                         texit2, alpexit2, betexit2)
     texit = min(texit0, texit1, texit2)
 
@@ -97,22 +102,19 @@ contains
                        sxx, sxy, syy, &
                        alp0, bet0, alp1, bet1, alp2, bet2, alpi, beti, &
                        bary)
-    ! real(DP), intent(inout) :: p(3, 2) !< ??
-    ! real(DP), intent(inout) :: v(3, 2) !< ??
-    ! real(DP), intent(inout) :: i(2) !< ??
-    ! real(DP), intent(inout) :: r(2, 2) !< rotation matrix
-    ! real(DP), intent(inout) :: s(2, 2) !< skew matrix
-    ! real(DP), intent(inout) :: t(3, 2) !< triangle points
-    ! logical(LGP), intent(in), optional :: bary !< barycentric coordinates
-    implicit real(DP) (a - h, o - z)
-    logical :: bary
+    ! -- dummy
+    real(DP), intent(in) :: x0, y0, x1, y1, x2, y2
+    real(DP), intent(in) :: v0x, v0y, v1x, v1y, v2x, v2y
+    real(DP), intent(in) :: xi, yi
+    real(DP), intent(inout) :: rxx, rxy, ryx, ryy !< rotation matrix
+    real(DP), intent(inout) :: sxx, sxy, syy !< skew matrix entries (top left, top right, bottom right)
+    real(DP), intent(inout) :: alp0, bet0, alp1, bet1, alp2, bet2, alpi, beti !< alpha and beta coefficients
+    logical(LGP), intent(in) :: bary !< whether to use barycentric coordinates
+    ! -- local
+    real(DP) :: baselen, oobaselen
+    real(DP) :: sinomega, cosomega
+    real(DP) :: x1diff, y1diff, x2diff, y2diff, xidiff, yidiff
     real(DP) :: rot(2, 2), res(2)
-
-    ! if (present(bary)) then
-    !   lbary = bary
-    ! else
-    !   lbary = .true.
-    ! end if
 
     ! -- Translate and rotate coordinates to "canonical" configuration
     x1diff = x1 - x0
@@ -132,7 +134,6 @@ contains
     alp1 = baselen
     bet1 = 0d0
 
-    ! todo refactor alp/bet vars
     rot = reshape((/rxx, ryx, rxy, ryy/), shape(rot))
     res = matmul(rot, (/x2diff, y2diff/))
     alp2 = res(1)
@@ -158,7 +159,6 @@ contains
       cv0 = skew(cv0, (/sxx, sxy, syy/))
       cv1 = skew(cv1, (/sxx, sxy, syy/))
       cv2 = skew(cv2, (/sxx, sxy, syy/))
-      ! todo turn alpi/beti into array
       res = (/alpi, beti/)
       res = skew(res, (/sxx, sxy, syy/))
       alpi = res(1)
@@ -175,8 +175,6 @@ contains
     ! -- dummy
     real(DP), intent(in) :: alp1, bet1, alp2, bet2 !< triangle face points
     real(DP), intent(inout) :: waa, wab, wba, wbb !< w matrix
-    ! real(DP), intent(inout) :: t1(2), t2(2) !< triangle face points
-    ! real(DP), intent(inout) :: w(2, 2) !< w matrix
     logical(LGP), intent(in), optional :: bary !< barycentric coordinates
     ! -- local
     logical(LGP) :: lbary
@@ -213,7 +211,10 @@ contains
 
   !> @brief Compute analytical solution coefficients depending on case
   subroutine solve_coefs(alpi, beti)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
+    real(DP), intent(in) :: alpi, beti
+    ! -- local
+    real(DP) :: zerotol, wratv, acoef, bcoef, afact, bfact, vfact, oowaa
 
     zerotol = 1d-10 ! kluge
     if (dabs(wbb) .gt. zerotol) then
@@ -275,7 +276,9 @@ contains
 
   !> @brief Step (evaluate) analytically depending on case
   subroutine step_analytical(t, alp, bet)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
+    real(DP), intent(in) :: t
+    real(DP), intent(inout) :: alp, bet
 
     if (icase .eq. 1) then
       alp = ca1 + ca2 * dexp(waa * t) + ca3 * dexp(wbb * t)
@@ -298,7 +301,19 @@ contains
 
   !> @brief Step (evaluate) numerically depending in case
   subroutine step_euler(nt, step, vziodz, az, alpi, beti, t, alp, bet)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
+    integer(I4B) :: nt
+    real(DP), intent(in) :: step
+    real(DP), intent(in) :: vziodz, az
+    real(DP), intent(in) :: alpi, beti
+    real(DP), intent(inout) :: t
+    real(DP), intent(inout) :: alp, bet
+    ! -- local
+    real(DP) :: alpproj, betproj
+    real(DP) :: valp, vbet
+    real(DP) :: vz, vmeasure
+    real(DP) :: delt, thalf
+    real(DP) :: rkn1, rln1, rkn2, rln2, rkn3, rln3, rkn4, rln4
 
     if (nt .eq. 0) then
       ! -- Initial location
@@ -345,14 +360,23 @@ contains
   end subroutine
 
   !> @brief Find the exit time and location in barycentric coordinates.
-  subroutine find_exit_bary(isolv, itriface, itrifaceenter, alp1, bet1, &
-                            alp2, bet2, alpi, beti, rxx, rxy, &
-                            ryx, ryy, tol, step, vziodz, az, &
+  subroutine find_exit_bary(isolv, itriface, itrifaceenter, &
+                            alpi, beti, &
+                            tol, step, vziodz, az, &
                             texit, alpexit, betexit)
-    implicit real(DP) (a - h, o - z)
-    character facename(0:2) * 7
-    data(facename(itri), itri=0, 2)/"beta=0 ", "gamma=0", "alpha=0"/
-    common / debug / ntdebug
+    ! -- dummy
+    integer(I4B), intent(in) :: isolv, itriface, itrifaceenter
+    real(DP), intent(in) :: alpi, beti
+    real(DP), intent(in) :: tol, step, vziodz, az
+    real(DP), intent(inout) :: texit, alpexit, betexit
+    ! -- local
+    real(DP) :: alplo, alphi, alpt, alplim
+    real(DP) :: fax, fbx
+    real(DP) :: t, tlo, thi
+    real(DP) :: v0alpstar, valpi, v1n, v2n, vbeti
+    real(DP) :: zerotol
+    real(DP) :: betlo, bethi, betsollo, betsolhi, betoutlo, betouthi
+    integer(I4B) :: ibettrend
 
     ! -- Use iterative scheme or numerical integration indicated by isolv.
     zerotol = 1d-10 ! kluge
@@ -383,7 +407,6 @@ contains
               texit = t
               alpexit = alpt
               betexit = 0d0
-              ntdebug = -111 ! kluge debug bludebug
             else
               ! -- alpt not within the edge, so not an exit
               texit = huge(1d0)
@@ -441,10 +464,8 @@ contains
               if (waa .ne. 0d0) then
                 alplim = -v0alpstar / waa
                 texit = dlog(alpexit - alplim / (alpi - alplim)) / waa
-                ntdebug = -222 ! kluge debug bludebug
               else
                 texit = (alpexit - alpi) / v0alpstar
-                ntdebug = -333 ! kluge debug bludebug
               end if
             end if
           end if
@@ -491,10 +512,7 @@ contains
                 call soln_euler(itriface, alpi, beti, step, vziodz, az, &
                                 texit, alpexit, betexit)
               else
-                write (*, '(A)') "Invalid isolv = ", isolv ! kluge
-                write (69, '(A)') "Invalid isolv = ", isolv
-                !!pause
-                stop
+                call pstop(1, "Invalid isolv, expected 1, 2, 3 or -1")
               end if
             end if
           end if
@@ -511,9 +529,11 @@ contains
 
   !> @brief Brent's method applied to canonical face 1 (gamma = 0)
   function fbary1(bet) result(fb)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
     real(DP), intent(in) :: bet
     real(DP) :: fb
+    ! -- local
+    real(DP) :: t, alpt
 
     ! -- Evaluate gamma{t{beta}} = 1. - alpha{t{beta}} - beta
     call get_t_alpt(bet, t, alpt)
@@ -522,9 +542,11 @@ contains
 
   !> @brief Brent's method applied to canonical face 2 (alpha = 0)
   function fbary2(bet) result(fb)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
     real(DP), intent(in) :: bet
     real(DP) :: fb
+    ! -- local
+    real(DP) :: t, alpt
 
     ! -- Evaluate alpha{t{beta}}
     call get_t_alpt(bet, t, alpt)
@@ -533,7 +555,11 @@ contains
 
   !> @brief Given beta evaluate t and alpha depending on case
   subroutine get_t_alpt(bet, t, alp)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
+    real(DP), intent(in) :: bet
+    real(DP), intent(inout) :: t, alp
+    ! -- local
+    real(DP) :: term, zerotol
 
     ! kluge note: assumes cb2<>0, wbb<>0 as appropriate
     zerotol = 1d-10 ! kluge
@@ -562,7 +588,11 @@ contains
 
   !> @brief Find outflow interval
   subroutine get_bet_outflow_bary(vn1, vn2, betoutlo, betouthi)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
+    real(DP), intent(in) :: vn1, vn2
+    real(DP), intent(inout) :: betoutlo, betouthi
+    ! -- local
+    real(DP) :: vndiff
 
     vndiff = vn2 - vn1
     if (vn1 .lt. 0d0) then
@@ -591,7 +621,12 @@ contains
 
   !> @brief Find trend of and limits on beta from beta{t} solution
   subroutine get_bet_soln_limits(beti, betsollo, betsolhi, ibettrend)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
+    real(DP), intent(in) :: beti
+    real(DP), intent(inout) :: betsollo, betsolhi
+    integer(I4B), intent(inout) :: ibettrend
+    ! -- local
+    real(DP) :: betlim
 
     if (wbb .gt. 0d0) then
       betlim = -cv0(2) / wbb
@@ -644,7 +679,14 @@ contains
   !> @brief Use Brent's method with initial bounds on beta of betlo and bethi
   subroutine soln_brent(itriface, betlo, bethi, tol, &
                         texit, alpexit, betexit)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
+    integer(I4B), intent(in) :: itriface
+    real(DP), intent(in) :: betlo, bethi
+    real(DP), intent(in) :: tol
+    real(DP), intent(inout) :: texit, alpexit, betexit
+    ! -- local
+    real(DP) :: itmax, itact
+    real(DP) :: blo, bhi
     procedure(f1d), pointer :: f
 
     ! -- assuming betlo and bethi bracket the root
@@ -668,7 +710,14 @@ contains
   !> @brief Use Chandrupatla's method with initial bounds on beta of betlo and bethi
   subroutine soln_chand(itriface, betlo, bethi, tol, &
                         texit, alpexit, betexit)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
+    integer(I4B), intent(in) :: itriface
+    real(DP), intent(in) :: betlo, bethi
+    real(DP), intent(in) :: tol
+    real(DP), intent(inout) :: texit, alpexit, betexit
+    ! -- local
+    real(DP) :: itmax, itact
+    real(DP) :: blo, bhi
     procedure(f1d), pointer :: f
 
     ! -- note: assuming betlo and bethi bracket the root
@@ -691,7 +740,14 @@ contains
   !> @brief Use a test method with initial bounds on beta of betlo and bethi
   subroutine soln_test(itriface, betlo, bethi, tol, &
                        texit, alpexit, betexit)
-    implicit real(DP) (a - h, o - z)
+    ! -- dummy
+    integer(I4B), intent(in) :: itriface
+    real(DP), intent(in) :: betlo, bethi
+    real(DP), intent(in) :: tol
+    real(DP), intent(inout) :: texit, alpexit, betexit
+    ! -- local
+    real(DP) :: itmax, itact
+    real(DP) :: blo, bhi
     procedure(f1d), pointer :: f
 
     ! -- assuming betlo and bethi bracket the root
@@ -714,8 +770,17 @@ contains
   !> @brief Use Euler integration to find exit
   subroutine soln_euler(itriface, alpi, beti, step, vziodz, &
                         az, texit, alpexit, betexit)
-    implicit real(DP) (a - h, o - z)
-    common / debug / ntdebug ! kluge debug
+    ! -- dummy
+    integer(I4B), intent(in) :: itriface
+    real(DP), intent(in) :: alpi, beti
+    real(DP), intent(in) :: step
+    real(DP), intent(in) :: vziodz, az
+    real(DP), intent(inout) :: texit, alpexit, betexit
+    ! -- local
+    real(DP) :: alp, bet, gam
+    real(DP) :: alpold, betold, gamold
+    real(DP) :: wt, omwt
+    real(DP) :: t, told
 
     t = 0d0
     alp = alpi
@@ -762,12 +827,9 @@ contains
       end if
       ! -- End time step loop
     end do
-    ntdebug = nt ! kluge debug
     if (nt .gt. 1000000000) then ! kluge hardwired
       ! -- Exit not found after max number of time steps
-      write (*, '(A)') "Didn't find exit in soln_euler" ! kluge note: shouldn't get here
-      write (69, '(A)') "Didn't find exit in soln_euler" ! kluge note: shouldn't get here
-      stop
+      call pstop(1, "Didn't find exit in soln_euler")
     end if
 
   end subroutine
