@@ -1,7 +1,7 @@
 module PrtOcModule
 
   use BaseDisModule, only: DisBaseType
-  use KindModule, only: DP, I4B
+  use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: LENMODELNAME, MNORMAL
   use OutputControlModule, only: OutputControlType
   use OutputControlDataModule, only: OutputControlDataType, ocd_cr
@@ -19,7 +19,11 @@ module PrtOcModule
     integer(I4B), pointer :: itrkout => null() !< binary output file
     integer(I4B), pointer :: itrkhdr => null() !< output header file
     integer(I4B), pointer :: itrkcsv => null() !< CSV output file
-    integer(I4B), pointer :: itrkevent => null() !< track event option
+    logical(LGP), pointer :: itrkrls => null() !< track release events
+    logical(LGP), pointer :: itrktrs => null() !< track cell transition events
+    logical(LGP), pointer :: itrktst => null() !< track timestep events
+    logical(LGP), pointer :: itrkter => null() !< track termination events
+    logical(LGP), pointer :: itrkwsk => null() !< track weak sink exit events
 
   contains
     procedure :: oc_ar
@@ -67,7 +71,11 @@ contains
     call mem_allocate(this%itrkout, 'ITRKOUT', this%memoryPath)
     call mem_allocate(this%itrkhdr, 'ITRKHDR', this%memoryPath)
     call mem_allocate(this%itrkcsv, 'ITRKCSV', this%memoryPath)
-    call mem_allocate(this%itrkevent, 'ITRACKEVENT', this%memoryPath)
+    call mem_allocate(this%itrkrls, 'ITRACKRLS', this%memoryPath)
+    call mem_allocate(this%itrktrs, 'ITRACKTRS', this%memoryPath)
+    call mem_allocate(this%itrktst, 'ITRACKTST', this%memoryPath)
+    call mem_allocate(this%itrkter, 'ITRACKTER', this%memoryPath)
+    call mem_allocate(this%itrkwsk, 'ITRACKWSK', this%memoryPath)
 
     this%name_model = name_model
     this%inunit = 0
@@ -78,7 +86,12 @@ contains
     this%itrkout = 0
     this%itrkhdr = 0
     this%itrkcsv = 0
-    this%itrkevent = -1
+    this%itrkrls = .false.
+    this%itrktrs = .false.
+    this%itrktst = .false.
+    this%itrkter = .false.
+    this%itrkwsk = .false.
+
   end subroutine prt_oc_allocate_scalars
 
   !> @ brief Setup output control variables.
@@ -139,7 +152,11 @@ contains
     call mem_deallocate(this%itrkout)
     call mem_deallocate(this%itrkhdr)
     call mem_deallocate(this%itrkcsv)
-    call mem_deallocate(this%itrkevent)
+    call mem_deallocate(this%itrkrls)
+    call mem_deallocate(this%itrktrs)
+    call mem_deallocate(this%itrktst)
+    call mem_deallocate(this%itrkter)
+    call mem_deallocate(this%itrkwsk)
   end subroutine prt_oc_da
 
   subroutine prt_oc_read_options(this)
@@ -159,7 +176,7 @@ contains
     character(len=:), allocatable :: line
     integer(I4B) :: ierr
     integer(I4B) :: ipos
-    logical :: isfound, found, endOfBlock
+    logical :: isfound, found, endOfBlock, eventFound
     type(OutputControlDataType), pointer :: ocdobjptr
     character(len=LINELENGTH) :: trkevent
     ! -- formats
@@ -182,6 +199,7 @@ contains
         if (endOfBlock) exit
         call this%parser%GetStringCaps(keyword)
         found = .false.
+        eventFound = .false.
         select case (keyword)
         case ('BUDGETCSV')
           call this%parser%GetStringCaps(keyword2)
@@ -235,29 +253,36 @@ contains
           end if
           found = .true.
         case ('TRACKEVENT')
-          call this%parser%GetStringCaps(trkevent)
-          select case (trkevent)
-          case ('')
-            this%itrkevent = -1
-          case ('ALL')
-            this%itrkevent = -1
-          case ('RELEASE')
-            this%itrkevent = 0
-          case ('TRANSIT')
-            this%itrkevent = 1
-          case ('TIMESTEP')
-            this%itrkevent = 2
-          case ('TERMINATE')
-            this%itrkevent = 3
-          case ('WEAKSINK')
-            this%itrkevent = 4
-          case default
-            write (errmsg, '(2a)') &
-              'Looking for ALL, RELEASE, TRANSIT, TIMESTEP, &
-              &TERMINATE, or WEAKSINK. Found: ', &
-              trim(adjustl(trkevent))
-            call store_error(errmsg, terminate=.TRUE.)
-          end select
+          trackeventloop: do
+            call this%parser%GetStringCaps(trkevent)
+            select case (trkevent)
+            case ('')
+              exit trackeventloop
+            case ('ALL')
+              this%itrkrls = .true.
+              this%itrktrs = .true.
+              this%itrktst = .true.
+              this%itrkter = .true.
+              this%itrkwsk = .true.
+            case ('RELEASE')
+              this%itrkrls = .true.
+            case ('TRANSIT')
+              this%itrktrs = .true.
+            case ('TIMESTEP')
+              this%itrktst = .true.
+            case ('TERMINATE')
+              this%itrkter = .true.
+            case ('WEAKSINK')
+              this%itrkwsk = .true.
+            case default
+              write (errmsg, '(2a)') &
+                'Looking for ALL, RELEASE, TRANSIT, TIMESTEP, &
+                &TERMINATE, or WEAKSINK. Found: ', &
+                trim(adjustl(trkevent))
+              call store_error(errmsg, terminate=.TRUE.)
+            end select
+            eventFound = .true.
+          end do trackeventloop
           found = .true.
         case default
           found = .false.
@@ -280,6 +305,16 @@ contains
           call ocdobjptr%set_option(line, this%parser%iuactive, this%iout)
         end if
       end do
+
+      ! -- default to all events
+      if (.not. eventFound) then
+        this%itrkrls = .true.
+        this%itrktrs = .true.
+        this%itrktst = .true.
+        this%itrkter = .true.
+        this%itrkwsk = .true.
+      end if
+
       write (this%iout, '(1x,a)') 'END OF OC OPTIONS'
     end if
   end subroutine prt_oc_read_options

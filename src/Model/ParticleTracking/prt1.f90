@@ -286,7 +286,12 @@ contains
       call this%trackctl%init_track_file(this%oc%itrkout)
     if (this%oc%itrkcsv > 0) &
       call this%trackctl%init_track_file(this%oc%itrkcsv, csv=.true.)
-    call this%trackctl%set_track_event(this%oc%itrkevent)
+    call this%trackctl%set_track_events(&
+      this%oc%itrkrls, &
+      this%oc%itrktrs, &
+      this%oc%itrktst, &
+      this%oc%itrkter, &
+      this%oc%itrkwsk)
   end subroutine prt_ar
 
   !> @brief Read and prepare (calls package read and prepare routines)

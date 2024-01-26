@@ -142,14 +142,48 @@ longname
 description
 
 block options
-name trackevent
-type string
+name columns
+type integer
 shape
+in_record true
 reader urword
 tagged true
-optional true
-longname tracking event(s)
-description particle tracking event(s) to include in track output files.  Can be ALL, RELEASE, TRANSIT, TIMESTEP, TERMINATE, or WEAKSINK.  RELEASE selects particle releases.  TRANSIT selects cell-to-cell transitions.  TIMESTEP selects transitions between timesteps.  TERMINATE selects particle terminations.  WEAKSINK selects particle exits from weak sink cells.  Events may coincide with other events.
+optional
+longname number of columns
+description number of columns for writing data.
+
+block options
+name width
+type integer
+shape
+in_record true
+reader urword
+tagged true
+optional
+longname width for each number
+description width for writing each number.
+
+block options
+name digits
+type integer
+shape
+in_record true
+reader urword
+tagged true
+optional
+longname number of digits
+description number of digits to use for writing a number.
+
+block options
+name format
+type string
+shape
+in_record true
+reader urword
+tagged false
+optional false
+longname write format
+description write format can be EXPONENTIAL, FIXED, GENERAL, or SCIENTIFIC.
 
 block options
 name track_filerecord
@@ -170,7 +204,7 @@ reader urword
 tagged true
 optional false
 longname track keyword
-description keyword to specify that record corresponds to track.
+description keyword to specify that record corresponds to pathlines.
 
 block options
 name trackfile
@@ -218,48 +252,37 @@ longname file keyword
 description name of the comma-separated value (CSV) file to write tracking information.
 
 block options
-name columns
-type integer
+name trackeventrecord
+type record trackevent events
 shape
-in_record true
 reader urword
 tagged true
-optional
-longname number of columns
-description number of columns for writing data.
+optional true
+longname
+description 
 
 block options
-name width
-type integer
-shape
-in_record true
+name trackevent
+type keyword
 reader urword
-tagged true
-optional
-longname width for each number
-description width for writing each number.
-
-block options
-name digits
-type integer
-shape
 in_record true
-reader urword
-tagged true
-optional
-longname number of digits
-description number of digits to use for writing a number.
-
-block options
-name format
-type string
-shape
-in_record true
-reader urword
-tagged false
 optional false
-longname write format
-description write format can be EXPONENTIAL, FIXED, GENERAL, or SCIENTIFIC.
+tagged true
+shape
+longname tracking events
+description keyword indicating that particle events will follow
+
+block options
+name events
+type string
+shape (unknown)
+reader urword
+in_record true
+optional false
+tagged false
+repeating true
+longname tracking events
+description particle event(s) to track.  RELEASE selects particle release events.  TRANSIT selects cell-to-cell transitions.  TIMESTEP selects transitions between timesteps.  TERMINATE selects particle termination events.  WEAKSINK selects occasions in which a particle exits a weak sink, a cell which removes some but not all of the inflow from adjacent cells.
 
 # --------------------- prt oc period ---------------------
 

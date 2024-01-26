@@ -164,7 +164,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
         pname="oc",
         track_filerecord=[prt_track_file],
         trackcsv_filerecord=[prt_track_csv_file],
-        trackevent=event,
+        trackeventrecord=[event],
     )
 
     # create the flow model interface

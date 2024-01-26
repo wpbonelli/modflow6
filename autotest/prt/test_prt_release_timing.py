@@ -25,7 +25,6 @@ reports relative times, so there is no reason
 
 
 from pathlib import Path
-from pprint import pformat
 from typing import Optional
 
 import flopy

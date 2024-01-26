@@ -40,12 +40,16 @@ module TrackModule
     private
     type(TrackFileType), public, allocatable :: trackfiles(:) !< output files
     integer(I4B), public :: ntrackfiles !< number of output files
-    integer(I4B), public :: itrackevent !< track event selection
+    logical(LGP), public :: itrackrelease !< track release events
+    logical(LGP), public :: itracktransit !< track cell-to-cell transitions
+    logical(LGP), public :: itracktimestep !< track timestep ends
+    logical(LGP), public :: itrackterminate !< track termination events
+    logical(LGP), public :: itrackweaksink !< track weak sink exit events
   contains
     procedure :: expand
     procedure, public :: init_track_file
     procedure, public :: save
-    procedure, public :: set_track_event
+    procedure, public :: set_track_events
   end type TrackControlType
 
   ! Track file headers
@@ -251,9 +255,20 @@ contains
     integer(I4B) :: i
     type(TrackFileType) :: file
 
-    ! -- Only save if reporting is enabled for all events, or
-    !    if the specified event matches the reporting reason.
-    if (this%itrackevent > -1 .and. this%itrackevent /= reason) &
+    ! print *, 'reason:', reason
+    ! print *, this%itrackrelease
+    ! print *, this%itracktransit
+    ! print *, this%itracktimestep
+    ! print *, this%itrackterminate
+    ! print *, this%itrackweaksink
+    ! stop
+
+    ! -- Only save if reporting is enabled for specified event.
+    if (.not. ((this%itrackrelease .and. reason == 0) .or. &
+               (this%itracktransit .and. reason == 1) .or. &
+               (this%itracktimestep .and. reason == 2) .or. &
+               (this%itrackterminate .and. reason == 3) .or. &
+               (this%itrackweaksink .and. reason == 4))) &
       return
 
     ! -- For now, only allow reporting from outside the tracking
@@ -280,18 +295,24 @@ contains
 
   end subroutine save
 
-  !> @brief Set the event filter.
+  !> @brief Configure particle events to track.
   !!
-  !! Track event -1 indicates TRACKEVENT ALL and so on.
-  !! If track event >= 0, only events of the given type
-  !! will be recorded. Each non-negative tracking event
-  !! number corresponds to an "ireason" code as appears
-  !! in each row of output.
+  !! Each tracking event corresponds to an "ireason" code
+  !! as appears in each row of track output.
   !<
-  subroutine set_track_event(this, itrackevent)
+  subroutine set_track_events(this, &
+    release,&
+    transit,&
+    timestep,&
+    terminate,&
+    weaksink)
     class(TrackControlType) :: this
-    integer(I4B), intent(in) :: itrackevent
-    this%itrackevent = itrackevent
-  end subroutine set_track_event
+    logical(LGP), intent(in) :: release, transit, timestep, terminate, weaksink
+    this%itrackrelease = release
+    this%itracktransit = transit
+    this%itracktimestep = timestep
+    this%itrackterminate = terminate
+    this%itrackweaksink = weaksink
+  end subroutine set_track_events
 
 end module TrackModule
