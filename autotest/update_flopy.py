@@ -9,9 +9,9 @@ from pathlib import Path
 import flopy
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 
-dfn_path = project_root_path / "doc" / "mf6io" / "mf6ivar" / "dfn"
+dfn_path = PROJ_ROOT / "doc" / "mf6io" / "mf6ivar" / "dfn"
 fpy_path = flopy.__path__[0]
 print(f"flopy is installed in {fpy_path}")
 

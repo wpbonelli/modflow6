@@ -4,11 +4,11 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 from framework import TestFramework
 
 cases = ["nr_ur01", "nr_ur02"]
-data_path = project_root_path / "autotest/data/ex-gwf-bump/"
+data_path = PROJ_ROOT / "autotest/data/ex-gwf-bump/"
 nper = 1
 nlay = 1
 nrow = 51

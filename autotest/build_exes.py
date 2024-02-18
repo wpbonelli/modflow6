@@ -4,10 +4,10 @@ from pathlib import Path
 import pytest
 from modflow_devtools.build import meson_build
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 
 repository = "MODFLOW-USGS/modflow6"
-top_bin_path = project_root_path / "bin"
+top_bin_path = PROJ_ROOT / "bin"
 
 
 @pytest.fixture
@@ -17,8 +17,8 @@ def bin_path():
 
 def test_meson_build(bin_path):
     meson_build(
-        project_path=project_root_path,
-        build_path=project_root_path / "builddir",
+        project_path=PROJ_ROOT,
+        build_path=PROJ_ROOT / "builddir",
         bin_path=bin_path,
     )
 

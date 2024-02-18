@@ -7,9 +7,9 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 
-data_path = project_root_path / "autotest" / "data"
+data_path = PROJ_ROOT / "autotest" / "data"
 model_path = str(data_path / "prudic2004test2")
 testgroup = "prudic2004t2fmi"
 

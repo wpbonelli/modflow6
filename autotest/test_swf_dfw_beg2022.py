@@ -18,13 +18,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 from framework import TestFramework
 
 cases = [
     "swf-beg2022",
 ]
-data_path = project_root_path / "autotest/data/beg2022/"
+data_path = PROJ_ROOT / "autotest/data/beg2022/"
 
 
 def build_models(idx, test):

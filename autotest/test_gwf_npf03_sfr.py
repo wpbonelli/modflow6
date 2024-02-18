@@ -4,11 +4,11 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 from framework import TestFramework
 
 cases = ["npf03_sfra", "npf03_sfrb"]
-fpth = str(project_root_path / "autotest" / "data" / "npf03_hk.ref")
+fpth = str(PROJ_ROOT / "autotest" / "data" / "npf03_hk.ref")
 shape = (50, 108)
 hk = flopy.utils.Util2d.load_txt(shape, fpth, dtype=float, fmtin="(FREE)")
 n1 = hk.shape[1]

@@ -4,7 +4,7 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 from framework import TestFramework
 
 cases = ["csub_wc01a", "csub_wc02b"]
@@ -15,7 +15,7 @@ paktest = "csub"
 isnewton = [None, "NEWTON"]
 
 # static model data
-pth = str(project_root_path / "autotest" / "data" / "ibc01_ibound.ref")
+pth = str(PROJ_ROOT / "autotest" / "data" / "ibc01_ibound.ref")
 ib0 = np.genfromtxt(pth)
 
 # temporal discretization

@@ -4,7 +4,7 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 from framework import TestFramework
 
 cases = ["csub_subwt02a", "csub_subwt02b", "csub_subwt02c", "csub_subwt02d"]
@@ -19,7 +19,7 @@ ivoid = [0, 1, 0, 1]
 gs0 = [0.0, 0.0, 1700.0, 1700.0]
 
 # static model data
-pth = str(project_root_path / "autotest" / "data" / "ibc01_ibound.ref")
+pth = str(PROJ_ROOT / "autotest" / "data" / "ibc01_ibound.ref")
 ib0 = np.genfromtxt(pth)
 
 # temporal discretization

@@ -10,14 +10,14 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 from framework import TestFramework
 
 cases = [
     "swf-dfw-loop",
 ]
 
-data_path = project_root_path / "autotest/data/swr04/"
+data_path = PROJ_ROOT / "autotest/data/swr04/"
 fpth = data_path / "SWRSample04_Stage.csv.cmp"
 answer = np.genfromtxt(fpth, names=True, delimiter=",")
 print(answer)

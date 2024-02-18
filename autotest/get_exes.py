@@ -12,10 +12,10 @@ from modflow_devtools.build import meson_build
 from modflow_devtools.download import download_and_unzip, get_release
 from modflow_devtools.misc import get_ostag, is_in_ci, set_env
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 
 repository = "MODFLOW-USGS/modflow6"
-top_bin_path = project_root_path / "bin"
+top_bin_path = PROJ_ROOT / "bin"
 
 
 def get_asset_name(asset: dict) -> str:

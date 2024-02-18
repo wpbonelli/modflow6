@@ -4,7 +4,7 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 from framework import TestFramework
 
 cases = ["csub_subwt03a", "csub_subwt03b", "csub_subwt03c", "csub_subwt03d"]
@@ -19,7 +19,7 @@ headbased = [True, True, False, False]
 delay = 4 * [False]
 
 # static model data
-pth = str(project_root_path / "autotest" / "data" / "ibc01_ibound.ref")
+pth = str(PROJ_ROOT / "autotest" / "data" / "ibc01_ibound.ref")
 ib0 = np.genfromtxt(pth)
 
 # temporal discretization

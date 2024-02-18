@@ -4,53 +4,52 @@ from typing import Dict
 from warnings import warn
 
 import pytest
+from syrupy.extensions.single_file import SingleFileSnapshotExtension
 from modflow_devtools.ostags import get_binary_suffixes
 
-pytest_plugins = ["modflow_devtools.fixtures"]
-project_root_path = Path(__file__).resolve().parent.parent
-
-
-_exe_ext, _lib_ext = get_binary_suffixes(sys.platform)
-_binaries_path = project_root_path / "bin"
-_dl_bin_path = _binaries_path / "downloaded"
-_rb_bin_path = _binaries_path / "rebuilt"
-_binaries = {
+pytest_plugins = ["modflow_devtools.fixtures"]  # needs to be lowercase
+PROJ_ROOT = Path(__file__).resolve().parent.parent
+EXE_EXT, LIB_EXT = get_binary_suffixes(sys.platform)
+BIN_PATH = PROJ_ROOT / "bin"
+BIN_PATH_DL = BIN_PATH / "downloaded"
+BIN_PATH_RB = BIN_PATH / "rebuilt"
+BINARIES = {
     "development": [
-        ("mf6", _binaries_path / f"mf6{_exe_ext}"),
-        ("libmf6", _binaries_path / f"libmf6{_lib_ext}"),
-        ("mf5to6", _binaries_path / f"mf5to6{_exe_ext}"),
-        ("zbud6", _binaries_path / f"zbud6{_exe_ext}"),
+        ("mf6", BIN_PATH / f"mf6{EXE_EXT}"),
+        ("libmf6", BIN_PATH / f"libmf6{LIB_EXT}"),
+        ("mf5to6", BIN_PATH / f"mf5to6{EXE_EXT}"),
+        ("zbud6", BIN_PATH / f"zbud6{EXE_EXT}"),
     ],
     "downloaded": [
-        ("mf2000", _dl_bin_path / f"mf2000{_exe_ext}"),
-        ("mf2005", _dl_bin_path / f"mf2005dbl{_exe_ext}"),
-        ("mfnwt", _dl_bin_path / f"mfnwtdbl{_exe_ext}"),
-        ("mfusg", _dl_bin_path / f"mfusgdbl{_exe_ext}"),
-        ("mflgr", _dl_bin_path / f"mflgrdbl{_exe_ext}"),
-        ("mf2005s", _dl_bin_path / f"mf2005{_exe_ext}"),
-        ("mt3dms", _dl_bin_path / f"mt3dms{_exe_ext}"),
-        ("crt", _dl_bin_path / f"crt{_exe_ext}"),
-        ("gridgen", _dl_bin_path / f"gridgen{_exe_ext}"),
-        ("mp6", _dl_bin_path / f"mp6{_exe_ext}"),
-        ("mp7", _dl_bin_path / f"mp7{_exe_ext}"),
-        ("swtv4", _dl_bin_path / f"swtv4{_exe_ext}"),
-        ("sutra", _dl_bin_path / f"sutra{_exe_ext}"),
-        ("triangle", _dl_bin_path / f"triangle{_exe_ext}"),
-        ("vs2dt", _dl_bin_path / f"vs2dt{_exe_ext}"),
-        ("zonbudusg", _dl_bin_path / f"zonbudusg{_exe_ext}"),
+        ("mf2000", BIN_PATH_DL / f"mf2000{EXE_EXT}"),
+        ("mf2005", BIN_PATH_DL / f"mf2005dbl{EXE_EXT}"),
+        ("mfnwt", BIN_PATH_DL / f"mfnwtdbl{EXE_EXT}"),
+        ("mfusg", BIN_PATH_DL / f"mfusgdbl{EXE_EXT}"),
+        ("mflgr", BIN_PATH_DL / f"mflgrdbl{EXE_EXT}"),
+        ("mf2005s", BIN_PATH_DL / f"mf2005{EXE_EXT}"),
+        ("mt3dms", BIN_PATH_DL / f"mt3dms{EXE_EXT}"),
+        ("crt", BIN_PATH_DL / f"crt{EXE_EXT}"),
+        ("gridgen", BIN_PATH_DL / f"gridgen{EXE_EXT}"),
+        ("mp6", BIN_PATH_DL / f"mp6{EXE_EXT}"),
+        ("mp7", BIN_PATH_DL / f"mp7{EXE_EXT}"),
+        ("swtv4", BIN_PATH_DL / f"swtv4{EXE_EXT}"),
+        ("sutra", BIN_PATH_DL / f"sutra{EXE_EXT}"),
+        ("triangle", BIN_PATH_DL / f"triangle{EXE_EXT}"),
+        ("vs2dt", BIN_PATH_DL / f"vs2dt{EXE_EXT}"),
+        ("zonbudusg", BIN_PATH_DL / f"zonbudusg{EXE_EXT}"),
     ],
     "rebuilt": [
-        ("mf6_regression", _rb_bin_path / f"mf6{_exe_ext}"),
-        ("libmf6_regression", _rb_bin_path / f"libmf6{_lib_ext}"),
-        ("mf5to6_regression", _rb_bin_path / f"mf5to6{_exe_ext}"),
-        ("zbud6_regression", _rb_bin_path / f"zbud6{_exe_ext}"),
+        ("mf6_regression", BIN_PATH_RB / f"mf6{EXE_EXT}"),
+        ("libmf6_regression", BIN_PATH_RB / f"libmf6{LIB_EXT}"),
+        ("mf5to6_regression", BIN_PATH_RB / f"mf5to6{EXE_EXT}"),
+        ("zbud6_regression", BIN_PATH_RB / f"zbud6{EXE_EXT}"),
     ],
 }
 
 
 @pytest.fixture(scope="session")
 def bin_path() -> Path:
-    return _binaries_path
+    return BIN_PATH
 
 
 @pytest.fixture(scope="session")
@@ -62,17 +61,17 @@ def targets() -> Dict[str, Path]:
     """
 
     d = dict()
-    for k, v in _binaries["development"]:
+    for k, v in BINARIES["development"]:
         # require development binaries
         assert v.is_file(), f"Couldn't find binary '{k}' expected at: {v}"
         d[k] = v
-    for k, v in _binaries["downloaded"]:
+    for k, v in BINARIES["downloaded"]:
         # downloaded binaries are optional
         if v.is_file():
             d[k] = v
         else:
             warn(f"Couldn't find downloaded binary '{k}' expected at: {v}")
-    for k, v in _binaries["rebuilt"]:
+    for k, v in BINARIES["rebuilt"]:
         # rebuilt binaries are optional
         if v.is_file():
             d[k] = v
@@ -90,7 +89,7 @@ def try_get_target(targets: Dict[str, Path], name: str) -> Path:
     exe = targets.get(name)
     if exe:
         return exe
-    elif name in _binaries["development"]:
+    elif name in BINARIES["development"]:
         raise ValueError(f"Couldn't find binary '{name}'")
     else:
         pytest.skip(f"Couldn't find binary '{name}'")
@@ -129,3 +128,25 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "parallel" in item.keywords:
             item.add_marker(skip_parallel)
+
+
+class CbcFileExtension(SingleFileSnapshotExtension):
+    _file_extension = "cbc"
+
+
+class HedFileExtension(SingleFileSnapshotExtension):
+    _file_extension = "hed"
+
+
+class HdsFileExtension(SingleFileSnapshotExtension):
+    _file_extension = "hds"
+
+
+@pytest.fixture
+def cell_budget_file_snapshot(snapshot):
+    return snapshot.use_extension(CbcFileExtension)
+
+
+@pytest.fixture
+def head_file_snapshot(snapshot):
+    return snapshot.use_extension(HedFileExtension)

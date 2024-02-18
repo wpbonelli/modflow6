@@ -1,9 +1,9 @@
 import platform
 import subprocess
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 
-bin_path = project_root_path / "bin"
+bin_path = PROJ_ROOT / "bin"
 ext = ".exe" if platform.system() == "Windows" else ""
 exe = f"mf6{ext}"
 

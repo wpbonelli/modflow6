@@ -4,7 +4,7 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 from framework import TestFramework
 
 cases = ["csub_sub03a", "csub_sub03b"]
@@ -132,7 +132,7 @@ nz = [1, 1]
 dstart = []
 for k in ldnd:
     pth = str(
-        project_root_path / "autotest" / "data" / f"ibc03_dstart{k + 1}.ref"
+        PROJ_ROOT / "autotest" / "data" / f"ibc03_dstart{k + 1}.ref"
     )
     v = np.genfromtxt(pth)
     dstart.append(v.copy())

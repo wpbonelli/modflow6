@@ -18,6 +18,7 @@ dependencies:
   - pyshp
   - shapely
   - scipy
+  - syrupy
   - pip
   - pip:
       - git+https://github.com/modflowpy/flopy.git

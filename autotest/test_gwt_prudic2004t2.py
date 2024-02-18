@@ -13,11 +13,11 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from conftest import PROJ_ROOT
 from framework import TestFramework
 
 cases = ["prudic2004t2"]
-data_path = project_root_path / "autotest" / "data"
+data_path = PROJ_ROOT / "autotest" / "data"
 model_path = data_path / "prudic2004test2"
 fname = str(model_path / "lakibd.dat")
 lakibd = np.loadtxt(fname, dtype=int)

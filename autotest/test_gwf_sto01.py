@@ -262,7 +262,7 @@ def build_models(idx, test):
     return sim, mc
 
 
-def check_output(idx, test):
+def check_output(idx, test, cbc_snapshot):
     # get results from listing file
     fpth = os.path.join(test.workspace, f"{os.path.basename(test.name)}.lst")
     budl = flopy.utils.Mf6ListBudget(fpth)
@@ -342,12 +342,12 @@ def check_output(idx, test):
 
 
 @pytest.mark.parametrize("idx, name", enumerate(cases))
-def test_mf6model(idx, name, function_tmpdir, targets):
+def test_mf6model(idx, name, function_tmpdir, targets, cbc_snapshot):
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
         build=lambda t: build_models(idx, t),
-        check=lambda t: check_output(idx, t),
+        check=lambda t: check_output(idx, t, cbc_snapshot),
         targets=targets,
         htol=htol[idx],
     )
