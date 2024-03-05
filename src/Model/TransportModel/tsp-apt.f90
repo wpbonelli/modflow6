@@ -41,7 +41,8 @@ module TspAptModule
                              DNODATA, TABLEFT, TABCENTER, TABRIGHT, &
                              TABSTRING, TABUCSTRING, TABINTEGER, TABREAL, &
                              LENAUXNAME, LENVARNAME
-  use SimModule, only: store_error, store_error_unit, count_errors
+  use SimModule, only: store_error, store_error_unit, count_errors, &
+                       store_error_filename
   use SimVariablesModule, only: errmsg
   use BndModule, only: BndType
   use TspFmiModule, only: TspFmiType
@@ -510,79 +511,72 @@ contains
     integer(I4B) :: jj
     real(DP), pointer :: bndElem => null()
     logical :: found
-    ! -- formats
-    !
+
     ! -- Support these general options in LKT, SFT, MWT, UZT
     ! STATUS <status>
     ! CONCENTRATION <concentration> or TEMPERATURE <temperature>
     ! WITHDRAWAL <withdrawal>
     ! AUXILIARY <auxname> <auxval>
-    !
+
     ! -- read line
     call this%parser%GetStringCaps(keyword)
-    select case (keyword)
+    selectitem:select case(keyword)
     case ('STATUS')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetStringCaps(text)
-      this%status(itemno) = text(1:8)
-      if (text == 'CONSTANT') then
-        this%iboundpak(itemno) = -1
-      else if (text == 'INACTIVE') then
-        this%iboundpak(itemno) = 0
-      else if (text == 'ACTIVE') then
-        this%iboundpak(itemno) = 1
-      else
-        write (errmsg, '(a,a)') &
-          'Unknown '//trim(this%text)//' status keyword: ', text//'.'
-        call store_error(errmsg)
-      end if
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetStringCaps(text)
+    this%status(itemno) = text(1:8)
+    if (text == 'CONSTANT') then
+      this%iboundpak(itemno) = -1
+    else if (text == 'INACTIVE') then
+      this%iboundpak(itemno) = 0
+    else if (text == 'ACTIVE') then
+      this%iboundpak(itemno) = 1
+    else
+      write (errmsg, '(a,a)') &
+        'Unknown '//trim(this%text)//' status keyword: ', text//'.'
+      call store_error(errmsg)
+    end if
     case ('CONCENTRATION', 'TEMPERATURE')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For feature concentration
-      bndElem => this%concfeat(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, this%depvartype)
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For feature concentration
+    bndElem => this%concfeat(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, this%depvartype)
     case ('AUXILIARY')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetStringCaps(caux)
-      do jj = 1, this%naux
-        if (trim(adjustl(caux)) /= trim(adjustl(this%auxname(jj)))) cycle
-        call this%parser%GetString(text)
-        ii = itemno
-        bndElem => this%lauxvar(jj, ii)
-        call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                           this%packName, 'AUX', &
-                                           this%tsManager, this%iprpak, &
-                                           this%auxname(jj))
-        exit
-      end do
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetStringCaps(caux)
+    do jj = 1, this%naux
+      if (trim(adjustl(caux)) /= trim(adjustl(this%auxname(jj)))) cycle
+      call this%parser%GetString(text)
+      ii = itemno
+      bndElem => this%lauxvar(jj, ii)
+      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                         this%packName, 'AUX', &
+                                         this%tsManager, this%iprpak, &
+                                         this%auxname(jj))
+      exit
+    end do
     case default
-      !
-      ! -- call the specific package to look for stress period data
-      call this%pak_set_stressperiod(itemno, keyword, found)
-      !
-      ! -- terminate with error if data not valid
-      if (.not. found) then
-        write (errmsg, '(2a)') &
-          'Unknown '//trim(adjustl(this%text))//' data keyword: ', &
-          trim(keyword)//'.'
-        call store_error(errmsg)
-      end if
-    end select
+    !
+    ! -- call the specific package to look for stress period data
+    call this%pak_set_stressperiod(itemno, keyword, found)
+    !
+    ! -- terminate with error if data not valid
+    if (.not. found) then
+      write (errmsg, '(2a)') &
+        'Unknown '//trim(adjustl(this%text))//' data keyword: ', &
+        trim(keyword)//'.'
+      call store_error(errmsg)
+    end if
+    end select selectitem
     !
     ! -- terminate if any errors were detected
-999 if (count_errors() > 0) then
+    if (count_errors() > 0) then
       call this%parser%StoreErrorUnit()
     end if
     !
@@ -625,12 +619,13 @@ contains
     class(TspAptType), intent(inout) :: this
     integer(I4B), intent(in) :: itemno
     ! -- local
-    ! -- formats
+
     ierr = 0
     if (itemno < 1 .or. itemno > this%ncv) then
       write (errmsg, '(a,1x,i6,1x,a,1x,i6)') &
         'Featureno ', itemno, 'must be > 0 and <= ', this%ncv
       call store_error(errmsg)
+      call store_error_filename(this%input_fname, terminate=.false.)
       ierr = 1
     end if
   end function apt_check_valid

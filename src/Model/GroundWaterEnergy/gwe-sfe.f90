@@ -35,7 +35,7 @@ module GweSfeModule
 
   use KindModule, only: DP, I4B
   use ConstantsModule, only: DZERO, DONE, LINELENGTH
-  use SimModule, only: store_error
+  use SimModule, only: store_error, store_error_filename
   use BndModule, only: BndType, GetBndFromList
   use TspFmiModule, only: TspFmiType
   use SfrModule, only: SfrType
@@ -1081,69 +1081,55 @@ contains
     integer(I4B) :: ierr
     integer(I4B) :: jj
     real(DP), pointer :: bndElem => null()
-    !
+
     ! RAINFALL <rainfall>
     ! EVAPORATION <evaporation>
     ! RUNOFF <runoff>
     ! INFLOW <inflow>
     ! WITHDRAWAL <withdrawal>
-    !
+
     found = .true.
-    select case (keyword)
+    selectitem:select case(keyword)
     case ('RAINFALL')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%temprain(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'RAINFALL')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%temprain(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'RAINFALL')
     case ('EVAPORATION')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%tempevap(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'EVAPORATION')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%tempevap(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'EVAPORATION')
     case ('RUNOFF')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%temproff(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'RUNOFF')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%temproff(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'RUNOFF')
     case ('INFLOW')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%tempiflw(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'INFLOW')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%tempiflw(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'INFLOW')
     case default
-      !
-      ! -- Keyword not recognized so return to caller with found = .false.
-      found = .false.
-    end select
-    !
-999 continue
-    !
-    ! -- Return
-    return
+    found = .false.
+    end select selectitem
+
   end subroutine sfe_set_stressperiod
 
 end module GweSfeModule

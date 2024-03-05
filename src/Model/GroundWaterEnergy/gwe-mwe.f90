@@ -36,7 +36,7 @@ module GweMweModule
 
   use KindModule, only: DP, I4B
   use ConstantsModule, only: DZERO, LINELENGTH
-  use SimModule, only: store_error
+  use SimModule, only: store_error, store_error_filename
   use BndModule, only: BndType, GetBndFromList
   use TspFmiModule, only: TspFmiType
   use MawModule, only: MawType
@@ -987,32 +987,24 @@ contains
     integer(I4B) :: ierr
     integer(I4B) :: jj
     real(DP), pointer :: bndElem => null()
-    !
+
     ! RATE <rate>
-    !
+
     found = .true.
-    select case (keyword)
+    selectitem:select case(keyword)
     case ('RATE')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%temprate(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'RATE')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%temprate(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'RATE')
     case default
-      !
-      ! -- Keyword not recognized so return to caller with found = .false.
-      found = .false.
-    end select
-    !
-999 continue
-    !
-    ! -- Return
-    return
+    found = .false.
+    end select selectitem
+
   end subroutine mwe_set_stressperiod
 
 end module GweMweModule

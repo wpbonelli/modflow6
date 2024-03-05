@@ -27,7 +27,7 @@ module LakModule
   use InputOutputModule, only: URWORD, extract_idnum_or_bndname
   use BaseDisModule, only: DisBaseType
   use SimModule, only: count_errors, store_error, store_error_unit, &
-                       deprecation_warning
+                       deprecation_warning, store_error_filename
   use MathUtilModule, only: is_close
   use BlockParserModule, only: BlockParserType
   use BaseDisModule, only: DisBaseType
@@ -2947,6 +2947,7 @@ contains
           'LAKENO', itemno, 'must be greater than 0 and less than or equal to', &
           this%nlakes, '.'
         call store_error(errmsg)
+        call store_error_filename(this%input_fname, terminate=.false.)
         ierr = 1
       end if
     else
@@ -2955,6 +2956,7 @@ contains
           'IOUTLET', itemno, 'must be greater than 0 and less than or equal to', &
           this%noutlets, '.'
         call store_error(errmsg)
+        call store_error_filename(this%input_fname, terminate=.false.)
         ierr = 1
       end if
     end if
@@ -2979,205 +2981,178 @@ contains
     integer(I4B) :: ierr
     integer(I4B) :: ii
     integer(I4B) :: jj
+    integer(I4B) :: ifno
     real(DP), pointer :: bndElem => null()
-    !
+
     ! -- read line
     call this%parser%GetStringCaps(keyword)
-    select case (keyword)
+    selectitem:select case(keyword)
     case ('STATUS')
-      ierr = this%lak_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetStringCaps(text)
-      this%status(itemno) = text(1:8)
-      if (text == 'CONSTANT') then
-        this%iboundpak(itemno) = -1
-      else if (text == 'INACTIVE') then
-        this%iboundpak(itemno) = 0
-      else if (text == 'ACTIVE') then
-        this%iboundpak(itemno) = 1
-      else
-        write (errmsg, '(a,a)') &
-          'Unknown '//trim(this%text)//' lak status keyword: ', text//'.'
-        call store_error(errmsg)
-      end if
+    ierr = this%lak_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetStringCaps(text)
+    this%status(itemno) = text(1:8)
+    if (text == 'CONSTANT') then
+      this%iboundpak(itemno) = -1
+    else if (text == 'INACTIVE') then
+      this%iboundpak(itemno) = 0
+    else if (text == 'ACTIVE') then
+      this%iboundpak(itemno) = 1
+    else
+      write (errmsg, '(a,a)') &
+        'Unknown '//trim(this%text)//' lak status keyword: ', text//'.'
+      call store_error(errmsg)
+    end if
     case ('STAGE')
-      ierr = this%lak_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For STAGE
-      bndElem => this%stage(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'STAGE')
+    ierr = this%lak_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For STAGE
+    bndElem => this%stage(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'STAGE')
     case ('RAINFALL')
-      ierr = this%lak_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For RAINFALL
-      bndElem => this%rainfall(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'RAINFALL')
-      if (this%rainfall(itemno) < DZERO) then
-        write (errmsg, '(a,i0,a,G0,a)') &
-          'Lake ', itemno, ' was assigned a rainfall value of ', &
-          this%rainfall(itemno), '. Rainfall must be positive.'
-        call store_error(errmsg)
-      end if
+    ierr = this%lak_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For RAINFALL
+    bndElem => this%rainfall(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'RAINFALL')
+    if (this%rainfall(itemno) < DZERO) then
+      write (errmsg, '(a,i0,a,G0,a)') &
+        'Lake ', itemno, ' was assigned a rainfall value of ', &
+        this%rainfall(itemno), '. Rainfall must be positive.'
+      call store_error(errmsg)
+    end if
     case ('EVAPORATION')
-      ierr = this%lak_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For EVAPORATION
-      bndElem => this%evaporation(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'EVAPORATION')
-      if (this%evaporation(itemno) < DZERO) then
-        write (errmsg, '(a,i0,a,G0,a)') &
-          'Lake ', itemno, ' was assigned an evaporation value of ', &
-          this%evaporation(itemno), '. Evaporation must be positive.'
-        call store_error(errmsg)
-      end if
+    ierr = this%lak_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For EVAPORATION
+    bndElem => this%evaporation(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'EVAPORATION')
+    if (this%evaporation(itemno) < DZERO) then
+      write (errmsg, '(a,i0,a,G0,a)') &
+        'Lake ', itemno, ' was assigned an evaporation value of ', &
+        this%evaporation(itemno), '. Evaporation must be positive.'
+      call store_error(errmsg)
+    end if
     case ('RUNOFF')
-      ierr = this%lak_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For RUNOFF
-      bndElem => this%runoff(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'RUNOFF')
-      if (this%runoff(itemno) < DZERO) then
-        write (errmsg, '(a,i0,a,G0,a)') &
-          'Lake ', itemno, ' was assigned a runoff value of ', &
-          this%runoff(itemno), '. Runoff must be positive.'
-        call store_error(errmsg)
-      end if
+    ierr = this%lak_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For RUNOFF
+    bndElem => this%runoff(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'RUNOFF')
+    if (this%runoff(itemno) < DZERO) then
+      write (errmsg, '(a,i0,a,G0,a)') &
+        'Lake ', itemno, ' was assigned a runoff value of ', &
+        this%runoff(itemno), '. Runoff must be positive.'
+      call store_error(errmsg)
+    end if
     case ('INFLOW')
-      ierr = this%lak_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For specified INFLOW
-      bndElem => this%inflow(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'INFLOW')
-      if (this%inflow(itemno) < DZERO) then
-        write (errmsg, '(a,i0,a,G0,a)') &
-          'Lake ', itemno, ' was assigned an inflow value of ', &
-          this%inflow(itemno), '. Inflow must be positive.'
-        call store_error(errmsg)
-      end if
+    ierr = this%lak_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For specified INFLOW
+    bndElem => this%inflow(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'INFLOW')
+    if (this%inflow(itemno) < DZERO) then
+      write (errmsg, '(a,i0,a,G0,a)') &
+        'Lake ', itemno, ' was assigned an inflow value of ', &
+        this%inflow(itemno), '. Inflow must be positive.'
+      call store_error(errmsg)
+    end if
     case ('WITHDRAWAL')
-      ierr = this%lak_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For specified WITHDRAWAL
-      bndElem => this%withdrawal(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'WITHDRAWL')
-      if (this%withdrawal(itemno) < DZERO) then
-        write (errmsg, '(a,i0,a,G0,a)') &
-          'Lake ', itemno, ' was assigned a withdrawal value of ', &
-          this%withdrawal(itemno), '. Withdrawal must be positive.'
-        call store_error(errmsg)
-      end if
+    ierr = this%lak_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For specified WITHDRAWAL
+    bndElem => this%withdrawal(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'WITHDRAWL')
+    if (this%withdrawal(itemno) < DZERO) then
+      write (errmsg, '(a,i0,a,G0,a)') &
+        'Lake ', itemno, ' was assigned a withdrawal value of ', &
+        this%withdrawal(itemno), '. Withdrawal must be positive.'
+      call store_error(errmsg)
+    end if
     case ('RATE')
-      ierr = this%lak_check_valid(-itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For specified OUTLET RATE
-      bndElem => this%outrate(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'RATE')
+    ierr = this%lak_check_valid(-itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For specified OUTLET RATE
+    bndElem => this%outrate(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'RATE')
     case ('INVERT')
-      ierr = this%lak_check_valid(-itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For OUTLET INVERT
-      bndElem => this%outinvert(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'INVERT')
+    ierr = this%lak_check_valid(-itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For OUTLET INVERT
+    bndElem => this%outinvert(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'INVERT')
     case ('WIDTH')
-      ierr = this%lak_check_valid(-itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For OUTLET WIDTH
-      bndElem => this%outwidth(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'WIDTH')
+    ierr = this%lak_check_valid(-itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For OUTLET WIDTH
+    bndElem => this%outwidth(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'WIDTH')
     case ('ROUGH')
-      ierr = this%lak_check_valid(-itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For OUTLET ROUGHNESS
-      bndElem => this%outrough(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'ROUGH')
+    ierr = this%lak_check_valid(-itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For OUTLET ROUGHNESS
+    bndElem => this%outrough(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'ROUGH')
     case ('SLOPE')
-      ierr = this%lak_check_valid(-itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1 ! For OUTLET SLOPE
-      bndElem => this%outslope(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'SLOPE')
+    ierr = this%lak_check_valid(-itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1 ! For OUTLET SLOPE
+    bndElem => this%outslope(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'SLOPE')
     case ('AUXILIARY')
-      ierr = this%lak_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetStringCaps(caux)
-      do jj = 1, this%naux
-        if (trim(adjustl(caux)) /= trim(adjustl(this%auxname(jj)))) cycle
-        call this%parser%GetString(text)
-        ii = itemno
-        bndElem => this%lauxvar(jj, ii)
-        call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                           this%packName, 'AUX', &
-                                           this%tsManager, this%iprpak, &
-                                           this%auxname(jj))
-        exit
-      end do
+    ierr = this%lak_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetStringCaps(caux)
+    do jj = 1, this%naux
+      if (trim(adjustl(caux)) /= trim(adjustl(this%auxname(jj)))) cycle
+      call this%parser%GetString(text)
+      ii = itemno
+      bndElem => this%lauxvar(jj, ii)
+      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                         this%packName, 'AUX', &
+                                         this%tsManager, this%iprpak, &
+                                         this%auxname(jj))
+      exit
+    end do
     case default
-      write (errmsg, '(2a)') &
-        'Unknown '//trim(this%text)//' lak data keyword: ', &
-        trim(keyword)//'.'
-    end select
-    !
-    ! -- Return
-999 return
+    write (errmsg, '(2a)') &
+      'Unknown '//trim(this%text)//' lak data keyword: ', &
+      trim(keyword)//'.'
+    end select selectitem
+
   end subroutine lak_set_stressperiod
 
   !> @brief Issue a parameter error for lakweslls(ilak)

@@ -28,7 +28,7 @@ module GweUzeModule
 
   use KindModule, only: DP, I4B
   use ConstantsModule, only: DZERO, DONE, LINELENGTH
-  use SimModule, only: store_error
+  use SimModule, only: store_error, store_error_filename
   use BndModule, only: BndType, GetBndFromList
   use TspFmiModule, only: TspFmiType
   use UzfModule, only: UzfType
@@ -1352,44 +1352,34 @@ contains
     integer(I4B) :: ierr
     integer(I4B) :: jj
     real(DP), pointer :: bndElem => null()
-    !
+
     ! INFILTRATION <infiltration>
     ! UZET <uzet>
-    !
+
     found = .true.
-    select case (keyword)
+    selectitem:select case(keyword)
     case ('INFILTRATION')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(temp_text)
-      jj = 1
-      bndElem => this%tempinfl(itemno)
-      call read_value_or_time_series_adv(temp_text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'INFILTRATION')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(temp_text)
+    jj = 1
+    bndElem => this%tempinfl(itemno)
+    call read_value_or_time_series_adv(temp_text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'INFILTRATION')
     case ('UZET')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(temp_text)
-      jj = 1
-      bndElem => this%tempuzet(itemno)
-      call read_value_or_time_series_adv(temp_text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'UZET')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(temp_text)
+    jj = 1
+    bndElem => this%tempuzet(itemno)
+    call read_value_or_time_series_adv(temp_text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'UZET')
     case default
-      !
-      ! -- Keyword not recognized so return to caller with found = .false.
-      found = .false.
-    end select
-    !
-999 continue
-    !
-    ! -- Return
-    return
+    found = .false.
+    end select selectitem
+
   end subroutine uze_set_stressperiod
 
 end module GweUzeModule

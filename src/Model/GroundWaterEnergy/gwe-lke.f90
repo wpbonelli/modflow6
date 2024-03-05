@@ -35,7 +35,7 @@ module GweLkeModule
 
   use KindModule, only: DP, I4B
   use ConstantsModule, only: DZERO, DONE, LINELENGTH
-  use SimModule, only: store_error
+  use SimModule, only: store_error, store_error_filename
   use BndModule, only: BndType, GetBndFromList
   use TspFmiModule, only: TspFmiType
   use LakModule, only: LakType
@@ -1173,20 +1173,20 @@ contains
     integer(I4B) :: ierr
     integer(I4B) :: jj
     real(DP), pointer :: bndElem => null()
-    !
+
     ! RAINFALL <rainfall>
     ! EVAPORATION <evaporation>
     ! RUNOFF <runoff>
     ! EXT-INFLOW <inflow>
     ! WITHDRAWAL <withdrawal>
-    !
+
+    ! validate feature number
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) call store_error_filename(this%input_fname)
+
     found = .true.
     select case (keyword)
     case ('RAINFALL')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
       call this%parser%GetString(text)
       jj = 1
       bndElem => this%temprain(itemno)
@@ -1194,10 +1194,6 @@ contains
                                          this%packName, 'BND', this%tsManager, &
                                          this%iprpak, 'RAINFALL')
     case ('EVAPORATION')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
       call this%parser%GetString(text)
       jj = 1
       bndElem => this%tempevap(itemno)
@@ -1205,10 +1201,6 @@ contains
                                          this%packName, 'BND', this%tsManager, &
                                          this%iprpak, 'EVAPORATION')
     case ('RUNOFF')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
       call this%parser%GetString(text)
       jj = 1
       bndElem => this%temproff(itemno)
@@ -1216,10 +1208,6 @@ contains
                                          this%packName, 'BND', this%tsManager, &
                                          this%iprpak, 'RUNOFF')
     case ('EXT-INFLOW')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
       call this%parser%GetString(text)
       jj = 1
       bndElem => this%tempiflw(itemno)
@@ -1227,15 +1215,9 @@ contains
                                          this%packName, 'BND', this%tsManager, &
                                          this%iprpak, 'EXT-INFLOW')
     case default
-      !
-      ! -- Keyword not recognized so return to caller with found = .false.
       found = .false.
     end select
-    !
-999 continue
-    !
-    ! -- Return
-    return
+
   end subroutine lke_set_stressperiod
 
 end module GweLkeModule

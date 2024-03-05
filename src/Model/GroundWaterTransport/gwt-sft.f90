@@ -993,61 +993,47 @@ contains
     ! WITHDRAWAL <withdrawal>
     !
     found = .true.
-    select case (keyword)
+    selectitem:select case(keyword)
     case ('RAINFALL')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%concrain(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'RAINFALL')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%concrain(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'RAINFALL')
     case ('EVAPORATION')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%concevap(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'EVAPORATION')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%concevap(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'EVAPORATION')
     case ('RUNOFF')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%concroff(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'RUNOFF')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%concroff(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'RUNOFF')
     case ('INFLOW')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%conciflw(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'INFLOW')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%conciflw(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'INFLOW')
     case default
-      !
-      ! -- keyword not recognized so return to caller with found = .false.
-      found = .false.
-    end select
-    !
-999 continue
-    !
-    ! -- Return
-    return
+    found = .false.
+    end select selectitem
+
   end subroutine sft_set_stressperiod
 
 end module GwtSftModule

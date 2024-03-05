@@ -904,28 +904,20 @@ contains
     ! RATE <rate>
     !
     found = .true.
-    select case (keyword)
+    selectitem:select case(keyword)
     case ('RATE')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(text)
-      jj = 1
-      bndElem => this%concrate(itemno)
-      call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'RATE')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(text)
+    jj = 1
+    bndElem => this%concrate(itemno)
+    call read_value_or_time_series_adv(text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'RATE')
     case default
-      !
-      ! -- keyword not recognized so return to caller with found = .false.
-      found = .false.
-    end select
-    !
-999 continue
-    !
-    ! -- Return
-    return
+    found = .false.
+    end select selectitem
+
   end subroutine mwt_set_stressperiod
 
 end module GwtMwtModule

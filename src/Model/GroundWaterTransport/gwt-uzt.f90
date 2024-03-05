@@ -922,39 +922,29 @@ contains
     ! UZET <uzet>
     !
     found = .true.
-    select case (keyword)
+    selectitem:select case(keyword)
     case ('INFILTRATION')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(temp_text)
-      jj = 1
-      bndElem => this%concinfl(itemno)
-      call read_value_or_time_series_adv(temp_text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'INFILTRATION')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(temp_text)
+    jj = 1
+    bndElem => this%concinfl(itemno)
+    call read_value_or_time_series_adv(temp_text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'INFILTRATION')
     case ('UZET')
-      ierr = this%apt_check_valid(itemno)
-      if (ierr /= 0) then
-        goto 999
-      end if
-      call this%parser%GetString(temp_text)
-      jj = 1
-      bndElem => this%concuzet(itemno)
-      call read_value_or_time_series_adv(temp_text, itemno, jj, bndElem, &
-                                         this%packName, 'BND', this%tsManager, &
-                                         this%iprpak, 'UZET')
+    ierr = this%apt_check_valid(itemno)
+    if (ierr /= 0) exit selectitem
+    call this%parser%GetString(temp_text)
+    jj = 1
+    bndElem => this%concuzet(itemno)
+    call read_value_or_time_series_adv(temp_text, itemno, jj, bndElem, &
+                                       this%packName, 'BND', this%tsManager, &
+                                       this%iprpak, 'UZET')
     case default
-      !
-      ! -- keyword not recognized so return to caller with found = .false.
-      found = .false.
-    end select
-    !
-999 continue
-    !
-    ! -- Return
-    return
+    found = .false.
+    end select selectitem
+
   end subroutine uzt_set_stressperiod
 
 end module GwtUztModule
