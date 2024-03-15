@@ -1,10 +1,13 @@
+from io import BytesIO, StringIO
 import sys
 from pathlib import Path
 from typing import Dict
 from warnings import warn
 
 import pytest
+import numpy as np
 from modflow_devtools.ostags import get_binary_suffixes
+
 
 pytest_plugins = ["modflow_devtools.fixtures"]
 project_root_path = Path(__file__).resolve().parent.parent
@@ -104,6 +107,93 @@ def original_regression(request) -> bool:
 @pytest.fixture(scope="session")
 def markers(pytestconfig) -> str:
     return pytestconfig.getoption("-m")
+
+
+from typing import Optional
+
+from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
+from syrupy.types import SerializableData, SerializedData, PropertyFilter, PropertyMatcher
+
+
+class BinaryArrayExtension(SingleFileSnapshotExtension):
+    """
+    Binary snapshot of a NumPy array. Can be read back into NumPy with
+    .load(), preserving dtype and shape. This is the recommended array
+    snapshot approach if human-readability is not a necessity, as disk
+    space is minimized.
+    """
+
+    _write_mode = WriteMode.BINARY
+    _file_extension = "npy"
+
+    def serialize(
+        self,
+        data: "SerializableData",
+        *,
+        exclude: Optional["PropertyFilter"] = None,
+        include: Optional["PropertyFilter"] = None,
+        matcher: Optional["PropertyMatcher"] = None,
+    ) -> "SerializedData":
+        buffer = BytesIO()
+        np.save(buffer, data)
+        return buffer.getvalue()
+
+
+class TextArrayExtension(SingleFileSnapshotExtension):
+    """
+    Text snapshot of a NumPy array. Flattens the array before writing.
+    Can be read back into NumPy with .loadtxt() assuming you know the
+    shape of the expected data and subsequently reshape it if needed.
+    """
+
+    _write_mode = WriteMode.TEXT
+    _file_extension = "txt"
+
+    def serialize(
+        self,
+        data: "SerializableData",
+        *,
+        exclude: Optional["PropertyFilter"] = None,
+        include: Optional["PropertyFilter"] = None,
+        matcher: Optional["PropertyMatcher"] = None,
+    ) -> "SerializedData":
+        buffer = StringIO()
+        np.savetxt(buffer, data.ravel())
+        return buffer.getvalue()
+    
+
+class ReadableTextArrayExtension(SingleFileSnapshotExtension):
+    """
+    Human-readable snapshot of a NumPy array. Preserves array shape
+    at the expense of possible loss of precision (default 8 places)
+    and more difficulty loading into NumPy than TextArrayExtension.
+    """
+
+    _write_mode = WriteMode.TEXT
+    _file_extension = "txt"
+
+    def serialize(
+        self,
+        data: "SerializableData",
+        *,
+        exclude: Optional["PropertyFilter"] = None,
+        include: Optional["PropertyFilter"] = None,
+        matcher: Optional["PropertyMatcher"] = None,
+    ) -> "SerializedData":
+        return np.array2string(data, threshold=np.inf)
+
+
+@pytest.fixture
+def binary_array_snapshot(snapshot):
+    return snapshot.use_extension(BinaryArrayExtension)
+
+@pytest.fixture
+def text_array_snapshot(snapshot):
+    return snapshot.use_extension(TextArrayExtension)
+
+@pytest.fixture
+def readable_text_array_snapshot(snapshot):
+    return snapshot.use_extension(ReadableTextArrayExtension)
 
 
 def pytest_addoption(parser):

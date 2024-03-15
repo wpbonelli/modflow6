@@ -13,26 +13,13 @@ future.
 
 # Imports
 
+from io import BytesIO
 import os
 import numpy as np
 import pytest
+from base64 import b64encode
 
-try:
-    import pymake
-except:
-    msg = "Error. Pymake package is not available.\n"
-    msg += "Try installing using the following command:\n"
-    msg += " pip install https://github.com/modflowpy/pymake/zipball/master"
-    raise Exception(msg)
-
-try:
-    import flopy
-except:
-    msg = "Error. FloPy package is not available.\n"
-    msg += "Try installing using the following command:\n"
-    msg += " pip install flopy"
-    raise Exception(msg)
-
+import flopy
 
 from framework import TestFramework
 
@@ -353,7 +340,7 @@ def build_models(idx, test):
     return sim, None
 
 
-def check_output(idx, test):
+def check_output(idx, test, snapshot):
     print("evaluating results...")
 
     # read transport results from GWE model
@@ -371,7 +358,7 @@ def check_output(idx, test):
         assert False, f'could not load concentration data from "{fpth}"'
 
     # This is the answer
-    c_ans = [
+    expected = [
         4.00000000e01,
         3.99999983e01,
         3.99999898e01,
@@ -474,22 +461,22 @@ def check_output(idx, test):
         1.12178999e-16,
         5.01900830e-17,
     ]
+    actual = conc1[-1, 0, 0, :]
+    msg = "gwe temperatures do not match stored concentrations"
+    assert np.allclose(actual, expected, atol=1e-8), msg
+    assert snapshot == actual, msg
 
-    msg = f"gwe temperatures do not match stored concentrations"
-    assert np.allclose(conc1[-1, 0, 0, :], c_ans, atol=1e-5), msg
 
-
-# - No need to change any code below
 @pytest.mark.parametrize(
     "idx, name",
     list(enumerate(cases)),
 )
-def test_mf6model(idx, name, function_tmpdir, targets):
+def test_mf6model(idx, name, function_tmpdir, targets, snapshot, binary_array_snapshot, text_array_snapshot, readable_text_array_snapshot):
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
         build=lambda t: build_models(idx, t),
-        check=lambda t: check_output(idx, t),
+        check=lambda t: check_output(idx, t, binary_array_snapshot),
         targets=targets,
     )
     test.run()
