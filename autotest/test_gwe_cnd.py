@@ -13,11 +13,9 @@ future.
 
 # Imports
 
-from io import BytesIO
 import os
 import numpy as np
 import pytest
-from base64 import b64encode
 
 import flopy
 
@@ -342,141 +340,22 @@ def build_models(idx, test):
 
 def check_output(idx, test, snapshot):
     print("evaluating results...")
-
-    # read transport results from GWE model
-    name = cases[idx]
-    gwename = "gwe-" + name
-
-    fpth = os.path.join(test.workspace, f"{gwename}.ucn")
-    try:
-        # load temperatures
-        cobj = flopy.utils.HeadFile(
-            fpth, precision="double", text="TEMPERATURE"
-        )
-        conc1 = cobj.get_alldata()
-    except:
-        assert False, f'could not load concentration data from "{fpth}"'
-
-    # This is the answer
-    expected = [
-        4.00000000e01,
-        3.99999983e01,
-        3.99999898e01,
-        3.99999566e01,
-        3.99998462e01,
-        3.99995197e01,
-        3.99986427e01,
-        3.99964775e01,
-        3.99915230e01,
-        3.99809477e01,
-        3.99597839e01,
-        3.99198995e01,
-        3.98488519e01,
-        3.97288247e01,
-        3.95359427e01,
-        3.92403042e01,
-        3.88070317e01,
-        3.81985089e01,
-        3.73777505e01,
-        3.63125911e01,
-        3.49801399e01,
-        3.33708033e01,
-        3.14911723e01,
-        2.93652158e01,
-        2.70334931e01,
-        2.45504338e01,
-        2.19800532e01,
-        1.93907148e01,
-        1.68496655e01,
-        1.44180473e01,
-        1.21469471e01,
-        1.00748333e01,
-        8.22648357e00,
-        6.61329449e00,
-        5.23470060e00,
-        4.08034410e00,
-        3.13261741e00,
-        2.36924164e00,
-        1.76562010e00,
-        1.29679741e00,
-        9.38944408e-01,
-        6.70362685e-01,
-        4.72056032e-01,
-        3.27947150e-01,
-        2.24829892e-01,
-        1.52144844e-01,
-        1.01654320e-01,
-        6.70766201e-02,
-        4.37223104e-02,
-        2.81598160e-02,
-        1.79249349e-02,
-        1.12795213e-02,
-        7.01828727e-03,
-        4.31895689e-03,
-        2.62924728e-03,
-        1.58374083e-03,
-        9.44125798e-04,
-        5.57133590e-04,
-        3.25507431e-04,
-        1.88330495e-04,
-        1.07925092e-04,
-        6.12700035e-05,
-        3.44648666e-05,
-        1.92125906e-05,
-        1.06157638e-05,
-        5.81494908e-06,
-        3.15821246e-06,
-        1.70101068e-06,
-        9.08679391e-07,
-        4.81524218e-07,
-        2.53159103e-07,
-        1.32068539e-07,
-        6.83748562e-08,
-        3.51353218e-08,
-        1.79225415e-08,
-        9.07652498e-09,
-        4.56413759e-09,
-        2.27913640e-09,
-        1.13033292e-09,
-        5.56823550e-10,
-        2.72491770e-10,
-        1.32483548e-10,
-        6.40015158e-11,
-        3.07244529e-11,
-        1.46584603e-11,
-        6.95098705e-12,
-        3.27643160e-12,
-        1.53530190e-12,
-        7.15261898e-13,
-        3.31325318e-13,
-        1.52616350e-13,
-        6.99104644e-14,
-        3.18504005e-14,
-        1.44329547e-14,
-        6.50576657e-15,
-        2.91728603e-15,
-        1.30145909e-15,
-        5.77678170e-16,
-        2.55141072e-16,
-        1.12178999e-16,
-        5.01900830e-17,
-    ]
-    actual = conc1[-1, 0, 0, :]
-    msg = "gwe temperatures do not match stored concentrations"
-    assert np.allclose(actual, expected, atol=1e-8), msg
-    assert snapshot == actual, msg
+    headfile = flopy.utils.HeadFile(
+        test.workspace / f"gwe-{test.name}.ucn", precision="double", text="TEMPERATURE"
+    )
+    assert snapshot == headfile.get_alldata(), "gwe temperatures don't match expectation"
 
 
 @pytest.mark.parametrize(
     "idx, name",
     list(enumerate(cases)),
 )
-def test_mf6model(idx, name, function_tmpdir, targets, snapshot, binary_array_snapshot, text_array_snapshot, readable_text_array_snapshot):
+def test_mf6model(idx, name, function_tmpdir, targets, array_snapshot):
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
         build=lambda t: build_models(idx, t),
-        check=lambda t: check_output(idx, t, binary_array_snapshot),
+        check=lambda t: check_output(idx, t, array_snapshot),
         targets=targets,
     )
     test.run()

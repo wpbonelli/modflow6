@@ -115,6 +115,12 @@ from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from syrupy.types import SerializableData, SerializedData, PropertyFilter, PropertyMatcher
 
 
+def _serialize_bytes(data):
+    buffer = BytesIO()
+    np.save(buffer, data)
+    return buffer.getvalue()
+
+
 class BinaryArrayExtension(SingleFileSnapshotExtension):
     """
     Binary snapshot of a NumPy array. Can be read back into NumPy with
@@ -128,15 +134,13 @@ class BinaryArrayExtension(SingleFileSnapshotExtension):
 
     def serialize(
         self,
-        data: "SerializableData",
+        data,
         *,
-        exclude: Optional["PropertyFilter"] = None,
-        include: Optional["PropertyFilter"] = None,
-        matcher: Optional["PropertyMatcher"] = None,
-    ) -> "SerializedData":
-        buffer = BytesIO()
-        np.save(buffer, data)
-        return buffer.getvalue()
+        exclude = None,
+        include = None,
+        matcher = None,
+    ):
+        return _serialize_bytes(data)
 
 
 class TextArrayExtension(SingleFileSnapshotExtension):
@@ -183,8 +187,26 @@ class ReadableTextArrayExtension(SingleFileSnapshotExtension):
         return np.array2string(data, threshold=np.inf)
 
 
+class Modflow6OutputSnapshotExtension(SingleFileSnapshotExtension):
+    """
+    """
+
+    _write_mode = WriteMode.TEXT
+    _file_extension = "cmp"
+
+    def serialize(
+        self,
+        data,
+        *,
+        exclude = None,
+        include = None,
+        matcher = None,
+    ):
+        return ({k: data[k] for k in ["budget", "head", "conc", "temp", "pathlines"]})
+
+
 @pytest.fixture
-def binary_array_snapshot(snapshot):
+def array_snapshot(snapshot):
     return snapshot.use_extension(BinaryArrayExtension)
 
 @pytest.fixture
