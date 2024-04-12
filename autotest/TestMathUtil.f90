@@ -4,7 +4,7 @@ module TestMathUtil
   use testdrive, only: check, error_type, new_unittest, test_failed, &
                        to_string, unittest_type
   use MathUtilModule, only: f1d, is_close, mod_offset, &
-                            zero_ch, zero_test, zero_br
+                            zero_ch, zero_test, zero_br, zero_newt
   implicit none
   private
   public :: collect_mathutil
@@ -24,7 +24,9 @@ contains
                 new_unittest("zero_br", &
                              test_zero_br), &
                 new_unittest("zero_test", &
-                             test_zero_test) &
+                             test_zero_test), &
+                new_unittest("zero_newt", &
+                             test_zero_newt), &
                 ]
   end subroutine collect_mathutil
 
@@ -177,6 +179,10 @@ contains
     s = sin(bet)
   end function sine
 
+  pure function cosine(bet) result(c)
+    real(DP), intent(in) :: bet
+    real(DP) :: c
+    c = cos(bet)
   subroutine test_zero_ch(error)
     type(error_type), allocatable, intent(out) :: error
     real(DP), parameter :: pi = 4 * atan(1.0_DP)
@@ -239,5 +245,22 @@ contains
     call check(error, is_close(z, pi, atol=1d-6), &
                'expected pi, got: '//to_string(z))
   end subroutine test_zero_test
+
+  subroutine test_zero_newt(error)
+    type(error_type), allocatable, intent(out) :: error
+    real(DP), parameter :: pi = 4 * atan(1.0_DP)
+    real(DP) :: z
+    procedure(f1d), pointer :: f, fp
+    logical(LGP) :: cvgd
+
+    f => sine
+    fp => cosine
+    cvgd = .false.
+
+    z = zero_newt(f, fp, 0.5, cvgd, tol=1d-6)
+    call check(error, is_close(z, 0.0_DP, atol=1d-6), &
+               'expected 0, got: '//to_string(z))
+
+  end subroutine test_zero_newt()
 
 end module TestMathUtil

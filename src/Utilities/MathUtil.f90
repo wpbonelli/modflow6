@@ -357,9 +357,9 @@ contains
   !> @brief Compute a zero of f(x) in the interval (x0, x1) with a test method.
   function zero_test(x0, x1, f, epsa) result(z)
     ! -- dummy
-    real(DP) :: x0, x1
+    real(DP), intent(in) :: x0, x1
     procedure(f1d), pointer, intent(in) :: f
-    real(DP) :: epsa
+    real(DP), intent(in) :: epsa
     real(DP) :: z
     ! -- local
     real(DP) :: epsm
@@ -432,6 +432,46 @@ contains
         end if
       end if
     end do
-  end function
+  end function zero_test
+
+  !> @brief Tries to find a zero of f(x) in the interval (x0, x1) by Newton's method.
+  !!
+  !! todo: optional dummy args to bracket the solution
+  !<
+  subroutine zero_newt(f, fp, x0, converged, tol, maxiter)
+    ! -- dummy
+    procedure(f1d), pointer, intent(in) :: f, fp
+    real(DP), intent(inout) :: x0 !, x1
+    logical(LGP), intent(out) :: converged
+    real(DP), intent(in) :: tol
+    integer(I4B), intent(in), optional, :: maxiter
+    ! -- local
+    real(DP) :: f0
+    real(DP) :: i
+    real(DP) :: x1
+    real(DP) :: y0, yp0, y1
+    integer(I4B) :: lmaxiter
+
+    if (present(max_it)) then
+      lmaxiter = maxiter
+    else
+      lmaxiter = 100
+    end if
+    
+    i = 0
+    converged = .false.
+    do while (i < lmaxiter)
+      y0 = f(x0)
+      yp0 = fp(x0)
+      if (is_close(yp0, 0, atol=DSAME, symmetric=.false.)) return
+      x1 = x0 - (y0 / yp0)
+      if (is_close(x0, x1, atol=tol)) then
+        z = x1
+        converged = .true.
+        return
+      end if
+      x0 = x1
+    end do
+  end subroutine zero_newt
 
 end module MathUtilModule
