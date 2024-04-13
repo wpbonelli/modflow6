@@ -1,5 +1,5 @@
 module TestMathUtil
-  use KindModule, only: I4B, DP
+  use KindModule, only: I4B, DP, LGP
   use ConstantsModule, only: DNODATA, DZERO
   use testdrive, only: check, error_type, new_unittest, test_failed, &
                        to_string, unittest_type
@@ -26,7 +26,7 @@ contains
                 new_unittest("zero_test", &
                              test_zero_test), &
                 new_unittest("zero_newt", &
-                             test_zero_newt), &
+                             test_zero_newt) &
                 ]
   end subroutine collect_mathutil
 
@@ -183,6 +183,8 @@ contains
     real(DP), intent(in) :: bet
     real(DP) :: c
     c = cos(bet)
+  end function cosine
+
   subroutine test_zero_ch(error)
     type(error_type), allocatable, intent(out) :: error
     real(DP), parameter :: pi = 4 * atan(1.0_DP)
@@ -257,10 +259,11 @@ contains
     fp => cosine
     cvgd = .false.
 
-    z = zero_newt(f, fp, 0.5, cvgd, tol=1d-6)
+    z = 0.5_DP
+    call zero_newt(f, fp, z, -1.0_DP, 1.0_DP, tol=1d-6, converged=cvgd)
     call check(error, is_close(z, 0.0_DP, atol=1d-6), &
                'expected 0, got: '//to_string(z))
 
-  end subroutine test_zero_newt()
+  end subroutine test_zero_newt
 
 end module TestMathUtil

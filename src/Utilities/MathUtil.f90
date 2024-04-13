@@ -7,7 +7,8 @@ module MathUtilModule
 
   implicit none
   private
-  public :: f1d, is_close, mod_offset, zero_ch, zero_br, zero_test
+  public :: f1d, is_close, mod_offset, &
+            zero_ch, zero_br, zero_test, zero_newt
 
   interface mod_offset
     module procedure :: mod_offset_int, mod_offset_dbl
@@ -18,6 +19,14 @@ module MathUtilModule
       import DP
       real(DP), intent(in) :: x
       real(DP) :: fx
+    end function
+
+    function root(f, x0, x1, tol) result(r)
+      import DP
+      import f1d
+      procedure(f1d), pointer, intent(in) :: f
+      real(DP), intent(in) :: x0, x1
+      real(DP), intent(in) :: tol
     end function
   end interface
 
@@ -438,40 +447,47 @@ contains
   !!
   !! todo: optional dummy args to bracket the solution
   !<
-  subroutine zero_newt(f, fp, x0, converged, tol, maxiter)
+  subroutine zero_newt(f, fp, x, x0, x1, tol, converged, maxiter, fallback)
     ! -- dummy
     procedure(f1d), pointer, intent(in) :: f, fp
-    real(DP), intent(inout) :: x0 !, x1
-    logical(LGP), intent(out) :: converged
+    real(DP), intent(inout) :: x
+    real(DP), intent(in) :: x0, x1
     real(DP), intent(in) :: tol
-    integer(I4B), intent(in), optional, :: maxiter
+    logical(LGP), intent(out) :: converged
+    integer(I4B), intent(in), optional :: maxiter
+    procedure(root), pointer, intent(in), optional :: fallback
     ! -- local
-    real(DP) :: f0
     real(DP) :: i
-    real(DP) :: x1
-    real(DP) :: y0, yp0, y1
+    real(DP) :: xnext
+    real(DP) :: y0, yp0
     integer(I4B) :: lmaxiter
 
-    if (present(max_it)) then
+    if (present(maxiter)) then
       lmaxiter = maxiter
     else
-      lmaxiter = 100
+      lmaxiter = 300
     end if
-    
+
     i = 0
     converged = .false.
     do while (i < lmaxiter)
-      y0 = f(x0)
-      yp0 = fp(x0)
-      if (is_close(yp0, 0, atol=DSAME, symmetric=.false.)) return
-      x1 = x0 - (y0 / yp0)
-      if (is_close(x0, x1, atol=tol)) then
-        z = x1
+      y0 = f(x)
+      yp0 = fp(x)
+      if (is_close(yp0, DZERO, atol=DSAME, symmetric=.false.)) &
+        ! todo try perturbing slightly?
+        exit
+      xnext = x - (y0 / yp0)
+      if (is_close(x, xnext, atol=tol)) then
+        x = xnext
         converged = .true.
         return
       end if
-      x0 = x1
+      x = xnext
+      i = i + 1
     end do
+
+    if (.not. converged .and. associated(fallback)) &
+      x = fallback(f, x0, x1, tol)
   end subroutine zero_newt
 
 end module MathUtilModule
