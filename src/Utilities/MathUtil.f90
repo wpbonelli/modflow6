@@ -443,7 +443,10 @@ contains
     end do
   end function zero_test
 
-  !> @brief Tries to find a zero of f(x) in the interval (x0, x1) by Newton's method.
+  !> @brief Find a zero of f(x) in the interval (x0, x1) by Newton's method.
+  !!
+  !! Optionally specify a cutoff after which to abort iteration. Optionally
+  !! fall back to a method guaranted to converge if a solution exists.
   !!
   !! todo: optional dummy args to bracket the solution
   !<
@@ -486,8 +489,10 @@ contains
       i = i + 1
     end do
 
-    if (.not. converged .and. associated(fallback)) &
-      x = fallback(f, x0, x1, tol)
+    if (.not. converged .and. present(fallback)) then
+      if (associated(fallback)) &
+        x = fallback(f, x0, x1, tol)
+    end if
   end subroutine zero_newt
 
 end module MathUtilModule
