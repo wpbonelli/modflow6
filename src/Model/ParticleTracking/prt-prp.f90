@@ -61,6 +61,8 @@ module PrtPrpModule
     real(DP), pointer, contiguous :: rptmass(:) => null() !< total mass released from point
     character(len=LENBOUNDNAME), pointer, contiguous :: rptname(:) => null() !< release point names
     type(TimeSelectType), pointer :: releasetimes
+    
+    integer(I4B), pointer :: ivvorig => NULL()    ! kluge note: devoption for now
 
   contains
     procedure :: prp_allocate_arrays
@@ -152,6 +154,8 @@ contains
     call mem_deallocate(this%itrkhdr)
     call mem_deallocate(this%itrkcsv)
     call mem_deallocate(this%irlstls)
+    
+    call mem_deallocate(this%ivvorig)    ! kluge note: devoption for now
 
     ! -- deallocate arrays
     call mem_deallocate(this%rptx)
@@ -242,6 +246,8 @@ contains
     call mem_allocate(this%itrkhdr, 'ITRKHDR', this%memoryPath)
     call mem_allocate(this%itrkcsv, 'ITRKCSV', this%memoryPath)
     call mem_allocate(this%irlstls, 'IRLSTLS', this%memoryPath)
+    
+    call mem_allocate(this%ivvorig, 'IVVORIG', this%memoryPath)   ! kluge note: devoption for now
 
     ! -- Set values
     this%rlsall = .false.
@@ -259,6 +265,8 @@ contains
     this%itrkhdr = 0
     this%itrkcsv = 0
     this%irlstls = 0
+    
+    this%ivvorig = 0    ! kluge note: devoption for now
   end subroutine prp_allocate_scalars
 
   !> @ brief Allocate and read period data
@@ -436,6 +444,9 @@ contains
         particle%iboundary(2) = 0
         particle%idomain(3) = 0
         particle%iboundary(3) = 0
+        
+        particle%ivvorig = this%ivvorig     ! kluge note: devoption for now
+        
         call this%particles%load_from_particle(particle, np)
 
         ! -- Accumulate mass release from this point
@@ -793,6 +804,12 @@ contains
         call store_error('OPTIONAL TRACKCSV KEYWORD MUST BE &
           &FOLLOWED BY FILEOUT')
       end if
+      found = .true.
+    case ('DEV_VVORIG')
+      call this%parser%DevOpt()
+      this%ivvorig = 1
+      write (this%iout, '(4x,a)') &
+        'VERTEX VELOCITIES WILL BE CALCULATED THE ORIGINAL WAY'
       found = .true.
     case default
       found = .false.

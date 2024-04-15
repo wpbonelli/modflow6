@@ -135,7 +135,7 @@ contains
     statusVZ = calculate_dt(subcell%vz1, subcell%vz2, subcell%dz, &
                             initialZ, vz, dvzdz, dtexitz)
 
-    ! -- Subcells should never be strong sinks, contact the developer situation
+    ! -- Subcells should never be strong sinks, contact the developer situation  ! kluge note: is this true? suppose so, if we already know the cell is not a strong sink
     if ((statusVX .eq. 3) .and. (statusVY .eq. 3) .and. (statusVZ .eq. 3)) then
       print *, "Subcell with no exit face:", &
         "particle", get_particle_id(particle), &

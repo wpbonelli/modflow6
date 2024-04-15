@@ -190,6 +190,16 @@ optional false
 longname file keyword
 description name of the release times file
 
+# dev options
+block options
+name dev_vvorig
+type keyword
+reader urword
+optional false
+longname original vertex velocities
+description calculate vertex velocities the original way
+mf6internal ivvorig
+
 # --------------------- prt prp dimensions ---------------------
 
 block dimensions

@@ -209,7 +209,7 @@ contains
       res = (/alpi, beti/)
       res = skew(res, (/sxx, sxy, syy/))
       alpi = res(1)
-      beti = res(2)
+      beti = res(2)     ! kluge note: tiny negative beti led to tiny negative texit in test_prt_triangle with iflowface=1
     end if
 
   end subroutine
