@@ -200,6 +200,16 @@ longname original vertex velocities
 description calculate vertex velocities the original way
 mf6internal ivvorig
 
+block options
+name dev_forceternary
+type keyword
+reader urword
+optional false
+longname force ternary tracking method
+description force use of the ternary tracking method regardless of cell type in disv grid
+mf6internal ifrctrn
+
+
 # --------------------- prt prp dimensions ---------------------
 
 block dimensions

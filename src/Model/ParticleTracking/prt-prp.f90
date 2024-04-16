@@ -63,6 +63,7 @@ module PrtPrpModule
     type(TimeSelectType), pointer :: releasetimes
     
     integer(I4B), pointer :: ivvorig => NULL()    ! kluge note: devoption for now
+    integer(I4B), pointer :: ifrctrn => NULL()    ! kluge note: devoption for now
 
   contains
     procedure :: prp_allocate_arrays
@@ -156,6 +157,7 @@ contains
     call mem_deallocate(this%irlstls)
     
     call mem_deallocate(this%ivvorig)    ! kluge note: devoption for now
+    call mem_deallocate(this%ifrctrn)    ! kluge note: devoption for now
 
     ! -- deallocate arrays
     call mem_deallocate(this%rptx)
@@ -248,6 +250,7 @@ contains
     call mem_allocate(this%irlstls, 'IRLSTLS', this%memoryPath)
     
     call mem_allocate(this%ivvorig, 'IVVORIG', this%memoryPath)   ! kluge note: devoption for now
+    call mem_allocate(this%ifrctrn, 'IFRCTRN', this%memoryPath)   ! kluge note: devoption for now
 
     ! -- Set values
     this%rlsall = .false.
@@ -267,6 +270,7 @@ contains
     this%irlstls = 0
     
     this%ivvorig = 0    ! kluge note: devoption for now
+    this%ifrctrn = 0    ! kluge note: devoption for now
   end subroutine prp_allocate_scalars
 
   !> @ brief Allocate and read period data
@@ -446,6 +450,7 @@ contains
         particle%iboundary(3) = 0
         
         particle%ivvorig = this%ivvorig     ! kluge note: devoption for now
+        particle%ifrctrn = this%ifrctrn     ! kluge note: devoption for now
         
         call this%particles%load_from_particle(particle, np)
 
@@ -810,6 +815,12 @@ contains
       this%ivvorig = 1
       write (this%iout, '(4x,a)') &
         'VERTEX VELOCITIES WILL BE CALCULATED THE ORIGINAL WAY'
+      found = .true.
+    case ('DEV_FORCETERNARY')
+      call this%parser%DevOpt()
+      this%ifrctrn = 1
+      write (this%iout, '(4x,a)') &
+        'TRACKING WILL BE DONE USING THE TERNARY METHOD REGARDLESS OF CELL TYPE'
       found = .true.
     case default
       found = .false.

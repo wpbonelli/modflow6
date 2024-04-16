@@ -21,7 +21,7 @@ module CellRectQuadModule
     double precision :: yOrigin ! model y origin for local (x, y)
     double precision :: zOrigin ! model z origin for local z
 
-    double precision :: qextl1(4), qextl2(4), qintl(5) ! external and internal subcell flows for the cell
+    double precision :: qextl1(4), qextl2(4), qintl(5) ! external and internal subcell flows for the cell   ! kluge note: move these to MethodCellRectQuad ???
     integer, allocatable :: irectvert(:) ! list of indices of the rectangle vertices
     integer, allocatable :: ipv4irv(:, :) ! list of the polygon vertex indices that correspond to the rectangle vertex indices
     double precision, allocatable :: rectflow(:, :) ! flow(s) for each rectangle face

@@ -95,7 +95,14 @@ contains
         submethod => method_cell_ptb
       else
         ! -- Select and initialize cell method and set cell method pointer
-        if (cell%defn%can_be_rect) then
+        if (particle%ifrctrn > 0) then     ! kluge note: devoption for now
+           call method_cell_tern%init( &
+            cell=this%cell, &
+            trackfilectl=this%trackfilectl, &
+            tracktimes=this%tracktimes)
+          submethod => method_cell_tern
+          method_cell_tern%zeromethod = this%zeromethod
+        else if (cell%defn%can_be_rect) then
           call cell_poly_to_rect(cell, rect)
           base => rect
           call method_cell_plck%init( &
