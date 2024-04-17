@@ -112,9 +112,13 @@ def build_gwf_sim(name, ws, targets, chd_sides=None):
             cells.extend(topcells)
         for icpl in set(cells):
             h = get_chd_head(xcyc[icpl, 0])
-            chdlist.append([(0, icpl), h])
+            chdlist.append(
+                [(0, icpl), h, 0]
+            )  # todo: figure out actual iflowface
 
-    chd = flopy.mf6.ModflowGwfchd(gwf, stress_period_data=chdlist)
+    chd = flopy.mf6.ModflowGwfchd(
+        gwf, auxiliary="IFLOWFACE", stress_period_data=chdlist
+    )
     oc = flopy.mf6.ModflowGwfoc(
         gwf,
         budget_filerecord=f"{gwfname}.cbc",
@@ -159,20 +163,24 @@ def build_prt_sim(idx, name, gwf_ws, prt_ws, targets):
         (0, (0, 88), 95, 92, 0.5),
         (1, (0, 86), 96, 86, 0.5),
     ]
-    prp_track_file = f"{prtname}.prp.trk"
-    prp_track_csv_file = f"{prtname}.prp.trk.csv"
-    flopy.mf6.ModflowPrtprp(
-        prt,
-        pname="prp1",
-        filename=f"{prtname}_1.prp",
-        nreleasepts=len(prpdata),
-        packagedata=prpdata,
-        perioddata={0: ["FIRST"]},
-        track_filerecord=[prp_track_file],
-        trackcsv_filerecord=[prp_track_csv_file],
-        boundnames=True,
-        stop_at_weak_sink=True,  # currently required for this problem
-    )
+
+    # set up 2 PRPs, identical except for the dev
+    # option toggling new vs old vertex velocity
+    # calculation. we expect both approaches to
+    # return approximately identical results.
+    for i in range(2):
+        flopy.mf6.ModflowPrtprp(
+            prt,
+            pname=f"prp{i}",
+            filename=f"{prtname}_{i}.prp",
+            nreleasepts=len(prpdata),
+            packagedata=prpdata,
+            perioddata={0: ["FIRST"]},
+            boundnames=True,
+            stop_at_weak_sink=True,  # currently required for this problem
+            dev_vvorig=i == 1,  # temp dev option, todo: remove later
+            # dev_forceternary=tern,  # temp dev option, todo: remove later
+        )
     prt_track_file = f"{prtname}.trk"
     prt_track_csv_file = f"{prtname}.trk.csv"
     flopy.mf6.ModflowPrtoc(
@@ -207,7 +215,9 @@ def build_models(idx, test):
         (
             ["left", "right"]
             if "r2l" in test.name
-            else ["left", "botm"] if "diag" in test.name else None
+            else ["left", "botm"]
+            if "diag" in test.name
+            else None
         ),
     )
     prt_sim = build_prt_sim(
@@ -233,13 +243,9 @@ def check_output(idx, test):
 
     # get prt output
     prt_name = get_model_name(name, "prt")
-    prt_track_csv_file = f"{prt_name}.prp.trk.csv"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
     pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
-    endpts = (
-        pls.sort_values("t")
-        .groupby(["imdl", "iprp", "irpt", "trelease"])
-        .tail(1)
-    )
+    endpts = pls[pls.ireason == 3]  # termination
 
     plot_debug = False
     if plot_debug:
@@ -258,20 +264,32 @@ def check_output(idx, test):
                 y="y",
                 ax=ax,
                 legend=False,
-                color="black",
+                color="red" if iprp == 1 else "blue",
             )
         plt.show()
 
     if "r2l" in name:
-        assert pls.shape == (76, 16)
+        assert pls.shape == (152, 16)
         assert (pls.z == 0.5).all()
         assert isclose(min(pls.x), 5.1145, rel_tol=1e-6)
         assert isclose(max(pls.x), 96, rel_tol=1e-6)
-        assert set(endpts.icell) == {12, 128}
+        assert set(endpts.icell) == {130, 136}
     elif "diag" in name:
-        assert pls.shape == (112, 16)
-        assert endpts.shape == (2, 16)
-        assert set(endpts.icell) == {111, 144}
+        assert pls.shape == (224, 16)
+        assert endpts.shape == (4, 16)
+        assert set(endpts.icell) == {111, 112}
+
+    # pathlines should be (very nearly) identical for both
+    # vertex velocity calculation approaches
+    pls_prp1 = pls[pls.iprp == 1].drop(["iprp", "name"], axis=1).round(8)
+    pls_prp2 = (
+        pls[pls.iprp == 2]
+        .drop(["iprp", "name"], axis=1)
+        .round(8)
+        .reset_index(drop=True)
+    )
+    diff = pls_prp1.compare(pls_prp2)
+    assert not any(diff), diff
 
 
 @pytest.mark.parametrize("idx, name", enumerate(cases))
