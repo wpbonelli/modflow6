@@ -61,9 +61,9 @@ module PrtPrpModule
     real(DP), pointer, contiguous :: rptmass(:) => null() !< total mass released from point
     character(len=LENBOUNDNAME), pointer, contiguous :: rptname(:) => null() !< release point names
     type(TimeSelectType), pointer :: releasetimes
-    
-    integer(I4B), pointer :: ivvorig => NULL()    ! kluge note: devoption for now
-    integer(I4B), pointer :: ifrctrn => NULL()    ! kluge note: devoption for now
+
+    integer(I4B), pointer :: ivvorig => NULL() ! kluge note: devoption for now
+    integer(I4B), pointer :: ifrctrn => NULL() ! kluge note: devoption for now
 
   contains
     procedure :: prp_allocate_arrays
@@ -155,9 +155,9 @@ contains
     call mem_deallocate(this%itrkhdr)
     call mem_deallocate(this%itrkcsv)
     call mem_deallocate(this%irlstls)
-    
-    call mem_deallocate(this%ivvorig)    ! kluge note: devoption for now
-    call mem_deallocate(this%ifrctrn)    ! kluge note: devoption for now
+
+    call mem_deallocate(this%ivvorig) ! kluge note: devoption for now
+    call mem_deallocate(this%ifrctrn) ! kluge note: devoption for now
 
     ! -- deallocate arrays
     call mem_deallocate(this%rptx)
@@ -248,9 +248,9 @@ contains
     call mem_allocate(this%itrkhdr, 'ITRKHDR', this%memoryPath)
     call mem_allocate(this%itrkcsv, 'ITRKCSV', this%memoryPath)
     call mem_allocate(this%irlstls, 'IRLSTLS', this%memoryPath)
-    
-    call mem_allocate(this%ivvorig, 'IVVORIG', this%memoryPath)   ! kluge note: devoption for now
-    call mem_allocate(this%ifrctrn, 'IFRCTRN', this%memoryPath)   ! kluge note: devoption for now
+
+    call mem_allocate(this%ivvorig, 'IVVORIG', this%memoryPath) ! kluge note: devoption for now
+    call mem_allocate(this%ifrctrn, 'IFRCTRN', this%memoryPath) ! kluge note: devoption for now
 
     ! -- Set values
     this%rlsall = .false.
@@ -268,9 +268,9 @@ contains
     this%itrkhdr = 0
     this%itrkcsv = 0
     this%irlstls = 0
-    
-    this%ivvorig = 0    ! kluge note: devoption for now
-    this%ifrctrn = 0    ! kluge note: devoption for now
+
+    this%ivvorig = 0 ! kluge note: devoption for now
+    this%ifrctrn = 0 ! kluge note: devoption for now
   end subroutine prp_allocate_scalars
 
   !> @ brief Allocate and read period data
@@ -448,10 +448,10 @@ contains
         particle%iboundary(2) = 0
         particle%idomain(3) = 0
         particle%iboundary(3) = 0
-        
-        particle%ivvorig = this%ivvorig     ! kluge note: devoption for now
-        particle%ifrctrn = this%ifrctrn     ! kluge note: devoption for now
-        
+
+        particle%ivvorig = this%ivvorig ! kluge note: devoption for now
+        particle%ifrctrn = this%ifrctrn ! kluge note: devoption for now
+
         call this%particles%load_from_particle(particle, np)
 
         ! -- Accumulate mass release from this point

@@ -123,8 +123,8 @@ contains
           cell%vz2 = -cell%defn%faceflow(7) * term
 
           ! -- Select and initialize Pollock's method and set method pointer
-          call method_cell_plck%init( &    ! kluge note: could the FORCETERNARY (ifrctrn) devoption be used here?
-            cell=this%cell, &              !             if not, we could always make a rectangular grid using disv
+          call method_cell_plck%init( & ! kluge note: could the FORCETERNARY (ifrctrn) devoption be used here?
+            cell=this%cell, & !             if not, we could always make a rectangular grid using disv
             trackfilectl=this%trackfilectl, &
             tracktimes=this%tracktimes)
           submethod => method_cell_plck

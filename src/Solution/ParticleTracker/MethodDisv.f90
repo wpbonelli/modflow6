@@ -95,8 +95,8 @@ contains
         submethod => method_cell_ptb
       else
         ! -- Select and initialize cell method and set cell method pointer
-        if (particle%ifrctrn > 0) then     ! kluge note: devoption for now
-           call method_cell_tern%init( &
+        if (particle%ifrctrn > 0) then ! kluge note: devoption for now
+          call method_cell_tern%init( &
             cell=this%cell, &
             trackfilectl=this%trackfilectl, &
             tracktimes=this%tracktimes)

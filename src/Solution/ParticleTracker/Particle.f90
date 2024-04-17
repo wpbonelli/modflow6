@@ -60,9 +60,9 @@ module ParticleModule
     real(DP), public :: cosrot !< cosine of rotation angle for coordinate transformation from model to local
     logical(LGP), public :: transformed !< whether coordinates have been transformed from model to local
     logical(LGP), public :: advancing !< whether particle is still being tracked for current time step
-    
-    integer(I4B), public :: ivvorig    ! kluge note: devoption for now
-    integer(I4B), public :: ifrctrn    ! kluge note: devoption for now
+
+    integer(I4B), public :: ivvorig ! kluge note: devoption for now
+    integer(I4B), public :: ifrctrn ! kluge note: devoption for now
   contains
     procedure, public :: destroy => destroy_particle
     procedure, public :: get_model_coords
@@ -93,9 +93,9 @@ module ParticleModule
     real(DP), dimension(:), pointer, contiguous :: trelease !< particle release time
     real(DP), dimension(:), pointer, contiguous :: tstop !< particle stop time
     real(DP), dimension(:), pointer, contiguous :: ttrack !< current tracking time
-    
-    integer(I4B), dimension(:), pointer, contiguous :: ivvorig   ! kluge note: devoption for now
-    integer(I4B), dimension(:), pointer, contiguous :: ifrctrn   ! kluge note: devoption for now
+
+    integer(I4B), dimension(:), pointer, contiguous :: ivvorig ! kluge note: devoption for now
+    integer(I4B), dimension(:), pointer, contiguous :: ifrctrn ! kluge note: devoption for now
   contains
     procedure, public :: destroy => destroy_store
     procedure, public :: resize => resize_store
@@ -146,9 +146,9 @@ contains
     call mem_allocate(this%ttrack, np, 'PLTTRACK', mempath)
     call mem_allocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
     call mem_allocate(this%istopzone, np, 'PLISTOPZONE', mempath)
-    
-    call mem_allocate(this%ivvorig, np, 'PLIVVORIG', mempath)  ! kluge note: devoption for now
-    call mem_allocate(this%ifrctrn, np, 'PLIFRCTRN', mempath)  ! kluge note: devoption for now
+
+    call mem_allocate(this%ivvorig, np, 'PLIVVORIG', mempath) ! kluge note: devoption for now
+    call mem_allocate(this%ifrctrn, np, 'PLIFRCTRN', mempath) ! kluge note: devoption for now
   end subroutine create_particle_store
 
   !> @brief Deallocate particle arrays
@@ -175,8 +175,8 @@ contains
     call mem_deallocate(this%istopweaksink, 'PLISTOPWEAKSINK', mempath)
     call mem_deallocate(this%istopzone, 'PLISTOPZONE', mempath)
 
-    call mem_deallocate(this%ivvorig, 'PLIVVORIG', mempath)  ! kluge note: devoption for now
-    call mem_deallocate(this%ifrctrn, 'PLIFRCTRN', mempath)  ! kluge note: devoption for now
+    call mem_deallocate(this%ivvorig, 'PLIVVORIG', mempath) ! kluge note: devoption for now
+    call mem_deallocate(this%ifrctrn, 'PLIFRCTRN', mempath) ! kluge note: devoption for now
   end subroutine destroy_store
 
   !> @brief Reallocate particle arrays
@@ -205,10 +205,10 @@ contains
     call mem_reallocate(this%ttrack, np, 'PLTTRACK', mempath)
     call mem_reallocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
     call mem_reallocate(this%istopzone, np, 'PLISTOPZONE', mempath)
-    
-    call mem_reallocate(this%ivvorig, np, 'PLIVVORIG', mempath)    ! kluge note: devoption for now
-    call mem_reallocate(this%ifrctrn, np, 'PLIFRCTRN', mempath)    ! kluge note: devoption for now
-    
+
+    call mem_reallocate(this%ivvorig, np, 'PLIVVORIG', mempath) ! kluge note: devoption for now
+    call mem_reallocate(this%ifrctrn, np, 'PLIFRCTRN', mempath) ! kluge note: devoption for now
+
     ! resize first dimension of 2D arrays
     ! todo: memory manager support?
     call ExpandArray2D( &
@@ -258,9 +258,9 @@ contains
     this%idomain(1) = imdl
     this%iboundary(levelmin:levelmax) = &
       store%iboundary(ip, levelmin:levelmax)
-    
-    this%ivvorig = store%ivvorig(ip)  ! kluge note: devoption for now
-    this%ifrctrn = store%ifrctrn(ip)  ! kluge note: devoption for now
+
+    this%ivvorig = store%ivvorig(ip) ! kluge note: devoption for now
+    this%ifrctrn = store%ifrctrn(ip) ! kluge note: devoption for now
   end subroutine load_from_store
 
   !> @brief Update particle store from particle
@@ -293,9 +293,9 @@ contains
       ip, &
       levelmin:levelmax) = &
       particle%iboundary(levelmin:levelmax)
-    
-    this%ivvorig = particle%ivvorig  ! kluge note: devoption for now
-    this%ifrctrn = particle%ifrctrn  ! kluge note: devoption for now
+
+    this%ivvorig = particle%ivvorig ! kluge note: devoption for now
+    this%ifrctrn = particle%ifrctrn ! kluge note: devoption for now
   end subroutine load_from_particle
 
   !> @brief Apply the given global-to-local transformation to the particle.
