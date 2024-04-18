@@ -154,7 +154,7 @@ contains
     integer(I4B) :: inface
 
     exitFace = particle%iboundary(3)
-    isc = particle%idomain(3)
+    isc = particle%idomain(3)  ! subcell id
 
     select case (exitFace)
     case (0)
@@ -192,6 +192,8 @@ contains
     else
       particle%iboundary(2) = inface
     end if
+
+    print *, "passing from ", exitFace, " to ", inface
   end subroutine pass_mct
 
   !> @brief Apply the ternary method to a polygonal cell
@@ -262,11 +264,15 @@ contains
     if (particle%ivvorig > 0) then
       call this%vertvelo_orig() ! kluge note: devoption for now
     else
+      print *, "calculating vertvelo"
       call this%vertvelo()
+      print *, "calculated vertvelo"
     end if
 
     ! Track across subcells
+    print *, "tracking over subcells"
     call this%track(particle, 2, tmax) ! kluge, hardwired to level 2
+    print *, "tracked over subcells"
 
   end subroutine apply_mct
 

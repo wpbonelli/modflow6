@@ -184,6 +184,7 @@ contains
     ! -- stepping during triangle (subcell) traversal
     ! kluge note: actually, can probably do z calculation just once for each cell
     zirel = (zi - zbot) / dz
+    print *, "calculating dt"
     call calculate_dt(vzbot, vztop, dz, zirel, vzi, &
                       az, dtexitz, izstatus, &
                       itopbotexit)
@@ -197,6 +198,7 @@ contains
     ! kluge note: can probably avoid calculating alpexit
     ! here in many cases and wait to calculate it later,
     ! once the final trajectory time is known
+    print *, "traversing triangle"
     call traverse_triangle(isolv, tol, step, &
                            dtexitxy, alpexit, betexit, &
                            itrifaceenter, itrifaceexit, &
@@ -254,10 +256,12 @@ contains
     call this%tracktimes%try_advance()
     tslice = this%tracktimes%selection
     if (all(tslice > 0)) then
+      print *, "about to solve tslice ", tslice
       do i = tslice(1), tslice(2)
         t = this%tracktimes%times(i)
         if (t < particle%ttrack .or. t >= texit .or. t >= tmax) cycle
         dt = t - t0
+        print *, "stepping analytical, i = ", i
         call step_analytical(dt, alp, bet)
         loc = (/alp, bet/)
         if (lbary) loc = skew(loc, (/sxx, sxy, syy/), invert=.true.)
@@ -346,7 +350,7 @@ contains
 
     ! -- Save particle track record
     if (reason > -1) &
-      call this%save(particle, reason=reason) ! reason=2: timestep
+      call this%save(particle, reason=reason)
   end subroutine track_subcell
 
   !> @brief Do calculations related to analytical z solution

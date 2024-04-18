@@ -271,6 +271,7 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
     call this%track(particle, 1, tmax) ! kluge, hardwired to level 1
+    print *, "tracking completed for particle ", particle%irpt, ", cell ", this%cell%defn%icell
   end subroutine apply_disv
 
   !> @brief Return the number of polygon vertices for a cell in the grid
