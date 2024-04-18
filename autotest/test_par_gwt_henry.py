@@ -5,20 +5,20 @@ test_gwt_henry_gwtgwt.py and runs it in parallel mode.
 
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["par-henry-ups", "par-henry-cen", "par-henry-tvd"]
 
 
 def build_models(idx, test):
-    from test_gwt_henry_gwtgwt import build_models as build
+    from autotest.test_gwt_henry_gwtgwt import build_models as build
 
     sim, dummy = build(idx, test)
     return sim, dummy
 
 
 def check_output(idx, test):
-    from test_gwt_henry_gwtgwt import check_output as check
+    from autotest.test_gwt_henry_gwtgwt import check_output as check
 
     check(idx, test)
 

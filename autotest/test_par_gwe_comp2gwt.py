@@ -6,20 +6,20 @@ in parallel on two cpus
 
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["gwegwe-gwtgwt"]
 
 
 def build_models(idx, test):
-    from test_gwegwe_exchng_with_comp2gwt import build_models as build
+    from autotest.test_gwegwe_exchng_with_comp2gwt import build_models as build
 
     sim, dummy = build(idx, test)
     return sim, dummy
 
 
 def check_output(idx, test):
-    from test_gwegwe_exchng_with_comp2gwt import check_output as check
+    from autotest.test_gwegwe_exchng_with_comp2gwt import check_output as check
 
     check(idx, test)
 

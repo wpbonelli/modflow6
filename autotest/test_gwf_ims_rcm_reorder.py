@@ -4,7 +4,7 @@ import flopy
 import pytest
 from flopy.utils.compare import eval_bud_diff
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 paktest = "ims"
 cases = ["ims_rcm"]

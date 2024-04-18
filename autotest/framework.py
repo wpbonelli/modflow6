@@ -11,7 +11,7 @@ from warnings import warn
 import flopy
 import numpy as np
 import pytest
-from common_regression import (
+from autotest.common_regression import (
     COMPARE_PROGRAMS,
     adjust_htol,
     get_mf6_comparison,

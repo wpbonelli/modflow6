@@ -18,8 +18,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from conftest import project_root_path
-from framework import TestFramework
+from autotest.conftest import project_root_path
+from autotest.framework import TestFramework
 
 cases = [
     "swf-beg2022",
@@ -262,7 +262,7 @@ def make_plot(test, mfsim):
 def check_output(idx, test):
     print("evaluating model...")
 
-    # get MFSimulation from test
+    # get MFSimulation from autotest.test
     sim = test.sims[0]
 
     makeplot = False

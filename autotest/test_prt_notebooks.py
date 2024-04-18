@@ -12,7 +12,7 @@ from flopy.mf6 import MFSimulation
 from flopy.utils import PathlineFile
 from modflow_devtools.misc import run_cmd, set_env
 
-from conftest import project_root_path
+from autotest.conftest import project_root_path
 
 
 def get_notebook_scripts(pattern=None, exclude=None):

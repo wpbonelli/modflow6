@@ -17,7 +17,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["buy_lak_01a"]  # , 'buy_lak_01b', 'buy_lak_01c']
 buy_on_list = [False]  # , True, True]

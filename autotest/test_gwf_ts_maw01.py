@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from flopy.utils.compare import eval_bud_diff
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 paktest = "maw"
 cases = [f"ts_{paktest}01"]

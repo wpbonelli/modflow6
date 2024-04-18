@@ -4,8 +4,8 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
-from framework import TestFramework
+from autotest.conftest import project_root_path
+from autotest.framework import TestFramework
 
 cases = ["nr_ur01", "nr_ur02"]
 data_path = project_root_path / "autotest/data/ex-gwf-bump/"

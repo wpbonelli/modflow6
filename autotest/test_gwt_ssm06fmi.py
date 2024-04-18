@@ -1,5 +1,5 @@
 """
-Derived from test_gwt_ssm01fmi.py, but drops RIV and adds SFR.
+Derived from autotest.test_gwt_ssm01fmi.py, but drops RIV and adds SFR.
 In that autotest, flow and transport run separately, which is the case here
 as well. However, by adding SFR we can now invoke MVR, in this case
 WEL -> SFR at the same time as invoking auxiliary variables.  A

@@ -12,20 +12,20 @@ with a serial 'refmodel'
 
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["par_idomain"]
 
 
 def build_models(idx, test):
-    from test_gwf_ifmod_idomain import build_models as build
+    from autotest.test_gwf_ifmod_idomain import build_models as build
 
     sim, dummy = build(idx, test)
     return sim, dummy
 
 
 def check_output(idx, test):
-    from test_gwf_ifmod_idomain import check_output as check
+    from autotest.test_gwf_ifmod_idomain import check_output as check
 
     check(idx, test)
 

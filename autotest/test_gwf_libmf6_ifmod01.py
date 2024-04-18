@@ -17,7 +17,7 @@ import flopy
 import pytest
 from modflowapi import ModflowApi
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["libgwf_ifmod01"]
 name_left = "leftmodel"

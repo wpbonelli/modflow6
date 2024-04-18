@@ -1,0 +1,17 @@
+{
+    "version": 1,
+    "project": "modflow6",
+    "project_url": "http://github.com/MODFLOW-USGS/modflow6",
+    "repo": ".",
+    "branches": ["develop"],
+    "dvcs": "git",
+    "environment_type": "existing",
+    "install_timeout": 600,
+    "pythons": ["3.12"],
+    "conda_channels": ["conda-forge", "defaults"],
+    "conda_environment_file": "environment.yml",
+    "benchmark_dir": "autotest",
+    "env_dir": ".asv/env",
+    "results_dir": ".asv/results",
+    "html_dir": ".asv/html"
+}

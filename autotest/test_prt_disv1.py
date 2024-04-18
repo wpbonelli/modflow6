@@ -36,8 +36,8 @@ from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 from flopy.utils.gridutil import get_disv_kwargs
 
-from framework import TestFramework
-from prt_test_utils import (
+from autotest.framework import TestFramework
+from autotest.prt_test_utils import (
     all_equal,
     check_budget_data,
     check_track_data,

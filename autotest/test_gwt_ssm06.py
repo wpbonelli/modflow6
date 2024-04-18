@@ -1,5 +1,5 @@
 """
-Derived from test_gwt_ssm01fmi.py, but drops RIV and adds SFR.
+Derived from autotest.test_gwt_ssm01fmi.py, but drops RIV and adds SFR.
 See test_gwt_ssm06fmi.py for additional detail on what this test is about.
 """
 

@@ -18,7 +18,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["par_gwf03-a", "par_gwf03-b", "par_gwf03-c", "par_gwf03-d"]
 ncpus = [1, 1, 2, 4]

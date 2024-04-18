@@ -28,9 +28,9 @@ from flopy.utils.triangle import Triangle
 from flopy.utils.voronoi import VoronoiGrid
 from shapely.geometry import LineString, Point
 
-from framework import TestFramework
-from prt_test_utils import get_model_name
-from test_prt_voronoi1 import build_gwf_sim, get_grid
+from autotest.framework import TestFramework
+from autotest.prt_test_utils import get_model_name
+from autotest.test_prt_voronoi1 import build_gwf_sim, get_grid
 
 simname = "prtvor2"
 cases = [simname]

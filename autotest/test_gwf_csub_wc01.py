@@ -4,8 +4,8 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
-from framework import TestFramework
+from autotest.conftest import project_root_path
+from autotest.framework import TestFramework
 
 cases = ["csub_wc01a", "csub_wc02b"]
 cmppth = "mf6"

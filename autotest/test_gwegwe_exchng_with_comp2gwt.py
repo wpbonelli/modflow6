@@ -71,7 +71,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 # from figspecs import USGSFigure
 

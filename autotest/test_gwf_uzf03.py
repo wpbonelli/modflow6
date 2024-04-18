@@ -9,7 +9,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["gwf_uzf03a"]
 nlay, nrow, ncol = 15, 1, 1

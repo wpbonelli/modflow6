@@ -17,7 +17,7 @@ import os
 import sys
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 # Base simulation and model name and workspace
 cases = ["t_vs_c"]

@@ -4,7 +4,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["dsp01a_noadv", "dsp01b_noadv"]
 xt3d = [False, True]

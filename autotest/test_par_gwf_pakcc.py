@@ -14,13 +14,13 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["par_uzf_3lay_1p", "par_uzf_3lay_2p"]
 
 
 def build_models(idx, test):
-    from test_gwf_uzf_gwet import build_models as build
+    from autotest.test_gwf_uzf_gwet import build_models as build
 
     sim, dummy = build(idx, test)
     if idx == 1:

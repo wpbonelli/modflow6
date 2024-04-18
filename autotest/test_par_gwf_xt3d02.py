@@ -12,20 +12,20 @@ with a serial 'refmodel' in case of XT3D
 
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["par_xt3d02"]
 
 
 def build_models(idx, test):
-    from test_gwf_ifmod_xt3d02 import build_models as build
+    from autotest.test_gwf_ifmod_xt3d02 import build_models as build
 
     sim, dummy = build(idx, test)
     return sim, dummy
 
 
 def check_output(idx, test):
-    from test_gwf_ifmod_xt3d02 import check_output as check
+    from autotest.test_gwf_ifmod_xt3d02 import check_output as check
 
     check(idx, test)
 

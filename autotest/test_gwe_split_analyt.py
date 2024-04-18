@@ -57,7 +57,7 @@ import pytest
 import flopy
 import numpy as np
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 # Parameters that vary by scenario
 cases = ["eslcasei", "eslcaseii", "eslcaseiii"]

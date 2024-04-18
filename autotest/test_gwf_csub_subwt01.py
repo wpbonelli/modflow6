@@ -4,7 +4,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["csub_subwt01a", "csub_subwt01b", "csub_subwt01c", "csub_subwt01d"]
 cmppth = "mf6_regression"

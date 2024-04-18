@@ -53,14 +53,7 @@ def bin_path() -> Path:
     return _binaries_path
 
 
-@pytest.fixture(scope="session")
-def targets() -> Dict[str, Path]:
-    """
-    Target executables for tests. These include local development builds as
-    well as binaries 1) downloaded from GitHub and 2) rebuilt from the last
-    official release.
-    """
-
+def get_targets():
     d = dict()
     for k, v in _binaries["development"]:
         # require development binaries
@@ -79,6 +72,16 @@ def targets() -> Dict[str, Path]:
         else:
             warn(f"Couldn't find rebuilt binary '{k}' expected at: {v}")
     return d
+
+
+@pytest.fixture(scope="session")
+def targets() -> Dict[str, Path]:
+    """
+    Target executables for tests. These include local development builds as
+    well as binaries 1) downloaded from GitHub and 2) rebuilt from the last
+    official release.
+    """
+    return _targets()
 
 
 def try_get_target(targets: Dict[str, Path], name: str) -> Path:

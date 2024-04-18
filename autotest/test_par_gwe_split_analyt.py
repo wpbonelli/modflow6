@@ -6,13 +6,13 @@ models documented in Carslaw and Jaeger (1947).
 
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["par_eslcasei", "par_eslcaseii", "par_eslcaseiii"]
 
 
 def build_models(idx, test):
-    from test_gwe_split_analyt import (
+    from autotest.test_gwe_split_analyt import (
         build_models as build,
     )
 
@@ -21,7 +21,7 @@ def build_models(idx, test):
 
 
 def check_output(idx, test):
-    from test_gwe_split_analyt import (
+    from autotest.test_gwe_split_analyt import (
         check_output as check,
     )
 

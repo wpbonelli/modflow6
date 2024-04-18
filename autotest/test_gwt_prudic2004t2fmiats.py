@@ -13,7 +13,7 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
+from autotest.conftest import project_root_path
 
 data_path = project_root_path / "autotest" / "data"
 model_path = str(data_path / "prudic2004test2")

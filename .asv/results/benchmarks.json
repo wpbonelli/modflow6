@@ -1,0 +1,33 @@
+{
+    "benchmarks.PrtSuite.time_prt_triangle": {
+        "code": "class PrtSuite:\n    def time_prt_triangle(self):\n        from autotest.test_prt_triangle import build_models, check_output\n        with TemporaryDirectory() as tmpdir:\n            test = TestFramework(\n                name=\"prt-triangle\",\n                workspace=tmpdir.name,\n                build=lambda t: build_models(0, t),\n                check=lambda t: check_output(0, t),\n                targets=get_targets(),\n                compare=None,\n            )\n            test.run()",
+        "min_run_count": 2,
+        "name": "benchmarks.PrtSuite.time_prt_triangle",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "repeat": 0,
+        "rounds": 2,
+        "sample_time": 0.01,
+        "type": "time",
+        "unit": "seconds",
+        "version": "9031130f84e890e92c2814eec5de8ed7fc4d72b40c4ec6bf405fecb96a567de1",
+        "warmup_time": -1
+    },
+    "benchmarks.PrtSuite.time_prt_voronoi1": {
+        "code": "class PrtSuite:\n    def time_prt_voronoi1(self):\n        from autotest.test_prt_voronoi1 import build_models, check_output\n        with TemporaryDirectory() as tmpdir:\n            test = TestFramework(\n                name=\"prt-voronoi1\",\n                workspace=tmpdir.name,\n                build=lambda t: build_models(0, t),\n                check=lambda t: check_output(0, t),\n                targets=get_targets(),\n                compare=None,\n            )\n            test.run()",
+        "min_run_count": 2,
+        "name": "benchmarks.PrtSuite.time_prt_voronoi1",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "repeat": 0,
+        "rounds": 2,
+        "sample_time": 0.01,
+        "type": "time",
+        "unit": "seconds",
+        "version": "92c4374138b4a94a9a5539eed21c0b67b485c54ae5eafac015e19450bec7befa",
+        "warmup_time": -1
+    },
+    "version": 2
+}

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from flopy.utils.binaryfile import write_budget, write_head
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["dsp01a_fmi", "dsp01b_fmi"]
 xt3d = [False, True]

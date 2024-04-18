@@ -23,8 +23,8 @@ from flopy.utils import GridIntersect
 from flopy.utils.triangle import Triangle
 from shapely.geometry import LineString
 
-from framework import TestFramework
-from prt_test_utils import get_model_name
+from autotest.framework import TestFramework
+from autotest.prt_test_utils import get_model_name
 
 simname = "prttri"
 cases = [f"{simname}r2l", f"{simname}diag"]

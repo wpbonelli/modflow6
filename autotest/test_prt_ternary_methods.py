@@ -26,9 +26,9 @@ from flopy.utils import GridIntersect
 from flopy.utils.triangle import Triangle
 from shapely.geometry import LineString
 
-from framework import TestFramework
-from prt_test_utils import get_model_name
-from test_prt_triangle import (
+from autotest.framework import TestFramework
+from autotest.prt_test_utils import get_model_name
+from autotest.test_prt_triangle import (
     active_domain,
     botm,
     build_gwf_sim,

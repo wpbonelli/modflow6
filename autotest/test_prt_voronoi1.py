@@ -32,8 +32,8 @@ from flopy.utils.voronoi import VoronoiGrid
 from modflow_devtools.misc import is_in_ci
 from shapely.geometry import LineString, Point
 
-from framework import TestFramework
-from prt_test_utils import get_model_name
+from autotest.framework import TestFramework
+from autotest.prt_test_utils import get_model_name
 
 simname = "prtvor1"
 cases = [f"{simname}l2r", f"{simname}welp", f"{simname}weli"]

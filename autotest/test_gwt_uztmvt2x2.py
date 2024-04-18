@@ -45,7 +45,7 @@ import numpy as np
 import pytest
 import flopy
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 # Base simulation and model name and workspace
 

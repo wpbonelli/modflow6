@@ -24,8 +24,8 @@ import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 
-from framework import TestFramework
-from prt_test_utils import FlopyReadmeCase, check_budget_data, check_track_data
+from autotest.framework import TestFramework
+from autotest.prt_test_utils import FlopyReadmeCase, check_budget_data, check_track_data
 
 simname = "prtexg01"
 cases = [simname, f"{simname}bnms"]

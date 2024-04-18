@@ -8,7 +8,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["gwf_ats01a"]
 nlay, nrow, ncol = 1, 1, 2

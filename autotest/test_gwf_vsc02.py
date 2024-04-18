@@ -15,7 +15,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 # Setup scenario input
 cases = ["no-vsc02-bnd", "vsc02-bnd", "no-vsc02-k"]

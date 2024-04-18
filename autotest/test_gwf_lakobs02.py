@@ -13,7 +13,7 @@ import numpy as np
 import pathlib as pl
 import pytest
 
-from framework import DNODATA, TestFramework
+from autotest.framework import DNODATA, TestFramework
 
 cases = ["lakoutlet_obs"]
 

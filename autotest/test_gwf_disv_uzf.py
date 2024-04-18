@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from flopy.utils.gridutil import get_disv_kwargs
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["disv_with_uzf"]
 nlay = 5

@@ -12,7 +12,7 @@ import flopy
 import numpy as np
 import pytest
 import math
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["sfe-conductn", "sfe-conducti", "sfe-conducto", "sfe-conductm"]
 #

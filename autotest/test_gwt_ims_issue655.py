@@ -11,7 +11,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["issue655a", "issue655b"]
 newton = [

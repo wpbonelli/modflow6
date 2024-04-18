@@ -4,7 +4,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["sfr_div"]
 inflows = np.array([10, 0, 10, 0, 10])

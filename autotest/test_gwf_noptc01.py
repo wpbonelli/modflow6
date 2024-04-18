@@ -3,7 +3,7 @@ import os
 import flopy
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["gwf_noptc01", "gwf_noptc02", "gwf_noptc03"]
 no_ptcrecords = ["FIRST", "ALL", None]

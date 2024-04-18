@@ -11,7 +11,7 @@ import pytest
 from flopy.utils.binaryfile import write_budget, write_head
 from flopy.utils.gridutil import uniform_flow_field
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["adv01a_fmi", "adv01b_fmi", "adv01c_fmi"]
 scheme = ["upstream", "central", "tvd"]

@@ -9,7 +9,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["adv01a_gwtgwt", "adv01b_gwtgwt", "adv01c_gwtgwt"]
 scheme = ["upstream", "central", "tvd"]

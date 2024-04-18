@@ -9,7 +9,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ("maw_09a", "maw_09b", "maw_09c", "maw_09d")
 dis_option = ("dis", "dis", "disv", "disv")

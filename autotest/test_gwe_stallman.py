@@ -11,7 +11,7 @@ import pytest
 import matplotlib.pyplot as plt
 import flopy
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 # Base simulation and model name and workspace
 

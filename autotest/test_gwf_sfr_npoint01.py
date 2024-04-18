@@ -4,8 +4,8 @@ import flopy
 import numpy as np
 import pytest
 
-from cross_section_functions import get_depths
-from framework import TestFramework
+from autotest.cross_section_functions import get_depths
+from autotest.framework import TestFramework
 
 paktest = "sfr"
 cases = [

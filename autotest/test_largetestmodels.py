@@ -2,8 +2,8 @@ from shutil import copytree
 
 import pytest
 
-from framework import TestFramework
-from common_regression import (
+from autotest.framework import TestFramework
+from autotest.common_regression import (
     setup_mf6,
     setup_mf6_comparison,
     get_mf6_comparison,

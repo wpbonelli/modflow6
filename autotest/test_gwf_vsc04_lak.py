@@ -20,7 +20,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["no-vsc04-lak", "vsc04-lak"]
 viscosity_on = [False, True]

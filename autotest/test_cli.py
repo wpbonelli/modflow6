@@ -1,7 +1,7 @@
 import platform
 import subprocess
 
-from conftest import project_root_path
+from autotest.conftest import project_root_path
 
 bin_path = project_root_path / "bin"
 ext = ".exe" if platform.system() == "Windows" else ""

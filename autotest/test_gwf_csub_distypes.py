@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 from flopy.utils.gridgen import Gridgen
 
-from conftest import try_get_target
-from framework import TestFramework
+from autotest.conftest import try_get_target
+from autotest.framework import TestFramework
 
 cases = ["csub_dis", "csub_disv", "csub_disu", "csub_disu01", "csub_disu02"]
 ex_dict = {name: None for name in cases}

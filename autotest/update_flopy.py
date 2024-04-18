@@ -9,7 +9,7 @@ from pathlib import Path
 import flopy
 import pytest
 
-from conftest import project_root_path
+from autotest.conftest import project_root_path
 
 dfn_path = project_root_path / "doc" / "mf6io" / "mf6ivar" / "dfn"
 fpy_path = flopy.__path__[0]

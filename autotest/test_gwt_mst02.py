@@ -8,7 +8,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["mst02a", "mst02b"]
 distcoef = [0.0, 1.0]

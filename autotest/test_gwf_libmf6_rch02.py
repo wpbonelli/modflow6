@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 from modflowapi import ModflowApi
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["libgwf_rch02"]
 

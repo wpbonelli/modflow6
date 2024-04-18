@@ -4,8 +4,8 @@ import flopy
 import numpy as np
 import pytest
 
-from cross_section_functions import calculate_rectchan_mannings_discharge
-from framework import TestFramework
+from autotest.cross_section_functions import calculate_rectchan_mannings_discharge
+from autotest.framework import TestFramework
 
 paktest = "sfr"
 cases = [

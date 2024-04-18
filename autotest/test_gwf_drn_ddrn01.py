@@ -4,7 +4,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["drn_ddrn01a", "drn_ddrn01b"]
 paktest = "drn"

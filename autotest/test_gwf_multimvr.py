@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from flopy.utils.lgrutil import Lgr
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["mltmvr", "mltmvr5050", "mltmvr7525"]
 sim_workspaces = []

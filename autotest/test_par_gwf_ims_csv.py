@@ -1,7 +1,7 @@
 import flopy
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 """
 Test for parallel MODFLOW running on two cpus.
@@ -22,7 +22,7 @@ name_right = "rightmodel"
 
 
 def update_ims(idx, ims):
-    from test_par_gwf01 import hclose, ninner, nouter, rclose
+    from autotest.test_par_gwf01 import hclose, ninner, nouter, rclose
 
     name = cases[idx]
     ims.csv_outer_output_filerecord.set_data(f"{name}.outer.csv")
@@ -31,8 +31,8 @@ def update_ims(idx, ims):
 
 
 def build_models(idx, test):
-    from test_par_gwf01 import cases as ex_ext
-    from test_par_gwf01 import get_model
+    from autotest.test_par_gwf01 import cases as ex_ext
+    from autotest.test_par_gwf01 import get_model
 
     sim = get_model(idx, test.workspace)
     update_ims(idx, sim.get_solution_package(f"{ex_ext[idx]}.ims"))
@@ -40,7 +40,7 @@ def build_models(idx, test):
 
 
 def check_output(idx, test):
-    from test_par_gwf01 import check_output as check
+    from autotest.test_par_gwf01 import check_output as check
 
     check(idx, test)
 

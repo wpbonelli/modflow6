@@ -37,8 +37,8 @@ import pytest
 from flopy.utils import PathlineFile
 from flopy.utils.binaryfile import HeadFile
 
-from framework import TestFramework
-from prt_test_utils import (
+from autotest.framework import TestFramework
+from autotest.prt_test_utils import (
     FlopyReadmeCase,
     all_equal,
     check_budget_data,

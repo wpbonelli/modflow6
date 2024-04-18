@@ -4,8 +4,8 @@ import flopy
 import numpy as np
 import pytest
 
-from conftest import project_root_path
-from framework import TestFramework
+from autotest.conftest import project_root_path
+from autotest.framework import TestFramework
 
 cases = ["csub_subwt02a", "csub_subwt02b", "csub_subwt02c", "csub_subwt02d"]
 timeseries = [True, False, True, False]

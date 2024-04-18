@@ -1,7 +1,7 @@
 import flopy
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["ts01"]
 

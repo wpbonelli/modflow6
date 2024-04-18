@@ -4,9 +4,9 @@ import flopy
 import numpy as np
 import pytest
 from flopy.utils.gridgen import Gridgen
-from conftest import try_get_target
+from autotest.conftest import try_get_target
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 dis_types = (
     "disv",

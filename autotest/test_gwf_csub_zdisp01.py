@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 from flopy.utils.compare import compare_heads
 
-from framework import TestFramework
-from conftest import try_get_target
+from autotest.framework import TestFramework
+from autotest.conftest import try_get_target
 
 cases = ["csub_zdisp01"]
 cmppth = "mfnwt"

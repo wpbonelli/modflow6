@@ -142,6 +142,8 @@ autotest/.failed
 # compiler compatibility markdown tables
 .github/compat/*.md
 
+# mac files
 **.DS_Store
+
 # pixi environments
 .pixi

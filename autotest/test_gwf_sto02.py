@@ -8,7 +8,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["gwf_sto02a", "gwf_sto02b"]
 ncols = [1, 2]

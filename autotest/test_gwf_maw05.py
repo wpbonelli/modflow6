@@ -11,7 +11,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["maw_05a", "maw_05b", "maw_05c"]
 mawstrt = [4.0, 3.5, 2.5]  # add 3.0

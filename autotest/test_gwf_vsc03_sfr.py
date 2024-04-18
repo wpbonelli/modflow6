@@ -15,7 +15,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["no-vsc-sfr01", "vsc-sfr01"]
 viscosity_on = [False, True]

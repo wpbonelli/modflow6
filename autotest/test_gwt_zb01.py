@@ -10,7 +10,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["zbud6_zb01"]
 htol = None

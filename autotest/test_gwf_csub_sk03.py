@@ -5,7 +5,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["csub_sk03a"]
 constantcv = [True for _ in range(len(cases))]

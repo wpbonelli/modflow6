@@ -4,7 +4,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["moc3d02a", "moc3d02b"]
 xt3d = [None, True]

@@ -12,7 +12,7 @@ import flopy.utils.cvfdutil
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["dsp02a", "dsp02b"]
 xt3d = [True, False]

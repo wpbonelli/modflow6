@@ -56,7 +56,7 @@ import flopy
 import numpy as np
 import matplotlib.pyplot as plt
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 # Parameters that vary by scenario
 cases = ["esl_casei", "esl_caseii", "esl_caseiii"]

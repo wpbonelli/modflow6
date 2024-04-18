@@ -5,14 +5,14 @@ from shutil import copytree
 import flopy
 import pytest
 
-from common_regression import (
+from autotest.common_regression import (
     get_namefiles,
     setup_model,
     setup_mf6,
     setup_mf6_comparison,
     get_mf6_comparison,
 )
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 excluded_models = ["alt_model", "mf2005"]
 

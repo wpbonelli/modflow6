@@ -9,7 +9,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import DNODATA, TestFramework
+from autotest.framework import DNODATA, TestFramework
 
 cases = ["lkt_02"]
 

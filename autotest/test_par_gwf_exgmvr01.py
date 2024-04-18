@@ -11,20 +11,20 @@ with a serial 'single'
 
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["par_exgmvr01"]
 
 
 def build_models(idx, test):
-    from test_gwf_exgmvr01 import build_models as build
+    from autotest.test_gwf_exgmvr01 import build_models as build
 
     sim, sim_ref = build(idx, test)
     return sim, sim_ref
 
 
 def check_output(idx, test):
-    from test_gwf_exgmvr01 import check_output as check
+    from autotest.test_gwf_exgmvr01 import check_output as check
 
     check(idx, test)
 

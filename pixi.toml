@@ -6,6 +6,7 @@ version = "6.5.0.dev2"
 
 [dependencies]
 appdirs = "*"
+asv = "*"
 filelock = "*"
 flaky = "*"
 fortran-language-server = "*"

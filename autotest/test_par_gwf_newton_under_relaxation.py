@@ -13,13 +13,13 @@ from decimal import Decimal
 
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["par_nr_ur01", "par_nr_ur02"]
 
 
 def build_petsc_db(idx, exdir):
-    from test_gwf_newton_under_relaxation import hclose, ninner
+    from autotest.test_gwf_newton_under_relaxation import hclose, ninner
 
     petsc_db_file = os.path.join(exdir, ".petscrc")
     with open(petsc_db_file, "w") as petsc_file:
@@ -33,7 +33,7 @@ def build_petsc_db(idx, exdir):
 
 
 def build_models(idx, test):
-    from test_gwf_newton_under_relaxation import build_models as build
+    from autotest.test_gwf_newton_under_relaxation import build_models as build
 
     build_petsc_db(idx, test.workspace)
     sim, dummy = build(idx, test)
@@ -41,7 +41,7 @@ def build_models(idx, test):
 
 
 def check_output(idx, test):
-    from test_gwf_newton_under_relaxation import check_output as check
+    from autotest.test_gwf_newton_under_relaxation import check_output as check
 
     check(idx, test)
 

@@ -22,7 +22,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["gwfgwf01", "gwfgwf01ifmod"]
 ifmod = [False, True]

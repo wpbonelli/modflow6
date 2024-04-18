@@ -12,7 +12,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["maw10a", "maw10b", "maw10c", "maw10d"]
 mawsetting_a = {

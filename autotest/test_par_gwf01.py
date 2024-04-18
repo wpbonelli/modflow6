@@ -16,7 +16,7 @@ import flopy
 import numpy as np
 import pytest
 
-from framework import TestFramework
+from autotest.framework import TestFramework
 
 cases = ["par_gwf01-1d", "par_gwf01-2d", "par_gwf01-3d"]
 dis_shape = [(1, 1, 5), (1, 5, 5), (5, 5, 5)]
