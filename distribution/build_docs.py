@@ -527,16 +527,16 @@ def build_documentation(
         download_and_unzip(asset["browser_download_url"], output_path, verbose=True)
 
         # download publications
-        for url in _publication_urls:
-            print(f"Downloading publication: {url}")
-            try:
-                download_and_unzip(url, path=output_path, delete_zip=False)
-                assert (output_path / url.rpartition("/")[2]).is_file()
-            except HTTPError as e:
-                if "404" in str(e):
-                    warn(f"Publication not found: {url}")
-                else:
-                    raise
+        # for url in _publication_urls:
+        #     print(f"Downloading publication: {url}")
+        #     try:
+        #         download_and_unzip(url, path=output_path, delete_zip=False)
+        #         assert (output_path / url.rpartition("/")[2]).is_file()
+        #     except HTTPError as e:
+        #         if "404" in str(e):
+        #             warn(f"Publication not found: {url}")
+        #         else:
+        #             raise
 
         # convert LaTex to PDF
         build_pdfs_from_tex(
