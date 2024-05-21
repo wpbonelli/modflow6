@@ -50,7 +50,7 @@ contains
       isize = size(array)
       newsize = isize + inclocal
       allocate(array_temp(newsize))
-      array_temp(1:isize) = array
+      array_temp(1:min(isize, newsize)) = array
       deallocate(array)
       call move_alloc(array_temp, array)
     else

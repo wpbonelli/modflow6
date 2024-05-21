@@ -457,7 +457,50 @@ contains
     ! local
     integer(I4B) :: inc
 
-      inc = this%nverts
+      inc = this%nverts - size(this%le)
+      if (inc < 0) then
+        deallocate(this%le) ! lengths of exterior (cell) edges
+        deallocate(this%unextx) ! x components of unit normals to exterior edges
+        deallocate(this%unexty) ! y components of unit normals to exterior edges
+        deallocate(this%areasub) ! subcell areas
+        deallocate(this%li) ! lengths of interior edges ("spokes")
+        deallocate(this%unintx) ! x components of unit normals to interior edges
+        deallocate(this%uninty) ! y components of unit normals to interior edges
+        deallocate(this%xmid) ! x coordinates of midpoints
+        deallocate(this%ymid) ! y coordinates of midpoints
+        deallocate(this%lm) ! lengths of midpoint connectors
+        deallocate(this%umx) ! x components of midpoint-connector (cw) unit vectors
+        deallocate(this%umy) ! y components of midpoint-connector (cw) unit vectors
+        deallocate(this%kappax) ! x components of kappa vectors
+        deallocate(this%kappay) ! y components of kappa vectors
+        deallocate(this%vm0x) ! x component of vm0
+        deallocate(this%vm0y) ! y component of vm0
+        deallocate(this%vm1x) ! x component of vm1
+        deallocate(this%vm1y) ! y component of vm1
+        deallocate(this%unextxnext) ! vector of "next" interior unit-normal x coordinates defined for convenience
+        deallocate(this%unextynext) ! vector of "next" interior unit-normal y coordinates defined for convenience
+        deallocate(this%wk1)
+        deallocate(this%wk2)
+        deallocate(this%vm0i)
+        deallocate(this%vm0e)
+        deallocate(this%vm1i)
+        deallocate(this%vm1e)
+        deallocate(this%uprod)
+        deallocate(this%det)
+        deallocate(this%wt)
+        deallocate(this%bi0x)
+        deallocate(this%be0x)
+        deallocate(this%bi0y)
+        deallocate(this%be0y)
+        deallocate(this%bi1x)
+        deallocate(this%be1x)
+        deallocate(this%bi1y)
+        deallocate(this%be1y)
+        deallocate(this%be01x)
+        deallocate(this%be01y)
+        inc = this%nverts
+      end if
+      if (inc > 0) then
       call ExpandArray(this%le, inc) ! lengths of exterior (cell) edges
       call ExpandArray(this%unextx, inc) ! x components of unit normals to exterior edges
       call ExpandArray(this%unexty, inc) ! y components of unit normals to exterior edges
@@ -498,7 +541,7 @@ contains
       call ExpandArray(this%be1y, inc)
       call ExpandArray(this%be01x, inc)
       call ExpandArray(this%be01y, inc)
-    end if
+      end if
   end subroutine reallocate_vv
 
   !> @brief Calculate vertex velocities
@@ -677,7 +720,6 @@ contains
     this%be1y = (this%unexty - this%unextynext * this%uprod) / this%det
     this%be01x = 5.d-1 * (this%be0x + this%be1x)
     this%be01y = 5.d-1 * (this%be0y + this%be1y)
-    print *, "------", this%be01x
     this%wt = this%areasub / areacell
     emxx = DTWO - sum(this%wt * this%be01x * this%unextx)
     emxy = -sum(this%wt * this%be01x * this%unexty)
