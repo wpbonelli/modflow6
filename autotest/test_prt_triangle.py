@@ -26,8 +26,6 @@ from modflow_devtools.markers import requires_pkg
 from prt_test_utils import get_model_name
 from shapely.geometry import LineString
 
-pytest_plugins = ["modflow_devtools.snapshots"]
-
 simname = "prttri"
 cases = [f"{simname}r2l", f"{simname}diag"]
 angle = 30

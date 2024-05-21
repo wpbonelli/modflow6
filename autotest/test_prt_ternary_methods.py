@@ -38,8 +38,6 @@ from test_prt_triangle import (
     top,
 )
 
-pytest_plugins = ["modflow_devtools.snapshots"]
-
 simname = "prtter"
 cases = [
     f"{simname}br",

@@ -6,7 +6,7 @@ from warnings import warn
 import pytest
 from modflow_devtools.ostags import get_binary_suffixes
 
-pytest_plugins = ["modflow_devtools.fixtures"]
+pytest_plugins = ["modflow_devtools.fixtures", "modflow_devtools.snapshots"]
 project_root_path = Path(__file__).resolve().parent.parent
 
 
@@ -106,11 +106,6 @@ def markers(pytestconfig) -> str:
     return pytestconfig.getoption("-m")
 
 
-@pytest.fixture(scope="session")
-def snapshot_disable(pytestconfig) -> bool:
-    return pytestconfig.getoption("--snapshot-disable")
-
-
 def pytest_addoption(parser):
     parser.addoption(
         "--original-regression",
@@ -123,12 +118,6 @@ def pytest_addoption(parser):
         action="store_true",
         default=False,
         help="include parallel test cases",
-    )
-    parser.addoption(
-        "--snapshot-disable",
-        action="store_true",
-        default=False,
-        help="don't compare against snapshots"
     )
 
 

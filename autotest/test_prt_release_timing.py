@@ -45,8 +45,6 @@ from prt_test_utils import (
     DEFAULT_EXIT_SOLVE_TOL,
 )
 
-pytest_plugins = ["modflow_devtools.snapshots"]
-
 simname = "prtrelt"
 cases = [
     # options block options

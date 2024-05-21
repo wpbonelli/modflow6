@@ -421,7 +421,6 @@ contains
         if (isc .le. 0) then
           print *, "error -- initial triangle not found in cell ", ic, &
             " for particle at ", particle%x, particle%y, particle%z
-
           call pstop(1)
         else
           particle%idomain(3) = isc
