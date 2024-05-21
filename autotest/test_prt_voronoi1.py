@@ -730,9 +730,10 @@ def check_output(idx, test, snapshot):
     pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
     endpts = pls[pls.ireason == 3]  # termination
 
-    # compare pathlines with snapshot. particles shouldn't
-    # have moved vertically. round for cross-platform error
-    assert snapshot == endpts.round(1).to_records(index=False)
+    if snapshot is not None:
+        # compare pathlines with snapshot. particles shouldn't
+        # have moved vertically. round for cross-platform error
+        assert snapshot == endpts.round(1).to_records(index=False)
 
     # plot results if enabled
     plot = False
@@ -742,17 +743,22 @@ def check_output(idx, test, snapshot):
         )
 
 
+@pytest.fixture
+def snapshot(array_snapshot, snapshot_disable):
+    return None if snapshot_disable else array_snapshot
+
+
 @requires_pkg("syrupy")
 @pytest.mark.slow
 @pytest.mark.parametrize("idx, name", enumerate(cases))
 def test_mf6model(
-    idx, name, function_tmpdir, targets, benchmark, array_snapshot
+    idx, name, function_tmpdir, targets, benchmark, snapshot
 ):
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
         build=lambda t: build_models(idx, t),
-        check=lambda t: check_output(idx, t, array_snapshot),
+        check=lambda t: check_output(idx, t, snapshot),
         targets=targets,
         compare=None,
     )

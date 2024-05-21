@@ -11,6 +11,7 @@ module MethodCellTernaryModule
   use TrackModule, only: TrackFileControlType
   use GeomUtilModule, only: area
   use ConstantsModule, only: DZERO, DONE, DTWO
+  use ArrayHandlersModule, only: ExpandArray
   implicit none
 
   private
@@ -40,6 +41,49 @@ module MethodCellTernaryModule
     real(DP), allocatable, dimension(:) :: xvertnext
     real(DP), allocatable, dimension(:) :: yvertnext !< arrays of shifted cell vertex coordinates
     integer(I4B), public, pointer :: zeromethod
+    ! vertvelo vars
+    real(DP), allocatable, dimension(:) :: le
+    real(DP), allocatable, dimension(:) :: unextx
+    real(DP), allocatable, dimension(:) :: unexty
+    real(DP), allocatable, dimension(:) :: areasub
+    real(DP), allocatable, dimension(:) :: li
+    real(DP), allocatable, dimension(:) :: unintx
+    real(DP), allocatable, dimension(:) :: uninty
+    real(DP), allocatable, dimension(:) :: xmid
+    real(DP), allocatable, dimension(:) :: ymid
+    real(DP), allocatable, dimension(:) :: lm
+    real(DP), allocatable, dimension(:) :: umx
+    real(DP), allocatable, dimension(:) :: umy
+    real(DP), allocatable, dimension(:) :: kappax
+    real(DP), allocatable, dimension(:) :: kappay
+    real(DP), allocatable, dimension(:) :: vm0x
+    real(DP), allocatable, dimension(:) :: vm0y
+    real(DP), allocatable, dimension(:) :: vm1x
+    real(DP), allocatable, dimension(:) :: vm1y
+    real(DP), allocatable, dimension(:) :: unextxnext
+    real(DP), allocatable, dimension(:) :: unextynext
+    real(DP), allocatable, dimension(:) :: wk1
+    real(DP), allocatable, dimension(:) :: wk2
+    real(DP), allocatable, dimension(:) :: xvals
+    real(DP), allocatable, dimension(:) :: yvals
+    ! calc_thru_hsum vars
+    real(DP), allocatable, dimension(:) :: vm0i
+    real(DP), allocatable, dimension(:) :: vm0e
+    real(DP), allocatable, dimension(:) :: vm1i
+    real(DP), allocatable, dimension(:) :: vm1e
+    real(DP), allocatable, dimension(:) :: uprod
+    real(DP), allocatable, dimension(:) :: det
+    real(DP), allocatable, dimension(:) :: wt
+    real(DP), allocatable, dimension(:) :: bi0x
+    real(DP), allocatable, dimension(:) :: be0x
+    real(DP), allocatable, dimension(:) :: bi0y
+    real(DP), allocatable, dimension(:) :: be0y
+    real(DP), allocatable, dimension(:) :: bi1x
+    real(DP), allocatable, dimension(:) :: be1x
+    real(DP), allocatable, dimension(:) :: bi1y
+    real(DP), allocatable, dimension(:) :: be1y
+    real(DP), allocatable, dimension(:) :: be01x
+    real(DP), allocatable, dimension(:) :: be01y
   contains
     procedure, public :: apply => apply_mct
     procedure, public :: deallocate => destroy_mct
@@ -48,6 +92,8 @@ module MethodCellTernaryModule
     procedure, public :: pass => pass_mct
     procedure :: vertvelo
     procedure :: calc_thru_hcsum
+    procedure :: reallocate_vv
+    procedure :: reallocate_cth
   end type MethodCellTernaryType
 
 contains
@@ -61,6 +107,8 @@ contains
     type(SubcellTriType), pointer :: subcell
 
     allocate (method)
+    allocate (method%xvals(3))
+    allocate (method%yvals(3))
     call create_cell_poly(cell)
     method%cell => cell
     method%type => method%cell%type
@@ -73,6 +121,49 @@ contains
   subroutine destroy_mct(this)
     class(MethodCellTernaryType), intent(inout) :: this
     deallocate (this%type)
+    ! vertvelo vars
+    deallocate (this%le)
+    deallocate (this%unextx)
+    deallocate (this%unexty)
+    deallocate (this%areasub)
+    deallocate (this%li)
+    deallocate (this%unintx)
+    deallocate (this%uninty)
+    deallocate (this%xmid)
+    deallocate (this%ymid)
+    deallocate (this%lm)
+    deallocate (this%umx)
+    deallocate (this%umy)
+    deallocate (this%kappax)
+    deallocate (this%kappay)
+    deallocate (this%vm0x)
+    deallocate (this%vm0y)
+    deallocate (this%vm1x)
+    deallocate (this%vm1y)
+    deallocate (this%unextxnext)
+    deallocate (this%unextynext)
+    deallocate (this%wk1)
+    deallocate (this%wk2)
+    deallocate (this%xvals)
+    deallocate (this%yvals)
+    ! calc_thru_hsum vars
+    ! deallocate (vm0i)
+    ! deallocate (vm0e)
+    ! deallocate (vm1i)
+    ! deallocate (vm1e)
+    ! deallocate (uprod)
+    ! deallocate (det)
+    ! deallocate (wt)
+    ! deallocate (bi0x)
+    ! deallocate (be0x)
+    ! deallocate (bi0y)
+    ! deallocate (be0y)
+    ! deallocate (bi1x)
+    ! deallocate (be1x)
+    ! deallocate (bi1y)
+    ! deallocate (be1y)
+    ! deallocate (be01x)
+    ! deallocate (be01y)
   end subroutine destroy_mct
 
   !> @brief Load subcell into tracking method
@@ -320,6 +411,109 @@ contains
     end select
   end subroutine load_subcell
 
+  subroutine reallocate_vv(this)
+    ! dummy
+    class(MethodCellTernaryType), intent(inout) :: this
+    ! local
+    integer(I4B) :: inc
+
+    if (allocated(this%le)) then
+      deallocate (this%le) ! lengths of exterior (cell) edges
+      deallocate (this%unextx) ! x components of unit normals to exterior edges
+      deallocate (this%unexty) ! y components of unit normals to exterior edges
+      deallocate (this%areasub) ! subcell areas
+      deallocate (this%li) ! lengths of interior edges ("spokes")
+      deallocate (this%unintx) ! x components of unit normals to interior edges
+      deallocate (this%uninty) ! y components of unit normals to interior edges
+      deallocate (this%xmid) ! x coordinates of midpoints
+      deallocate (this%ymid) ! y coordinates of midpoints
+      deallocate (this%lm) ! lengths of midpoint connectors
+      deallocate (this%umx) ! x components of midpoint-connector (cw) unit vectors
+      deallocate (this%umy) ! y components of midpoint-connector (cw) unit vectors
+      deallocate (this%kappax) ! x components of kappa vectors
+      deallocate (this%kappay) ! y components of kappa vectors
+      deallocate (this%vm0x) ! x component of vm0
+      deallocate (this%vm0y) ! y component of vm0
+      deallocate (this%vm1x) ! x component of vm1
+      deallocate (this%vm1y) ! y component of vm1
+      deallocate (this%unextxnext) ! vector of "next" interior unit-normal x coordinates defined for convenience
+      deallocate (this%unextynext) ! vector of "next" interior unit-normal y coordinates defined for convenience
+      deallocate (this%wk1)
+      deallocate (this%wk2)
+    end if
+      allocate (this%le(this%nverts)) ! lengths of exterior (cell) edges
+      allocate (this%unextx(this%nverts)) ! x components of unit normals to exterior edges
+      allocate (this%unexty(this%nverts)) ! y components of unit normals to exterior edges
+      allocate (this%areasub(this%nverts)) ! subcell areas
+      allocate (this%li(this%nverts)) ! lengths of interior edges ("spokes")
+      allocate (this%unintx(this%nverts)) ! x components of unit normals to interior edges
+      allocate (this%uninty(this%nverts)) ! y components of unit normals to interior edges
+      allocate (this%xmid(this%nverts)) ! x coordinates of midpoints
+      allocate (this%ymid(this%nverts)) ! y coordinates of midpoints
+      allocate (this%lm(this%nverts)) ! lengths of midpoint connectors
+      allocate (this%umx(this%nverts)) ! x components of midpoint-connector (cw) unit vectors
+      allocate (this%umy(this%nverts)) ! y components of midpoint-connector (cw) unit vectors
+      allocate (this%kappax(this%nverts)) ! x components of kappa vectors
+      allocate (this%kappay(this%nverts)) ! y components of kappa vectors
+      allocate (this%vm0x(this%nverts)) ! x component of vm0
+      allocate (this%vm0y(this%nverts)) ! y component of vm0
+      allocate (this%vm1x(this%nverts)) ! x component of vm1
+      allocate (this%vm1y(this%nverts)) ! y component of vm1
+      allocate (this%unextxnext(this%nverts)) ! vector of "next" interior unit-normal x coordinates defined for convenience
+      allocate (this%unextynext(this%nverts)) ! vector of "next" interior unit-normal y coordinates defined for convenience
+      allocate (this%wk1(this%nverts))
+      allocate (this%wk2(this%nverts))
+    ! end if
+    if (this%nverts > size(this%le)) then
+      inc = this%nverts - size(this%le)
+      print *, "expanding by ", inc
+      call ExpandArray(this%le, inc) ! lengths of exterior (cell) edges
+      call ExpandArray(this%unextx, inc) ! x components of unit normals to exterior edges
+      call ExpandArray(this%unexty, inc) ! y components of unit normals to exterior edges
+      call ExpandArray(this%areasub, inc) ! subcell areas
+      call ExpandArray(this%li, inc) ! lengths of interior edges ("spokes")
+      call ExpandArray(this%unintx, inc) ! x components of unit normals to interior edges
+      call ExpandArray(this%uninty, inc) ! y components of unit normals to interior edges
+      call ExpandArray(this%xmid, inc) ! x coordinates of midpoints
+      call ExpandArray(this%ymid, inc) ! y coordinates of midpoints
+      call ExpandArray(this%lm, inc) ! lengths of midpoint connectors
+      call ExpandArray(this%umx, inc) ! x components of midpoint-connector (cw) unit vectors
+      call ExpandArray(this%umy, inc) ! y components of midpoint-connector (cw) unit vectors
+      call ExpandArray(this%kappax, inc) ! x components of kappa vectors
+      call ExpandArray(this%kappay, inc) ! y components of kappa vectors
+      call ExpandArray(this%vm0x, inc) ! x component of vm0
+      call ExpandArray(this%vm0y, inc) ! y component of vm0
+      call ExpandArray(this%vm1x, inc) ! x component of vm1
+      call ExpandArray(this%vm1y, inc) ! y component of vm1
+      call ExpandArray(this%unextxnext, inc) ! vector of "next" interior unit-normal x coordinates defined for convenience
+      call ExpandArray(this%unextynext, inc) ! vector of "next" interior unit-normal y coordinates defined for convenience
+      call ExpandArray(this%wk1, inc)
+      call ExpandArray(this%wk2, inc)
+    end if
+    ! this%le = DZERO
+    ! this%unextx = DZERO
+    ! this%unexty = DZERO
+    ! this%areasub = DZERO
+    ! this%li = DZERO
+    ! this%unintx = DZERO
+    ! this%uninty = DZERO
+    ! this%xmid = DZERO
+    ! this%ymid = DZERO
+    ! this%lm = DZERO
+    ! this%umx = DZERO
+    ! this%umy = DZERO
+    ! this%kappax = DZERO
+    ! this%kappay = DZERO
+    ! this%vm0x = DZERO 
+    ! this%vm0y = DZERO
+    ! this%vm1x = DZERO
+    ! this%vm1y = DZERO
+    ! this%unextxnext = DZERO
+    ! this%unextynext = DZERO
+    ! this%wk1 = DZERO
+    ! this%wk2 = DZERO
+  end subroutine reallocate_vv
+
   !> @brief Calculate vertex velocities
   subroutine vertvelo(this)
     use ConstantsModule, only: DZERO, DONE, DHALF
@@ -329,243 +523,160 @@ contains
     real(DP) :: term
     integer(I4B) :: i
     real(DP) :: perturb
-    real(DP), allocatable, dimension(:) :: xvals
-    real(DP), allocatable, dimension(:) :: yvals
     real(DP) :: sixa
     real(DP) :: vm0i0
     real(DP) :: vm0ival
     real(DP) :: hcsum0
     real(DP) :: hcsum
     real(DP) :: jac
-    real(DP), allocatable, dimension(:) :: wk1
-    real(DP), allocatable, dimension(:) :: wk2
-    real(DP), allocatable, dimension(:) :: unextxnext
-    real(DP), allocatable, dimension(:) :: unextynext
-    real(DP), allocatable, dimension(:) :: le
-    real(DP), allocatable, dimension(:) :: unextx
-    real(DP), allocatable, dimension(:) :: unexty
     real(DP) :: areacell
-    real(DP), allocatable, dimension(:) :: areasub
     real(DP) :: divcell
-    real(DP), allocatable, dimension(:) :: li
-    real(DP), allocatable, dimension(:) :: unintx
-    real(DP), allocatable, dimension(:) :: uninty
-    real(DP), allocatable, dimension(:) :: xmid
-    real(DP), allocatable, dimension(:) :: ymid
-    real(DP), allocatable, dimension(:) :: lm
-    real(DP), allocatable, dimension(:) :: umx
-    real(DP), allocatable, dimension(:) :: umy
-    real(DP), allocatable, dimension(:) :: kappax
-    real(DP), allocatable, dimension(:) :: kappay
-    real(DP), allocatable, dimension(:) :: vm0x
-    real(DP), allocatable, dimension(:) :: vm0y
-    real(DP), allocatable, dimension(:) :: vm1x
-    real(DP), allocatable, dimension(:) :: vm1y
 
     select type (cell => this%cell)
     type is (CellPolyType)
 
-      ! Allocate local arrays
-      allocate (le(this%nverts)) ! lengths of exterior (cell) edges
-      allocate (unextx(this%nverts)) ! x components of unit normals to exterior edges
-      allocate (unexty(this%nverts)) ! y components of unit normals to exterior edges
-      allocate (areasub(this%nverts)) ! subcell areas
-      allocate (li(this%nverts)) ! lengths of interior edges ("spokes")
-      allocate (unintx(this%nverts)) ! x components of unit normals to interior edges
-      allocate (uninty(this%nverts)) ! y components of unit normals to interior edges
-      allocate (xmid(this%nverts)) ! x coordinates of midpoints
-      allocate (ymid(this%nverts)) ! y coordinates of midpoints
-      allocate (lm(this%nverts)) ! lengths of midpoint connectors
-      allocate (umx(this%nverts)) ! x components of midpoint-connector (cw) unit vectors
-      allocate (umy(this%nverts)) ! y components of midpoint-connector (cw) unit vectors
-      allocate (kappax(this%nverts)) ! x components of kappa vectors
-      allocate (kappay(this%nverts)) ! y components of kappa vectors
-      allocate (vm0x(this%nverts)) ! x component of vm0
-      allocate (vm0y(this%nverts)) ! y component of vm0
-      allocate (vm1x(this%nverts)) ! x component of vm1
-      allocate (vm1y(this%nverts)) ! y component of vm1
-      allocate (unextxnext(this%nverts)) ! vector of "next" interior unit-normal x coordinates defined for convenience
-      allocate (unextynext(this%nverts)) ! vector of "next" interior unit-normal y coordinates defined for convenience
-      allocate (wk1(this%nverts))
-      allocate (wk2(this%nverts))
-      allocate (xvals(3))
-      allocate (yvals(3))
+      call this%reallocate_vv()     
 
       ! Exterior edge unit normals (outward) and lengths
-      wk1 = this%xvertnext - this%xvert
-      wk2 = this%yvertnext - this%yvert
-      le = dsqrt(wk1 * wk1 + wk2 * wk2)
-      unextx = -wk2 / le
-      unexty = wk1 / le
+      this%wk1 = this%xvertnext - this%xvert
+      this%wk2 = this%yvertnext - this%yvert
+      this%le = dsqrt(this%wk1 * this%wk1 + this%wk2 * this%wk2)
+      this%unextx = -this%wk2 / this%le
+      this%unexty = this%wk1 / this%le
 
       ! Cell area
       areacell = area(this%xvert, this%yvert)
 
       ! Cell centroid (in general, this is NOT the average of the vertex coordinates)
       sixa = areacell * 6.d0
-      wk1 = -(this%xvert * this%yvertnext - this%xvertnext * this%yvert)
-      this%xctr = sum((this%xvert + this%xvertnext) * wk1) / sixa
-      this%yctr = sum((this%yvert + this%yvertnext) * wk1) / sixa
+      this%wk1 = -(this%xvert * this%yvertnext - this%xvertnext * this%yvert)
+      this%xctr = sum((this%xvert + this%xvertnext) * this%wk1) / sixa
+      this%yctr = sum((this%yvert + this%yvertnext) * this%wk1) / sixa
 
       ! Subcell areas
       do i = 1, this%nverts
-        xvals(1) = this%xvert(i)
-        xvals(2) = this%xvertnext(i)
-        xvals(3) = this%xctr
-        yvals(1) = this%yvert(i)
-        yvals(2) = this%yvertnext(i)
-        yvals(3) = this%yctr
-        areasub(i) = area(xvals, yvals)
+        this%xvals(1) = this%xvert(i)
+        this%xvals(2) = this%xvertnext(i)
+        this%xvals(3) = this%xctr
+        this%yvals(1) = this%yvert(i)
+        this%yvals(2) = this%yvertnext(i)
+        this%yvals(3) = this%yctr
+        this%areasub(i) = area(this%xvals, this%yvals)
       end do
 
       ! Cell-edge normal velocities (outward)
       term = DONE / (cell%defn%porosity * cell%defn%retfactor * this%dz)
       do i = 1, this%nverts
-        this%vne(i) = -cell%defn%faceflow(i) * term / le(i)
+        this%vne(i) = -cell%defn%faceflow(i) * term / this%le(i)
       end do
 
       ! Cell divergence (2D)
-      divcell = sum(le * this%vne) / areacell
+      divcell = sum(this%le * this%vne) / areacell
 
       ! Interior edge (cw) unit normals and lengths
-      wk1 = this%xvert - this%xctr
-      wk2 = this%yvert - this%yctr
-      li = dsqrt(wk1 * wk1 + wk2 * wk2)
-      unintx = wk2 / li
-      uninty = -wk1 / li
+      this%wk1 = this%xvert - this%xctr
+      this%wk2 = this%yvert - this%yctr
+      this%li = dsqrt(this%wk1 * this%wk1 + this%wk2 * this%wk2)
+      this%unintx = this%wk2 / this%li
+      this%uninty = -this%wk1 / this%li
       ! Shifted arrays for convenience
-      unextxnext = cshift(unintx, 1)
-      unextynext = cshift(uninty, 1)
+      this%unextxnext = cshift(this%unintx, 1)
+      this%unextynext = cshift(this%uninty, 1)
 
       ! Midpoints of interior edges
-      xmid = 5.d-1 * (this%xvert + this%xctr)
-      ymid = 5.d-1 * (this%yvert + this%yctr)
+      this%xmid = 5.d-1 * (this%xvert + this%xctr)
+      this%ymid = 5.d-1 * (this%yvert + this%yctr)
 
       ! Unit midpoint-connector (cw) vectors and lengths
-      wk1 = cshift(xmid, 1) - xmid
-      wk2 = cshift(ymid, 1) - ymid
-      lm = dsqrt(wk1 * wk1 + wk2 * wk2)
-      umx = wk1 / lm
-      umy = wk2 / lm
+      this%wk1 = cshift(this%xmid, 1) - this%xmid
+      this%wk2 = cshift(this%ymid, 1) - this%ymid
+      this%lm = dsqrt(this%wk1 * this%wk1 + this%wk2 * this%wk2)
+      this%umx = this%wk1 / this%lm
+      this%umy = this%wk2 / this%lm
 
       ! Kappa vectors (K tensor times unit midpoint-connector vectors) do not
       ! account for anisotropy, which is consistent with the way internal face
       ! flow calculations are done in MP7. The isotropic value of K does not
       ! matter in this case because it cancels out of the calculations, so
       ! K = 1 is assumed for simplicity.
-      kappax = umx
-      kappay = umy
+      this%kappax = this%umx
+      this%kappay = this%umy
 
       ! Use linearity to find vm0i[0] such that curl of the head gradient
       ! is zero
       perturb = 1.d-2
       ! Calculations at base value
       vm0i0 = 0.d0
-      call this%calc_thru_hcsum(vm0i0, divcell, le, li, lm, areasub, areacell, &
-                                unintx, uninty, unextx, unexty, &
-                                unextxnext, unextynext, &
-                                kappax, kappay, vm0x, vm0y, vm1x, vm1y, hcsum0)
+      call this%calc_thru_hcsum(&
+        vm0i0, &
+        divcell, &
+        areacell, &
+        hcsum0)
       ! Calculations at perturbed value
       vm0ival = vm0i0 + perturb
-      call this%calc_thru_hcsum(vm0ival, divcell, le, li, lm, areasub, areacell, &
-                                unintx, uninty, unextx, unexty, &
-                                unextxnext, unextynext, &
-                                kappax, kappay, vm0x, vm0y, vm1x, vm1y, hcsum)
+      call this%calc_thru_hcsum(&
+        vm0ival, &
+        divcell, &
+        areacell, &
+        hcsum)
       ! Calculations at root value
       jac = (hcsum - hcsum0) / perturb
       vm0ival = vm0i0 - hcsum0 / jac
-      call this%calc_thru_hcsum(vm0ival, divcell, le, li, lm, areasub, areacell, &
-                                unintx, uninty, unextx, unexty, &
-                                unextxnext, unextynext, &
-                                kappax, kappay, vm0x, vm0y, vm1x, vm1y, hcsum)
+      call this%calc_thru_hcsum(&
+        vm0ival, &
+        divcell, &
+        areacell, &
+        hcsum)
 
       ! Project linearly to get corner (vertex) velocities. Note that velocity
       ! vv1 is at the next vertex cw from vv0, so vv0(i) and vv1(i) are the
       ! two vertex velocities used by triangular subcell i.
-      this%vv0x = 2.d0 * vm0x - this%vctrx
-      this%vv0y = 2.d0 * vm0y - this%vctry
-      this%vv1x = 2.d0 * vm1x - this%vctrx
-      this%vv1y = 2.d0 * vm1y - this%vctry
+      this%vv0x = 2.d0 * this%vm0x - this%vctrx
+      this%vv0y = 2.d0 * this%vm0y - this%vctry
+      this%vv1x = 2.d0 * this%vm1x - this%vctrx
+      this%vv1y = 2.d0 * this%vm1y - this%vctry
 
       ! Set top and bottom velocities
       term = DONE / (cell%defn%retfactor * cell%defn%porosity * areacell)
       this%vzbot = cell%defn%faceflow(this%nverts + 2) * term
       this%vztop = -cell%defn%faceflow(this%nverts + 3) * term
 
-      ! Deallocate local arrays
-      deallocate (le)
-      deallocate (unextx)
-      deallocate (unexty)
-      deallocate (areasub)
-      deallocate (li)
-      deallocate (unintx)
-      deallocate (uninty)
-      deallocate (xmid)
-      deallocate (ymid)
-      deallocate (lm)
-      deallocate (umx)
-      deallocate (umy)
-      deallocate (kappax)
-      deallocate (kappay)
-      deallocate (vm0x)
-      deallocate (vm0y)
-      deallocate (vm1x)
-      deallocate (vm1y)
-      deallocate (unextxnext)
-      deallocate (unextynext)
-      deallocate (wk1)
-      deallocate (wk2)
-      deallocate (xvals)
-      deallocate (yvals)
-
     end select
   end subroutine vertvelo
 
-  subroutine calc_thru_hcsum(this, vm0ival, divcell, &
-                             le, li, lm, areasub, areacell, &
-                             unintx, uninty, unextx, unexty, &
-                             unintxnext, unintynext, &
-                             kappax, kappay, vm0x, vm0y, vm1x, vm1y, hcsum)
+  subroutine reallocate_cth(this)
+    ! dummy
+    class(MethodCellTernaryType), intent(inout) :: this
+
+    ! Allocate local arrays
+    allocate (this%vm0i(this%nverts))
+    allocate (this%vm0e(this%nverts))
+    allocate (this%vm1i(this%nverts))
+    allocate (this%vm1e(this%nverts))
+    allocate (this%uprod(this%nverts))
+    allocate (this%det(this%nverts))
+    allocate (this%wt(this%nverts))
+    allocate (this%bi0x(this%nverts))
+    allocate (this%be0x(this%nverts))
+    allocate (this%bi0y(this%nverts))
+    allocate (this%be0y(this%nverts))
+    allocate (this%bi1x(this%nverts))
+    allocate (this%be1x(this%nverts))
+    allocate (this%bi1y(this%nverts))
+    allocate (this%be1y(this%nverts))
+    allocate (this%be01x(this%nverts))
+    allocate (this%be01y(this%nverts))
+
+  end subroutine reallocate_cth
+
+  subroutine calc_thru_hcsum(this, vm0ival, divcell, areacell, hcsum)
     ! dummy
     class(MethodCellTernaryType), intent(inout) :: this
     real(DP) :: vm0ival
     real(DP) :: divcell
     real(DP) :: hcsum
-    real(DP), dimension(:) :: le
-    real(DP), dimension(:) :: li
-    real(DP), dimension(:) :: lm
-    real(DP), dimension(:) :: areasub
     real(DP) :: areacell
-    real(DP), dimension(:) :: unintx
-    real(DP), dimension(:) :: uninty
-    real(DP), dimension(:) :: unextx
-    real(DP), dimension(:) :: unexty
-    real(DP), dimension(:) :: unintxnext
-    real(DP), dimension(:) :: unintynext
-    real(DP), dimension(:) :: kappax
-    real(DP), dimension(:) :: kappay
-    real(DP), dimension(:) :: vm0x
-    real(DP), dimension(:) :: vm0y
-    real(DP), dimension(:) :: vm1x
-    real(DP), dimension(:) :: vm1y
     ! local
-    real(DP), allocatable, dimension(:) :: vm0i
-    real(DP), allocatable, dimension(:) :: vm0e
-    real(DP), allocatable, dimension(:) :: vm1i
-    real(DP), allocatable, dimension(:) :: vm1e
-    real(DP), allocatable, dimension(:) :: uprod
-    real(DP), allocatable, dimension(:) :: det
-    real(DP), allocatable, dimension(:) :: wt
-    real(DP), allocatable, dimension(:) :: bi0x
-    real(DP), allocatable, dimension(:) :: be0x
-    real(DP), allocatable, dimension(:) :: bi0y
-    real(DP), allocatable, dimension(:) :: be0y
-    real(DP), allocatable, dimension(:) :: bi1x
-    real(DP), allocatable, dimension(:) :: be1x
-    real(DP), allocatable, dimension(:) :: bi1y
-    real(DP), allocatable, dimension(:) :: be1y
-    real(DP), allocatable, dimension(:) :: be01x
-    real(DP), allocatable, dimension(:) :: be01y
     real(DP) :: emxx
     real(DP) :: emxy
     real(DP) :: emyx
@@ -576,98 +687,83 @@ contains
     integer(I4B) :: i
     integer(I4B) :: ip
 
-    ! Allocate local arrays
-    allocate (vm0i(this%nverts))
-    allocate (vm0e(this%nverts))
-    allocate (vm1i(this%nverts))
-    allocate (vm1e(this%nverts))
-    allocate (uprod(this%nverts))
-    allocate (det(this%nverts))
-    allocate (wt(this%nverts))
-    allocate (bi0x(this%nverts))
-    allocate (be0x(this%nverts))
-    allocate (bi0y(this%nverts))
-    allocate (be0y(this%nverts))
-    allocate (bi1x(this%nverts))
-    allocate (be1x(this%nverts))
-    allocate (bi1y(this%nverts))
-    allocate (be1y(this%nverts))
-    allocate (be01x(this%nverts))
-    allocate (be01y(this%nverts))
+    call this%reallocate_cth()   
 
     ! Set vm0i(1)
-    vm0i(1) = vm0ival
+    this%vm0i(1) = vm0ival
 
     ! Get remaining vm0i's sequentially using divergence conditions
     do i = 2, this%nverts
       ip = this%iprev(i)
-      vm0i(i) = (li(ip) * vm0i(ip) - le(ip) * this%vne(ip) &
-                 + areasub(ip) * divcell) / li(i)
+      this%vm0i(i) = (this%li(ip) * this%vm0i(ip) - this%le(ip) * this%vne(ip) &
+                 + this%areasub(ip) * divcell) / this%li(i)
     end do
 
     ! Get vm1i's from vm0i's using continuity conditions
-    vm1i = cshift(vm0i, 1)
+    this%vm1i = cshift(this%vm0i, 1)
 
     ! Get centroid velocity by setting up and solving 2x2 linear system
-    uprod = unintx * unextx + uninty * unexty
-    det = DONE - uprod * uprod
-    bi0x = (unintx - unextx * uprod) / det
-    be0x = (unextx - unintx * uprod) / det
-    bi0y = (uninty - unexty * uprod) / det
-    be0y = (unexty - uninty * uprod) / det
-    uprod = unintxnext * unextx + unintynext * unexty
-    det = DONE - uprod * uprod
-    bi1x = (unintxnext - unextx * uprod) / det
-    be1x = (unextx - unintxnext * uprod) / det
-    bi1y = (unintynext - unexty * uprod) / det
-    be1y = (unexty - unintynext * uprod) / det
-    be01x = 5.d-1 * (be0x + be1x)
-    be01y = 5.d-1 * (be0y + be1y)
-    wt = areasub / areacell
-    emxx = DTWO - sum(wt * be01x * unextx)
-    emxy = -sum(wt * be01x * unexty)
-    emyx = -sum(wt * be01y * unextx)
-    emyy = DTWO - sum(wt * be01y * unexty)
-    rx = sum(wt * (bi0x * vm0i + bi1x * vm1i + be01x * this%vne))
-    ry = sum(wt * (bi0y * vm0i + bi1y * vm1i + be01y * this%vne))
+    this%uprod = this%unintx * this%unextx + this%uninty * this%unexty
+    this%det = DONE - this%uprod * this%uprod
+    this%bi0x = (this%unintx - this%unextx * this%uprod) / this%det
+    this%be0x = (this%unextx - this%unintx * this%uprod) / this%det
+    this%bi0y = (this%uninty - this%unexty * this%uprod) / this%det
+    this%be0y = (this%unexty - this%uninty * this%uprod) / this%det
+    this%uprod = this%unextxnext * this%unextx + this%unextynext * this%unexty
+    this%det = DONE - this%uprod * this%uprod
+    this%bi1x = (this%unextxnext - this%unextx * this%uprod) / this%det
+    this%be1x = (this%unextx - this%unextxnext * this%uprod) / this%det
+    this%bi1y = (this%unextynext - this%unexty * this%uprod) / this%det
+    this%be1y = (this%unexty - this%unextynext * this%uprod) / this%det
+    this%be01x = 5.d-1 * (this%be0x + this%be1x)
+    this%be01y = 5.d-1 * (this%be0y + this%be1y)
+    this%wt = this%areasub / areacell
+    emxx = DTWO - sum(this%wt * this%be01x * this%unextx)
+    emxy = -sum(this%wt * this%be01x * this%unexty)
+    emyx = -sum(this%wt * this%be01y * this%unextx)
+    emyy = DTWO - sum(this%wt * this%be01y * this%unexty)
+    rx = sum(this%wt * (this%bi0x * this%vm0i + this%bi1x * this%vm1i + this%be01x * this%vne))
+    ry = sum(this%wt * (this%bi0y * this%vm0i + this%bi1y * this%vm1i + this%be01y * this%vne))
     emdet = emxx * emyy - emxy * emyx
     this%vctrx = (emyy * rx - emxy * ry) / emdet
     this%vctry = (emxx * ry - emyx * rx) / emdet
 
     ! Get vm0e's using "known" conditions
-    vm0e = 5.d-1 * (this%vne + unextx * this%vctrx + unexty * this%vctry)
+    this%vm0e = 5.d-1 * (this%vne + this%unextx * this%vctrx + this%unexty * this%vctry)
 
     ! Get vm1e's from uniformity along exterior edges
-    vm1e = vm0e
+    this%vm1e = this%vm0e
 
     ! Transform vm0 and vm1 to (x, y) coordinates
-    vm0x = bi0x * vm0i + be0x * vm0e
-    vm0y = bi0y * vm0i + be0y * vm0e
-    vm1x = bi1x * vm1i + be1x * vm0e
-    vm1y = bi1y * vm1i + be1y * vm0e
+    this%vm0x = this%bi0x * this%vm0i + this%be0x * this%vm0e
+    this%vm0y = this%bi0y * this%vm0i + this%be0y * this%vm0e
+    this%vm1x = this%bi1x * this%vm1i + this%be1x * this%vm0e
+    this%vm1y = this%bi1y * this%vm1i + this%be1y * this%vm0e
 
     ! Calculate head-cycle summation (which is proportional to
     ! the curl of the head gradient)
-    hcsum = sum(lm * (kappax * (vm0x + vm1x) + kappay * (vm0y + vm1y)))
+    hcsum = sum(this%lm * (this%kappax * &
+      (this%vm0x + this%vm1x) + &
+      this%kappay * (this%vm0y + this%vm1y)))
 
     ! Deallocate local arrays
-    deallocate (vm0i)
-    deallocate (vm0e)
-    deallocate (vm1i)
-    deallocate (vm1e)
-    deallocate (uprod)
-    deallocate (det)
-    deallocate (wt)
-    deallocate (bi0x)
-    deallocate (be0x)
-    deallocate (bi0y)
-    deallocate (be0y)
-    deallocate (bi1x)
-    deallocate (be1x)
-    deallocate (bi1y)
-    deallocate (be1y)
-    deallocate (be01x)
-    deallocate (be01y)
+    deallocate (this%vm0i)
+    deallocate (this%vm0e)
+    deallocate (this%vm1i)
+    deallocate (this%vm1e)
+    deallocate (this%uprod)
+    deallocate (this%det)
+    deallocate (this%wt)
+    deallocate (this%bi0x)
+    deallocate (this%be0x)
+    deallocate (this%bi0y)
+    deallocate (this%be0y)
+    deallocate (this%bi1x)
+    deallocate (this%be1x)
+    deallocate (this%bi1y)
+    deallocate (this%be1y)
+    deallocate (this%be01x)
+    deallocate (this%be01y)
 
   end subroutine calc_thru_hcsum
 

@@ -96,7 +96,7 @@ def try_get_target(targets: Dict[str, Path], name: str) -> Path:
         pytest.skip(f"Couldn't find binary '{name}'")
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def original_regression(request) -> bool:
     return request.config.getoption("--original-regression")
 
@@ -104,6 +104,11 @@ def original_regression(request) -> bool:
 @pytest.fixture(scope="session")
 def markers(pytestconfig) -> str:
     return pytestconfig.getoption("-m")
+
+
+@pytest.fixture(scope="session")
+def snapshot_disable(pytestconfig) -> bool:
+    return pytestconfig.getoption("--snapshot-disable")
 
 
 def pytest_addoption(parser):
@@ -119,13 +124,23 @@ def pytest_addoption(parser):
         default=False,
         help="include parallel test cases",
     )
+    parser.addoption(
+        "--snapshot-disable",
+        action="store_true",
+        default=False,
+        help="don't compare against snapshots"
+    )
 
 
-def pytest_collection_modifyitems(config, items):
-    if config.getoption("--parallel"):
-        # --parallel given in cli: do not skip parallel tests
-        return
+def skip_parallel(items):
+    """Skip parallel tests if --parallel not given in cli"""
     skip_parallel = pytest.mark.skip(reason="need --parallel option to run")
     for item in items:
         if "parallel" in item.keywords:
             item.add_marker(skip_parallel)
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--parallel"):
+        skip_parallel(items)
+    
