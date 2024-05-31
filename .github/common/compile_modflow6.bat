@@ -1,4 +1,4 @@
-set FC=ifort
+set FC=ifx
 cd "%GITHUB_WORKSPACE%\modflow6"
 pixi run setup -Dparallel=true builddir
 pixi run build builddir
