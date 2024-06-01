@@ -197,7 +197,7 @@ jobs:
         shell: bash
     env:
       FC: gfortran
-      FC_V: 13.2.0
+      FC_V: 14
     steps:
       - name: Checkout modflow6
         uses: actions/checkout@v4
