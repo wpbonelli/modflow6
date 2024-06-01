@@ -232,6 +232,12 @@ jobs:
         working-directory: modflow6
         run: pixi run install
 
+      - uses: sinoru/actions-setup-xcode@v2
+        with:
+          xcode-version: '15.3'
+          apple-id: 'wesbonelli@gmail.com'
+          apple-id-password: ${{ secrets.APPLE_ID_PASSWORD }}
+
       - name: Set LDFLAGS (macOS)
         if: matrix.os == 'macos-14'
         run: |
