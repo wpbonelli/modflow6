@@ -197,7 +197,7 @@ jobs:
         shell: bash
     env:
       FC: gfortran
-      FC_V: 12
+      FC_V: 13
     steps:
       - name: Checkout modflow6
         uses: actions/checkout@v4
@@ -234,7 +234,7 @@ jobs:
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: 14.3.1
+          xcode-version: 15.4
 
       # - name: Set LDFLAGS (macOS)
       #   if: matrix.os == 'macos-14'
