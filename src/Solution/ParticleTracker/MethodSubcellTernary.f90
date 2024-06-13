@@ -132,6 +132,7 @@ contains
     integer(I4B) :: reason
     integer(I4B) :: i
     integer(I4B) :: tslice(2)
+    integer(I4B) :: ic, isc
 
     ntmax = 10000
     isolv = particle%iexmethod
@@ -159,6 +160,11 @@ contains
     dz = subcell%dz
     vzbot = subcell%vzbot
     vztop = subcell%vztop
+
+    ic = subcell%icell
+    isc = subcell%isubcell
+
+    print *, " --- cell: ", ic, ", subcell: ", isc
 
     ! -- Transform coordinates to "canonical" configuration
     call canonical(x0, y0, x1, y1, x2, y2, &
@@ -192,6 +198,7 @@ contains
     !    todo: after initial release, consider ramifications
     if ((itopbotexit .eq. 0) .and. (itrifaceexit .eq. 0)) then
       particle%istatus = 9
+      particle%advancing = .false.
       call this%save(particle, reason=3)
       return
     end if
@@ -264,7 +271,7 @@ contains
       ! -- so set final time for particle trajectory equal to exit time.
       t = texit
       dt = dtexit
-      reason = 1 ! cell transition
+      reason = 1 ! subcell transition
     end if
 
     call calculate_xyz_position(dt, rxx, rxy, ryx, ryy, sxx, sxy, syy, &

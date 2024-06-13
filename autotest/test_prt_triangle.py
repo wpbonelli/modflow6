@@ -231,10 +231,10 @@ def build_models(idx, test):
     return gwf_sim, prt_sim
 
 
-def plot_output(name, grid, head, spdis, pls):
+def plot_output(name, gwf, head, spdis, pls):
     fig = plt.figure(figsize=(10, 10))
     ax = plt.subplot(1, 1, 1, aspect="equal")
-    pmv = flopy.plot.PlotMapView(model=grid, ax=ax)
+    pmv = flopy.plot.PlotMapView(model=gwf, ax=ax)
     pmv.plot_grid()
     pmv.plot_array(head, cmap="Blues", alpha=0.25)
     pmv.plot_vector(*spdis, normalize=True, alpha=0.25)
@@ -243,16 +243,19 @@ def plot_output(name, grid, head, spdis, pls):
         pl.plot(
             title=f"MF6 pathlines ({name})",
             kind="line",
+            linestyle="--",
+            marker='o',
+            ms=2,
             x="x",
             y="y",
             ax=ax,
             legend=False,
-            color="red" if iprp == 1 else "blue",
+            color="black",
         )
-    xc, yc = grid.get_xcellcenters_for_layer(
+    xc, yc = gwf.modelgrid.get_xcellcenters_for_layer(
         0
-    ), grid.get_ycellcenters_for_layer(0)
-    for i in range(grid.ncpl):
+    ), gwf.modelgrid.get_ycellcenters_for_layer(0)
+    for i in range(gwf.modelgrid.ncpl):
         x, y = xc[i], yc[i]
         ax.plot(x, y, "o", color="grey", alpha=0.25, ms=2)
         ax.annotate(str(i + 1), (x, y), color="grey", alpha=0.5)
@@ -283,9 +286,9 @@ def check_output(idx, test, snapshot):
     # check termination points against snapshot
     assert snapshot == endpts.round(3).to_records(index=False)
 
-    plot_debug = False
+    plot_debug = True
     if plot_debug:
-        plot_output(name, gwf.modelgrid, head, (qx, qy), pls)
+        plot_output(name, gwf, head, (qx, qy), pls)
 
     if "r2l" in name:
         assert pls.shape == (164, 16)
