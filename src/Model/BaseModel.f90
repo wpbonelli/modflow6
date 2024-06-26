@@ -1,6 +1,6 @@
 module BaseModelModule
 
-  use KindModule, only: DP, I4B
+  use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: LENMODELNAME, LINELENGTH, LENMEMPATH
   use ListModule, only: ListType
   implicit none
@@ -21,6 +21,7 @@ module BaseModelModule
     integer(I4B), pointer :: iprpak => null() !< integer flag to echo input
     integer(I4B), pointer :: iprflow => null() !< flag to print simulated flows
     integer(I4B), pointer :: ipakcb => null() !< save_flows flag
+    logical(LGP), pointer :: explicit => null() !< explicit model flag
   contains
     procedure :: model_df
     procedure :: model_ar
@@ -110,6 +111,7 @@ contains
     call mem_allocate(this%iprflow, 'IPRFLOW', this%memoryPath)
     call mem_allocate(this%ipakcb, 'IPAKCB', this%memoryPath)
     call mem_allocate(this%idsoln, 'IDSOLN', this%memoryPath)
+    call mem_allocate(this%explicit, 'EXPLICIT', this%memoryPath)
     !
     this%name = modelname
     this%macronym = ''
@@ -120,6 +122,7 @@ contains
     this%iprflow = 0
     this%ipakcb = 0
     this%inewton = 0 !default is standard formulation
+    this%explicit = .false.
   end subroutine allocate_scalars
 
   !> @brief Deallocate
@@ -142,6 +145,7 @@ contains
     call mem_deallocate(this%iprflow)
     call mem_deallocate(this%ipakcb)
     call mem_deallocate(this%idsoln)
+    call mem_deallocate(this%explicit)
   end subroutine model_da
 
   function CastAsBaseModelClass(obj) result(res)

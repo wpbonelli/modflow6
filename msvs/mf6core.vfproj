@@ -325,7 +325,6 @@
 		<File RelativePath="..\src\Model\TransportModel\tsp-ssm.f90"/>
 		<File RelativePath="..\src\Model\TransportModel\tsp.f90"/></Filter>
 		<File RelativePath="..\src\Model\BaseModel.f90"/>
-		<File RelativePath="..\src\Model\ExplicitModel.f90"/>
 		<File RelativePath="..\src\Model\NumericalModel.f90"/>
 		<File RelativePath="..\src\Model\NumericalPackage.f90"/></Filter>
 		<Filter Name="Solution">

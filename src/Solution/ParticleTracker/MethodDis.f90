@@ -131,6 +131,7 @@ contains
       ! -- If cell is active but dry, Initialize instant pass-to-bottom method
       if (this%fmi%ibdgwfsat0(ic) == 0) then
         call method_cell_ptb%init( &
+          fmi=this%fmi, &
           cell=this%cell, &
           trackfilectl=this%trackfilectl, &
           tracktimes=this%tracktimes)
@@ -138,6 +139,7 @@ contains
       else
         ! -- Otherwise initialize Pollock's method
         call method_cell_plck%init( &
+          fmi=this%fmi, &
           cell=this%cell, &
           trackfilectl=this%trackfilectl, &
           tracktimes=this%tracktimes)
@@ -435,7 +437,7 @@ contains
       n = defn%facenbr(m)
       if (n > 0) then
         q = this%fmi%gwfflowja(this%fmi%dis%con%ia(defn%icell) + n)
-        defn%faceflow(m) = q
+        defn%faceflow(m) = defn%faceflow(m) + q
       end if
       if (defn%faceflow(m) < DZERO) defn%inoexitface = 0
     end do

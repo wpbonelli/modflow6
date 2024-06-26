@@ -227,7 +227,6 @@ modflow_sources = files(
     'Model' / 'TransportModel' / 'tsp-mvt.f90',
     'Model' / 'TransportModel' / 'tsp-ssm.f90',
     'Model' / 'BaseModel.f90',
-    'Model' / 'ExplicitModel.f90',
     'Model' / 'NumericalModel.f90',
     'Model' / 'NumericalPackage.f90',
     'Solution' / 'ConvergenceSummary.f90',

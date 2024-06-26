@@ -458,7 +458,6 @@ $(OBJDIR)/blas1_d.o \
 $(OBJDIR)/Iunit.o \
 $(OBJDIR)/RectangularGeometry.o \
 $(OBJDIR)/CircularGeometry.o \
-$(OBJDIR)/ExplicitModel.o \
 $(OBJDIR)/swf-disidm.o
 
 # Define the objects that make up the program

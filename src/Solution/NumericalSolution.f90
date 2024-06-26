@@ -486,6 +486,7 @@ contains
     ! -- Go through each model and point x, ibound, and rhs to solution
     do i = 1, this%modellist%Count()
       mp => GetNumericalModelFromList(this%modellist, i)
+      if (mp%explicit) cycle
       call mp%set_xptr(this%x, this%matrix_offset, 'X', this%name)
       call mp%set_rhsptr(this%rhs, this%matrix_offset, 'RHS', this%name)
       call mp%set_iboundptr(this%active, this%matrix_offset, 'IBOUND', this%name)

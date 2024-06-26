@@ -1,8 +1,10 @@
 module TrackModule
 
   use KindModule, only: DP, I4B, LGP
-  use ConstantsModule, only: DZERO, DONE
+  use ConstantsModule, only: DZERO, DONE, DPIO180
   use ParticleModule, only: ParticleType
+  use BaseDisModule, only: DisBaseType
+  use GeomUtilModule, only: transform
 
   implicit none
 
@@ -181,10 +183,11 @@ contains
   end subroutine expand
 
   !> @brief Save record to binary or CSV file, internal use only
-  subroutine save_record(iun, particle, kper, kstp, reason, csv)
+  subroutine save_record(iun, particle, dis, kper, kstp, reason, csv)
     ! -- dummy
     integer(I4B), intent(in) :: iun
     type(ParticleType), pointer, intent(in) :: particle
+    class(DisBaseType), pointer, intent(in) :: dis
     integer(I4B), intent(in) :: kper
     integer(I4B), intent(in) :: kstp
     integer(I4B), intent(in) :: reason
@@ -193,10 +196,31 @@ contains
     real(DP) :: x
     real(DP) :: y
     real(DP) :: z
+    real(DP) :: xout, yout, zout
+    real(DP) :: xorigin, yorigin, angrot
     integer(I4B) :: status
 
-    ! -- Get model (global) coordinates
+    ! -- Convert from cell-local to model coordinates if needed
     call particle%get_model_coords(x, y, z)
+
+    ! -- Apply model grid offset/rotation if needed
+    xorigin = dis%xorigin
+    yorigin = dis%yorigin
+    angrot = dis%angrot
+    if (angrot /= DZERO .or. &
+        xorigin /= DZERO .or. &
+        yorigin /= DZERO) then
+      call transform(x, y, z, &
+                     xout, yout, zout, &
+                     xorigin, &
+                     yorigin, &
+                     DZERO, &
+                     sin(angrot * DPIO180), &
+                     cos(angrot * DPIO180), &
+                     invert=.true.)
+      x = xout
+      y = yout
+    end if
 
     ! -- Get status
     if (particle%istatus .lt. 0) then
@@ -251,10 +275,11 @@ contains
   !! any PRP-level files with PRP index matching the particle's
   !! PRP index.
   !<
-  subroutine save(this, particle, kper, kstp, reason, level)
+  subroutine save(this, particle, dis, kper, kstp, reason, level)
     ! -- dummy
     class(TrackFileControlType), intent(inout) :: this
     type(ParticleType), pointer, intent(in) :: particle
+    class(DisBaseType), pointer, intent(in) :: dis
     integer(I4B), intent(in) :: kper
     integer(I4B), intent(in) :: kstp
     integer(I4B), intent(in) :: reason
@@ -287,7 +312,7 @@ contains
       if (file%iun > 0 .and. &
           (file%iprp == -1 .or. &
            file%iprp == particle%iprp)) &
-        call save_record(file%iun, particle, &
+        call save_record(file%iun, particle, dis, &
                          kper, kstp, reason, csv=file%csv)
     end do
 

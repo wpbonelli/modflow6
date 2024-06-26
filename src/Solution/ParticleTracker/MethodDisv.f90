@@ -91,6 +91,7 @@ contains
         ! -- Cell is active but dry, so select and initialize pass-to-bottom
         ! -- cell method and set cell method pointer
         call method_cell_ptb%init( &
+          fmi=this%fmi, &
           cell=this%cell, &
           trackfilectl=this%trackfilectl, &
           tracktimes=this%tracktimes)
@@ -99,6 +100,7 @@ contains
         ! -- Select and initialize cell method and set cell method pointer
         if (particle%ifrctrn > 0) then
           call method_cell_tern%init( &
+            fmi=this%fmi, &
             cell=this%cell, &
             trackfilectl=this%trackfilectl, &
             tracktimes=this%tracktimes)
@@ -107,6 +109,7 @@ contains
           call cell_poly_to_rect(cell, rect)
           base => rect
           call method_cell_plck%init( &
+            fmi=this%fmi, &
             cell=base, &
             trackfilectl=this%trackfilectl, &
             tracktimes=this%tracktimes)
@@ -115,12 +118,14 @@ contains
           call cell_poly_to_quad(cell, quad)
           base => quad
           call method_cell_quad%init( &
+            fmi=this%fmi, &
             cell=base, &
             trackfilectl=this%trackfilectl, &
             tracktimes=this%tracktimes)
           submethod => method_cell_quad
         else
           call method_cell_tern%init( &
+            fmi=this%fmi, &
             cell=this%cell, &
             trackfilectl=this%trackfilectl, &
             tracktimes=this%tracktimes)
@@ -464,7 +469,7 @@ contains
       n = defn%facenbr(m)
       if (n > 0) then
         q = this%fmi%gwfflowja(this%fmi%dis%con%ia(defn%icell) + n)
-        defn%faceflow(m) = q
+        defn%faceflow(m) = defn%faceflow(m) + q
       end if
       if (defn%faceflow(m) < DZERO) defn%inoexitface = 0
     end do

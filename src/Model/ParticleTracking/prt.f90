@@ -155,6 +155,7 @@ contains
     this%name = modelname
     this%macronym = 'PRT'
     this%id = id
+    this%explicit = .true.
 
     ! -- Set input model namfile memory path
     input_mempath = create_mem_path(modelname, 'NAM', idm_context)
@@ -956,7 +957,7 @@ contains
           ! Get and apply the tracking method
           call this%method%apply(particle, tmax)
 
-          ! Update particle storage
+          ! Persist particle to particle store
           call packobj%particles%save_particle(particle, np)
         end do
       end select
