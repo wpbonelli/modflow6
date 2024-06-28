@@ -99,15 +99,35 @@ contains
       areax = dy * dz
       areay = dx * dz
       areaz = dx * dy
-      factor = DONE / cell%defn%retfactor
-      factor = factor / cell%defn%porosity
-      term = factor / areax
+      if (cell%defn%retfactor > DZERO) then
+        factor = DONE / cell%defn%retfactor
+      else
+        factor = DZERO
+      end if
+      if (cell%defn%porosity > DZERO) then
+        factor = factor / cell%defn%porosity
+      else
+        factor = DZERO
+      end if
+      if (areax > DZERO) then
+        term = factor / areax
+      else
+        term = DZERO
+      end if
       cell%vx1 = cell%defn%faceflow(1) * term
       cell%vx2 = -cell%defn%faceflow(3) * term
-      term = factor / areay
+      if (areay > DZERO) then
+        term = factor / areay
+      else
+        term = DZERO
+      end if
       cell%vy1 = cell%defn%faceflow(4) * term
       cell%vy2 = -cell%defn%faceflow(2) * term
-      term = factor / areaz
+      if (areaz > DZERO) then
+        term = factor / areaz
+      else
+        term = DZERO
+      end if
       cell%vz1 = cell%defn%faceflow(6) * term
       cell%vz2 = -cell%defn%faceflow(7) * term
     end select
