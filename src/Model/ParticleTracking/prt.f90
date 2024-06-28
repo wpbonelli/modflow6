@@ -857,15 +857,15 @@ contains
     call AddBndToList(this%bndlist, packobj)
   end subroutine package_create
 
-  !> @brief Check to make sure required input files have been specified
+  !> @brief Make sure required input files have been specified
   subroutine ftype_check(this, indis)
-    ! -- dummy
+    ! dummy
     class(PrtModelType) :: this
     integer(I4B), intent(in) :: indis
-    ! -- local
+    ! local
     character(len=LINELENGTH) :: errmsg
 
-    ! -- Check for DIS(u) and MIP. Stop if not present.
+    ! Check for DIS(u) and MIP. Stop if not present.
     if (indis == 0) then
       write (errmsg, '(1x,a)') &
         'Discretization (DIS6, DISV6, or DISU6) package not specified.'
@@ -876,6 +876,7 @@ contains
         'Model input (MIP6) package not specified.'
       call store_error(errmsg)
     end if
+    ! todo: prohibit IMS
 
     if (count_errors() > 0) then
       write (errmsg, '(1x,a)') 'One or more required package(s) not specified.'
@@ -884,85 +885,78 @@ contains
     end if
   end subroutine ftype_check
 
-  !> @brief Solve the model
+  !> @brief Solve the particle tracking model
   subroutine prt_solve(this)
-    ! -- modules
+    ! modules
     use TdisModule, only: kper, kstp, totimc, nper, nstp, delt
     use PrtPrpModule, only: PrtPrpType
-    ! -- dummy variables
+    ! dummy
     class(PrtModelType) :: this
-    ! -- local variables
-    integer(I4B) :: np, ip
-    class(BndType), pointer :: packobj
-    type(ParticleType), pointer :: particle
+    ! local
     real(DP) :: tmax
-    integer(I4B) :: iprp
+    integer(I4B) :: ip, ipkg, iprp
+    class(BndType), pointer :: prp
+    type(ParticleType), pointer :: particle
 
-    ! -- Initialize particle
     call create_particle(particle)
 
-    ! -- Loop over PRP packages
+    ! Loop over PRP packages
     iprp = 0
-    do ip = 1, this%bndlist%Count()
-      packobj => GetBndFromList(this%bndlist, ip)
-      select type (packobj)
+    do ipkg = 1, this%bndlist%Count()
+      prp => GetBndFromList(this%bndlist, ipkg)
+      select type (prp)
       type is (PrtPrpType)
-        ! -- Update PRP index
         iprp = iprp + 1
 
-        ! -- Initialize PRP-specific track files, if enabled
-        if (packobj%itrkout > 0) then
+        ! Initialize PRP-specific track files, if enabled
+        if (prp%itrkout > 0) then
           call this%trackfilectl%init_track_file( &
-            packobj%itrkout, &
+            prp%itrkout, &
             iprp=iprp)
         end if
-        if (packobj%itrkcsv > 0) then
+        if (prp%itrkcsv > 0) then
           call this%trackfilectl%init_track_file( &
-            packobj%itrkcsv, &
+            prp%itrkcsv, &
             csv=.true., &
             iprp=iprp)
         end if
 
-        ! -- Loop over particles in package
-        do np = 1, packobj%nparticles
-          ! -- Load particle from storage
-          call particle%load_particle(packobj%particles, &
-                                      this%id, iprp, np)
+        ! Load each particle from storage and apply the tracking method.
+        do ip = 1, prp%nparticles
+          ! Load the particle.
+          call particle%load(prp%particles, this%id, iprp, ip)
 
-          ! -- If particle is permanently unreleased, record its initial/terminal state
-          if (particle%istatus == 8) &
-            call this%method%save(particle, reason=3) ! reason=3: termination
-
-          ! If particle is inactive or not yet to be released, cycle
-          if (particle%istatus > 1) cycle
-
-          ! If particle released this time step, record its initial state
+          ! If it's permanently unreleased record the initial/terminal state.
+          ! If inactive, skip it. If just released, record the initial state.
+          if (particle%istatus > 1) then
+            if (particle%istatus == 8) &
+              call this%method%save(particle, reason=3)
+            cycle
+          end if
           particle%istatus = 1
           if (particle%trelease >= totimc) &
-            call this%method%save(particle, reason=0) ! reason=0: release
+            call this%method%save(particle, reason=0)
 
-          ! Maximum time is the end of the time step or the particle
-          ! stop time, whichever comes first, unless it's the final
-          ! time step and the extend option is on, in which case
-          ! it's just the particle stop time.
+          ! Calculate the maximum tracking time for this time step.
+          ! This time is the end of the time step or the particle's
+          ! stop time, whichever comes first, unless the simulation
+          ! is in its final time step and the extend option is true,
+          ! in which case tracking is continued until the stop time.
           if (nper == kper .and. &
               nstp(kper) == kstp .and. &
               particle%extend > 0) then
-            tmax = particle%tstop
+            tmax = particle%stoptime
           else
-            tmax = min(totimc + delt, particle%tstop)
+            tmax = min(totimc + delt, particle%stoptime)
           end if
 
-          ! Get and apply the tracking method
+          ! Apply the tracking method and update the particle store.
           call this%method%apply(particle, tmax)
-
-          ! Update particle storage
-          call packobj%particles%save_particle(particle, np)
+          call prp%particles%save(particle, ip)
         end do
       end select
     end do
 
-    ! -- Deallocate particle
     deallocate (particle)
   end subroutine prt_solve
 

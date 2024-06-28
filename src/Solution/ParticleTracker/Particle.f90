@@ -26,7 +26,7 @@ module ParticleModule
   !! Particles are identified by composite key, i.e.,
   !! combinations of properties imdl, iprp, irpt, and
   !! trelease. An optional label may be provided, but
-  !! need not be unique
+  !! need not be unique.
   !<
   type ParticleType
     private
@@ -36,9 +36,14 @@ module ParticleModule
     integer(I4B), public :: iprp !< index of release package the particle is from
     integer(I4B), public :: irpt !< index of release point the particle is from
     integer(I4B), public :: ip !< index of particle in the particle list
-    ! stop criteria
+    ! options
     integer(I4B), public :: istopweaksink !< weak sink option (0: do not stop, 1: stop)
     integer(I4B), public :: istopzone !< stop zone number
+    integer(I4B), public :: ifrctrn !< whether to force solving the particle with the ternary method
+    integer(I4B), public :: iexmethod !< method for iterative solution of particle exit location and time in generalized Pollock's method
+    integer(I4B), public :: extend !< whether to extend tracking beyond the end of the simulation
+    real(DP), public :: extol !< tolerance for iterative solution of particle exit location and time in generalized Pollock's method
+    real(DP), public :: stoptime !< stop time (max simulation time to track to)
     ! state
     integer(I4B), allocatable, public :: idomain(:) !< tracking domain hierarchy
     integer(I4B), allocatable, public :: iboundary(:) !< tracking domain boundaries
@@ -50,26 +55,27 @@ module ParticleModule
     real(DP), public :: y !< y coordinate
     real(DP), public :: z !< z coordinate
     real(DP), public :: trelease !< release time
-    real(DP), public :: tstop !< stop time
     real(DP), public :: ttrack !< time tracked so far
     real(DP), public :: xorigin !< x origin for coordinate transformation from model to local
     real(DP), public :: yorigin !< y origin for coordinate transformation from model to local
     real(DP), public :: zorigin !< z origin for coordinate transformation from model to local
-    real(DP), public :: sinrot !< sine of rotation angle for coordinate transformation from model to local
-    real(DP), public :: cosrot !< cosine of rotation angle for coordinate transformation from model to local
-    logical(LGP), public :: transformed !< whether coordinates have been transformed from model to local
-    logical(LGP), public :: advancing !< whether particle is still being tracked for current time step
-    integer(I4B), public :: ifrctrn !< whether to force solving the particle with the ternary method
-    integer(I4B), public :: iexmethod !< method for iterative solution of particle exit location and time in generalized Pollock's method
-    real(DP), public :: extol !< tolerance for iterative solution of particle exit location and time in generalized Pollock's method
-    integer(I4B), public :: extend !< whether to extend tracking beyond the end of the simulation
+    real(DP), public :: sinrot !< sine of rotation angle for local coordinate transformation
+    real(DP), public :: cosrot !< cosine of rotation angle for local coordinate transformation
+    logical(LGP), public :: transformed !< whether coordinates have been transformed to local
+    logical(LGP), public :: advancing !< whether particle is still advancing in the subdomain
   contains
     procedure, public :: get_model_coords
-    procedure, public :: load_particle
+    procedure, public :: load
     procedure, public :: transform => transform_coords
   end type ParticleType
 
-  !> @brief Structure of arrays to store particles.
+  !> @brief Structure of arrays to store particles' state.
+  !!
+  !! Only the current state of each particle is stored. The
+  !! tracking method saves pathline records to output files
+  !! as it proceeds, with no internal buffer beyond the one
+  !! maintained by the system. TODO: eager flush option?
+  !<
   type ParticleStoreType
     private
     ! identity
@@ -77,9 +83,14 @@ module ParticleModule
     integer(I4B), dimension(:), pointer, public, contiguous :: imdl !< index of model particle originated in
     integer(I4B), dimension(:), pointer, public, contiguous :: iprp !< index of release package the particle originated in
     integer(I4B), dimension(:), pointer, public, contiguous :: irpt !< index of release point in the particle release package the particle originated in
-    ! stopping criteria
+    ! options
     integer(I4B), dimension(:), pointer, public, contiguous :: istopweaksink !< weak sink option: 0 = do not stop, 1 = stop
     integer(I4B), dimension(:), pointer, public, contiguous :: istopzone !< stop zone number
+    integer(I4B), dimension(:), pointer, public, contiguous :: ifrctrn !< force ternary method
+    integer(I4B), dimension(:), pointer, public, contiguous :: iexmethod !< method for iterative solution of particle exit location and time in generalized Pollock's method
+    integer(LGP), dimension(:), pointer, public, contiguous :: extend !< whether to extend tracking beyond the end of the simulation
+    real(DP), dimension(:), pointer, public, contiguous :: extol !< tolerance for iterative solution of particle exit location and time in generalized Pollock's method
+    real(DP), dimension(:), pointer, public, contiguous :: stoptime !< particle stop time
     ! state
     integer(I4B), dimension(:, :), pointer, public, contiguous :: idomain !< array of indices for domains in the tracking domain hierarchy
     integer(I4B), dimension(:, :), pointer, public, contiguous :: iboundary !< array of indices for tracking domain boundaries
@@ -91,16 +102,12 @@ module ParticleModule
     real(DP), dimension(:), pointer, public, contiguous :: y !< model y coord of particle
     real(DP), dimension(:), pointer, public, contiguous :: z !< model z coord of particle
     real(DP), dimension(:), pointer, public, contiguous :: trelease !< particle release time
-    real(DP), dimension(:), pointer, public, contiguous :: tstop !< particle stop time
     real(DP), dimension(:), pointer, public, contiguous :: ttrack !< current tracking time
-    integer(I4B), dimension(:), pointer, public, contiguous :: ifrctrn !< force ternary method
-    integer(I4B), dimension(:), pointer, public, contiguous :: iexmethod !< method for iterative solution of particle exit location and time in generalized Pollock's method
-    real(DP), dimension(:), pointer, public, contiguous :: extol !< tolerance for iterative solution of particle exit location and time in generalized Pollock's method
-    integer(LGP), dimension(:), pointer, public, contiguous :: extend !< whether to extend tracking beyond the end of the simulation
+    
   contains
     procedure, public :: deallocate
     procedure, public :: resize
-    procedure, public :: save_particle
+    procedure, public :: save
   end type ParticleStoreType
 
 contains
@@ -132,7 +139,7 @@ contains
     call mem_allocate(this%y, np, 'PLY', mempath)
     call mem_allocate(this%z, np, 'PLZ', mempath)
     call mem_allocate(this%trelease, np, 'PLTRELEASE', mempath)
-    call mem_allocate(this%tstop, np, 'PLTSTOP', mempath)
+    call mem_allocate(this%stoptime, np, 'PLTSTOP', mempath)
     call mem_allocate(this%ttrack, np, 'PLTTRACK', mempath)
     call mem_allocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
     call mem_allocate(this%istopzone, np, 'PLISTOPZONE', mempath)
@@ -161,7 +168,7 @@ contains
     call mem_deallocate(this%y, 'PLY', mempath)
     call mem_deallocate(this%z, 'PLZ', mempath)
     call mem_deallocate(this%trelease, 'PLTRELEASE', mempath)
-    call mem_deallocate(this%tstop, 'PLTSTOP', mempath)
+    call mem_deallocate(this%stoptime, 'PLTSTOP', mempath)
     call mem_deallocate(this%ttrack, 'PLTTRACK', mempath)
     call mem_deallocate(this%istopweaksink, 'PLISTOPWEAKSINK', mempath)
     call mem_deallocate(this%istopzone, 'PLISTOPZONE', mempath)
@@ -193,7 +200,7 @@ contains
     call mem_reallocate(this%y, np, 'PLY', mempath)
     call mem_reallocate(this%z, np, 'PLZ', mempath)
     call mem_reallocate(this%trelease, np, 'PLTRELEASE', mempath)
-    call mem_reallocate(this%tstop, np, 'PLTSTOP', mempath)
+    call mem_reallocate(this%stoptime, np, 'PLTSTOP', mempath)
     call mem_reallocate(this%ttrack, np, 'PLTTRACK', mempath)
     call mem_reallocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
     call mem_reallocate(this%istopzone, np, 'PLISTOPZONE', mempath)
@@ -210,7 +217,7 @@ contains
   !! This routine is used to initialize a particle for tracking.
   !! The advancing flag and coordinate transformation are reset.
   !<
-  subroutine load_particle(this, store, imdl, iprp, ip)
+  subroutine load(this, store, imdl, iprp, ip)
     class(ParticleType), intent(inout) :: this !< particle
     type(ParticleStoreType), intent(in) :: store !< particle storage
     integer(I4B), intent(in) :: imdl !< index of model particle originated in
@@ -233,7 +240,7 @@ contains
     this%y = store%y(ip)
     this%z = store%z(ip)
     this%trelease = store%trelease(ip)
-    this%tstop = store%tstop(ip)
+    this%stoptime = store%stoptime(ip)
     this%ttrack = store%ttrack(ip)
     this%advancing = .true.
     this%idomain(1:levelmax) = &
@@ -245,10 +252,10 @@ contains
     this%iexmethod = store%iexmethod(ip)
     this%extol = store%extol(ip)
     this%extend = store%extend(ip)
-  end subroutine load_particle
+  end subroutine load
 
   !> @brief Save a particle's state to the particle store
-  subroutine save_particle(this, particle, ip)
+  subroutine save(this, particle, ip)
     class(ParticleStoreType), intent(inout) :: this !< particle storage
     type(ParticleType), intent(in) :: particle !< particle
     integer(I4B), intent(in) :: ip !< particle index
@@ -267,7 +274,7 @@ contains
     this%y(ip) = particle%y
     this%z(ip) = particle%z
     this%trelease(ip) = particle%trelease
-    this%tstop(ip) = particle%tstop
+    this%stoptime(ip) = particle%stoptime
     this%ttrack(ip) = particle%ttrack
     this%idomain( &
       ip, &
@@ -281,7 +288,7 @@ contains
     this%iexmethod(ip) = particle%iexmethod
     this%extol(ip) = particle%extol
     this%extend(ip) = particle%extend
-  end subroutine save_particle
+  end subroutine save
 
   !> @brief Apply the given global-to-local transformation to the particle.
   subroutine transform_coords(this, xorigin, yorigin, zorigin, &

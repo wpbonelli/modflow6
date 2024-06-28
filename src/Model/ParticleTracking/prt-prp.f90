@@ -460,10 +460,10 @@ contains
         particle%trelease = trelease
         ! Set stopping time to earlier of times specified by STOPTIME and STOPTRAVELTIME
         if (this%stoptraveltime == huge(1d0)) then
-          particle%tstop = this%stoptime
+          particle%stoptime = this%stoptime
         else
-          particle%tstop = particle%trelease + this%stoptraveltime
-          if (this%stoptime < particle%tstop) particle%tstop = this%stoptime
+          particle%stoptime = particle%trelease + this%stoptraveltime
+          if (this%stoptime < particle%stoptime) particle%stoptime = this%stoptime
         end if
         particle%ttrack = particle%trelease
         particle%idomain(1) = 0
@@ -478,7 +478,7 @@ contains
         particle%extend = this%extend
 
         ! -- Persist particle to particle store
-        call this%particles%save_particle(particle, np)
+        call this%particles%save(particle, np)
 
         ! -- Accumulate mass release from this point
         this%rptmass(nps) = this%rptmass(nps) + DONE
