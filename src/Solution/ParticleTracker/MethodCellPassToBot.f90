@@ -17,7 +17,6 @@ module MethodCellPassToBotModule
 
   type, extends(MethodType) :: MethodCellPassToBotType
     private
-    type(CellDefnType), pointer :: defn
   contains
     procedure, public :: apply => apply_ptb
     procedure, public :: deallocate
@@ -32,7 +31,6 @@ contains
     allocate (method%type)
     method%type = "passtobottom"
     method%delegates = .false.
-    call create_defn(method%defn)
   end subroutine create_method_cell_ptb
 
   !> @brief Deallocate the pass-to-bottom tracking method
@@ -43,18 +41,17 @@ contains
 
   !> @brief Pass particle vertically and instantaneously to the cell bottom
   subroutine apply_ptb(this, particle, tmax)
-    ! dummy
     class(MethodCellPassToBotType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
 
     ! Update particle state, terminate early if done advancing
-    call this%update(particle, this%defn)
+    call this%update(particle, this%cell%defn)
     if (.not. particle%advancing) return
 
     ! Pass the particle vertically and instantaneously to the cell bottom.
-    particle%z = this%defn%bot
-    particle%iboundary(2) = this%defn%npolyverts + 2
+    particle%z = this%cell%defn%bot
+    particle%iboundary(2) = this%cell%defn%npolyverts + 2
     call this%save(particle, reason=1)
   end subroutine apply_ptb
 
