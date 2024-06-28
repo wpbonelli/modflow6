@@ -42,15 +42,21 @@ from prt_test_utils import (
 )
 
 simname = "prtdry"
-cases = [simname]
+cases = [simname, f"{simname}newt"]
 
 
 nlay = 2
 nrow = 1
 ncol = 2
-tdis_pd = [(1., 1, 1.)]
+tdis_pd = [(1.0, 1, 1.0)]
 top = 2
-botm = [[1, 1,], [0, 0]]
+botm = [
+    [
+        1,
+        1,
+    ],
+    [0, 0],
+]
 idomain = np.ones((nlay, nrow, ncol), dtype=int)
 idomain[1, 0, 0] = 0
 
@@ -75,10 +81,15 @@ def build_gwf_sim(name, ws, mf6):
 
     # create gwf model
     gwfname = f"{name}_gwf"
-    gwf = flopy.mf6.ModflowGwf(sim, modelname=gwfname, save_flows=True)
+    gwf = flopy.mf6.ModflowGwf(
+        sim,
+        modelname=gwfname,
+        save_flows=True,
+        newtonoptions="NEWTON" if "newt" in name else None,
+    )
 
     # create gwf discretization
-    
+
     flopy.mf6.modflow.mfgwfdis.ModflowGwfdis(
         gwf,
         pname="dis",
@@ -87,7 +98,7 @@ def build_gwf_sim(name, ws, mf6):
         ncol=ncol,
         top=top,
         botm=botm,
-        idomain=idomain
+        idomain=idomain,
     )
 
     # create gwf initial conditions package
@@ -104,19 +115,12 @@ def build_gwf_sim(name, ws, mf6):
     # create wel package
     wel = flopy.mf6.ModflowGwfwel(
         gwf,
-        stress_period_data={
-            0: [[(1, 0, 1), -2., -2]]
-        },
-        auxiliary=["IFLOWFACE"]
+        stress_period_data={0: [[(1, 0, 1), -2.0, -2]]},
+        auxiliary=["IFLOWFACE"],
     )
 
     # create gwf chd package
-    chd_pd = {0:
-        [
-            [(0, 0, 0), 1.2],
-            [(0, 0, 1), 0.8]
-        ]
-    }
+    chd_pd = {0: [[(0, 0, 0), 1.2], [(0, 0, 1), 0.8]]}
     if False:
         chd_pd.append([(1, 0, 1), 0.2])
     chd = flopy.mf6.ModflowGwfchd(
@@ -137,7 +141,10 @@ def build_gwf_sim(name, ws, mf6):
     )
 
     # create iterative model solution for gwf model
-    ims = flopy.mf6.ModflowIms(sim)
+    ims = flopy.mf6.ModflowIms(
+        sim,
+        linear_acceleration="BICGSTAB" if "newt" in name else "CG",
+    )
 
     return sim
 
@@ -173,18 +180,14 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
         ncol=ncol,
         top=top,
         botm=botm,
-        idomain=idomain
+        idomain=idomain,
     )
 
     # create mip package
-    flopy.mf6.ModflowPrtmip(
-        prt, pname="mip", porosity=0.1
-    )
+    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=0.1)
 
     # create prp package
-    releasepts = [
-        (0, 0, 0, 0, 0.5, 0.5, 0.5)
-    ]
+    releasepts = [(0, 0, 0, 0, 0.5, 0.5, 0.5)]
     prp_track_file = f"{prt_name}.prp.trk"
     prp_track_csv_file = f"{prt_name}.prp.trk.csv"
     flopy.mf6.ModflowPrtprp(
@@ -198,7 +201,7 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
         trackcsv_filerecord=[prp_track_csv_file],
         exit_solve_tolerance=DEFAULT_EXIT_SOLVE_TOL,
         extend_tracking=True,
-        local_z=True
+        local_z=True,
     )
 
     # create output control package
@@ -280,7 +283,9 @@ def check_output(idx, test):
         )
 
         # plot pathline in cross section
-        pxs = flopy.plot.PlotCrossSection(modelgrid=mg, ax=ax[1], line={"row": 0})
+        pxs = flopy.plot.PlotCrossSection(
+            modelgrid=mg, ax=ax[1], line={"row": 0}
+        )
         pxs.plot_grid()
         pa = pxs.plot_array(hds, alpha=0.1, cmap="jet")
         plt.colorbar(pa, shrink=0.25)
