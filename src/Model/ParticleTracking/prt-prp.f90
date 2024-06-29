@@ -424,6 +424,8 @@ contains
     np = this%nparticles + 1
     this%nparticles = np
 
+    print *, "Releasing particle ", np
+
     ! Get user and reduced node number
     ic = this%rptnode(ip)
     icu = this%dis%get_nodeuser(ic)
@@ -483,26 +485,26 @@ contains
 
     ! Check release point is within the specified cell
     ! and not above/below grid top/bottom respectively
-    call this%fmi%dis%get_polyverts(ic, polyverts)
-    if (.not. point_in_polygon(x, y, polyverts)) then
-      write (errmsg, '(a,g0,a,g0,a,i0)') &
-        'Error: release point (x=', x, ', y=', y, ') is not in cell ', icu
-      call store_error(errmsg, terminate=.false.)
-      call store_error_unit(this%inunit, terminate=.true.)
-    end if
-    if (z > maxval(this%dis%top)) then
-      write (errmsg, '(a,g0,a,g0,a,i0)') &
-        'Error: release point (z=', z, ') is above grid top ', &
-        maxval(this%dis%top)
-      call store_error(errmsg, terminate=.false.)
-      call store_error_unit(this%inunit, terminate=.true.)
-    else if (z < minval(this%dis%bot)) then
-      write (errmsg, '(a,g0,a,g0,a,i0)') &
-        'Error: release point (z=', z, ') is below grid bottom ', &
-        minval(this%dis%bot)
-      call store_error(errmsg, terminate=.false.)
-      call store_error_unit(this%inunit, terminate=.true.)
-    end if
+    ! call this%fmi%dis%get_polyverts(ic, polyverts)
+    ! if (.not. point_in_polygon(x, y, polyverts)) then
+    !   write (errmsg, '(a,g0,a,g0,a,i0)') &
+    !     'Error: release point (x=', x, ', y=', y, ') is not in cell ', icu
+    !   call store_error(errmsg, terminate=.false.)
+    !   call store_error_unit(this%inunit, terminate=.true.)
+    ! end if
+    ! if (z > maxval(this%dis%top)) then
+    !   write (errmsg, '(a,g0,a,g0,a,i0)') &
+    !     'Error: release point (z=', z, ') is above grid top ', &
+    !     maxval(this%dis%top)
+    !   call store_error(errmsg, terminate=.false.)
+    !   call store_error_unit(this%inunit, terminate=.true.)
+    ! else if (z < minval(this%dis%bot)) then
+    !   write (errmsg, '(a,g0,a,g0,a,i0)') &
+    !     'Error: release point (z=', z, ') is below grid bottom ', &
+    !     minval(this%dis%bot)
+    !   call store_error(errmsg, terminate=.false.)
+    !   call store_error_unit(this%inunit, terminate=.true.)
+    ! end if
 
     ! Initialize the particle
     call create_particle(particle)

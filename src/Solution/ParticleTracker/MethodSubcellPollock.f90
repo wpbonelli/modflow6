@@ -251,7 +251,7 @@ contains
         z = DZERO
         if (exitFace .eq. 6) z = DONE
       else
-        particle%istatus = 5
+        particle%istatus = 10
         particle%advancing = .false.
         reason = 3
       end if

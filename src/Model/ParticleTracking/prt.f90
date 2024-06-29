@@ -926,6 +926,8 @@ contains
 
         ! -- Loop over particles in package
         do np = 1, packobj%nparticles
+          print *, "Solving particle ", np
+
           ! -- Load particle from storage
           call particle%load_particle(packobj%particles, &
                                       this%id, iprp, np)
