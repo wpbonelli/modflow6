@@ -2,7 +2,7 @@ module PrtPrpModule
   use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: DZERO, DEM1, DONE, LENFTYPE, LINELENGTH, &
                              LENBOUNDNAME, LENPAKLOC, TABLEFT, TABCENTER, &
-                             MNORMAL
+                             MNORMAL, DSAME
   use BndModule, only: BndType
   use ObsModule, only: DefaultObsIdProcessor
   use TableModule, only: TableType, table_cr
@@ -24,6 +24,8 @@ module PrtPrpModule
   use TimeSelectModule, only: TimeSelectType
   use DisModule, only: DisType
   use DisvModule, only: DisvType
+  use ErrorUtilModule, only: pstop
+  use MathUtilModule, only: is_close
 
   implicit none
 
@@ -83,7 +85,6 @@ module PrtPrpModule
     procedure :: bnd_options => prp_options
     procedure :: read_dimensions => prp_read_dimensions
     procedure :: prp_read_packagedata
-    procedure :: get_release_time
     procedure :: release
     procedure, public :: bnd_obs_supported => prp_obs_supported
     procedure, public :: bnd_df_obs => prp_df_obs
@@ -222,12 +223,12 @@ contains
     call mem_allocate(this%rptm, this%npoints, 'RPTMASS', this%memoryPath)
     call mem_allocate(this%rptnode, this%npoints, 'RPTNODER', &
                       this%memoryPath)
-    call mem_allocate(this%rlskstp, 1, 'RLSKSTP', this%memoryPath)
+    call mem_allocate(this%rlskstp, 0, 'RLSKSTP', this%memoryPath)
     call mem_allocate(this%rptname, LENBOUNDNAME, this%npoints, &
                       'RPTNAME', this%memoryPath)
 
     ! -- Initialize arrays
-    this%rlskstp(1) = 1 ! single release in first time step by default
+    ! this%rlskstp(1) = 1 ! single release in first time step by default
     do nps = 1, this%npoints
       this%rptm(nps) = DZERO
     end do
@@ -315,95 +316,91 @@ contains
   end subroutine prp_ar
 
   !> @brief Advance a time step and release particles if appropriate.
-  !!
-  !! Releases may be scheduled via a global RELEASETIME, or within a
-  !! stress period via ALL, FIRST, FREQUENCY or STEPS (with optional
-  !! FRACTION). If no release option is specified, a single release
-  !! is conducted at the first moment of the first time step of the
-  !! first stress period.
-  !<
   subroutine prp_ad(this)
     ! modules
-    use TdisModule, only: kstp
+    use TdisModule, only: kstp, totimc, delt
     ! dummy
     class(PrtPrpType) :: this
     ! local
     integer(I4B) :: ip, it
     integer(I4B) :: nparticles
-    integer(I4B) :: nreleasetimes
-    real(DP) :: trelease
+    integer(I4B) :: nconditions
+    real(DP) :: treleaseperiod
+    real(DP) :: treleaseglobal
 
-    ! Check if there's a release this time step, return early if not.
-    if (.not. ( &
-        ! all time steps?
-        this%rlsall .or. &
-        ! first time step?
-        (this%rlsfirst .and. kstp == 1) .or. &
-        ! specified time steps?
-        any(this%rlskstp == kstp) .or. &
-        ! specified release times?
-        this%rlstimes)) return
+    ! Initialize variables for a period-block release
+    ! setting and explicitly specified release time(s).
+    ! Handle these separately as the complete release
+    ! specification is their union, barring any times
+    ! which coincide (within a given tolerance).
+    treleaseperiod = -DONE
+    treleaseglobal = -DONE
 
-    ! Reset mass for this time step.
+    ! Reset mass accumulator for this time step.
     do ip = 1, this%npoints
       this%rptm(ip) = DZERO
     end do
 
-    ! Count release times and particles to be released.
-    if (this%rlstimes) then
-      nreleasetimes = size(this%releasetimes%times)
-    else
-      nreleasetimes = 1
+    ! Count release conditions. One particle is
+    ! released from each release point for each
+    ! release condition which does not coincide
+    ! with another release condition.
+    !
+    ! A release condition might be a simulation
+    ! time point specified in the options block
+    ! or a release setting in the period block.
+    !
+    ! Each release point might be thought of as
+    ! a Pez dispenser, with an arbitrary supply
+    ! of candies: any number can be released in
+    ! total but only one is released at a time.
+    nconditions = 0
+    if (this%rlsall .or. &
+        (this%rlsfirst .and. kstp == 1) .or. &
+        any(this%rlskstp == kstp)) then
+      nconditions = nconditions + 1
+      treleaseperiod = totimc + this%offset * delt
     end if
-    nparticles = this%npoints * nreleasetimes
+    if (this%rlstimes) then
+      call this%releasetimes%try_advance()
+      nconditions = nconditions + &
+        this%releasetimes%selection(2) - this%releasetimes%selection(1)
+    end if
 
-    ! Resize particle store if another set
-    ! of particles will exceed its capacity.
+    ! Return early if no releases scheduled.
+    if (nconditions == 0) return
+
+    ! Resize particle store if this set of
+    ! particles will exceed its capacity.
+    nparticles = this%npoints * nconditions
     if ((this%nparticles + nparticles) > size(this%particles%irpt)) &
       call this%particles%resize( &
       size(this%particles%irpt) + nparticles, &
       this%memoryPath)
-
+    
     ! Release a particle from each point for each
-    ! release time within the current time step.
+    ! release condition in the current time step.
     do ip = 1, this%npoints
-      do it = 1, nreleasetimes
-        call this%get_release_time(ip, it, trelease)
-        call this%release(ip, trelease)
-      end do
+      ! Period block setting: reference time as
+      ! time step start, with optional offset
+      if (treleaseperiod >= DZERO) &
+        call this%release(ip, treleaseperiod)
+      
+      ! Global release time setting
+      if (all(this%releasetimes%selection > 0)) then
+        do it = this%releasetimes%selection(1), this%releasetimes%selection(2)
+          treleaseglobal = this%releasetimes%times(it)
+          ! Skip the release time if it coincides
+          ! with the period block release setting.
+          if (is_close(treleaseperiod, treleaseglobal, atol=DSAME)) &
+            cycle
+          call this%release(ip, treleaseglobal)
+        end do
+      end if
     end do
   end subroutine prp_ad
 
-  subroutine get_release_time(this, ip, it, trelease)
-    ! modules
-    use TdisModule, only: totimc, delt, kstp, kper
-    ! dummy
-    class(PrtPrpType), intent(inout) :: this !< prp
-    integer(I4B), intent(in) :: ip !< particle index
-    integer(I4B), intent(in) :: it !< release time index
-    real(DP), intent(out) :: trelease !< release time
-    ! local
-    character(len=LINELENGTH) :: errmsg
-
-    if (this%rlstimes) then
-      ! If this is an explicitly specified release time,
-      ! make sure it falls within the current time step.
-      ! If not, warn and don't release the particle.
-      trelease = this%releasetimes%times(it)
-      if (trelease < totimc .or. trelease >= (totimc + delt)) then
-        write (errmsg, '(a,g0,a,i0,a,i0)') &
-          'Release time ', trelease, ' falls outside period ', kper, &
-          ' time step ', kstp
-        call store_error(errmsg, terminate=.false.)
-        call store_error_unit(this%inunit, terminate=.true.)
-      end if
-    else
-      ! Reference time is timestep start, optional offset
-      trelease = totimc + this%offset * delt
-    end if
-
-  end subroutine get_release_time
-
+  !> Release a particle at the given time.
   subroutine release(this, ip, trelease)
     ! dummy
     class(PrtPrpType), intent(inout) :: this !< prp
@@ -438,7 +435,7 @@ contains
       z = this%rptz(ip)
     end if
 
-    ! Calculate user node number
+    ! Get user node number
     icu = this%dis%get_nodeuser(ic)
 
     ! Check release point is within the specified cell
@@ -588,11 +585,12 @@ contains
       end if
     end if
 
-    ! -- If no period data for the simulation default to single
-    !    release at beginning of first period's first time step.
-    !    Otherwise read release timing settings from the period
-    !    data block of the package input file.
-    if (noperiodblocks) then
+    ! -- If no period data for the simulation and no specified
+    !    release times, default to a single release time at the
+    !    start of first period's first time step. Otherwise read
+    !    release timing settings from the period data block of the
+    !    package input file.
+    if (noperiodblocks .and. size(this%releasetimes%times) == 0) then
       if (kper == 1) then
         call mem_reallocate(this%rlskstp, 1, &
                             "RLSKSTP", this%memoryPath)
