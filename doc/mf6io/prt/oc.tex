@@ -4,6 +4,14 @@ Output Control data must be specified using words.  The numeric codes supported 
 
 For the PRINT and SAVE options, there is no option to specify individual layers.  Whenever the budget array is printed or saved, all layers are printed or saved.
 
+\subsection{Tracking Events}
+
+The Particle Tracking Model distinguishes a number of tracking events to report in binary and/or CSV output files. Each event corresponds to an IREASON value which indicates the reason the particle track record was saved. IREASON codes are enumerated in the Particle Track Output subsection of the Particle Tracking Model Input and Output section.
+
+The Output Control package provides a keyword option corresponding to each tracking event. These are named TRACK\_\ldots, where the ellipsis is replaced by the event name. If no tracking event keywords are provided, reporting is enabled for all tracking events. If any tracking event keywords are provided, only the selected events are reported. This mechanism can be used to filter out events which are not of interest, limiting the size of output files and potentially accelerating the program's runtime due to reduced file IO.
+
+For instance, to configure PRT for an endpoint analysis, provide the TRACK\_RELEASE and TRACK\_TERMINATE keywords. To configure PRT for a timeseries analysis, provide the TRACK\_USERTIME keyword as well as a tracking time selection via TRACK\_TIMES or TRACK\_TIMESFILE.
+
 \vspace{5mm}
 \subsubsection{Structure of Blocks}
 \vspace{5mm}
