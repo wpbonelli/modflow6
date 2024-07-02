@@ -1,32 +1,4 @@
-!> @brief This module contains the PrintSaveManagerModule
-!!
-!! This module defines the PrintSaveManagerType, which can be used
-!! to determine when something should be printed and/or saved. The
-!! object should be initiated with the following call:
-!!   call psm_obj%init()
-!!
-!! The set method will configure the members based on the following
-!! keywords when set is called as follows:
-!!   call psm_obj%set(nstp, line)
-!! where line may be in the following form:
-!!   PRINT ALL
-!!   PRINT STEPS 1 4 5 6
-!!   PRINT FIRST
-!!   PRINT LAST
-!!   PRINT FREQUENCY 4
-!!   SAVE ALL
-!!   SAVE STEPS 1 4 5 6
-!!   SAVE FIRST
-!!   SAVE LAST
-!!   SAVE FREQUENCY 4
-!!
-!! Based on the keywords, the object can be called with
-!!   psm_obj%time_to_print(kstp, kper)
-!!   psm_obj%time_to_save(kstp, kper)
-!! to return a logical flag indicating whether or not it
-!! it is time to print or time to save
-!!
-!<
+!> @brief Print/save manager module.
 module PrintSaveManagerModule
 
   use KindModule, only: DP, I4B, LGP
@@ -34,29 +6,42 @@ module PrintSaveManagerModule
   use SimVariablesModule, only: errmsg
   use SimModule, only: store_error
   use InputOutputModule, only: urword
+  use PeriodBlockTimingModule, only: PeriodBlockTimingType
 
   implicit none
   private
   public :: PrintSaveManagerType
 
-  !> @ brief PrintSaveManagerType
+  !> @brief Print/save manager type.
   !!
-  !!  Object for storing information and determining whether or
-  !!  not data should be printed to a list file or saved to disk.
+  !! Stores user settings as configured in an input file's period block
+  !! and determines whether data should be printed to a list (log) file
+  !! or saved to disk.
+  !!
+  !! The object should be initiated with the init() procedure.
+  !!
+  !! The rp() procedure will read a character string and configure the
+  !! manager, where the character string may be of the following form:
+  !!
+  !!   PRINT ALL
+  !!   PRINT STEPS 1 4 5 6
+  !!   PRINT FIRST
+  !!   PRINT LAST
+  !!   PRINT FREQUENCY 4
+  !!   SAVE ALL
+  !!   SAVE STEPS 1 4 5 6
+  !!   SAVE FIRST
+  !!   SAVE LAST
+  !!   SAVE FREQUENCY 4
+  !!
+  !! The time_to_print() and time_to_save() functions indicate whether
+  !! to save or print during the current time step.
   !<
   type :: PrintSaveManagerType
-    integer(I4B), allocatable, dimension(:) :: kstp_list_print
-    integer(I4B), allocatable, dimension(:) :: kstp_list_save
-    integer(I4B) :: ifreq_print
-    integer(I4B) :: ifreq_save
-    logical :: print_first
-    logical :: save_first
-    logical :: print_last
-    logical :: save_last
-    logical :: print_all
-    logical :: save_all
-    logical :: save_detected
-    logical :: print_detected
+    type(PeriodBlockTimingType) :: save_timing
+    type(PeriodBlockTimingType) :: print_timing
+    logical(LGP) :: save_detected
+    logical(LGP) :: print_detected
   contains
     procedure :: init
     procedure :: rp
@@ -66,41 +51,17 @@ module PrintSaveManagerModule
 
 contains
 
-  !> @ brief Initialize PrintSaveManager
-  !!
-  !!  Initializes variables of a PrintSaveManagerType
-  !!
-  !<
+  !> @brief (Re-)initialize the manager.
   subroutine init(this)
-    ! -- dummy
-    class(PrintSaveManagerType) :: this !< psm object to initialize
-    !
-    ! -- Initialize members to their defaults
-    if (allocated(this%kstp_list_print)) deallocate (this%kstp_list_print)
-    if (allocated(this%kstp_list_save)) deallocate (this%kstp_list_save)
-    allocate (this%kstp_list_print(0))
-    allocate (this%kstp_list_save(0))
-    this%ifreq_print = 0
-    this%ifreq_save = 0
-    this%save_first = .false.
-    this%save_last = .false.
-    this%save_all = .false.
-    this%print_first = .false.
-    this%print_last = .false.
-    this%print_all = .false.
+    class(PrintSaveManagerType) :: this !< this instance
+    
+    call this%save_timing%init()
+    call this%print_timing%init()
     this%save_detected = .false.
     this%print_detected = .false.
-    !
-    ! -- return
-    return
   end subroutine init
 
-  !> @ brief Read and prepare for PrintSaveManager
-  !!
-  !!  Parse information in the line and assign settings for the
-  !!  PrintSaveManagerType.
-  !!
-  !<
+  !> @ brief Read a line of input and prepare the manager.
   subroutine rp(this, linein, iout)
     ! -- dummy
     class(PrintSaveManagerType) :: this !< psm object
@@ -117,14 +78,11 @@ contains
       &"(6x,'THE FOLLOWING STEPS WILL BE ',A,': ',50(I0,' '))"
     character(len=*), parameter :: fmt_freq = &
       &"(6x,'THE FOLLOWING FREQUENCY WILL BE ',A,': ',I0)"
-    !
-    ! -- Set the values based on line
-    ! -- Get keyword to use in assignment
+    
     line(:) = linein(:)
     lloc = 1
     call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-    !
-    ! -- set dimension for print or save
+    
     lp = .false.
     ls = .false.
     select case (line(istart:istop))
@@ -137,45 +95,30 @@ contains
         'Looking for PRINT or SAVE. Found:', trim(adjustl(line))
       call store_error(errmsg, terminate=.TRUE.)
     end select
-    !
-    ! -- set member variables
+    
     this%save_detected = ls
     this%print_detected = lp
-    !
-    ! -- set the steps to print or save
-    call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-    select case (line(istart:istop))
-    case ('ALL')
-      if (lp) then
-        this%print_all = .true.
-        if (iout > 0) write (iout, "(6x,a)") 'ALL TIME STEPS WILL BE PRINTED'
-      end if
-      if (ls) then
-        this%save_all = .true.
-        if (iout > 0) write (iout, "(6x,a)") 'ALL TIME STEPS WILL BE SAVED'
-      end if
-    case ('STEPS')
-      listsearch: do
-        call urword(line, lloc, istart, istop, 2, ival, rval, -1, 0)
-        if (ival > 0) then
-          if (lp) then
-            n = size(this%kstp_list_print)
-            call expandarray(this%kstp_list_print)
-            this%kstp_list_print(n + 1) = ival
-          end if
-          if (ls) then
-            n = size(this%kstp_list_save)
-            call expandarray(this%kstp_list_save)
-            this%kstp_list_save(n + 1) = ival
-          end if
-          cycle listsearch
-        end if
-        exit listsearch
-      end do listsearch
+
+    if (lp) then
+      call this%print_timing%read(line(istop:))
       if (iout > 0) then
-        if (lp) write (iout, fmt_steps) 'PRINTED', this%kstp_list_print
-        if (ls) write (iout, fmt_steps) 'SAVED', this%kstp_list_save
+        if (this%print_timing%all) then
+          write (iout, "(6x,a)") 'ALL TIME STEPS WILL BE PRINTED'
+        else if (this%print_timing%first) then
+          write (iout, "(6x,a)") 'THE FIRST TIME STEP WILL BE PRINTED'
+        else if (this%print_timing%last) then
+          write (iout, "(6x,a)") 'THE LAST TIME STEP WILL BE PRINTED'
+        else if (size(this%print_timing%kstp) > 0) then
+          write (iout, fmt_steps) 'PRINTED', this%print_timing%kstp
+        else if (this%print_timing%freq > 0) then
+          write (iout, fmt_freq) 'PRINTED', this%print_timing%freq
+        end if
       end if
+    else
+      call this%save_timing%read(line(istop:))
+    end if
+
+    ! -- set the steps to print or save
     case ('FREQUENCY')
       call urword(line, lloc, istart, istop, 2, ival, rval, -1, 0)
       if (lp) this%ifreq_print = ival
@@ -183,24 +126,6 @@ contains
       if (iout > 0) then
         if (lp) write (iout, fmt_freq) 'PRINTED', this%ifreq_print
         if (ls) write (iout, fmt_freq) 'SAVED', this%ifreq_save
-      end if
-    case ('FIRST')
-      if (lp) then
-        this%print_first = .true.
-        if (iout > 0) write (iout, "(6x,a)") 'THE FIRST TIME STEP WILL BE PRINTED'
-      end if
-      if (ls) then
-        this%save_first = .true.
-        if (iout > 0) write (iout, "(6x,a)") 'THE FIRST TIME STEP WILL BE SAVED'
-      end if
-    case ('LAST')
-      if (lp) then
-        this%print_last = .true.
-        if (iout > 0) write (iout, "(6x,a)") 'THE LAST TIME STEP WILL BE PRINTED'
-      end if
-      if (ls) then
-        this%save_last = .true.
-        if (iout > 0) write (iout, "(6x,a)") 'THE LAST TIME STEP WILL BE SAVED'
       end if
     case default
       write (errmsg, '(2a)') &

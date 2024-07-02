@@ -46,7 +46,8 @@ contains
   !> @brief Initialize or clear the time selection object.
   subroutine init(this)
     class(TimeSelectType) :: this
-    if (.not. allocated(this%times)) allocate (this%times(0))
+    if (allocated(this%times)) deallocate (this%times)
+    allocate (this%times(0))
     this%selection = (/0, 0/)
   end subroutine
 
