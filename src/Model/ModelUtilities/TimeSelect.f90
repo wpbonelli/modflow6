@@ -29,7 +29,7 @@ module TimeSelectModule
 
 contains
 
-  !> @brief Destroy the time selection object.
+  !> @brief Deallocate the time selection object.
   subroutine deallocate (this)
     class(TimeSelectType) :: this
     deallocate (this%times)

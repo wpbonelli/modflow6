@@ -176,7 +176,7 @@ contains
       ! -- Clear io flags
       do ipos = 1, size(this%ocdobj)
         ocdobjptr => this%ocdobj(ipos)
-        call ocdobjptr%psmobj%init()
+        call ocdobjptr%psm%init()
       end do
       !
       ! -- Output control time step matches simulation time step.
@@ -215,7 +215,7 @@ contains
           call this%parser%StoreErrorUnit()
         end if
         call this%parser%GetRemainingLine(line)
-        call ocdobjptr%psmobj%rp(trim(printsave)//' '//line, &
+        call ocdobjptr%psm%rp(trim(printsave)//' '//line, &
                                  this%iout)
         call ocdobjptr%ocd_rp_check(this%parser%iuactive)
         !
@@ -422,7 +422,7 @@ contains
       end if
     end do
     if (found) then
-      oc_save = ocdobjptr%psmobj%kstp_to_save(kstp, endofperiod)
+      oc_save = ocdobjptr%psm%should_save(kstp, endofperiod)
     end if
     !
     ! -- Return
@@ -455,7 +455,7 @@ contains
       end if
     end do
     if (found) then
-      oc_print = ocdobjptr%psmobj%kstp_to_print(kstp, endofperiod)
+      oc_print = ocdobjptr%psm%should_print(kstp, endofperiod)
     end if
     !
     ! -- Return

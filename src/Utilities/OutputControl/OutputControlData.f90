@@ -1,11 +1,4 @@
-!> @brief This module contains the OutputControlDataModule
-!!
-!! This module defines the OutputControlDataType.  This type
-!! can be assigned to different model variables, such as head
-!! or concentration.  The variables are then printed and/or
-!! saved in a consistent manner.
-!!
-!<
+!> @brief Output control data module.
 module OutputControlDataModule
 
   use BaseDisModule, only: DisBaseType
@@ -17,10 +10,11 @@ module OutputControlDataModule
   private
   public OutputControlDataType, ocd_cr
 
-  !> @ brief OutputControlDataType
+  !> @brief Output control data type.
   !!
-  !!  Object for storing information and determining whether or
-  !!  not model data should be printed to a list file or saved to disk.
+  !! Determines whether output data should be printed to a list file or saved to disk.
+  !! This type can be assigned to different variables, such as head or concentration.
+  !! This type controls the logging and saving of output data in a consistent manner.
   !<
   type OutputControlDataType
     character(len=16), pointer :: cname => null() !< name of variable, such as HEAD
@@ -31,10 +25,10 @@ module OutputControlDataModule
     integer(I4B), pointer :: nwidthp => null() !< width of the number for printing
     real(DP), pointer :: dnodata => null() !< no data value
     integer(I4B), pointer :: inodata => null() !< integer no data value
-    real(DP), dimension(:), pointer, contiguous :: dblvec => null() !< pointer to double precision data array
-    integer(I4B), dimension(:), pointer, contiguous :: intvec => null() !< pointer to integer data array
-    class(DisBaseType), pointer :: dis => null() !< pointer to discretization package
-    type(PrintSaveManagerType), pointer :: psmobj => null() !< print/save manager object
+    real(DP), dimension(:), pointer, contiguous :: dblvec => null() !< double precision data array
+    integer(I4B), dimension(:), pointer, contiguous :: intvec => null() !< integer data array
+    class(DisBaseType), pointer :: dis => null() !< discretization package
+    type(PrintSaveManagerType), pointer :: psm => null() !< print/save manager
   contains
     procedure :: allocate_scalars
     procedure :: init_int
@@ -47,46 +41,31 @@ module OutputControlDataModule
 
 contains
 
-  !> @ brief Create OutputControlDataType
-  !!
-  !!  Create by allocating a new OutputControlDataType object
-  !!
-  !<
+  !> @ brief Create a new output control data type.
   subroutine ocd_cr(ocdobj)
-    ! -- dummy
-    type(OutputControlDataType), pointer :: ocdobj !< OutputControlDataType object
-    !
-    ! -- Create the object
+    type(OutputControlDataType), pointer :: ocdobj !< this instance
+    
     allocate (ocdobj)
-    !
-    ! -- Allocate scalars
     call ocdobj%allocate_scalars()
-    !
-    ! -- Return
-    return
   end subroutine ocd_cr
 
-  !> @ brief Check OutputControlDataType object
-  !!
-  !!  Perform a consistency check
-  !!
-  !<
+  !> @ brief Check the output control data type for consistency.
   subroutine ocd_rp_check(this, inunit)
     ! -- modules
     use ConstantsModule, only: LINELENGTH
     use SimModule, only: store_error, count_errors, store_error_unit
     ! -- dummy
-    class(OutputControlDataType) :: this !< OutputControlDataType object
-    integer(I4B), intent(in) :: inunit !< Unit number for input
+    class(OutputControlDataType) :: this !< this instance
+    integer(I4B), intent(in) :: inunit !< output unit number
     ! -- locals
     character(len=LINELENGTH) :: errmsg
     ! -- formats
     character(len=*), parameter :: fmtocsaveerr = &
       "(1X,'REQUESTING TO SAVE ',A,' BUT ',A,' SAVE FILE NOT SPECIFIED. ', &
        &A,' SAVE FILE MUST BE SPECIFIED IN OUTPUT CONTROL OPTIONS.')"
-    !
-    ! -- Check to make sure save file was specified
-    if (this%psmobj%save_detected) then
+    
+    ! If saving is enabled, make sure an output file was specified
+    if (this%psm%save_steps%any_selected()) then
       if (this%idataun == 0) then
         write (errmsg, fmtocsaveerr) trim(adjustl(this%cname)), &
           trim(adjustl(this%cname)), &
@@ -94,21 +73,13 @@ contains
         call store_error(errmsg)
       end if
     end if
-    !
+    
     if (count_errors() > 0) then
       call store_error_unit(inunit)
     end if
-    !
-    ! -- return
-    return
   end subroutine ocd_rp_check
 
-  !> @ brief Output data
-  !!
-  !!  Depending on the settings, print the data to a listing file and/or
-  !!  save the data to a binary file.
-  !!
-  !<
+  !> @brief Write to list file and/or save to binary file, depending on settings.
   subroutine ocd_ot(this, ipflg, kstp, endofperiod, iout, iprint_opt, isav_opt)
     ! -- dummy
     class(OutputControlDataType) :: this !< OutputControlDataType object
@@ -121,63 +92,52 @@ contains
     ! -- local
     integer(I4B) :: iprint
     integer(I4B) :: idataun
-    !
-    ! -- initialize
+    
+    ! Initialize
     iprint = 0
     ipflg = 0
     idataun = 0
-    !
-    ! -- Determine whether or not to print the array.  The present
-    !    check allows a caller to override the print/save manager
+    
+    ! Determine whether or not to print the array.  The present
+    ! check allows a caller to override the print/save manager
     if (present(iprint_opt)) then
       if (iprint_opt /= 0) then
         iprint = 1
         ipflg = 1
       end if
     else
-      if (this%psmobj%kstp_to_print(kstp, endofperiod)) then
+      if (this%psm%should_print(kstp, endofperiod)) then
         iprint = 1
         ipflg = 1
       end if
     end if
-    !
-    ! -- determine whether or not to save the array to a file
+    
+    ! Determine whether to save the array to a file
     if (present(isav_opt)) then
       if (isav_opt /= 0) then
         idataun = this%idataun
       end if
     else
-      if (this%psmobj%kstp_to_save(kstp, endofperiod)) idataun = this%idataun
+      if (this%psm%should_save(kstp, endofperiod)) idataun = this%idataun
     end if
-    !
-    ! -- Record double precision array
+    
+    ! Record double precision array
     if (associated(this%dblvec)) &
       call this%dis%record_array(this%dblvec, iout, iprint, idataun, &
                                  this%cname, this%cdatafmp, this%nvaluesp, &
                                  this%nwidthp, this%editdesc, this%dnodata)
-    !
-    ! -- Record integer array (not supported yet)
+    
+    ! Record integer array (not supported yet)
     !if(associated(this%intvec)) &
     !call this%dis%record_array(this%intvec, iout, iprint, idataun, &
     !                               this%cname, this%cdatafmp, this%nvaluesp, &
     !                               this%nwidthp, this%editdesc, this%inodata)
-    !
-    ! -- Return
-    return
   end subroutine ocd_ot
 
-  !> @ brief Deallocate OutputControlDataType
-  !!
-  !!  Deallocate members of this type
-  !!
-  !<
+  !> @brief Deallocate the output control data type
   subroutine ocd_da(this)
-    ! -- modules
-    use ConstantsModule, only: DZERO
-    ! -- dummy
     class(OutputControlDataType) :: this
-    !
-    ! -- deallocate
+    
     deallocate (this%cname)
     deallocate (this%cdatafmp)
     deallocate (this%idataun)
@@ -186,10 +146,7 @@ contains
     deallocate (this%nwidthp)
     deallocate (this%dnodata)
     deallocate (this%inodata)
-    deallocate (this%psmobj)
-    !
-    ! -- return
-    return
+    deallocate (this%psm)
   end subroutine ocd_da
 
   !> @ brief Initialize this OutputControlDataType as double precision data
@@ -213,8 +170,8 @@ contains
     this%dblvec => dblvec
     this%dis => dis
     this%dnodata = dnodata
-    call this%psmobj%init()
-    if (cdefpsm /= '') call this%psmobj%rp(cdefpsm, iout)
+    call this%psm%init()
+    if (cdefpsm /= '') call this%psm%rp(cdefpsm, iout)
     call print_format(cdeffmp, this%cdatafmp, &
                       this%editdesc, this%nvaluesp, this%nwidthp, 0)
     !
@@ -244,8 +201,8 @@ contains
     this%dis => dis
     this%inodata = inodata
     this%editdesc = 'I'
-    call this%psmobj%init()
-    if (cdefpsm /= '') call this%psmobj%rp(cdefpsm, iout)
+    call this%psm%init()
+    if (cdefpsm /= '') call this%psm%rp(cdefpsm, iout)
     call print_format(cdeffmp, this%cdatafmp, this%editdesc, this%nvaluesp, &
                       this%nwidthp, 0)
     !
@@ -272,7 +229,7 @@ contains
     allocate (this%nwidthp)
     allocate (this%dnodata)
     allocate (this%inodata)
-    allocate (this%psmobj)
+    allocate (this%psm)
     !
     this%cname = ''
     this%cdatafmp = ''

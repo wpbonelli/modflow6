@@ -1,6 +1,6 @@
-module TestPeriodBlockTiming
+module TestTimeStepSelectModule
   use testdrive, only: error_type, unittest_type, new_unittest, check
-  use PeriodBlockTimingModule, only: PeriodBlockTimingType
+  use TimeStepSelectModule, only: TimeStepSelectType
   use ConstantsModule, only: LINELENGTH
 
   implicit none
@@ -22,107 +22,107 @@ contains
 
   subroutine test_first(error)
     type(error_type), allocatable, intent(out) :: error
-    type(PeriodBlockTimingType) :: timing
+    type(TimeStepSelectType) :: steps
     character(len=LINELENGTH) :: line
 
     line = "FIRST"
 
-    call timing%init()
-    call timing%read(line)
+    call steps%init()
+    call steps%read(line)
 
-    call check(error, timing%is_active(0, .false.))
+    call check(error, steps%is_selected(0, .false.))
     if (allocated(error)) return
 
-    call check(error, .not. timing%is_active(1, .false.))
+    call check(error, .not. steps%is_selected(1, .false.))
     if (allocated(error)) return
 
   end subroutine test_first
 
   subroutine test_last(error)
     type(error_type), allocatable, intent(out) :: error
-    type(PeriodBlockTimingType) :: timing
+    type(TimeStepSelectType) :: steps
     character(len=LINELENGTH) :: line
 
     line = "LAST"
 
-    call timing%init()
-    call timing%read(line)
+    call steps%init()
+    call steps%read(line)
 
-    call check(error, .not. timing%is_active(0, .false.))
+    call check(error, .not. steps%is_selected(0, .false.))
     if (allocated(error)) return
     
-    call check(error, timing%is_active(0, .true.))
+    call check(error, steps%is_selected(0, .true.))
     if (allocated(error)) return
 
   end subroutine test_last
 
   subroutine test_all(error)
     type(error_type), allocatable, intent(out) :: error
-    type(PeriodBlockTimingType) :: timing
+    type(TimeStepSelectType) :: steps
     character(len=LINELENGTH) :: line
 
     line = "ALL"
 
-    call timing%init()
-    call timing%read(line)
+    call steps%init()
+    call steps%read(line)
 
-    call check(error, timing%is_active(0, .true.))
+    call check(error, steps%is_selected(0, .true.))
     if (allocated(error)) return
 
-    call check(error, timing%is_active(0, .false.))
+    call check(error, steps%is_selected(0, .false.))
     if (allocated(error)) return
 
-    call check(error, timing%is_active(1, .true.))
+    call check(error, steps%is_selected(1, .true.))
     if (allocated(error)) return
 
-    call check(error, timing%is_active(1, .false.))
+    call check(error, steps%is_selected(1, .false.))
     if (allocated(error)) return
 
   end subroutine test_all
 
   subroutine test_freq(error)
     type(error_type), allocatable, intent(out) :: error
-    type(PeriodBlockTimingType) :: timing
+    type(TimeStepSelectType) :: steps
     character(len=LINELENGTH) :: line
 
     line = "FREQUENCY 2"
 
-    call timing%init()
-    call timing%read(line)
+    call steps%init()
+    call steps%read(line)
 
-    call check(error, timing%is_active(0, .false.))
+    call check(error, steps%is_selected(0, .false.))
     if (allocated(error)) return
 
-    call check(error, .not. timing%is_active(1, .false.))
+    call check(error, .not. steps%is_selected(1, .false.))
     if (allocated(error)) return
 
-    call check(error, timing%is_active(2, .false.))
+    call check(error, steps%is_selected(2, .false.))
     if (allocated(error)) return
 
-    call check(error, .not. timing%is_active(3, .false.))
+    call check(error, .not. steps%is_selected(3, .false.))
     if (allocated(error)) return
 
   end subroutine test_freq
 
   subroutine test_step(error)
     type(error_type), allocatable, intent(out) :: error
-    type(PeriodBlockTimingType) :: timing
+    type(TimeStepSelectType) :: steps
     character(len=LINELENGTH) :: line
 
     line = "STEP 1"
 
-    call timing%init()
-    call timing%read(line)
+    call steps%init()
+    call steps%read(line)
 
-    call check(error, .not. timing%is_active(0, .false.))
+    call check(error, .not. steps%is_selected(0, .false.))
     if (allocated(error)) return
 
-    call check(error, timing%is_active(1, .false.))
+    call check(error, steps%is_selected(1, .false.))
     if (allocated(error)) return
 
-    call check(error, .not. timing%is_active(2, .false.))
+    call check(error, .not. steps%is_selected(2, .false.))
     if (allocated(error)) return
 
   end subroutine test_step
 
-end module TestPeriodBlockTiming
+end module TestTimeStepSelectModule
