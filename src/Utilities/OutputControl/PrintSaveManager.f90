@@ -34,7 +34,7 @@ module PrintSaveManagerModule
   !!   SAVE LAST
   !!   SAVE FREQUENCY 4
   !!
-  !! The time_to_print() and time_to_save() functions indicate whether
+  !! The should_print() and should_save() functions indicate whether
   !! to save or print during the current time step.
   !<
   type :: PrintSaveManagerType
@@ -53,6 +53,10 @@ contains
   !> @brief Initialize or clear the print/save manager.
   subroutine init(this)
     class(PrintSaveManagerType) :: this !< this instance
+
+    if (allocated(this%save_steps)) deallocate(this%save_steps)
+    allocate (this%save_steps)
+    allocate (this%)
     call this%save_steps%init()
     call this%print_steps%init()
   end subroutine init
@@ -65,15 +69,9 @@ contains
     integer(I4B), intent(in) :: iout !< output file unit
     ! -- local
     character(len=len(linein)) :: line
-    logical lp, ls
-    integer(I4B) :: n
+    logical(LGP) lp, ls
     integer(I4B) :: lloc, istart, istop, ival
     real(DP) :: rval
-    ! -- formats
-    character(len=*), parameter :: fmt_steps = &
-      &"(6x,'THE FOLLOWING STEPS WILL BE ',A,': ',50(I0,' '))"
-    character(len=*), parameter :: fmt_freq = &
-      &"(6x,'THE FOLLOWING FREQUENCY WILL BE ',A,': ',I0)"
     
     line(:) = linein(:)
     lloc = 1
@@ -94,34 +92,12 @@ contains
 
     if (lp) then
       call this%print_steps%read(line(istop:))
-      if (iout > 0) then
-        if (this%print_steps%all) then
-          write (iout, "(6x,a)") 'ALL TIME STEPS WILL BE PRINTED'
-        else if (this%print_steps%first) then
-          write (iout, "(6x,a)") 'THE FIRST TIME STEP WILL BE PRINTED'
-        else if (this%print_steps%last) then
-          write (iout, "(6x,a)") 'THE LAST TIME STEP WILL BE PRINTED'
-        else if (size(this%print_steps%steps) > 0) then
-          write (iout, fmt_steps) 'PRINTED', this%print_steps%steps
-        else if (this%print_steps%freq > 0) then
-          write (iout, fmt_freq) 'PRINTED', this%print_steps%freq
-        end if
-      end if
+      if (iout > 0) &
+        call this%print_steps%log(iout, verb="PRINTED")
     else
       call this%save_steps%read(line(istop:))
-      if (iout > 0) then
-        if (this%save_steps%all) then
-          write (iout, "(6x,a)") 'ALL TIME STEPS WILL BE SAVED'
-        else if (this%save_steps%first) then
-          write (iout, "(6x,a)") 'THE FIRST TIME STEP WILL BE SAVED'
-        else if (this%save_steps%last) then
-          write (iout, "(6x,a)") 'THE LAST TIME STEP WILL BE SAVED'
-        else if (size(this%save_steps%steps) > 0) then
-          write (iout, fmt_steps) 'SAVED', this%save_steps%steps
-        else if (this%save_steps%freq > 0) then
-          write (iout, fmt_freq) 'SAVED', this%save_steps%freq
-        end if
-      end if
+      if (iout > 0) &
+        call this%save_steps%log(iout, verb="SAVED")
     end if
   end subroutine rp
 

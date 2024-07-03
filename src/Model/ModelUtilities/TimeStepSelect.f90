@@ -36,6 +36,7 @@ module TimeStepSelectModule
   contains
     procedure :: deallocate
     procedure :: init
+    procedure :: log
     procedure :: read
     procedure :: is_selected
     procedure :: any_selected
@@ -60,6 +61,30 @@ contains
     this%last = .false.
     this%all = .false.
   end subroutine init
+  
+  subroutine log(this, iout, verb)
+    ! dummy
+    class(TimeStepSelectType) :: this !< this instance
+    integer(I4B), intent(in) :: iout !< output unit
+    character(len=*), intent(in) :: verb !< selection name
+    ! formats
+    character(len=*), parameter :: fmt_steps = &
+      &"(6x,'THE FOLLOWING STEPS WILL BE ',A,': ',50(I0,' '))"
+    character(len=*), parameter :: fmt_freq = &
+      &"(6x,'THE FOLLOWING FREQUENCY WILL BE ',A,': ',I0)"
+
+    if (this%all) then
+      write (iout, "(6x,a,a)") 'ALL TIME STEPS WILL BE ', verb
+    else if (this%first) then
+      write (iout, "(6x,a,a)") 'THE FIRST TIME STEP WILL BE SAVED'
+    else if (this%last) then
+      write (iout, "(6x,a,a)") 'THE LAST TIME STEP WILL BE SAVED'
+    else if (size(this%steps) > 0) then
+      write (iout, fmt_steps) 'SAVED', this%steps
+    else if (this%freq > 0) then
+      write (iout, fmt_freq) 'SAVED', this%freq
+    end if
+  end subroutine log
 
   !> @brief Read a line of input and prepare the selection object.
   subroutine read(this, line)
