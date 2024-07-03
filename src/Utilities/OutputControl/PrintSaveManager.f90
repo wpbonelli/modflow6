@@ -11,6 +11,7 @@ module PrintSaveManagerModule
   implicit none
   private
   public :: PrintSaveManagerType
+  public :: create_psm
 
   !> @brief Print/save manager type.
   !!
@@ -42,6 +43,7 @@ module PrintSaveManagerModule
     type(TimeStepSelectType), pointer, public :: save_steps
     type(TimeStepSelectType), pointer, public :: print_steps
   contains
+    procedure :: deallocate
     procedure :: init
     procedure :: rp
     procedure :: should_print
@@ -51,15 +53,29 @@ module PrintSaveManagerModule
 contains
 
   !> @brief Initialize or clear the print/save manager.
-  subroutine init(this)
-    class(PrintSaveManagerType) :: this !< this instance
+  function create_psm() result(psm)
+    type(PrintSaveManagerType), pointer :: psm !< the print/save manager
 
-    if (allocated(this%save_steps)) deallocate(this%save_steps)
+    allocate (psm)
+    allocate (psm%save_steps)
+    allocate (psm%print_steps)
+    call psm%save_steps%init()
+    call psm%print_steps%init()
+  end function create_psm
+
+  subroutine init(this)
+    class(PrintSaveManagerType) :: this
+    if (associated(this%save_steps)) deallocate(this%save_steps)
+    if (associated(this%print_steps)) deallocate(this%print_steps)
     allocate (this%save_steps)
-    allocate (this%)
-    call this%save_steps%init()
-    call this%print_steps%init()
+    allocate (this%print_steps)
   end subroutine init
+
+  subroutine deallocate(this)
+    class(PrintSaveManagerType) :: this !< this instance
+    deallocate (this%save_steps)
+    deallocate (this%print_steps)
+  end subroutine deallocate
 
   !> @ brief Read a line of input and prepare the manager.
   subroutine rp(this, linein, iout)
@@ -91,11 +107,11 @@ contains
     end select
 
     if (lp) then
-      call this%print_steps%read(line(istop:))
+      call this%print_steps%read(line(istop + 2:))
       if (iout > 0) &
         call this%print_steps%log(iout, verb="PRINTED")
     else
-      call this%save_steps%read(line(istop:))
+      call this%save_steps%read(line(istop + 2:))
       if (iout > 0) &
         call this%save_steps%log(iout, verb="SAVED")
     end if

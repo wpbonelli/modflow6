@@ -1,15 +1,15 @@
-module TestTimeStepSelectModule
+module TestTimeStepSelect
   use testdrive, only: error_type, unittest_type, new_unittest, check
   use TimeStepSelectModule, only: TimeStepSelectType
   use ConstantsModule, only: LINELENGTH
 
   implicit none
   private
-  public :: collect_period_block_timing
+  public :: collect_timestepselect
 
 contains
 
-  subroutine collect_period_block_timing(testsuite)
+  subroutine collect_timestepselect(testsuite)
     type(unittest_type), allocatable, intent(out) :: testsuite(:)
     testsuite = [ &
                 new_unittest("first", test_first), &
@@ -18,7 +18,7 @@ contains
                 new_unittest("freq", test_freq), &
                 new_unittest("step", test_step) &
                 ]
-  end subroutine collect_period_block_timing
+  end subroutine collect_timestepselect
 
   subroutine test_first(error)
     type(error_type), allocatable, intent(out) :: error
@@ -30,10 +30,13 @@ contains
     call steps%init()
     call steps%read(line)
 
-    call check(error, steps%is_selected(0, .false.))
+    call check(error, steps%is_selected(1, .false.))
     if (allocated(error)) return
 
-    call check(error, .not. steps%is_selected(1, .false.))
+    call check(error, steps%is_selected(1, .true.))
+    if (allocated(error)) return
+
+    call check(error, .not. steps%is_selected(2, .false.))
     if (allocated(error)) return
 
   end subroutine test_first
@@ -48,10 +51,10 @@ contains
     call steps%init()
     call steps%read(line)
 
-    call check(error, .not. steps%is_selected(0, .false.))
+    call check(error, .not. steps%is_selected(1, .false.))
     if (allocated(error)) return
     
-    call check(error, steps%is_selected(0, .true.))
+    call check(error, steps%is_selected(1, .true.))
     if (allocated(error)) return
 
   end subroutine test_last
@@ -65,12 +68,6 @@ contains
 
     call steps%init()
     call steps%read(line)
-
-    call check(error, steps%is_selected(0, .true.))
-    if (allocated(error)) return
-
-    call check(error, steps%is_selected(0, .false.))
-    if (allocated(error)) return
 
     call check(error, steps%is_selected(1, .true.))
     if (allocated(error)) return
@@ -90,9 +87,6 @@ contains
     call steps%init()
     call steps%read(line)
 
-    call check(error, steps%is_selected(0, .false.))
-    if (allocated(error)) return
-
     call check(error, .not. steps%is_selected(1, .false.))
     if (allocated(error)) return
 
@@ -102,6 +96,9 @@ contains
     call check(error, .not. steps%is_selected(3, .false.))
     if (allocated(error)) return
 
+    call check(error, steps%is_selected(4, .false.))
+    if (allocated(error)) return
+
   end subroutine test_freq
 
   subroutine test_step(error)
@@ -109,13 +106,10 @@ contains
     type(TimeStepSelectType) :: steps
     character(len=LINELENGTH) :: line
 
-    line = "STEP 1"
+    line = "STEPS 1"
 
     call steps%init()
     call steps%read(line)
-
-    call check(error, .not. steps%is_selected(0, .false.))
-    if (allocated(error)) return
 
     call check(error, steps%is_selected(1, .false.))
     if (allocated(error)) return
@@ -125,4 +119,4 @@ contains
 
   end subroutine test_step
 
-end module TestTimeStepSelectModule
+end module TestTimeStepSelect
