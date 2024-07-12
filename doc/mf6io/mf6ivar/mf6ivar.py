@@ -131,9 +131,12 @@
 import os
 import re
 import shutil
+import sys
+import tempfile
 import textwrap
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 from collections import OrderedDict
+from difflib import context_diff
 from pathlib import Path
 
 
@@ -208,7 +211,7 @@ VALID_TYPES = [
 ]
 
 
-def block_entry(varname, block, vardict, prefix="  "):
+def get_param(varname, block, vardict, prefix="  "):
     key = (varname, block)
     v = vardict[key]
 
@@ -239,7 +242,7 @@ def block_entry(varname, block, vardict, prefix="  "):
         varnames = v["type"].strip().split()[1:]
         s = ""
         for vn in varnames:
-            blockentry = block_entry(vn, block, vardict, prefix="")
+            blockentry = get_param(vn, block, vardict, prefix="")
             s += f"{blockentry.strip()} "
         if v["type"].startswith("recarray"):
             s = s.strip()
@@ -273,13 +276,13 @@ def block_entry(varname, block, vardict, prefix="  "):
     return s
 
 
-def write_block(
+def get_block(
     vardict, block, blk_var_list, varexcludeprefix=None, indent=None
 ):
     prepend = "" if indent is None else indent * " "
     s = prepend + f"BEGIN {block.upper()}"
     for variable in blk_var_list:
-        ts = block_entry(variable[0], block, vardict).strip()
+        ts = get_param(variable[0], block, vardict).strip()
         if variable[1]:
             s = f"{s} [{ts}]"
         else:
@@ -310,7 +313,7 @@ def write_block(
                 if v["deprecated"] != "":
                     addv = False
             if addv:
-                ts = block_entry(name, block, vardict, prefix="  " + prepend)
+                ts = get_param(name, block, vardict, prefix="  " + prepend)
                 s += f"{ts}\n"
     s += prepend + f"END {block.upper()}"
     return s
@@ -335,7 +338,7 @@ def get_description(desc):
     return desc
 
 
-def write_desc(vardict, block, blk_var_list, varexcludeprefix=None):
+def get_desc(vardict, block, blk_var_list, varexcludeprefix=None):
     s = ""
     for name, b in vardict.keys():
         v = vardict[(name, b)]
@@ -379,8 +382,8 @@ def write_desc(vardict, block, blk_var_list, varexcludeprefix=None):
                 ss = "\\texttt{" + n + "}---" + desc
                 if "time_series" in v:
                     if v["time_series"] == "true":
-                        fmt = "\\textcolor{blue}\{\}"
-                        ss = "\\textcolor{blue}{" + ss + "}"
+                        fmt = r"\textcolor{blue}\{\}"
+                        ss = r"\textcolor{blue}{" + ss + "}"
                         # \textcolor{declared-color}{text}
                 s += "\\item " + ss + "\n\n"
 
@@ -389,7 +392,7 @@ def write_desc(vardict, block, blk_var_list, varexcludeprefix=None):
                     # s += '\\begin{verbatim}\n'
                     s += "\\begin{lstlisting}[style=blockdefinition]\n"
                     for vn in t.strip().split()[1:]:
-                        blockentry = block_entry(vn, block, vardict, "")
+                        blockentry = get_param(vn, block, vardict, "")
                         s += f"{blockentry}\n"
                     # s += '\\end{verbatim}\n\n'
                     s += "\\end{lstlisting}\n\n"
@@ -397,7 +400,7 @@ def write_desc(vardict, block, blk_var_list, varexcludeprefix=None):
     return s
 
 
-def write_desc_md(vardict, block, blk_var_list, varexcludeprefix=None):
+def get_desc_md(vardict, block, blk_var_list, varexcludeprefix=None):
     s = ""
     for name, b in vardict.keys():
         v = vardict[(name, b)]
@@ -448,7 +451,7 @@ def write_desc_md(vardict, block, blk_var_list, varexcludeprefix=None):
                 if t.startswith("keystring"):
                     for vn in t.strip().split()[1:]:
                         blockentry = md_replace(
-                            block_entry(vn, block, vardict, 10 * " ")
+                            get_param(vn, block, vardict, 10 * " ")
                         )
                         s += f"{blockentry}\n"
 
@@ -690,11 +693,11 @@ def get_dfn_files(models):
     return files
 
 
-def write_variables():
+def write_blocks(summary_md_path, tex_path, rtd_path):
     allblocks = []  # cumulative list of all block names
 
-    # write markdown input variables file
-    with open(MD_DIR_PATH / "mf6ivar.md", "w") as fmd:
+    # write markdown input parameters summary table
+    with open(summary_md_path, "w") as fmd:
         write_md_header(fmd)
 
         for fpath in dfns:
@@ -722,14 +725,14 @@ def write_variables():
                 # Write the name of the block to the latex file
                 desc += f"\\item \\textbf{'{Block: ' + b.upper() + '}'}\n\n"
                 desc += "\\begin{description}\n"
-                desc += write_desc(
+                desc += get_desc(
                     vardict, b, blk_var_list, varexcludeprefix="dev_"
                 )
                 desc += "\\end{description}\n"
 
-                with open(TEX_DIR_PATH / f"{fpath.stem}-{b}.dat", "w") as f:
+                with open(tex_path / f"{fpath.stem}-{b}.dat", "w") as f:
                     s = (
-                        write_block(
+                        get_block(
                             vardict, b, blk_var_list, varexcludeprefix="dev_"
                         )
                         + "\n"
@@ -738,7 +741,7 @@ def write_variables():
                     if verbose:
                         print(s)
 
-            with open(TEX_DIR_PATH / f"{fpath.stem}-desc.tex", "w") as f:
+            with open(tex_path / f"{fpath.stem}-desc.tex", "w") as f:
                 s = desc + "\n"
                 f.write(s)
                 if verbose:
@@ -746,7 +749,7 @@ def write_variables():
 
             # write markdown description
             mdname = fpath.stem
-            with open(RTD_DOC_DIR_PATH / f"{mdname}.md", "w") as f:
+            with open(rtd_path / f"{mdname}.md", "w") as f:
                 f.write(f"### {mdname.upper()}\n\n")
                 f.write("#### Structure of Blocks\n\n")
                 f.write("_FOR EACH SIMULATION_\n\n")
@@ -757,7 +760,7 @@ def write_variables():
                     # Write the name of the block to the latex file
                     desc += f"##### Block: {b.upper()}\n\n"
 
-                    desc += write_desc_md(
+                    desc += get_desc_md(
                         vardict, b, blk_var_list, varexcludeprefix="dev_"
                     )
 
@@ -766,7 +769,7 @@ def write_variables():
                     f.write("```\n")
                     s = (
                         md_replace(
-                            write_block(
+                            get_block(
                                 vardict,
                                 b,
                                 blk_var_list,
@@ -820,6 +823,13 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
+        "-c",
+        "--check",
+        required=False,
+        action="store_true",
+        help="Check if any files would change, don't regenerate them",
+    )
+    parser.add_argument(
         "-m",
         "--model",
         required=False,
@@ -832,22 +842,49 @@ if __name__ == "__main__":
         required=False,
         default=False,
         action="store_true",
-        help="Whether to show verbose output",
+        help="Show verbose output",
     )
     args = parser.parse_args()
+    check = args.check
     models = args.model if args.model else DEFAULT_MODELS
     verbose = args.verbose
 
-    # clean/recreate docdir
-    if os.path.isdir(RTD_DOC_DIR_PATH):
+    # clear output directory
+    if RTD_DOC_DIR_PATH.is_dir():
         shutil.rmtree(RTD_DOC_DIR_PATH)
-    os.makedirs(RTD_DOC_DIR_PATH)
+    RTD_DOC_DIR_PATH.mkdir()
 
     # filter dfn files corresponding to the selected set of models
-    # and write variables and appendix to markdown and latex files
     dfns = get_dfn_files(models)
-    blocks = write_variables()
-    write_appendix(blocks)
+
+    # write blocks to markdown and latex files
+    if check:
+        with tempfile.TemporaryDirectory() as tempdir:
+            workspace = Path(tempdir)
+            blocks = write_blocks(
+                workspace / "mf6ivar.md",
+                tex_path=workspace,
+                rtd_path=workspace,
+            )
+            pre = open(MD_DIR_PATH / "mf6ivar.md").readlines()
+            post = open(workspace / "mf6ivar.md").readlines()
+            diff = list(context_diff(pre, post))
+            if any(diff):
+                sys.stdout.writelines(diff)
+                # sys.exit(1)  # todo: fail if out of date?
+            sys.exit(0)
+
+    else:
+        blocks = write_blocks(
+            MD_DIR_PATH / "mf6ivar.md",
+            tex_path=TEX_DIR_PATH,
+            rtd_path=RTD_DOC_DIR_PATH,
+        )
+
+    # log all blocks if verbose
     if verbose:
         for block in blocks:
             print(block)
+
+    # write appendix file
+    write_appendix(blocks)

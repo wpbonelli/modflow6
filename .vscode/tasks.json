@@ -290,6 +290,20 @@
             "problemMatcher": []
         },
         {
+            "label": "Check mf6ivar.py",
+            "type": "shell",
+            "command": "source activate modflow6; pwd; python mf6ivar.py --check --verbose",
+            "options": {"cwd": "${workspaceFolder}/doc/mf6io/mf6ivar"},
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "clear": true
+            },
+            "problemMatcher": []
+        },
+        {
             "label": "Rebuild makefiles",
             "type": "shell",
             "command": "source activate modflow6; pwd; python build_makefiles.py",
