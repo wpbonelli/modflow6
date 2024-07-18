@@ -73,7 +73,7 @@ jobs:
             version: ${{ inputs.compiler_version }}
             optimization: 2
             parallel: false
-          - os: macos-13
+          - os: macos-12
             compiler: ${{ inputs.compiler_toolchain }}
             version: ${{ inputs.compiler_version }}
             optimization: 2
