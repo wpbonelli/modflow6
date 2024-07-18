@@ -146,7 +146,7 @@ jobs:
           echo "models=$models" >> $GITHUB_OUTPUT
   make_dist:
     name: Make distribution
-    uses: MODFLOW-USGS/modflow6/.github/workflows/release.yml@develop
+    uses: wpbonelli/modflow6/.github/workflows/release.yml@macos-release
     needs: set_options
     with:
       # If the workflow is manually triggered, the maintainer must manually set approve=true to approve a release.
