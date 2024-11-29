@@ -62,7 +62,7 @@ contains
     allocate (method)
     call create_cell_poly(cell)
     method%cell => cell
-    method%type => method%cell%type
+    method%name => method%cell%type
     method%delegates = .true.
     call create_subcell_tri(subcell)
     method%subcell => subcell
@@ -71,7 +71,7 @@ contains
   !> @brief Destroy the tracking method
   subroutine destroy_mct(this)
     class(MethodCellTernaryType), intent(inout) :: this
-    deallocate (this%type)
+    deallocate (this%name)
   end subroutine destroy_mct
 
   !> @brief Load subcell into tracking method
@@ -163,6 +163,26 @@ contains
     ! (Re)allocate type-bound arrays
     select type (cell => this%cell)
     type is (CellPolyType)
+      ! If particle is dry, apply selected the
+      ! dry tracking method
+      if (particle%z > cell%defn%top) then
+        if (particle%idry == 0) then
+          ! drop to water table
+          particle%z = cell%defn%top
+          call this%save(particle, reason=1)
+        else if (particle%idry == 1) then
+          ! terminate
+          particle%advancing = .false.
+          particle%istatus = 7
+          call this%save(particle, reason=3)
+          return
+        else if (particle%idry == 2) then
+          ! stationary
+          particle%advancing = .false.
+          return
+        end if
+      end if
+
       ! Number of vertices
       this%nverts = cell%defn%npolyverts
       ! (Re)allocate type-bound arrays

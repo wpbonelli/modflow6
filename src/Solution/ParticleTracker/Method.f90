@@ -29,7 +29,7 @@ module MethodModule
   !! depending on cell geometry (implementing the strategy pattern).
   !<
   type, abstract :: MethodType
-    character(len=40), pointer, public :: type !< method name
+    character(len=40), pointer, public :: name !< method name
     logical(LGP), public :: delegates !< whether the method delegates
     type(PrtFmiType), pointer, public :: fmi => null() !< ptr to fmi
     class(CellType), pointer, public :: cell => null() !< ptr to the current cell
@@ -96,7 +96,8 @@ contains
     if (present(retfactor)) this%retfactor => retfactor
   end subroutine init
 
-  !> @brief Track particle through subdomains
+  !> @brief Track the particle over domains of the given
+  ! level until the particle terminates or tmax elapses.
   recursive subroutine track(this, particle, level, tmax)
     ! dummy
     class(MethodType), intent(inout) :: this
@@ -108,6 +109,7 @@ contains
     integer(I4B) :: nextlevel
     class(methodType), pointer :: submethod
 
+    ! Advance the particle over subdomains
     advancing = .true.
     nextlevel = level + 1
     do while (advancing)
@@ -196,10 +198,6 @@ contains
     class(MethodType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellDefnType), pointer, intent(inout) :: cell_defn
-    ! local
-    logical(LGP) :: cell_dry
-    logical(LGP) :: locn_dry
-    integer(I4B) :: ic
 
     ! stop zone
     particle%izone = cell_defn%izone
@@ -210,27 +208,9 @@ contains
       return
     end if
 
-    ! dry
-    cell_dry = this%fmi%ibdgwfsat0(cell_defn%icell) == 0
-    locn_dry = particle%z > cell_defn%top
-    if (cell_dry .or. locn_dry) then
-      if (particle%idry == 0) then
-        ! drop
-        if (cell_dry) then
-          ! if no active cell underneath position, terminate
-          ic = particle%idomain(2)
-          call this%fmi%dis%highest_active(ic, this%fmi%ibound)
-          if (this%fmi%ibound(ic) == 0) then
-            particle%advancing = .false.
-            particle%istatus = 7
-            call this%save(particle, reason=3)
-            return
-          end if
-        else if (locn_dry) then
-          particle%z = cell_defn%top
-          call this%save(particle, reason=1)
-        end if
-      else if (particle%idry == 1) then
+    ! dry cell
+    if (this%fmi%ibdgwfsat0(cell_defn%icell) == 0) then
+      if (particle%idry == 1) then
         ! stop
         particle%advancing = .false.
         particle%istatus = 7
@@ -240,10 +220,9 @@ contains
         ! stay
         particle%advancing = .false.
       end if
-
-      ! cell with no exit face (mutually exclusive with
-      ! dry because a dry cell will have no exit face)
     else if (cell_defn%inoexitface > 0) then
+      ! cell with no exit face (mutually exclusive with
+      ! dry because a dry cell also has no exit face)
       particle%advancing = .false.
       particle%istatus = 5
       call this%save(particle, reason=3)

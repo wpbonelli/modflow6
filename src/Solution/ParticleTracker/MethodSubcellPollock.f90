@@ -36,14 +36,14 @@ contains
     allocate (method)
     call create_subcell_rect(subcell)
     method%subcell => subcell
-    method%type => method%subcell%type
+    method%name => method%subcell%type
     method%delegates = .false.
   end subroutine create_method_subcell_pollock
 
   !> @brief Deallocate the Pollock's subcell method
   subroutine deallocate (this)
     class(MethodSubcellPollockType), intent(inout) :: this
-    deallocate (this%type)
+    deallocate (this%name)
   end subroutine deallocate
 
   !> @brief Apply Pollock's method to a rectangular subcell

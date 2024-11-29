@@ -37,7 +37,7 @@ contains
     allocate (method)
     call create_cell_rect_quad(cell)
     method%cell => cell
-    method%type => method%cell%type
+    method%name => method%cell%type
     method%delegates = .true.
     call create_subcell_rect(subcell)
     method%subcell => subcell
@@ -46,7 +46,7 @@ contains
   !> @brief Deallocate the Pollock quad-refined cell method
   subroutine deallocate (this)
     class(MethodCellPollockQuadType), intent(inout) :: this
-    deallocate (this%type)
+    deallocate (this%name)
   end subroutine deallocate
 
   !> @brief Load subcell into tracking method
@@ -211,6 +211,26 @@ contains
       ! Prepare to apply method, return early if done advancing
       call this%prepare(particle, cell%defn)
       if (.not. particle%advancing) return
+
+      ! If particle is dry, apply selected the
+      ! dry tracking method
+      if (particle%z > cell%defn%top) then
+        if (particle%idry == 0) then
+          ! drop to water table
+          particle%z = cell%defn%top
+          call this%save(particle, reason=1)
+        else if (particle%idry == 1) then
+          ! terminate
+          particle%advancing = .false.
+          particle%istatus = 7
+          call this%save(particle, reason=3)
+          return
+        else if (particle%idry == 2) then
+          ! stationary
+          particle%advancing = .false.
+          return
+        end if
+      end if
 
       ! Transform particle location into local cell coordinates
       ! (translated and rotated but not scaled relative to model).

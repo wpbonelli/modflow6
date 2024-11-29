@@ -52,10 +52,10 @@ contains
     type(CellPolyType), pointer :: cell
 
     allocate (method)
-    allocate (method%type)
+    allocate (method%name)
     call create_cell_poly(cell)
     method%cell => cell
-    method%type = "disv"
+    method%name = "disv"
     method%delegates = .true.
     call create_defn(method%neighbor)
   end subroutine create_method_disv
@@ -63,7 +63,7 @@ contains
   !> @brief Destroy the tracking method
   subroutine deallocate (this)
     class(MethodDisvType), intent(inout) :: this
-    deallocate (this%type)
+    deallocate (this%name)
   end subroutine deallocate
 
   !> @brief Load the cell and the tracking method
@@ -290,11 +290,12 @@ contains
     end if
   end subroutine map_neighbor
 
-  !> @brief Apply the DISV-grid method
+  !> @brief Apply the DISV tracking method to a particle.
   subroutine apply_disv(this, particle, tmax)
     class(MethodDisvType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
+
     call this%track(particle, 1, tmax)
   end subroutine apply_disv
 
