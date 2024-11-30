@@ -194,6 +194,8 @@ contains
   !! for any reporting conditions as well.
   !<
   subroutine prepare(this, particle, cell_defn)
+    ! modules
+    use TdisModule, only: endofsimulation, totim
     ! dummy
     class(MethodType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
@@ -210,15 +212,33 @@ contains
 
     ! dry cell
     if (this%fmi%ibdgwfsat0(cell_defn%icell) == 0) then
-      if (particle%idry == 1) then
+      ! if dry tracking method 'drop', and the particle
+      ! is at the cell bottom, it was previously passed
+      ! there via pass-to-bottom method and couldn't be
+      ! passed to a neighboring cell (maybe there isn't
+      ! any). terminate it.
+      if (particle%idry == 0 .and. is_close(particle%z, cell_defn%bot)) then
+        particle%advancing = .false.
+        particle%istatus = 5
+        call this%save(particle, reason=3)
+        return
+      else if (particle%idry == 1) then
         ! stop
         particle%advancing = .false.
         particle%istatus = 7
         call this%save(particle, reason=3)
         return
       else if (particle%idry == 2) then
-        ! stay
         particle%advancing = .false.
+        particle%ttrack = totim
+        ! terminate if stationary and last period / time step
+        if (endofsimulation) then
+          particle%istatus = 5
+          call this%save(particle, reason=3)
+          return
+        end if
+        ! stay
+        call this%save(particle, reason=2)
       end if
     else if (cell_defn%inoexitface > 0) then
       ! cell with no exit face (mutually exclusive with
