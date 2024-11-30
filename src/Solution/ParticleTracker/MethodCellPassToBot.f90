@@ -46,7 +46,7 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     real(DP), intent(in) :: tmax
 
-    call this%prepare(particle, this%cell%defn)
+    call this%check_conditions(particle, this%cell%defn)
     if (.not. particle%advancing) return
     particle%z = this%cell%defn%bot
     particle%iboundary(2) = this%cell%defn%npolyverts + 2

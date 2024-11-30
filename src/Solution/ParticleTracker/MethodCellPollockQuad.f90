@@ -209,7 +209,7 @@ contains
     select type (cell => this%cell)
     type is (CellRectQuadType)
       ! Prepare to apply method, return early if done advancing
-      call this%prepare(particle, cell%defn)
+      call this%check_conditions(particle, cell%defn)
       if (.not. particle%advancing) return
 
       ! If particle is dry, apply selected the

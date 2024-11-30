@@ -157,7 +157,7 @@ contains
     integer(I4B) :: i
 
     ! Prepare to apply method, return early if done advancing
-    call this%prepare(particle, this%cell%defn)
+    call this%check_conditions(particle, this%cell%defn)
     if (.not. particle%advancing) return
 
     ! (Re)allocate type-bound arrays

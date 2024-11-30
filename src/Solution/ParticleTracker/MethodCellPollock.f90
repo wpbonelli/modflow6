@@ -131,7 +131,7 @@ contains
     type is (CellRectType)
       ! Prepare to apply the tracking method and
       ! check termination / reporting conditions
-      call this%prepare(particle, cell%defn)
+      call this%check_conditions(particle, cell%defn)
       if (.not. particle%advancing) return
 
       ! If particle is dry, apply selected the

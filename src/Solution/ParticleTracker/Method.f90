@@ -52,7 +52,7 @@ module MethodModule
     procedure :: save
     procedure :: track
     procedure :: try_pass
-    procedure :: prepare
+    procedure :: check_conditions
   end type MethodType
 
   abstract interface
@@ -193,7 +193,7 @@ contains
   !! tracking the particle or terminate it. This includes a check
   !! for any reporting conditions as well.
   !<
-  subroutine prepare(this, particle, cell_defn)
+  subroutine check_conditions(this, particle, cell_defn)
     ! modules
     use TdisModule, only: endofsimulation, totim
     ! dummy
@@ -229,6 +229,7 @@ contains
         call this%save(particle, reason=3)
         return
       else if (particle%idry == 2) then
+        ! stay
         particle%advancing = .false.
         particle%ttrack = totim
         ! terminate if stationary and last period / time step
@@ -237,7 +238,6 @@ contains
           call this%save(particle, reason=3)
           return
         end if
-        ! stay
         call this%save(particle, reason=2)
       end if
     else if (cell_defn%inoexitface > 0) then
@@ -260,6 +260,6 @@ contains
         return
       end if
     end if
-  end subroutine prepare
+  end subroutine check_conditions
 
 end module MethodModule
