@@ -47,17 +47,17 @@ contains
     type(CellRectType), pointer :: cell
 
     allocate (method)
-    allocate (method%type)
+    allocate (method%name)
     call create_cell_rect(cell)
     method%cell => cell
-    method%type = "dis"
+    method%name = "dis"
     method%delegates = .true.
   end subroutine create_method_dis
 
   !> @brief Destructor the tracking method
   subroutine deallocate (this)
     class(MethodDisType), intent(inout) :: this
-    deallocate (this%type)
+    deallocate (this%name)
   end subroutine deallocate
 
   subroutine load_cell(this, ic, cell)
@@ -284,7 +284,7 @@ contains
     end select
   end subroutine pass_dis
 
-  !> @brief Apply the method to a particle
+  !> @brief Apply the structured tracking method to a particle.
   subroutine apply_dis(this, particle, tmax)
     class(MethodDisType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
@@ -335,6 +335,8 @@ contains
     class(MethodDisType), intent(inout) :: this
     integer(I4B), intent(in) :: ic
     type(CellDefnType), pointer, intent(inout) :: defn
+    ! local
+    integer(I4B) :: irow, icol, ilay, icu
 
     defn%icell = ic
     defn%npolyverts = 4 ! rectangular cell always has 4 vertices
@@ -347,6 +349,12 @@ contains
     defn%sat = this%fmi%gwfsat(ic)
     defn%porosity = this%porosity(ic)
     defn%retfactor = this%retfactor(ic)
+    select type (dis => this%fmi%dis)
+    type is (DisType)
+      icu = dis%get_nodeuser(ic)
+      call get_ijk(icu, dis%nrow, dis%ncol, dis%nlay, irow, icol, ilay)
+      defn%ilay = ilay
+    end select
     defn%izone = this%izone(ic)
     defn%can_be_rect = .true.
     defn%can_be_quad = .false.

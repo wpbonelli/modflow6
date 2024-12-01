@@ -7,6 +7,8 @@ module MethodModule
   use SubcellModule, only: SubcellType
   use ParticleModule
   use BaseDisModule, only: DisBaseType
+  use DisModule, only: DisType
+  use DisvModule, only: DisvType
   use PrtFmiModule, only: PrtFmiType
   use CellModule, only: CellType
   use CellDefnModule, only: CellDefnType
@@ -29,7 +31,7 @@ module MethodModule
   !! depending on cell geometry (implementing the strategy pattern).
   !<
   type, abstract :: MethodType
-    character(len=40), pointer, public :: type !< method name
+    character(len=40), pointer, public :: name !< method name
     logical(LGP), public :: delegates !< whether the method delegates
     type(PrtFmiType), pointer, public :: fmi => null() !< ptr to fmi
     class(CellType), pointer, public :: cell => null() !< ptr to the current cell
@@ -52,7 +54,7 @@ module MethodModule
     procedure :: save
     procedure :: track
     procedure :: try_pass
-    procedure :: prepare
+    procedure :: check
   end type MethodType
 
   abstract interface
@@ -96,7 +98,8 @@ contains
     if (present(retfactor)) this%retfactor => retfactor
   end subroutine init
 
-  !> @brief Track particle through subdomains
+  !> @brief Track the particle over domains of the given
+  ! level until the particle terminates or tmax elapses.
   recursive subroutine track(this, particle, level, tmax)
     ! dummy
     class(MethodType), intent(inout) :: this
@@ -108,6 +111,7 @@ contains
     integer(I4B) :: nextlevel
     class(methodType), pointer :: submethod
 
+    ! Advance the particle over subdomains
     advancing = .true.
     nextlevel = level + 1
     do while (advancing)
@@ -180,26 +184,22 @@ contains
       end if
     end if
 
-    ! Save the particle's state to any registered tracking output files
-    call this%trackctl%save(particle, kper=per, &
-                            kstp=stp, reason=reason)
+    call this%trackctl%save(particle, kper=per, kstp=stp, reason=reason)
   end subroutine save
 
-  !> @brief Prepare to apply the tracking method to the particle.
+  !> @brief Check reporting/terminating conditions before tracking.
   !!
   !! Check a number of conditions determining whether to continue
-  !! tracking the particle or terminate it. This includes a check
-  !! for any reporting conditions as well.
+  !! tracking the particle or terminate it, as well as whether to
+  !! record any output data as per selected reporting conditions.
   !<
-  subroutine prepare(this, particle, cell_defn)
+  subroutine check(this, particle, cell_defn)
+    ! modules
+    use TdisModule, only: endofsimulation, totim
     ! dummy
     class(MethodType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellDefnType), pointer, intent(inout) :: cell_defn
-    ! local
-    logical(LGP) :: cell_dry
-    logical(LGP) :: locn_dry
-    integer(I4B) :: ic
 
     ! stop zone
     particle%izone = cell_defn%izone
@@ -210,44 +210,65 @@ contains
       return
     end if
 
-    ! dry
-    cell_dry = this%fmi%ibdgwfsat0(cell_defn%icell) == 0
-    locn_dry = particle%z > cell_defn%top
-    if (cell_dry .or. locn_dry) then
-      if (particle%idry == 0) then
-        ! drop
-        if (cell_dry) then
-          ! if no active cell underneath position, terminate
-          ic = particle%idomain(2)
-          call this%fmi%dis%highest_active(ic, this%fmi%ibound)
-          if (this%fmi%ibound(ic) == 0) then
-            particle%advancing = .false.
-            particle%istatus = 7
-            call this%save(particle, reason=3)
-            return
-          end if
-        else if (locn_dry) then
-          particle%z = cell_defn%top
-          call this%save(particle, reason=1)
-        end if
-      else if (particle%idry == 1) then
+    ! dry cell
+    if (this%fmi%ibdgwfsat0(cell_defn%icell) == 0) then
+      ! if dry tracking method 'drop', and the particle
+      ! is at the cell bottom, it was previously passed
+      ! there via pass-to-bottom method and couldn't be
+      ! passed to a neighbori (maybe there isn't one).
+      if (particle%idrymeth == 0 .and. is_close(particle%z, cell_defn%bot)) then
+        ! terminate
+        particle%advancing = .false.
+        particle%istatus = 5
+        call this%save(particle, reason=3)
+        return
+      else if (particle%idrymeth == 1) then
         ! stop
         particle%advancing = .false.
         particle%istatus = 7
         call this%save(particle, reason=3)
         return
-      else if (particle%idry == 2) then
+      else if (particle%idrymeth == 2) then
         ! stay
         particle%advancing = .false.
-      end if
+        particle%ttrack = totim
 
-      ! cell with no exit face (mutually exclusive with
-      ! dry because a dry cell will have no exit face)
-    else if (cell_defn%inoexitface > 0) then
+        ! terminate if last period/step
+        if (endofsimulation) then
+          particle%istatus = 5
+          call this%save(particle, reason=3)
+          return
+        end if
+
+        call this%save(particle, reason=2)
+      end if
+    end if
+
+    ! cell with no exit face
+    if (cell_defn%inoexitface > 0) then
       particle%advancing = .false.
       particle%istatus = 5
       call this%save(particle, reason=3)
       return
+    end if
+
+    ! dry particle
+    if (this%name /= 'passtobottom' .and. particle%z > cell_defn%top) then
+      if (particle%idrymeth == 0) then
+        ! drop to water table
+        particle%z = cell_defn%top
+        call this%save(particle, reason=1)
+      else if (particle%idrymeth == 1) then
+        ! terminate
+        particle%advancing = .false.
+        particle%istatus = 7
+        call this%save(particle, reason=3)
+        return
+      else if (particle%idrymeth == 2) then
+        ! stay
+        particle%advancing = .false.
+        return
+      end if
     end if
 
     ! weak sink
@@ -261,6 +282,6 @@ contains
         return
       end if
     end if
-  end subroutine prepare
+  end subroutine check
 
 end module MethodModule
