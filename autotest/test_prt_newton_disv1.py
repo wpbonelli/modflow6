@@ -6,13 +6,7 @@ be solved via Pollock's method applied to quad-
 refined cells, instead of the new ternary method
 which applies more generally to polygonal cells.
 
-The simulation includes a single stress period
-with multiple time steps. This serves to test
-whether PRT properly solves trajectories over
-"internal" time steps, i.e. within the step's
-slice of simulation time, as well as extending
-tracking to termination or particle stop times
-during the simulation's final time step.
+The simulation uses the Newton formulation.
 
 Several cases are provided:
     - default: No user-specified tracking times, MP7 in pathline mode.
@@ -380,6 +374,7 @@ def compare_output(name, mf6_pls, mp7_pls, mp7_eps):
         # pollock's method should be (nearly) identical
         mf6_pls_plck = mf6_pls[mf6_pls.particlegroup == 1]
         assert mf6_pls_plck.shape == mp7_pls.shape
+        import pdb; pdb.set_trace()
         assert np.allclose(mf6_pls_plck, mp7_pls, atol=1e-3)
 
         # ternary method will have extra path points
@@ -487,7 +482,7 @@ def check_output(idx, test):
     qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
 
     # plot results if enabled
-    plot = False
+    plot = True
     if "bprp" not in name and plot:
         plot_output(
             name, gwf, head, (qx, qy), mf6_pls, mp7_pls, gwf_ws / f"test_{simname}.png"

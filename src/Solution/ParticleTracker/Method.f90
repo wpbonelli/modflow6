@@ -242,18 +242,8 @@ contains
 
         call this%save(particle, reason=2)
       end if
-    end if
-
-    ! cell with no exit face
-    if (cell_defn%inoexitface > 0) then
-      particle%advancing = .false.
-      particle%istatus = 5
-      call this%save(particle, reason=3)
-      return
-    end if
-
     ! dry particle
-    if (this%name /= 'passtobottom' .and. particle%z > cell_defn%top) then
+    else if (particle%z > cell_defn%top) then
       if (particle%idrymeth == 0) then
         ! drop to water table
         particle%z = cell_defn%top
@@ -269,6 +259,14 @@ contains
         particle%advancing = .false.
         return
       end if
+    end if
+
+    ! cell with no exit face
+    if (cell_defn%inoexitface > 0) then
+      particle%advancing = .false.
+      particle%istatus = 5
+      call this%save(particle, reason=3)
+      return
     end if
 
     ! weak sink
