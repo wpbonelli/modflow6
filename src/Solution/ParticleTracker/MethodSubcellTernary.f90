@@ -215,11 +215,13 @@ contains
     ! considering only the velocity component in the direction of
     ! the face. Then compute the particle's exit time.
     if (itrifaceexit /= 0) then
+      print *, "exit thru side"
       ! Exit through lateral subcell face
       exitFace = itrifaceexit
       dtexit = dtexitxy
     else if (dtexitz < dtexitxy) then
       ! Exit through top or bottom
+      print *, "exit thru top or bottom"
       if (itopbotexit == -1) then
         exitFace = 4
       else
@@ -229,6 +231,16 @@ contains
     end if
     texit = particle%ttrack + dtexit
     t0 = particle%ttrack
+
+    ! ! don't allow a particle to return to the subcell was just in
+    ! if (particle%idomain(2) == particle%icp .and. particle%idomain(3) == particle%iscp) then
+    !   print *, "isc: ", particle%idomain(3)
+    !   particle%idomain(3) = particle%iscp
+    !   particle%istatus = 5
+    !   particle%advancing = .false.
+    !   call this%save(particle, reason=3)
+    !   return
+    ! end if
 
     ! Select user tracking times to solve. If this is the first time step
     ! of the simulation, include all times before it begins; if it is the
@@ -253,6 +265,12 @@ contains
       end do
     end if
 
+    ! if (izstatus > 1) then
+    !   particle%istatus = izstatus
+    !   particle%advancing = .false.
+    !   reason = 3
+    ! end if
+
     ! Compute exit time and face and update the particle's coordinates
     ! (local, unscaled) and other properties. The particle may at this
     ! point lie on a boundary of the subcell or may still be within it.
@@ -265,7 +283,6 @@ contains
       particle%istatus = 1
       particle%advancing = .false.
       reason = 2 ! timestep end
-      print *, "end of time step"
     else
       ! -- The computed exit time is less than or equal to the maximum time,
       ! -- so set final time for particle trajectory equal to exit time.
@@ -281,6 +298,13 @@ contains
     particle%z = z
     particle%ttrack = t
     particle%iboundary(3) = exitFace
+
+    ! save previous subcell id and exit face
+    particle%iscp = particle%idomain(3)
+    particle%iscefp = particle%iboundary(3)
+    print *, "exit face: ", particle%iboundary(3)
+    print *, "subcell: ", particle%idomain(3)
+
     call this%save(particle, reason=reason)
   end subroutine track_subcell
 

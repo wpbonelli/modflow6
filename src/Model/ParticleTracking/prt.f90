@@ -962,6 +962,7 @@ contains
           ! Reset previous cell, subcell, and zone numbers
           particle%icp = 0
           particle%iscp = 0
+          particle%iscefp = 0
           particle%izp = 0
 
           ! Update particle storage

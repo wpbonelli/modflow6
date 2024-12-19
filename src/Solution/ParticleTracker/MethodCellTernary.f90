@@ -1,6 +1,6 @@
 module MethodCellTernaryModule
 
-  use KindModule, only: DP, I4B
+  use KindModule, only: DP, I4B, LGP
   use ErrorUtilModule, only: pstop
   use MethodModule
   use MethodSubcellPoolModule
@@ -85,18 +85,6 @@ contains
     select type (subcell => this%subcell)
     type is (SubcellTriType)
       call this%load_subcell(particle, subcell)
-
-      ! don't allow a particle to return to the
-      ! subcell it was just in
-      ! if (subcell%isubcell /= 0 .and. subcell%isubcell == particle%iscp) then
-      !   print *, '---', subcell%isubcell
-      !   particle%advancing = .false.
-      !   particle%idomain(3) = particle%iscp
-      !   particle%istatus = 2
-      !   call this%save(particle, reason=3)
-      ! else
-      !   particle%iscp = particle%idomain(3)
-      ! end if
     end select
 
     call method_subcell_tern%init( &
@@ -150,6 +138,19 @@ contains
       ! Subcell top (cell top)
       inface = this%nverts + 3
     end select
+
+    print *, "--------", isc, particle%iscp, exitFace, particle%iscefp
+    ! if (inface /= exitFace .and. isc == particle%iscp .and. exitFace == particle%iscefp) then
+    !   print *, 'subcell cycle, terminating'
+    !   particle%advancing = .false.
+    !   particle%idomain(3) = particle%iscp
+    !   particle%istatus = 2
+    !   call this%save(particle, reason=3)
+    ! else
+    !   particle%iscp = particle%idomain(3)
+    !   particle%iscefp = exitFace
+    ! end if
+
     if (inface .eq. -1) then
       particle%iboundary(2) = 0
     else if (inface .eq. 0) then
