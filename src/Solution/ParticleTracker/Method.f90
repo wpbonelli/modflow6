@@ -114,7 +114,11 @@ contains
     nextlevel = level + 1
     do while (advancing)
       call this%load(particle, nextlevel, submethod)
-      call submethod%apply(particle, tmax)
+      if (particle%istatus > 1) then
+        advancing = .false.
+      else
+        call submethod%apply(particle, tmax)
+      end if
       call this%try_pass(particle, nextlevel, advancing)
     end do
   end subroutine track
@@ -184,6 +188,9 @@ contains
     end if
 
     call this%trackctl%save(particle, kper=per, kstp=stp, reason=reason)
+    print *, "saving"
+    ! if (kper == 3) stop
+
   end subroutine save
 
   !> @brief Check reporting/terminating conditions before tracking.

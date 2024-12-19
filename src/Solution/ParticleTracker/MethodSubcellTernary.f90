@@ -265,6 +265,7 @@ contains
       particle%istatus = 1
       particle%advancing = .false.
       reason = 2 ! timestep end
+      print *, "end of time step"
     else
       ! -- The computed exit time is less than or equal to the maximum time,
       ! -- so set final time for particle trajectory equal to exit time.

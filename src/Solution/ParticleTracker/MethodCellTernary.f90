@@ -85,7 +85,20 @@ contains
     select type (subcell => this%subcell)
     type is (SubcellTriType)
       call this%load_subcell(particle, subcell)
+
+      ! don't allow a particle to return to the
+      ! subcell it was just in
+      ! if (subcell%isubcell /= 0 .and. subcell%isubcell == particle%iscp) then
+      !   print *, '---', subcell%isubcell
+      !   particle%advancing = .false.
+      !   particle%idomain(3) = particle%iscp
+      !   particle%istatus = 2
+      !   call this%save(particle, reason=3)
+      ! else
+      !   particle%iscp = particle%idomain(3)
+      ! end if
     end select
+
     call method_subcell_tern%init( &
       fmi=this%fmi, &
       cell=this%cell, &

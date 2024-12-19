@@ -45,6 +45,7 @@ module ParticleModule
     integer(I4B), allocatable, public :: idomain(:) !< tracking domain hierarchy ! TODO: rename to itdomain? idomain
     integer(I4B), allocatable, public :: iboundary(:) !< tracking domain boundaries
     integer(I4B), public :: icp !< previous cell number (reduced)
+    integer(I4B), public :: iscp !< previous subcell number
     integer(I4B), public :: icu !< user cell number
     integer(I4B), public :: ilay !< grid layer
     integer(I4B), public :: izone !< current zone number
@@ -90,6 +91,7 @@ module ParticleModule
     integer(I4B), dimension(:, :), pointer, public, contiguous :: idomain !< array of indices for domains in the tracking domain hierarchy
     integer(I4B), dimension(:, :), pointer, public, contiguous :: iboundary !< array of indices for tracking domain boundaries
     integer(I4B), dimension(:), pointer, public, contiguous :: icp !< previous cell number (reduced)
+    integer(I4B), dimension(:), pointer, public, contiguous :: iscp !< previous subcell number
     integer(I4B), dimension(:), pointer, public, contiguous :: icu !< cell number (user)
     integer(I4B), dimension(:), pointer, public, contiguous :: ilay !< layer
     integer(I4B), dimension(:), pointer, public, contiguous :: izone !< current zone number
@@ -134,6 +136,7 @@ contains
     call mem_allocate(this%iprp, np, 'PLIPRP', mempath)
     call mem_allocate(this%name, LENBOUNDNAME, np, 'PLNAME', mempath)
     call mem_allocate(this%icp, np, 'PLICP', mempath)
+    call mem_allocate(this%iscp, np, 'PLISCP', mempath)
     call mem_allocate(this%icu, np, 'PLICU', mempath)
     call mem_allocate(this%ilay, np, 'PLILAY', mempath)
     call mem_allocate(this%izone, np, 'PLIZONE', mempath)
@@ -166,6 +169,7 @@ contains
     call mem_deallocate(this%irpt, 'PLIRPT', mempath)
     call mem_deallocate(this%name, 'PLNAME', mempath)
     call mem_deallocate(this%icp, 'PLICP', mempath)
+    call mem_deallocate(this%iscp, 'PLISCP', mempath)
     call mem_deallocate(this%icu, 'PLICU', mempath)
     call mem_deallocate(this%ilay, 'PLILAY', mempath)
     call mem_deallocate(this%izone, 'PLIZONE', mempath)
@@ -201,6 +205,7 @@ contains
     call mem_reallocate(this%irpt, np, 'PLIRPT', mempath)
     call mem_reallocate(this%name, LENBOUNDNAME, np, 'PLNAME', mempath)
     call mem_reallocate(this%icp, np, 'PLICP', mempath)
+    call mem_reallocate(this%iscp, np, 'PLISCP', mempath)
     call mem_reallocate(this%icu, np, 'PLICU', mempath)
     call mem_reallocate(this%ilay, np, 'PLILAY', mempath)
     call mem_reallocate(this%izone, np, 'PLIZONE', mempath)
@@ -245,6 +250,7 @@ contains
     this%istopzone = store%istopzone(ip)
     this%idrymeth = store%idrymeth(ip)
     this%icp = store%icp(ip)
+    this%iscp = store%iscp(ip)
     this%icu = store%icu(ip)
     this%ilay = store%ilay(ip)
     this%izone = store%izone(ip)
@@ -282,6 +288,7 @@ contains
     this%istopzone(ip) = particle%istopzone
     this%idrymeth(ip) = particle%idrymeth
     this%icp(ip) = particle%icp
+    this%iscp(ip) = particle%iscp
     this%icu(ip) = particle%icu
     this%ilay(ip) = particle%ilay
     this%izone(ip) = particle%izone
