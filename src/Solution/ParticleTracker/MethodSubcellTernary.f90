@@ -62,6 +62,8 @@ contains
 
   !> @brief Track a particle across a triangular subcell.
   subroutine track_subcell(this, subcell, particle, tmax)
+    ! modules
+    use TdisModule, only: kper, kstp
     ! dummy
     class(MethodSubcellTernaryType), intent(inout) :: this
     class(SubcellTriType), intent(in) :: subcell
@@ -164,6 +166,8 @@ contains
     vzbot = subcell%vzbot
     vztop = subcell%vztop
 
+    print *, "subcell in track_subcell: ", subcell%icell, subcell%isubcell, x0, y0, x1, y1, x2, y2
+
     ! Transform coordinates to the "canonical" configuration:
     ! barycentric in two dimensions with alpha, beta & gamma
     ! such that at f2 alpha = 0, f0 beta = 0, f1 gamma = 0.
@@ -215,13 +219,11 @@ contains
     ! considering only the velocity component in the direction of
     ! the face. Then compute the particle's exit time.
     if (itrifaceexit /= 0) then
-      print *, "exit thru side"
       ! Exit through lateral subcell face
       exitFace = itrifaceexit
       dtexit = dtexitxy
     else if (dtexitz < dtexitxy) then
       ! Exit through top or bottom
-      print *, "exit thru top or bottom"
       if (itopbotexit == -1) then
         exitFace = 4
       else
@@ -231,16 +233,6 @@ contains
     end if
     texit = particle%ttrack + dtexit
     t0 = particle%ttrack
-
-    ! ! don't allow a particle to return to the subcell was just in
-    ! if (particle%idomain(2) == particle%icp .and. particle%idomain(3) == particle%iscp) then
-    !   print *, "isc: ", particle%idomain(3)
-    !   particle%idomain(3) = particle%iscp
-    !   particle%istatus = 5
-    !   particle%advancing = .false.
-    !   call this%save(particle, reason=3)
-    !   return
-    ! end if
 
     ! Select user tracking times to solve. If this is the first time step
     ! of the simulation, include all times before it begins; if it is the
@@ -302,8 +294,11 @@ contains
     ! save previous subcell id and exit face
     particle%iscp = particle%idomain(3)
     particle%iscefp = particle%iboundary(3)
-    print *, "exit face: ", particle%iboundary(3)
-    print *, "subcell: ", particle%idomain(3)
+    ! print *, "exit face: ", particle%iboundary(3)
+    ! print *, "subcell: ", particle%idomain(3)
+    ! print *, "subcell vertices: ", subcell%x0, subcell%x1, subcell%x2, subcell%y0, subcell%y1, subcell%y2
+    ! print *, "cell vertices: ", this%cell%defn%polyvert
+    if (kper == 52 .and. kstp == 1) stop
 
     call this%save(particle, reason=reason)
   end subroutine track_subcell

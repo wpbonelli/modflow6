@@ -9,7 +9,7 @@ module MethodCellTernaryModule
   use SubcellTriModule, only: SubcellTriType, create_subcell_tri
   use ParticleModule
   use GeomUtilModule, only: area
-  use ConstantsModule, only: DZERO, DONE, DTWO
+  use ConstantsModule, only: DZERO, DONE, DTWO, DSIX
   implicit none
 
   private
@@ -139,18 +139,6 @@ contains
       inface = this%nverts + 3
     end select
 
-    print *, "--------", isc, particle%iscp, exitFace, particle%iscefp
-    ! if (inface /= exitFace .and. isc == particle%iscp .and. exitFace == particle%iscefp) then
-    !   print *, 'subcell cycle, terminating'
-    !   particle%advancing = .false.
-    !   particle%idomain(3) = particle%iscp
-    !   particle%istatus = 2
-    !   call this%save(particle, reason=3)
-    ! else
-    !   particle%iscp = particle%idomain(3)
-    !   particle%iscefp = exitFace
-    ! end if
-
     if (inface .eq. -1) then
       particle%iboundary(2) = 0
     else if (inface .eq. 0) then
@@ -278,6 +266,9 @@ contains
           y1 = this%yvertnext(iv0)
           x2 = this%xctr
           y2 = this%yctr
+
+          print *, "subcell in load_subcell: ", ic, isc, x0, y0, x1, y1, x2, y2
+
           x1rel = x1 - x0
           y1rel = y1 - y0
           x2rel = x2 - x0
@@ -410,11 +401,22 @@ contains
       ! Cell area
       areacell = area(this%xvert, this%yvert)
 
+      print *, "areacell in vertvelo:, ", areacell
+
       ! Cell centroid (in general, this is NOT the average of the vertex coordinates)
-      sixa = areacell * 6.d0
+      sixa = areacell * DSIX
       wk1 = -(this%xvert * this%yvertnext - this%xvertnext * this%yvert)
+
+      print *, "xvert in vertvelo: ", this%xvert
+      print *, "yvert in vertvelo: ", this%yvert
+      print *, "xvertnext in vertvelo: ", this%xvertnext
+      print *, "yvertnext in vertvelo: ", this%yvertnext
+
       this%xctr = sum((this%xvert + this%xvertnext) * wk1) / sixa
       this%yctr = sum((this%yvert + this%yvertnext) * wk1) / sixa
+
+      print *, "xctr in vertvelo: ", this%xctr
+      print *, "yctr in vertvelo: ", this%yctr
 
       ! Subcell areas
       do i = 1, this%nverts

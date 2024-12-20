@@ -429,9 +429,6 @@ contains
 
     ! Accumulate mass for release point
     this%rptm(ip) = this%rptm(ip) + DONE
-
-    print *, "released particle: ", ip
-
   end subroutine release
 
   subroutine initialize_particle(this, particle, ip, trelease)

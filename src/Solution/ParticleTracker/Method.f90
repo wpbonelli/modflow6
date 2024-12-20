@@ -188,8 +188,6 @@ contains
     end if
 
     call this%trackctl%save(particle, kper=per, kstp=stp, reason=reason)
-    print *, "saving"
-    ! if (kper == 3) stop
 
   end subroutine save
 
@@ -267,7 +265,6 @@ contains
       ! dry particle
       if (particle%idrymeth == 0) then
         ! drop to water table
-        print *, "dropping"
         particle%z = cell_defn%top
         call this%save(particle, reason=1)
       else if (particle%idrymeth == 1) then

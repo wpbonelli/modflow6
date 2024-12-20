@@ -131,6 +131,7 @@ contains
       write (line, fmtvspts) kper, kstp
     case (MNORMAL)
       write (line, fmtspts) cpref, kper, kstp, trim(cend)
+      ! write (line, "(a)") ""
     end select
     if (isim_level >= VALL) &
       call write_message(line)
