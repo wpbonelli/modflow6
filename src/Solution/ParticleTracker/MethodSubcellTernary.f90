@@ -166,7 +166,7 @@ contains
     vzbot = subcell%vzbot
     vztop = subcell%vztop
 
-    print *, "subcell in track_subcell: ", subcell%icell, subcell%isubcell, x0, y0, x1, y1, x2, y2
+    ! print *, "subcell in track_subcell: ", subcell%icell, subcell%isubcell, x0, y0, x1, y1, x2, y2
 
     ! Transform coordinates to the "canonical" configuration:
     ! barycentric in two dimensions with alpha, beta & gamma
@@ -298,7 +298,7 @@ contains
     ! print *, "subcell: ", particle%idomain(3)
     ! print *, "subcell vertices: ", subcell%x0, subcell%x1, subcell%x2, subcell%y0, subcell%y1, subcell%y2
     ! print *, "cell vertices: ", this%cell%defn%polyvert
-    if (kper == 52 .and. kstp == 1) stop
+    ! if (kper == 50) stop
 
     call this%save(particle, reason=reason)
   end subroutine track_subcell
