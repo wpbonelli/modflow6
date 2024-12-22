@@ -297,12 +297,21 @@ contains
 
   !> @brief Step (evaluate) analytically depending on case
   subroutine step_analytical(t, alp, bet)
+    use TdisModule, only: kper
     ! -- dummy
     real(DP), intent(in) :: t
     real(DP) :: alp
     real(DP) :: bet
 
     if (icase .eq. 1) then
+      if (kper > 86) then
+        print *, "----"
+        print *, ca1
+        print *, ca2
+        print *, ca3
+        print *, waa
+        print *, t
+      end if
       alp = ca1 + ca2 * dexp(waa * t) + ca3 * dexp(wbb * t)
       bet = cb1 + cb2 * dexp(wbb * t)
     else if (icase .eq. -1) then
