@@ -11,6 +11,7 @@ module MethodSubcellTernaryModule
   use TernarySolveTrack, only: traverse_triangle, step_analytical, canonical
   use PrtFmiModule, only: PrtFmiType
   use BaseDisModule, only: DisBaseType
+  use MathUtilModule, only: is_close
   implicit none
 
   private
@@ -257,12 +258,6 @@ contains
       end do
     end if
 
-    ! if (izstatus > 1) then
-    !   particle%istatus = izstatus
-    !   particle%advancing = .false.
-    !   reason = 3
-    ! end if
-
     ! Compute exit time and face and update the particle's coordinates
     ! (local, unscaled) and other properties. The particle may at this
     ! point lie on a boundary of the subcell or may still be within it.
@@ -294,11 +289,6 @@ contains
     ! save previous subcell id and exit face
     particle%iscp = particle%idomain(3)
     particle%iscefp = particle%iboundary(3)
-    ! print *, "exit face: ", particle%iboundary(3)
-    ! print *, "subcell: ", particle%idomain(3)
-    ! print *, "subcell vertices: ", subcell%x0, subcell%x1, subcell%x2, subcell%y0, subcell%y1, subcell%y2
-    ! print *, "cell vertices: ", this%cell%defn%polyvert
-    ! if (kper == 50) stop
 
     call this%save(particle, reason=reason)
   end subroutine track_subcell
@@ -365,7 +355,7 @@ contains
     vv = v1a
     if (v2a .gt. vv) vv = v2a
     vvv = dva / vv
-    if (vvv .lt. 1.0d-4) then
+    if (vvv .lt. 1.0d-3) then
       zro = tol
       zrom = -zro
       v = v1
@@ -436,8 +426,15 @@ contains
       end if
     end if
 
+    if (vr < DZERO) then
+      print *, "vr v1a v2a: ", vr, v1a, v2a
+      print *, "vr1 vr2: ", vr1, vr2
+      print *, "v1 v2: ", v1, v2
+      print *, "v: ", v
+    end if
+
     ! Compute travel time to exit face. Return with status = 0
-    dt = log(vr) / dvdx
+    dt = log(abs(vr)) / dvdx
     status = 0
   end subroutine calculate_dt
 
