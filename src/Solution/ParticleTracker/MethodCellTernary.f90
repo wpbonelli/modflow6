@@ -430,14 +430,26 @@ contains
       this%xctr = sum((this%xvert + this%xvertnext) * wk1) / sixa
       this%yctr = sum((this%yvert + this%yvertnext) * wk1) / sixa
 
-      ! TODO: can we use some of the terms of the centroid calculation
-      ! to do a cheap point in polygon check?
-      !
+      ! Check if the centroid is outside of the cell's
+      ! bounding box. Cheap shortcut for the full point
+      ! in polygon check, really this is unlikely unless
+      ! a cell is absolutely gargantuan since the coords
+      ! are local.
+      if ( &
+        this%xctr < minval(this%xvert) .or. &
+        this%xctr > maxval(this%xvert) .or. &
+        this%yctr < minval(this%yvert) .or. &
+        this%yctr > maxval(this%yvert)) then
+          print *, "error -- centroid not in cell ", this%cell%defn%icell
+          call pstop(1)
+      end if
+      
+      ! Full point in polygon check, in case we need it..
       ! allocate(poly(2, nvert))
       ! poly(1,:) = this%xvert
       ! poly(2,:) = this%yvert
       ! if (.not. point_in_polygon(this%xctr, this%yctr, poly)) then
-      !   print *, "error -- centroid not in cell ", this%cell%defn%icell, this%xctr, this%yctr
+      !   print *, "error -- centroid not in cell ", this%cell%defn%icell
       !   call pstop(1)
       ! end if
       ! deallocate(poly)
