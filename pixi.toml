@@ -38,7 +38,7 @@ ruff = "*"
 scipy = "*"
 shapely = "*"
 syrupy = "*"
-tomlkit = "*"
+tomli = "*"
 xmipy = "*"
 
 [feature.rtd.dependencies]

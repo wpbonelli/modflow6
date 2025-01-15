@@ -41,5 +41,5 @@ dependencies:
   - scipy
   - shapely
   - syrupy
-  - tomlkit
+  - tomli
   

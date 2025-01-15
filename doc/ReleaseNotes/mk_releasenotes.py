@@ -18,7 +18,7 @@ if __name__ == "__main__":
     tex_path = Path(f"{fname}.tex").absolute()
     tex_path.unlink(missing_ok=True)
 
-    import tomlkit
+    import tomli
     from jinja2 import Environment, FileSystemLoader
 
     loader = FileSystemLoader(tex_path.parent)
@@ -37,8 +37,8 @@ if __name__ == "__main__":
     )
     template = env.get_template(f"{tex_path.name}.jinja")
     with open(tex_path, "w") as tex_file:
-        with open(toml_path) as toml_file:
-            notes = tomlkit.load(toml_file).get("notes")
+        with open(toml_path, "rb") as toml_file:
+            notes = tomli.load(toml_file).get("notes")
             if not notes:
                 warn("No release notes found, aborting")
                 sys.exit(0)
