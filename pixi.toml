@@ -66,7 +66,7 @@ rtd = { features = ["rtd"], solve-group = "default" }
 install-flopy = "pip install --no-build-isolation --no-deps --disable-pip-version-check git+https://github.com/modflowpy/flopy.git"
 install-pymake = "pip install --no-build-isolation --no-deps --disable-pip-version-check git+https://github.com/modflowpy/pymake.git"
 install-modflowapi = "pip install --no-build-isolation --no-deps --disable-pip-version-check git+https://github.com/MODFLOW-USGS/modflowapi.git"
-install-modflow-devtools = "pip install --no-build-isolation --no-deps --disable-pip-version-check git+https://github.com/MODFLOW-USGS/modflow-devtools.git"
+install-modflow-devtools = "pip install --no-build-isolation --no-deps --disable-pip-version-check https://github.com/wpbonelli/modflow-devtools/archive/download.zip"
 install = { depends-on = [
     "install-flopy",
     "install-pymake",
