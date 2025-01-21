@@ -2,276 +2,439 @@ module GridFileReaderModule
 
   use KindModule
   use SimModule, only: store_error, store_error_unit
+  use SimVariablesModule, only: errmsg
   use ConstantsModule, only: LINELENGTH
   use BaseDisModule, only: DisBaseType
   use DisModule, only: DisType
   use DisvModule, only: DisvType
   use DisuModule, only: DisuType
-  use InputOutputModule, only: urword, read_line, upcase
-  use LongLineReaderModule, only: LongLineReaderType
+  use InputOutputModule, only: urword, upcase, openfile
+  use Integer1dReaderModule, only: read_int1d
+  use Integer2dReaderModule, only: read_int2d
+  use Double1dReaderModule, only: read_dbl1d
+  use Double2dReaderModule, only: read_dbl2d
+  use HashTableModule, only: HashTableType, hash_table_cr, hash_table_da
+  use DblHashTableModule, only: DblHashTableType, &
+                                dbl_hash_table_cr, dbl_hash_table_da
+  use ArrayHandlersModule, only: ExpandArray
 
   implicit none
 
-  public :: GridFileReaderType
+  public :: GridFileReaderType, read_grb
+
+  interface read_grb
+    module procedure :: &
+      read_int_0d, read_int_1d, read_int_2d, read_int_3d, &
+      read_dbl_0d, read_dbl_1d, read_dbl_2d, read_dbl_3d
+  end interface read_grb
 
   type :: GridFileReaderType
     private
+    ! unit
     integer(I4B), public :: inunit
+    ! header
     character(len=10), public :: grid_type
     integer(I4B), public :: version
     integer(I4B) :: ntxt
     integer(I4B) :: lentxt
-    type(LongLineReaderType) :: linereader
+    ! index
+    type(HashTableType), pointer :: int_values !< maps variable name to integer scalar
+    type(DblHashTableType), pointer :: dbl_values !< maps variable name to double scalar
+    type(HashTableType), pointer :: arr_indices !< maps array variable name to index in file
+    type(HashTableType), pointer :: arr_types !< maps array variable name to type of array (1=int, 2=double)
+    type(HashTableType), pointer :: arr_shapes_index !< maps variable name to index in shapes
+    integer(I4B), allocatable :: arr_shapes(:) !< flat array of array variable shapes
   contains
-    procedure, public :: initialize
-    procedure, public :: finalize
-    procedure, public :: get_nodes
-    generic, public :: get_idomain => &
-      get_idomain_dis, get_idomain_disv, get_idomain_disu
-    procedure, private :: get_idomain_dis
-    procedure, private :: get_idomain_disv
-    procedure, private :: get_idomain_disu
+    procedure :: initialize
+    procedure :: read_header
+    procedure :: build_index
+    procedure :: finalize
   end type GridFileReaderType
 
 contains
 
-  subroutine initialize(this, iu, iout)
-    ! dummy
+  subroutine initialize(this, iu)
     class(GridFileReaderType) :: this
     integer(I4B), intent(in) :: iu
-    integer(I4B), intent(in), optional :: iout
-    ! local
-    character(len=:), allocatable :: line
-    integer(I4B) :: liout, lloc, istart, istop, ival, ierr
-    real(DP) :: rval
 
     this%inunit = iu
 
-    if (present(iout)) then
-      liout = iout
-    else
-      liout = 0
-    end if
+    call hash_table_cr(this%int_values)
+    call dbl_hash_table_cr(this%dbl_values)
+    call hash_table_cr(this%arr_indices)
+    call hash_table_cr(this%arr_types)
+    call hash_table_cr(this%arr_shapes_index)
+    allocate (this%arr_shapes(0))
 
-    if (iout > 0) &
-      write (iout, '(a)') &
-      'Reading grid file text headers to determine variables.'
+    call this%read_header()
+    call this%build_index()
+  end subroutine initialize
+
+  subroutine read_header(this)
+    ! dummy
+    class(GridFileReaderType) :: this
+    ! local
+    character(len=50) :: line
+    integer(I4B) :: lloc, istart, istop, ival
+    real(DP) :: rval
 
     ! grid type
-    call this%linereader%rdcom(this%inunit, liout, line, ierr)
+    read (this%inunit) line
     lloc = 1
-    call urword(line, lloc, istart, istop, 1, ival, rval, liout, 0)
-    call urword(line, lloc, istart, istop, 1, ival, rval, liout, 0)
+    call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
+    if (line(istart:istop) /= 'GRID') then
+      call store_error('Binary grid file must begin with "GRID". '//&
+                       &'Found: '//line(istart:istop))
+      call store_error_unit(this%inunit)
+    end if
+    call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
     this%grid_type = line(istart:istop)
     call upcase(this%grid_type)
 
     ! version
-    call this%linereader%rdcom(this%inunit, liout, line, ierr)
+    read (this%inunit) line
     lloc = 1
-    call urword(line, lloc, istart, istop, 1, ival, rval, liout, 0)
-    call urword(line, lloc, istart, istop, 2, ival, rval, liout, 0)
+    call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
+    call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
     this%version = ival
 
     ! ntxt
-    call this%linereader%rdcom(this%inunit, liout, line, ierr)
+    read (this%inunit) line
     lloc = 1
-    call urword(line, lloc, istart, istop, 1, ival, rval, liout, 0)
-    call urword(line, lloc, istart, istop, 2, ival, rval, liout, 0)
+    call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
+    call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
     this%ntxt = ival
 
     ! lentxt
-    call this%linereader%rdcom(this%inunit, liout, line, ierr)
+    read (this%inunit) line
     lloc = 1
-    call urword(line, lloc, istart, istop, 1, ival, rval, liout, 0)
-    call urword(line, lloc, istart, istop, 2, ival, rval, liout, 0)
+    call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
+    call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
     this%lentxt = ival
 
-    ! rewind file
-    rewind (this%inunit)
+    print *, 'grid_type: ', trim(this%grid_type), &
+      ' version: ', this%version, ' ntxt: ', this%ntxt, &
+      ' lentxt: ', this%lentxt
 
-  end subroutine initialize
+  end subroutine read_header
+
+  subroutine build_index(this)
+    class(GridFileReaderType) :: this
+    ! local
+    character(len=50) :: line
+    character(len=10) :: key, dtype
+    integer(I4B) :: i, lloc, istart, istop, ndim, dim
+    integer(I4B) :: shp_idx
+    integer(I4B) :: ival
+    real(DP) :: rval
+    integer(I4B), allocatable :: shp(:)
+
+    do i = 1, this%ntxt
+      ! read line
+      read (this%inunit) line
+
+      ! parse variable name
+      lloc = 1
+      call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
+      key = line(istart:istop)
+      call upcase(key)
+
+      ! parse data type
+      call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
+      dtype = line(istart:istop)
+      call upcase(dtype)
+
+      ! parse dimensions
+      call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
+      call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
+      ndim = ival
+      if (allocated(shp)) deallocate (shp)
+      allocate (shp(ndim))
+
+      ! parse shape
+      do dim = 1, ndim
+        call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
+        shp(dim) = ival
+      end do
+
+      print *, 'key: ', trim(key), ' dtype: ', trim(dtype), &
+        ' ndim: ', ndim, ' shp: ', shp
+
+      ! if scalar, read and store it.
+      ! if array, store shape/dimensions.
+      if (ndim == 0) then
+        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
+        if (dtype == "INTEGER") then
+          call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
+          call this%int_values%add(key, ival)
+        else if (dtype == "DOUBLE") then
+          call urword(line, lloc, istart, istop, 3, ival, rval, 0, 0)
+          call this%dbl_values%add(key, rval)
+        end if
+        cycle
+      else
+        call this%arr_indices%add(key, i)
+        if (dtype == "INTEGER") then
+          call this%arr_types%add(key, 1)
+        else if (dtype == "DOUBLE") then
+          call this%arr_types%add(key, 2)
+        end if
+        shp_idx = size(this%arr_shapes)
+        call ExpandArray(this%arr_shapes, increment=ndim)
+        this%arr_shapes(shp_idx + 1:shp_idx + ndim) = shp
+        call this%arr_shapes_index%add(key, shp_idx + 1)
+      end if
+    end do
+
+    rewind (this%inunit)
+  end subroutine build_index
 
   subroutine finalize(this)
     class(GridFileReaderType) :: this
     close (this%inunit)
+    call hash_table_da(this%int_values)
+    call dbl_hash_table_da(this%dbl_values)
+    call hash_table_da(this%arr_indices)
+    call hash_table_da(this%arr_types)
+    call hash_table_da(this%arr_shapes_index)
+    deallocate (this%arr_shapes)
   end subroutine finalize
 
-  function get_nodes(this) result(nodes)
-    class(GridFileReaderType) :: this
-    integer(I4B) :: nodes
+  subroutine read_int_0d(this, key, v)
+    class(GridFileReaderType), intent(inout) :: this
+    character(len=*), intent(in) :: key
+    integer(I4B), intent(out) :: v
+    v = this%int_values%get(key)
+  end subroutine read_int_0d
+
+  subroutine read_dbl_0d(this, key, v)
+    class(GridFileReaderType), intent(inout) :: this
+    character(len=*), intent(in) :: key
+    real(DP), intent(out) :: v
+    v = this%dbl_values%get(key)
+  end subroutine read_dbl_0d
+
+  subroutine read_int_1d(this, key, v)
+    ! dummy
+    class(GridFileReaderType), intent(inout) :: this
+    character(len=*), intent(in) :: key
+    integer(I4B), allocatable, intent(out) :: v(:)
     ! local
-    character(len=:), allocatable :: line, key
-    integer(I4B) :: i, lloc, istart, istop, ival, ierr
-    real(DP) :: rval
+    integer(I4B) :: i, shp
 
-    ! skip 4 header lines
-    do i = 1, 4
-      call this%linereader%rdcom(this%inunit, 0, line, ierr)
+    ! check type
+    if (this%arr_types%get(key) /= 1) then
+      write (errmsg, '(a, a, a)') &
+        'Variable ', trim(key), ' is not an integer array.'
+      call store_error(errmsg)
+    end if
+
+    ! get shape and allocate
+    shp = this%arr_shapes_index%get(key)
+    allocate (v(shp))
+
+    ! skip text lines
+    do i = 1, this%ntxt + 4
+      read (this%inunit)
     end do
 
-    ! read remaining lines, find index
-    ! of node count, and read value
-    do i = 1, this%ntxt
-      call this%linereader%rdcom(this%inunit, 0, line, ierr)
-      lloc = 1
-      call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-      key = line(istart:istop)
-      if (key == "NCELLS") then
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
-        nodes = ival
-        exit
-      end if
+    ! skip preceding arrays
+    do i = 1, this%arr_indices%get(key) - 1
+      read (this%inunit)
     end do
 
-    ! rewind file
-    rewind (this%inunit)
+    ! read the array
+    read (this%inunit) v
+  end subroutine read_int_1d
 
-  end function get_nodes
-
-  subroutine get_idomain_dis(this, idomain)
-    class(GridFileReaderType) :: this
-    integer(I4B), allocatable, intent(out) :: idomain(:, :, :)
+  subroutine read_dbl_1d(this, key, v)
+    ! dummy
+    class(GridFileReaderType), intent(inout) :: this
+    character(len=*), intent(in) :: key
+    real(DP), allocatable, intent(out) :: v(:)
     ! local
-    character(len=:), allocatable :: line, key
-    integer(I4B) :: i, idx, iostat, lloc, istart, istop, ival, ierr, dim
-    integer(I4B) :: shp(3)
-    real(DP) :: rval
+    integer(I4B) :: i, shp
 
-    ! skip 4 header lines
-    do i = 1, 4
-      call this%linereader%rdcom(this%inunit, 0, line, ierr)
+    ! check type
+    if (this%arr_types%get(key) /= 2) then
+      write (errmsg, '(a, a, a)') &
+        'Variable ', trim(key), ' is not a double array.'
+      call store_error(errmsg)
+    end if
+
+    ! get shape and allocate
+    shp = this%arr_shapes_index%get(key)
+    allocate (v(shp))
+
+    ! skip text lines
+    do i = 1, this%ntxt + 4
+      read (this%inunit)
     end do
 
-    ! read remaining lines, find index
-    ! of idomain, and load its shape
-    idx = 0
-    do i = 1, this%ntxt
-      call this%linereader%rdcom(this%inunit, 0, line, ierr)
-      lloc = 1
-      call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-      key = line(istart:istop)
-      call upcase(key)
-      if (key == "IDOMAIN") then
-        idx = i
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        do dim = 1, 3
-          call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
-          shp(dim) = ival
-        end do
-      end if
+    ! skip preceding arrays
+    do i = 1, this%arr_indices%get(key) - 1
+      read (this%inunit)
     end do
 
-    ! skip to and read idomain array
-    do i = 1, idx - 1
-      read (this%inunit, iostat=iostat)
-    end do
-    allocate (idomain(shp(1), shp(2), shp(3)))
-    read (this%inunit, iostat=iostat) idomain
+    ! read the array
+    read (this%inunit) v
+  end subroutine read_dbl_1d
 
-    ! rewind file
-    rewind (this%inunit)
-
-  end subroutine get_idomain_dis
-
-  subroutine get_idomain_disv(this, idomain)
-    class(GridFileReaderType) :: this
-    integer(I4B), allocatable, intent(out) :: idomain(:, :)
+  subroutine read_int_2d(this, key, v)
+    ! dummy
+    class(GridFileReaderType), intent(inout) :: this
+    character(len=*), intent(in) :: key
+    integer(I4B), allocatable, intent(out) :: v(:, :)
     ! local
-    character(len=:), allocatable :: line, key
-    integer(I4B) :: i, idx, iostat, lloc, istart, istop, ival, ierr, ndim, dim
-    integer(I4B) :: shp(2)
-    real(DP) :: rval
+    integer(I4B) :: i
+    integer(I4B), allocatable :: shp(:)
 
-    ! skip 4 header lines
-    do i = 1, 4
-      call this%linereader%rdcom(this%inunit, 0, line, ierr)
+    ! check type
+    if (this%arr_types%get(key) /= 1) then
+      write (errmsg, '(a, a, a)') &
+        'Variable ', trim(key), ' is not an integer array.'
+      call store_error(errmsg)
+    end if
+
+    ! get shape and allocate
+    allocate (shp(2))
+    do i = this%arr_shapes_index%get(key), i + 1
+      print *, 'setting dim ', i, ' shape to ', this%arr_shapes(i)
+      shp(i) = this%arr_shapes(i)
+    end do
+    allocate (v(shp(1), shp(2)))
+
+    ! skip text lines
+    do i = 1, this%ntxt + 4
+      read (this%inunit)
     end do
 
-    ! read remaining text lines, find index
-    ! of idomain array, and load its shape
-    idx = 0
-    do i = 1, this%ntxt
-      call this%linereader%rdcom(this%inunit, 0, line, ierr)
-      lloc = 1
-      call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-      key = line(istart:istop)
-      call upcase(key)
-      if (key == "IDOMAIN") then
-        idx = i
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
-        ndim = ival
-        do dim = 1, ndim
-          call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
-          shp(dim) = ival
-        end do
-        if (ndim == 1) then
-          shp(2) = ival
-        end if
-      end if
+    ! skip preceding arrays
+    do i = 1, this%arr_indices%get(key) - 1
+      read (this%inunit)
     end do
 
-    ! skip to and read idomain array
-    do i = 1, idx - 1
-      read (this%inunit, iostat=iostat)
-    end do
-    allocate (idomain(shp(1), shp(2)))
-    read (this%inunit, iostat=iostat) idomain
+    print *, 'reading ', trim(key), ' of shape ', shp
 
-    ! rewind file
-    rewind (this%inunit)
+    ! read the array
+    read (this%inunit) v(:,:)
 
-  end subroutine get_idomain_disv
+    deallocate (shp)
+  end subroutine read_int_2d
 
-  subroutine get_idomain_disu(this, idomain)
-    class(GridFileReaderType) :: this
-    integer(I4B), allocatable, intent(out) :: idomain(:)
+  subroutine read_dbl_2d(this, key, v)
+    class(GridFileReaderType), intent(inout) :: this
+    character(len=*), intent(in) :: key
+    real(DP), allocatable, intent(out) :: v(:, :)
     ! local
-    character(len=:), allocatable :: line, key
-    integer(I4B) :: i, idx, iostat, lloc, istart, istop, ival, ierr
-    integer(I4B) :: shp
-    real(DP) :: rval
+    integer(I4B) :: i
+    integer(I4B), allocatable :: shp(:)
 
-    ! skip 4 header lines
-    do i = 1, 4
-      call this%linereader%rdcom(this%inunit, 0, line, ierr)
+    ! check type
+    if (this%arr_types%get(key) /= 2) then
+      write (errmsg, '(a, a, a)') &
+        'Variable ', trim(key), ' is not a double array.'
+      call store_error(errmsg)
+    end if
+
+    ! get shape and allocate
+    allocate (shp(2))
+    do i = this%arr_shapes_index%get(key), i + 1
+      shp(i) = this%arr_shapes(i)
+    end do
+    allocate (v(shp(1), shp(2)))
+
+    ! skip text lines
+    do i = 1, this%ntxt + 4
+      read (this%inunit)
     end do
 
-    ! read remaining text lines, find index
-    ! of idomain array, and load its shape
-    idx = 0
-    do i = 1, this%ntxt
-      call this%linereader%rdcom(this%inunit, 0, line, ierr)
-      lloc = 1
-      call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-      key = line(istart:istop)
-      call upcase(key)
-      if (key == "IDOMAIN") then
-        idx = i
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 1, ival, rval, 0, 0)
-        call urword(line, lloc, istart, istop, 2, ival, rval, 0, 0)
-        shp = ival
-      end if
+    ! skip preceding arrays
+    do i = 1, this%arr_indices%get(key) - 1
+      read (this%inunit)
     end do
 
-    ! skip to and read idomain array
-    do i = 1, idx - 1
-      read (this%inunit, iostat=iostat)
+    ! read the array
+    read (this%inunit) v(:,:)
+
+    deallocate (shp)
+  end subroutine read_dbl_2d
+
+  subroutine read_int_3d(this, key, v)
+    class(GridFileReaderType), intent(inout) :: this
+    character(len=*), intent(in) :: key
+    integer(I4B), allocatable, intent(out) :: v(:, :, :)
+    ! local
+    integer(I4B) :: i
+    integer(I4B), allocatable :: shp(:)
+
+    ! check type
+    if (this%arr_types%get(key) /= 1) then
+      write (errmsg, '(a, a, a)') &
+        'Variable ', trim(key), ' is not an integer array.'
+      call store_error(errmsg)
+    end if
+
+    ! get shape and allocate
+    allocate (shp(3))
+    do i = this%arr_shapes_index%get(key), i + 1
+      shp(i) = this%arr_shapes(i)
     end do
-    allocate (idomain(shp))
-    read (this%inunit, iostat=iostat) idomain
+    allocate (v(shp(1), shp(2), shp(3)))
 
-    ! rewind file
-    rewind (this%inunit)
+    ! skip text lines
+    do i = 1, this%ntxt + 4
+      read (this%inunit)
+    end do
 
-  end subroutine get_idomain_disu
+    ! skip preceding arrays
+    do i = 1, this%arr_indices%get(key) - 1
+      read (this%inunit)
+    end do
+
+    ! read the array
+    read (this%inunit) v
+
+    deallocate (shp)
+  end subroutine read_int_3d
+
+  subroutine read_dbl_3d(this, key, v)
+    ! dummy
+    class(GridFileReaderType), intent(inout) :: this
+    character(len=*), intent(in) :: key
+    real(DP), allocatable, intent(out) :: v(:, :, :)
+    ! local
+    integer(I4B) :: i
+    integer(I4B), allocatable :: shp(:)
+
+    ! check type
+    if (this%arr_types%get(key) /= 2) then
+      write (errmsg, '(a, a, a)') &
+        'Variable ', trim(key), ' is not a double array.'
+      call store_error(errmsg)
+    end if
+
+    ! get shape and allocate
+    allocate (shp(3))
+    do i = this%arr_shapes_index%get(key), i + 1
+      shp(i) = this%arr_shapes(i)
+    end do
+    allocate (v(shp(1), shp(2), shp(3)))
+
+    ! skip text lines
+    do i = 1, this%ntxt + 4
+      read (this%inunit)
+    end do
+
+    ! skip preceding arrays
+    do i = 1, this%arr_indices%get(key) - 1
+      read (this%inunit)
+    end do
+
+    ! read the array
+    read (this%inunit) v
+
+    deallocate (shp)
+  end subroutine read_dbl_3d
 
 end module GridFileReaderModule

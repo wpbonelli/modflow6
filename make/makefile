@@ -232,6 +232,7 @@ $(OBJDIR)/TimeSeriesLink.o \
 $(OBJDIR)/TimeSeriesFileList.o \
 $(OBJDIR)/tdis.o \
 $(OBJDIR)/HashTable.o \
+$(OBJDIR)/DblHashTable.o \
 $(OBJDIR)/VectorBase.o \
 $(OBJDIR)/Sparse.o \
 $(OBJDIR)/DisvGeom.o \
