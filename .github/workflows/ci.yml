@@ -367,8 +367,8 @@ jobs:
       - smoke_test
     runs-on: ${{ matrix.os }}
     env:
-      FC: intel-classic
-      FC_V: "2021.7"
+      FC: intel
+      FC_V: "2025.0"
     strategy:
       fail-fast: false
       matrix:
