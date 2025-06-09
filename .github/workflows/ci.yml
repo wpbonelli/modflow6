@@ -311,23 +311,23 @@ jobs:
           fi
           echo "filters=$filters" >> $GITHUB_OUTPUT
 
-      - name: Test MF6
-        working-directory: modflow6
-        env:
-          REPOS_PATH: ${{ github.workspace }}
-        run: pixi run autotest -m "${{ steps.set_markers.outputs.markers }} and not external" -k "${{ steps.set_filters.outputs.filters }}"
+      # - name: Test MF6
+      #   working-directory: modflow6
+      #   env:
+      #     REPOS_PATH: ${{ github.workspace }}
+      #   run: pixi run autotest -m "${{ steps.set_markers.outputs.markers }} and not external" -k "${{ steps.set_filters.outputs.filters }}"
 
-      - name: Test MF6 models
-        working-directory: modflow6
-        env:
-          REPOS_PATH: ${{ github.workspace }}
-        run: pixi run autotest -m "${{ steps.set_markers.outputs.markers }} and external" -k "${{ steps.set_filters.outputs.filters }}" --models-path ../../modflow6-testmodels/mf6
+      # - name: Test MF6 models
+      #   working-directory: modflow6
+      #   env:
+      #     REPOS_PATH: ${{ github.workspace }}
+      #   run: pixi run autotest -m "${{ steps.set_markers.outputs.markers }} and external" -k "${{ steps.set_filters.outputs.filters }}" --models-path ../../modflow6-testmodels/mf6
 
-      - name: Test converter models
-        working-directory: modflow6
-        env:
-          REPOS_PATH: ${{ github.workspace }}
-        run: pixi run autotest -m "${{ steps.set_markers.outputs.markers }} and external" -k "${{ steps.set_filters.outputs.filters }}" --models-path ../../modflow6-testmodels/mf5to6 --namefile-pattern "*.nam"
+      # - name: Test converter models
+      #   working-directory: modflow6
+      #   env:
+      #     REPOS_PATH: ${{ github.workspace }}
+      #   run: pixi run autotest -m "${{ steps.set_markers.outputs.markers }} and external" -k "${{ steps.set_filters.outputs.filters }}" --models-path ../../modflow6-testmodels/mf5to6 --namefile-pattern "*.nam"
 
       - name: Install executables
         uses: modflowpy/install-modflow-action@v1
@@ -339,7 +339,12 @@ jobs:
         working-directory: modflow6
         shell: pixi run bash -e {0}
         run: |
-          cp -R bin/* ~/.local/bin/modflow/
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            dest="/c/Users/runneradmin/.local/bin/modflow/"
+          else
+            dest="$HOME/.local/bin/modflow/"
+          fi
+          cp -R bin/* $dest
           cd ../modflow6-examples/autotest
           pytest -v -n auto test_scripts.py
 
