@@ -332,21 +332,22 @@ jobs:
       - name: Install executables
         uses: modflowpy/install-modflow-action@v1
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
+      - name: Test examples
+        working-directory: modflow6
+        if: runner.os != 'Windows'
+        shell: pixi run bash -e {0}
+        run: |
+          cp -R bin/* ~/.local/bin/modflow/
+          cd ../modflow6-examples/autotest
+          pytest -v -n auto test_scripts.py
 
       - name: Test examples
         working-directory: modflow6
-        shell: pixi run bash -e {0}
+        if: runner.os == 'Windows'
         run: |
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            dest="/c/Users/runneradmin/.local/bin/modflow/"
-          else
-            dest="$HOME/.local/bin/modflow/"
-          fi
-          cp -R bin/* $dest
+          cp -R bin/* /c/Users/runneradmin/.local/bin/modflow/
           cd ../modflow6-examples/autotest
-          pytest -v -n auto test_scripts.py
+          pixi run --manifest-path ../../modflow6/pixi.toml pytest -v -n auto test_scripts.py
 
       - name: Upload failed test output
         if: failure()
