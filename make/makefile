@@ -603,6 +603,8 @@ $(OBJDIR)/rcm.o \
 $(OBJDIR)/blas1_d.o \
 $(OBJDIR)/Iunit.o \
 $(OBJDIR)/ForwardBinaryFileReader.o \
+$(OBJDIR)/BirectionalBudgetFileReader.o \
+$(OBJDIR)/BidirectionalBinaryFileReader.o \
 $(OBJDIR)/GwfSfrCommon.o \
 $(OBJDIR)/gwf-sfr-transient.o \
 $(OBJDIR)/gwf-sfr-steady.o \

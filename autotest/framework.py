@@ -170,6 +170,10 @@ class TestFramework:
         - `check`: function to evaluate the results of the model(s)
         - `plot`: function to create plots of the results
 
+    Another hook is available, `post`, to run an arbitrary task
+    upon completion of each simulation under test. This hook runs
+    whether the simulation succeeds or fails.
+
     There are several supported comparison scenarios: typically,
     the test framework compares the output of the MF6 under test
     to the latest MF6 release. The "original" regression testing
@@ -201,6 +205,8 @@ class TestFramework:
         Takes `self` as input. This is a good place for assertions.
     plot: callable, optional
         User defined function to create plots of the results.
+    post: callable, optional
+        User defined function to run after simulations complete.
     compare: str or Comparison, optional
         Selects the comparison type or program name. If a string,
         must be a key into the `targets` dictionary, i.e. a valid
@@ -237,6 +243,7 @@ class TestFramework:
         build: Callable | None = None,
         check: Callable | None = None,
         plot: Callable | None = None,
+        post: Callable | None = None,
         compare: str | Comparison | None = "auto",
         parallel: bool = False,
         ncpus: int = 1,
@@ -259,6 +266,7 @@ class TestFramework:
         self.build = build
         self.check = check
         self.plot = plot
+        self.post = post
         self.parallel = parallel
         self.ncpus = [ncpus] if isinstance(ncpus, int) else ncpus
         self.api_func = api_func
@@ -629,6 +637,10 @@ class TestFramework:
                 f"{'Simulation' if 'mf6' in str(target) else 'Model'} "
                 f"{'should have failed' if xfail else 'failed'}: {workspace}"
             )
+
+            # run post-simulation hook
+            if self.post:
+                self.post(self)
 
         # setup and run comparison model(s), if enabled
         if self.compare:

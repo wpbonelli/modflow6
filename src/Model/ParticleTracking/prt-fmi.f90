@@ -8,6 +8,8 @@ module PrtFmiModule
   use FlowModelInterfaceModule, only: FlowModelInterfaceType
   use BaseDisModule, only: DisBaseType
   use BudgetObjectModule, only: BudgetObjectType
+  use MemoryManagerModule, only: mem_allocate, mem_deallocate
+  use MemoryManagerExtModule, only: mem_set_value
 
   implicit none
   private
@@ -25,17 +27,23 @@ module PrtFmiModule
 
   type, extends(FlowModelInterfaceType) :: PrtFmiType
     private
+
     integer(I4B), public :: max_faces !< maximum number of 3d cell faces
     real(DP), allocatable, public :: SourceFlows(:) ! cell source flows array
     real(DP), allocatable, public :: SinkFlows(:) ! cell sink flows array
     real(DP), allocatable, public :: StorageFlows(:) ! cell storage flows array
     real(DP), allocatable, public :: BoundaryFlows(:, :) ! cell boundary flows array
     integer(I4B), allocatable, public :: BoundaryFaces(:) ! bitmask of assigned boundary faces
+    logical(LGP), pointer :: backwards => null() !< whether fmi should run backwards in time
 
   contains
-
     procedure :: fmi_ad
-    procedure :: fmi_df => prtfmi_df
+    procedure :: fmi_da => prtfmi_da
+    procedure :: allocate_scalars => prtfmi_allocate_scalars
+    procedure :: allocate_arrays => prtfmi_allocate_arrays
+    procedure :: source_options => prtfmi_source_options
+    procedure :: initialize_hfr => prtfmi_initialize_hfr
+    procedure :: initialize_bfr => prtfmi_initialize_bfr
     procedure, private :: accumulate_flows
     procedure :: mark_boundary_face
     procedure :: is_boundary_face
@@ -54,7 +62,7 @@ contains
     character(len=*), intent(in) :: input_mempath
     integer(I4B), intent(inout) :: inunit
     integer(I4B), intent(in) :: iout
-
+    !
     ! Create the object
     allocate (fmiobj)
 
@@ -68,11 +76,72 @@ contains
     ! Set variables
     fmiobj%inunit = inunit
     fmiobj%iout = iout
-
+    !
+    ! Initialize block parser
+    call fmiobj%parser%Initialize(fmiobj%inunit, fmiobj%iout)
+    !
     ! Assign dependent variable label
     fmiobj%depvartype = 'TRACKS          '
 
   end subroutine fmi_cr
+
+  subroutine prtfmi_allocate_scalars(this)
+    class(PrtFmiType) :: this
+
+    call this%FlowModelInterfaceType%allocate_scalars()
+    call mem_allocate(this%backwards, 'BACKWARDS', this%memoryPath)
+    this%backwards = .false.
+  end subroutine prtfmi_allocate_scalars
+
+  subroutine prtfmi_da(this)
+    class(PrtFmiType) :: this
+
+    call mem_deallocate(this%backwards)
+    call this%FlowModelInterfaceType%fmi_da()
+  end subroutine prtfmi_da
+
+  !> @ brief Source input options for package
+  !<
+  subroutine prtfmi_source_options(this)
+    ! -- dummy
+    class(PrtFmiType) :: this
+    ! -- local
+    logical(LGP) :: found_ipakcb, found_backwards
+    character(len=*), parameter :: fmtisvflow = &
+      "(4x,'CELL-BY-CELL FLOW INFORMATION WILL BE SAVED TO BINARY FILE &
+      &WHENEVER ICBCFL IS NOT ZERO AND FLOW IMBALANCE CORRECTION ACTIVE.')"
+
+    write (this%iout, '(1x,a)') 'PROCESSING FMI OPTIONS'
+
+    ! -- source package input
+    call mem_set_value(this%ipakcb, 'SAVE_FLOWS', this%input_mempath, &
+                       found_ipakcb)
+    call mem_set_value(this%backwards, 'BACKWARDS', this%input_mempath, &
+                       found_backwards)
+
+    if (found_ipakcb) then
+      this%ipakcb = -1
+      write (this%iout, fmtisvflow)
+    end if
+
+    if (found_backwards) then
+      this%backwards = .true.
+      write (this%iout, '(4x,a)') 'FMI WILL RUN BACKWARDS IN TIME.'
+    end if
+
+    write (this%iout, '(1x,a)') 'END OF FMI OPTIONS'
+  end subroutine prtfmi_source_options
+
+  subroutine prtfmi_initialize_bfr(this)
+    class(PrtFmiType) :: this
+    integer(I4B) :: ncrbud
+    call this%bfr%initialize(this%iubud, this%iout, ncrbud, this%backwards)
+  end subroutine prtfmi_initialize_bfr
+
+  subroutine prtfmi_initialize_hfr(this)
+    class(PrtFmiType) :: this
+    call this%hfr%initialize(this%iuhds, this%iout, this%backwards)
+  end subroutine prtfmi_initialize_hfr
 
   !> @brief Time step advance
   subroutine fmi_ad(this)
@@ -105,6 +174,16 @@ contains
 
     ! Accumulate flows
     call this%accumulate_flows()
+
+    ! Invert flows for backwards tracking
+    if (this%backwards) then
+      this%gwfflowja = -this%gwfflowja
+      this%gwfspdis = -this%gwfspdis
+      this%BoundaryFlows = -this%BoundaryFlows
+      this%SourceFlows = -this%SourceFlows
+      this%SinkFlows = -this%SinkFlows
+      this%StorageFlows = -this%StorageFlows
+    end if
 
     ! if flow cell is dry, then set this%ibound = 0
     do n = 1, this%dis%nodes
@@ -139,13 +218,12 @@ contains
 
   end subroutine fmi_ad
 
-  !> @brief Define the flow model interface
-  subroutine prtfmi_df(this, dis, idryinactive)
+  !> @brief Allocate FMI arrays including PRT-specific ones
+  subroutine prtfmi_allocate_arrays(this, nodes)
     class(PrtFmiType) :: this
-    class(DisBaseType), pointer, intent(in) :: dis
-    integer(I4B), intent(in) :: idryinactive
+    integer(I4B), intent(in) :: nodes
 
-    call this%FlowModelInterfaceType%fmi_df(dis, idryinactive)
+    call this%FlowModelInterfaceType%allocate_arrays(nodes)
 
     this%max_faces = this%dis%get_max_npolyverts() + 2
     if (this%max_faces > 32) then
@@ -163,7 +241,7 @@ contains
     allocate (this%BoundaryFlows(this%dis%nodes, this%max_faces))
     allocate (this%BoundaryFaces(this%dis%nodes))
 
-  end subroutine prtfmi_df
+  end subroutine prtfmi_allocate_arrays
 
   !> @brief Accumulate flows
   subroutine accumulate_flows(this)

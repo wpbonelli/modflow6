@@ -8,6 +8,14 @@ optional true
 longname save cell-by-cell flows to budget file
 description REPLACE save_flows {'{#1}': 'FMI'}
 
+block options
+name backwards
+type keyword
+reader urword
+optional true
+longname backwards tracking
+description keyword to enable backwards tracking. When backwards tracking is enabled, flow signs will be switched and time steps will be solved in reverse order.
+
 # --------------------- prt fmi packagedata ---------------------
 
 block packagedata
