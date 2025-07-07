@@ -1,7 +1,8 @@
 module HeadFileReaderModule
 
-  use KindModule
+  use KindModule, only: I4B, DP, LGP
   use ConstantsModule, only: LINELENGTH
+  use BinaryFileHeaderModule, only: BinaryFileHeaderType
   use BinaryFileReaderModule, only: BinaryFileReaderType
 
   implicit none
@@ -15,7 +16,6 @@ module HeadFileReaderModule
     real(DP), dimension(:), allocatable :: head
   contains
     procedure :: initialize
-    procedure :: read_record
     procedure :: finalize
   end type HeadFileReaderType
 
@@ -31,15 +31,16 @@ contains
     ! -- local
     integer(I4B) :: kstp_last, kper_last
     logical :: success
+    type(BinaryFileHeaderType), pointer :: header
     !
     this%inunit = iu
-    this%endoffile = .false.
     this%nlay = 0
+    allocate(header)
     !
     ! -- Read the first head data record to set kstp_last, kstp_last
-    call this%read_record(success)
-    kstp_last = this%kstp
-    kper_last = this%kper
+    call this%read_record(header, success)
+    kstp_last = header%kstp
+    kper_last = header%kper
     rewind (this%inunit)
     !
     ! -- Determine number of records within a time step
@@ -47,9 +48,9 @@ contains
       write (iout, '(a)') &
       'Reading binary file to determine number of records per time step.'
     do
-      call this%read_record(success, iout)
+      call this%read_record(header, success, iout)
       if (.not. success) exit
-      if (kstp_last /= this%kstp .or. kper_last /= this%kper) exit
+      if (kstp_last /= header%kstp .or. kper_last /= header%kper) exit
       this%nlay = this%nlay + 1
     end do
     rewind (this%inunit)
@@ -60,12 +61,13 @@ contains
 
   !< @brief read record
   !<
-  subroutine read_record(this, success, iout)
+  subroutine read_record(this, header, success, iout)
     ! -- modules
     use InputOutputModule, only: fseek_stream
     ! -- dummy
     class(HeadFileReaderType), intent(inout) :: this
-    logical, intent(out) :: success
+    type(BinaryFileHeaderType), pointer, intent(inout) :: header
+    logical(LGP), intent(out) :: success
     integer(I4B), intent(in), optional :: iout
     ! -- local
     integer(I4B) :: iostat, iout_opt
@@ -77,13 +79,11 @@ contains
       iout_opt = 0
     end if
     !
-    this%kstp = 0
-    this%kper = 0
+    header%kstp = 0
+    header%kper = 0
     success = .true.
-    this%kstpnext = 0
-    this%kpernext = 0
-    read (this%inunit, iostat=iostat) this%kstp, this%kper, this%pertim, &
-      this%totim, this%text, ncol, nrow, ilay
+    read (this%inunit, iostat=iostat) header%kstp, header%kper, header%pertim, &
+      header%totim, this%text, ncol, nrow, ilay
     if (iostat /= 0) then
       success = .false.
       if (iostat < 0) this%endoffile = .true.
@@ -103,7 +103,8 @@ contains
     ! -- read the head array
     read (this%inunit) this%head
     !
-    call this%peek_record()
+    if (this%current == this%total) this%endoffile = .true.
+    this%current = this%current + 1
   end subroutine read_record
 
   !< @brief finalize

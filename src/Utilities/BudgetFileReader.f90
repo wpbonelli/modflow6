@@ -1,9 +1,11 @@
 module BudgetFileReaderModule
 
-  use KindModule
+  use KindModule, only: I4B, DP, LGP
   use SimModule, only: store_error, store_error_unit
   use ConstantsModule, only: LINELENGTH
+  use BinaryFileHeaderModule, only: BinaryFileHeaderType
   use BinaryFileReaderModule, only: BinaryFileReaderType
+  use InputOutputModule, only: fseek_stream
 
   implicit none
 
@@ -38,7 +40,6 @@ module BudgetFileReaderModule
     character(len=16), dimension(:), allocatable :: dstpackagenamearray
   contains
     procedure :: initialize
-    procedure :: read_record
     procedure :: finalize
   end type BudgetFileReaderType
 
@@ -56,6 +57,7 @@ contains
     integer(I4B) :: ibudterm
     integer(I4B) :: kstp_last, kper_last
     integer(I4B) :: maxaux
+    type(BinaryFileHeaderType), pointer :: header
     logical :: success
     !
     this%inunit = iu
@@ -63,6 +65,7 @@ contains
     this%nbudterms = 0
     ncrbud = 0
     maxaux = 0
+    allocate (header)
     !
     ! -- Determine number of budget terms within a time step
     if (iout > 0) &
@@ -71,15 +74,15 @@ contains
     !
     ! -- Read through the first set of data for time step 1 and stress period 1
     do
-      call this%read_record(success)
+      call this%read_record(header, success)
       if (.not. success) exit
       this%nbudterms = this%nbudterms + 1
       if (this%naux > maxaux) maxaux = this%naux
-      if (this%kstp /= this%kstpnext .or. this%kper /= this%kpernext) &
+      if (header%kstp /= header%kstpnext .or. header%kper /= header%kpernext) &
         exit
     end do
-    kstp_last = this%kstp
-    kper_last = this%kper
+    kstp_last = header%kstp
+    kper_last = header%kper
     allocate (this%budtxtarray(this%nbudterms))
     allocate (this%imetharray(this%nbudterms))
     allocate (this%dstpackagenamearray(this%nbudterms))
@@ -90,7 +93,7 @@ contains
     !
     ! -- Now read through again and store budget text names
     do ibudterm = 1, this%nbudterms
-      call this%read_record(success, iout)
+      call this%read_record(header, success, iout)
       if (.not. success) exit
       this%budtxtarray(ibudterm) = this%budtxt
       this%imetharray(ibudterm) = this%imeth
@@ -111,12 +114,11 @@ contains
 
   !< @brief read record
   !<
-  subroutine read_record(this, success, iout)
-    ! -- modules
-    use InputOutputModule, only: fseek_stream
-    ! -- dummy
+  ! -- dummy
+  subroutine read_record(this, header, success, iout)
     class(BudgetFileReaderType), intent(inout) :: this
-    logical, intent(out) :: success
+    type(BinaryFileHeaderType), pointer, intent(inout) :: header
+    logical(LGP), intent(out) :: success
     integer(I4B), intent(in), optional :: iout
     ! -- local
     integer(I4B) :: i, n, iostat, iout_opt
@@ -128,8 +130,8 @@ contains
       iout_opt = 0
     end if
     !
-    this%kstp = 0
-    this%kper = 0
+    header%kstp = 0
+    header%kper = 0
     this%budtxt = ''
     this%nval = 0
     this%naux = 0
@@ -141,9 +143,9 @@ contains
     this%dstpackagename = ''
 
     success = .true.
-    this%kstpnext = 0
-    this%kpernext = 0
-    read (this%inunit, iostat=iostat) this%kstp, this%kper, this%budtxt, &
+    header%kstpnext = 0
+    header%kpernext = 0
+    read (this%inunit, iostat=iostat) header%kstp, header%kper, this%budtxt, &
       this%nval, this%idum1, this%idum2
     if (iostat /= 0) then
       success = .false.
