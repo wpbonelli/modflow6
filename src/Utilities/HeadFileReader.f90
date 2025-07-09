@@ -2,7 +2,7 @@ module HeadFileReaderModule
 
   use KindModule
   use ErrorUtilModule, only: pstop
-  use ConstantsModule, only: LINELENGTH
+  use ConstantsModule, only: LINELENGTH, LENBIGLINE
   use BinaryFileHeaderModule, only: BinaryFileHeaderType
   use BinaryFileReaderModule, only: BinaryFileReaderType
   use InputOutputModule, only: fseek_stream
@@ -37,8 +37,10 @@ contains
   function get_str(this) result(str)
     class(HeadFileHeaderType), intent(in) :: this
     character(len=:), allocatable :: str
+    ! local
+    character(len=LENBIGLINE) :: temp
 
-    write (str, '(*(G0))') &
+    write (temp, '(*(G0))') &
       'Head file header (pos: ', this%pos, &
       ', kper: ', this%kper, &
       ', kstp: ', this%kstp, &
@@ -50,7 +52,7 @@ contains
       ', srcpackagename: ', trim(this%srcpackagename), &
       ', dstmodelname: ', trim(this%dstmodelname), &
       ', dstpackagename: ', trim(this%dstpackagename), ')'
-    str = trim(str)
+    str = trim(temp)
   end function get_str
 
   subroutine detect_nlay(this, iout)
@@ -128,6 +130,8 @@ contains
       allocate (this%headers(i)%header, source=header)
       i = i + 1
     end do
+    print *, "Head file index built with ", this%total, &
+      " records."
     rewind (this%inunit)
     this%current = 1
     this%indexed = .true.

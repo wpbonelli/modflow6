@@ -169,6 +169,7 @@ contains
     do
       if (i > this%total) exit
       call this%read_record(header, success, iout)
+      print *, header%get_str()
       if (.not. success) call pstop(1, 'Error reading record header')
       allocate (this%headers(i)%header, source=header)
       i = i + 1
