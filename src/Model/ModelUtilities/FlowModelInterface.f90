@@ -8,8 +8,9 @@ module FlowModelInterfaceModule
   use NumericalPackageModule, only: NumericalPackageType
   use BaseDisModule, only: DisBaseType
   use ListModule, only: ListType
-  use BudgetFileReaderModule, only: BudgetFileReaderType
-  use HeadFileReaderModule, only: HeadFileReaderType
+  use BinaryFileHeaderModule, only: BinaryFileHeaderType
+  use BudgetFileReaderModule, only: BudgetFileReaderType, BudgetFileHeaderType
+  use HeadFileReaderModule, only: HeadFileReaderType, HeadFileHeaderType
   use GridFileReaderModule, only: GridFileReaderType
   use PackageBudgetModule, only: PackageBudgetType
   use BudgetObjectModule, only: BudgetObjectType, budgetobject_cr_bfr
@@ -615,33 +616,105 @@ contains
         if (this%bfr%headernext%kper == kper + 1) then
           readnext = .false.
         else if (this%bfr%endoffile) then
-          readnext = .false.
-        end if
-      else if (this%bfr%endoffile) then
-        write (errmsg, '(4x,a)') 'REACHED END OF GWF BUDGET &
-          &FILE BEFORE READING SUFFICIENT BUDGET INFORMATION FOR THIS &
-          &GWT SIMULATION.'
-        call store_error(errmsg)
-        call store_error_unit(this%iubud)
-      end if
-    end if
-    !
-    ! -- Read the next record
-    if (readnext) then
-      !
-      ! -- Write the current time step and stress period
-      write (this%iout, fmtkstpkper) kstp, kper
-      !
-      ! -- loop through the budget terms for this stress period
-      !    i is the counter for gwf flow packages
-      ip = 1
-      do n = 1, this%bfr%nbudterms
-        call this%bfr%read_record(success, this%iout)
-        if (.not. success) then
-          write (errmsg, '(4x,a)') 'GWF BUDGET READ NOT SUCCESSFUL'
+          write (errmsg, '(4x,a)') 'REACHED END OF GWF BUDGET &
+            &FILE BEFORE READING SUFFICIENT BUDGET INFORMATION FOR THIS &
+            &GWT SIMULATION.'
           call store_error(errmsg)
           call store_error_unit(this%iubud)
         end if
+      end if
+      !
+      ! -- Read the next record
+      if (readnext) then
+        ! Log the current time step and stress period
+        write (this%iout, fmtkstpkper) kstp, kper
+
+        ! -- loop through the budget terms for this stress period
+        !    i is the counter for gwf flow packages
+        ip = 1
+        do n = 1, this%bfr%nbudterms
+          call this%bfr%read_record(header, success, this%iout)
+          if (.not. success) then
+            write (errmsg, '(4x,a)') 'GWF BUDGET READ NOT SUCCESSFUL'
+            call store_error(errmsg)
+            call store_error_unit(this%iubud)
+          end if
+
+          ! Ensure kper is same between model and budget file
+          if (kper /= header%kper) then
+            write (errmsg, '(4x,a)') 'PERIOD NUMBER IN BUDGET FILE &
+              &DOES NOT MATCH PERIOD NUMBER IN TRANSPORT MODEL.  IF THERE &
+              &IS MORE THAN ONE TIME STEP IN THE BUDGET FILE FOR A GIVEN &
+              &STRESS PERIOD, BUDGET FILE TIME STEPS MUST MATCH GWT MODEL &
+              &TIME STEPS ONE-FOR-ONE IN THAT STRESS PERIOD.'
+            call store_error(errmsg)
+            call store_error_unit(this%iubud)
+          end if
+
+          ! if budget file kstp > 1, then kstp must match
+          if (header%kstp > 1 .and. (kstp /= header%kstp)) then
+            write (errmsg, '(4x,a)') 'TIME STEP NUMBER IN BUDGET FILE &
+              &DOES NOT MATCH TIME STEP NUMBER IN TRANSPORT MODEL.  IF THERE &
+              &IS MORE THAN ONE TIME STEP IN THE BUDGET FILE FOR A GIVEN STRESS &
+              &PERIOD, BUDGET FILE TIME STEPS MUST MATCH GWT MODEL TIME STEPS &
+              &ONE-FOR-ONE IN THAT STRESS PERIOD.'
+            call store_error(errmsg)
+            call store_error_unit(this%iubud)
+          end if
+
+          ! parse based on the type of data, and compress all user node
+          ! numbers into reduced node numbers
+          select case (trim(adjustl(header%text)))
+          case ('FLOW-JA-FACE')
+            ! bfr%flowja contains only reduced connections so there is
+            ! a one-to-one match with this%gwfflowja
+            do ipos = 1, size(this%bfr%flowja)
+              this%gwfflowja(ipos) = this%bfr%flowja(ipos)
+            end do
+          case ('DATA-SPDIS')
+            do i = 1, header%nlist
+              nu = this%bfr%nodesrc(i)
+              nr = this%dis%get_nodenumber(nu, 0)
+              if (nr <= 0) cycle
+              this%gwfspdis(1, nr) = this%bfr%auxvar(1, i)
+              this%gwfspdis(2, nr) = this%bfr%auxvar(2, i)
+              this%gwfspdis(3, nr) = this%bfr%auxvar(3, i)
+            end do
+          case ('DATA-SAT')
+            do i = 1, header%nlist
+              nu = this%bfr%nodesrc(i)
+              nr = this%dis%get_nodenumber(nu, 0)
+              if (nr <= 0) cycle
+              this%gwfsat(nr) = this%bfr%auxvar(1, i)
+            end do
+          case ('STO-SS')
+            do nu = 1, this%dis%nodesuser
+              nr = this%dis%get_nodenumber(nu, 0)
+              if (nr <= 0) cycle
+              this%gwfstrgss(nr) = this%bfr%flow(nu)
+            end do
+          case ('STO-SY')
+            do nu = 1, this%dis%nodesuser
+              nr = this%dis%get_nodenumber(nu, 0)
+              if (nr <= 0) cycle
+              this%gwfstrgsy(nr) = this%bfr%flow(nu)
+            end do
+          case default
+            call this%gwfpackages(ip)%copy_values( &
+              header%nlist, &
+              this%bfr%nodesrc, &
+              this%bfr%flow, &
+              this%bfr%auxvar)
+            do i = 1, this%gwfpackages(ip)%nbound
+              nu = this%gwfpackages(ip)%nodelist(i)
+              nr = this%dis%get_nodenumber(nu, 0)
+              this%gwfpackages(ip)%nodelist(i) = nr
+            end do
+            ip = ip + 1
+          end select
+        end do
+
+      else
         !
         ! -- Ensure kper is same between model and budget file
         if (kper /= this%bfr%header%kper) then
@@ -769,33 +842,19 @@ contains
         if (this%hfr%headernext%kper == kper + 1) then
           readnext = .false.
         else if (this%hfr%endoffile) then
-          readnext = .false.
-        end if
-      else if (this%hfr%endoffile) then
-        write (errmsg, '(4x,a)') 'REACHED END OF GWF HEAD &
-          &FILE BEFORE READING SUFFICIENT HEAD INFORMATION FOR THIS &
-          &GWT SIMULATION.'
-        call store_error(errmsg)
-        call store_error_unit(this%iuhds)
-      end if
-    end if
-    !
-    ! -- Read the next record
-    if (readnext) then
-      !
-      ! -- write to list file that heads are being read
-      write (this%iout, fmtkstpkper) kstp, kper
-      !
-      ! -- loop through the layered heads for this time step
-      do ilay = 1, this%hfr%nlay
-        !
-        ! -- read next head chunk
-        call this%hfr%read_record(success, this%iout)
-        if (.not. success) then
-          write (errmsg, '(4x,a)') 'GWF HEAD READ NOT SUCCESSFUL'
+          write (errmsg, '(4x,a)') 'REACHED END OF GWF HEAD &
+            &FILE BEFORE READING SUFFICIENT HEAD INFORMATION FOR THIS &
+            &GWT SIMULATION.'
           call store_error(errmsg)
           call store_error_unit(this%iuhds)
         end if
+      end if
+      !
+      ! -- Read the next record
+      if (readnext) then
+        !
+        ! -- write to list file that heads are being read
+        write (this%iout, fmtkstpkper) kstp, kper
         !
         ! -- Ensure kper is same between model and head file
         if (kper /= this%hfr%header%kper) then

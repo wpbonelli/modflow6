@@ -389,6 +389,7 @@ modflow_sources = files(
     'Utilities' / 'Vector' / 'SeqVector.f90',
     'Utilities' / 'ArrayHandlers.f90',
     'Utilities' / 'ArrayReaders.f90',
+    'Utilities' / 'BinaryFileHeader.f90',
     'Utilities' / 'BinaryFileReader.f90',
     'Utilities' / 'BlockParser.f90',
     'Utilities' / 'Budget.f90',

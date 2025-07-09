@@ -1,51 +1,88 @@
 module BudgetFileReaderModule
 
   use KindModule
+  use ErrorUtilModule, only: pstop
   use SimModule, only: store_error, store_error_unit
-  use ConstantsModule, only: LINELENGTH
+  use ConstantsModule, only: LINELENGTH, LENBIGLINE
+  use BinaryFileHeaderModule, only: BinaryFileHeaderType
   use BinaryFileReaderModule, only: BinaryFileReaderType
+  use InputOutputModule, only: fseek_stream
 
   implicit none
 
   private
-  public :: BudgetFileReaderType
+  public :: BudgetFileHeaderType, BudgetFileReaderType
+
+  type, extends(BinaryFileHeaderType) :: BudgetFileHeaderType
+    integer(I4B) :: naux
+    integer(I4B) :: ndat
+    integer(I4B) :: nval
+    integer(I4B) :: nlist
+    integer(I4B) :: idum1
+    integer(I4B) :: idum2
+    integer(I4B) :: imeth
+    character(len=16) :: srcmodelname
+    character(len=16) :: srcpackagename
+    character(len=16) :: dstmodelname
+    character(len=16) :: dstpackagename
+    character(len=16), allocatable :: auxtxt(:)
+  contains
+    procedure :: get_str
+  end type BudgetFileHeaderType
 
   type, extends(BinaryFileReaderType) :: BudgetFileReaderType
     logical :: hasimeth1flowja = .false.
     integer(I4B) :: nbudterms
-    character(len=16) :: budtxt
-    character(len=16), dimension(:), allocatable :: budtxtarray
-    integer(I4B) :: nval
-    integer(I4B) :: idum1
-    integer(I4B) :: idum2
-    integer(I4B) :: imeth
-    integer(I4B), dimension(:), allocatable :: imetharray
-    character(len=16) :: srcmodelname
-    character(len=16) :: srcpackagename
-    integer(I4B) :: ndat
-    integer(I4B) :: naux
-    integer(I4B), dimension(:), allocatable :: nauxarray
-    character(len=16), dimension(:), allocatable :: auxtxt
-    character(len=16), dimension(:, :), allocatable :: auxtxtarray
-    integer(I4B) :: nlist
-    real(DP), dimension(:), allocatable :: flowja
-    integer(I4B), dimension(:), allocatable :: nodesrc
-    integer(I4B), dimension(:), allocatable :: nodedst
-    real(DP), dimension(:), allocatable :: flow
-    real(DP), dimension(:, :), allocatable :: auxvar
+    character(len=16), allocatable :: budtxtarray(:)
+    integer(I4B), allocatable :: imetharray(:)
+    integer(I4B), allocatable :: nauxarray(:)
+    character(len=16), allocatable :: auxtxtarray(:, :)
+    real(DP), allocatable :: flowja(:)
+    integer(I4B), allocatable :: nodesrc(:)
+    integer(I4B), allocatable :: nodedst(:)
+    real(DP), allocatable :: flow(:)
+    real(DP), allocatable :: auxvar(:, :)
     character(len=16) :: dstmodelname
     character(len=16) :: dstpackagename
     character(len=16), dimension(:), allocatable :: dstpackagenamearray
   contains
     procedure :: initialize
+    procedure :: build_index
     procedure :: read_record
     procedure :: finalize
   end type BudgetFileReaderType
 
 contains
 
-  !< @brief initialize
-  !<
+  function get_str(this) result(str)
+    class(BudgetFileHeaderType), intent(in) :: this
+    character(len=:), allocatable :: str
+    ! local
+    character(len=LENBIGLINE) :: temp
+
+    write (temp, '(*(G0))') &
+      'Budget file header (pos: ', this%pos, &
+      ', kper: ', this%kper, &
+      ', kstp: ', this%kstp, &
+      ', delt: ', this%delt, &
+      ', pertim: ', this%pertim, &
+      ', totim: ', this%totim, &
+      ', text: ', trim(this%text), &
+      ', naux: ', this%naux, &
+      ', ndat: ', this%ndat, &
+      ', nval: ', this%nval, &
+      ', nlist: ', this%nlist, &
+      ', idum1: ', this%idum1, &
+      ', idum2: ', this%idum2, &
+      ', imeth: ', this%imeth, &
+      ', srcmodelname: ', trim(this%srcmodelname), &
+      ', srcpackagename: ', trim(this%srcpackagename), &
+      ', dstmodelname: ', trim(this%dstmodelname), &
+      ', dstpackagename: ', trim(this%dstpackagename), &
+      ', auxtxt: ', this%auxtxt
+    str = trim(temp)
+  end function get_str
+
   subroutine initialize(this, iu, iout, ncrbud)
     ! -- dummy
     class(BudgetFileReaderType) :: this
@@ -53,26 +90,22 @@ contains
     integer(I4B), intent(in) :: iout
     integer(I4B), intent(out) :: ncrbud
     ! -- local
-    integer(I4B) :: ibudterm
-    integer(I4B) :: kstp_last, kper_last
+    integer(I4B) :: i, kstp_last, kper_last
     integer(I4B) :: maxaux
-    logical :: success
-    !
+
     this%inunit = iu
-    this%endoffile = .false.
     this%nbudterms = 0
     ncrbud = 0
     maxaux = 0
-    !
-    ! -- Determine number of budget terms within a time step
+
+    call this%build_index(iout=iout)
+
     if (iout > 0) &
       write (iout, '(a)') &
       'Reading budget file to determine number of terms per time step.'
-    !
-    ! -- Read through the first set of data for time step 1 and stress period 1
-    do
-      call this%read_record(success)
-      if (.not. success) exit
+
+    ! Look through the first set of headers for time step 1 and stress period 1
+    do i = 1, this%total
       this%nbudterms = this%nbudterms + 1
       if (this%naux > maxaux) maxaux = this%naux
       if (this%header%kstp /= this%headernext%kstp .or. &
@@ -87,42 +120,74 @@ contains
     allocate (this%nauxarray(this%nbudterms))
     allocate (this%auxtxtarray(maxaux, this%nbudterms))
     this%auxtxtarray(:, :) = ''
-    rewind (this%inunit)
-    !
-    ! -- Now read through again and store budget text names
-    do ibudterm = 1, this%nbudterms
-      call this%read_record(success, iout)
-      if (.not. success) exit
-      this%budtxtarray(ibudterm) = this%budtxt
-      this%imetharray(ibudterm) = this%imeth
-      this%dstpackagenamearray(ibudterm) = this%dstpackagename
-      this%nauxarray(ibudterm) = this%naux
-      if (this%naux > 0) then
-        this%auxtxtarray(1:this%naux, ibudterm) = this%auxtxt(:)
-      end if
-      if (this%srcmodelname == this%dstmodelname) then
-        if (allocated(this%nodesrc)) ncrbud = max(ncrbud, maxval(this%nodesrc))
-      end if
+
+    ! Now look through again and store budget text names
+    do i = 1, this%nbudterms
+      select type (header => this%headers(i)%header)
+      type is (BudgetFileHeaderType)
+        this%budtxtarray(i) = header%text
+        this%imetharray(i) = header%imeth
+        this%dstpackagenamearray(i) = header%dstpackagename
+        this%nauxarray(i) = header%naux
+        if (header%naux > 0) then
+          this%auxtxtarray(1:header%naux, i) = header%auxtxt(:)
+        end if
+        if (header%srcmodelname == header%dstmodelname) then
+          if (allocated(this%nodesrc)) ncrbud = max(ncrbud, maxval(this%nodesrc))
+        end if
+      end select
     end do
-    rewind (this%inunit)
+
     if (iout > 0) &
       write (iout, '(a, i0, a)') 'Detected ', this%nbudterms, &
       ' unique flow terms in budget file.'
   end subroutine initialize
 
-  !< @brief read record
-  !<
-  subroutine read_record(this, success, iout)
-    ! -- modules
-    use InputOutputModule, only: fseek_stream
-    ! -- dummy
+  subroutine build_index(this, iout)
     class(BudgetFileReaderType), intent(inout) :: this
+    integer(I4B), intent(in), optional :: iout
+    ! local
+    integer(I4B) :: i
+    logical(LGP) :: success
+    type(BudgetFileHeaderType) :: header
+
+    if (this%indexed) return
+    i = 0
+    rewind (this%inunit)
+    do
+      call this%read_record(header, success, iout)
+      i = i + 1
+      if (this%endoffile) then
+        if (success) exit
+        call pstop(1, 'Error scanning record header')
+      end if
+    end do
+    this%total = i
+    allocate (this%headers(this%total))
+    rewind (this%inunit)
+    i = 1
+    do
+      if (i > this%total) exit
+      call this%read_record(header, success, iout)
+      if (.not. success) call pstop(1, 'Error reading record header')
+      allocate (this%headers(i)%header, source=header)
+      i = i + 1
+    end do
+    rewind (this%inunit)
+    this%current = 1
+    this%indexed = .true.
+  end subroutine build_index
+
+  subroutine read_record(this, header, success, iout)
+    ! dummy
+    class(BudgetFileReaderType), intent(inout) :: this
+    class(BinaryFileHeaderType), intent(out) :: header
     logical, intent(out) :: success
     integer(I4B), intent(in), optional :: iout
-    ! -- local
+    ! local
     integer(I4B) :: i, n, iostat, iout_opt
     character(len=LINELENGTH) :: errmsg
-    !
+
     if (present(iout)) then
       iout_opt = iout
     else
@@ -207,12 +272,9 @@ contains
     call this%peek_record()
   end subroutine read_record
 
-  !< @brief finalize
-  !<
   subroutine finalize(this)
     class(BudgetFileReaderType) :: this
     close (this%inunit)
-    if (allocated(this%auxtxt)) deallocate (this%auxtxt)
     if (allocated(this%flowja)) deallocate (this%flowja)
     if (allocated(this%nodesrc)) deallocate (this%nodesrc)
     if (allocated(this%nodedst)) deallocate (this%nodedst)

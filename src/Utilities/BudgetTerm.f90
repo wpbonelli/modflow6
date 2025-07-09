@@ -8,6 +8,7 @@ module BudgetTermModule
   use ConstantsModule, only: LENBUDTXT, DZERO
   use BaseDisModule, only: DisBaseType
   use InputOutputModule, only: ubdsv06
+  use BinaryFileHeaderModule, only: BinaryFileHeaderType
 
   implicit none
 
@@ -363,7 +364,7 @@ contains
   !<
   subroutine fill_from_bfr(this, bfr, dis)
     ! -- modules
-    use BudgetFileReaderModule, only: BudgetFileReaderType
+    use BudgetFileReaderModule, only: BudgetFileHeaderType, BudgetFileReaderType
     ! -- dummy
     class(BudgetTermType) :: this
     type(BudgetFileReaderType) :: bfr
@@ -374,43 +375,46 @@ contains
     integer(I4B) :: n2
     real(DP) :: q
     !
-    this%flowtype = bfr%budtxt
-    this%text1id1 = bfr%srcmodelname
-    this%text2id1 = bfr%srcpackagename
-    this%text1id2 = bfr%dstmodelname
-    this%text2id2 = bfr%dstpackagename
-    this%naux = bfr%naux
-    !
-    if (.not. associated(this%auxtxt)) then
-      allocate (this%auxtxt(this%naux))
-    else
-      if (size(this%auxtxt) /= this%naux) then
-        deallocate (this%auxtxt)
+    select type (header => bfr%headers(bfr%current)%header)
+    type is (BudgetFileHeaderType)
+      this%flowtype = header%text
+      this%text1id1 = header%srcmodelname
+      this%text2id1 = header%srcpackagename
+      this%text1id2 = header%dstmodelname
+      this%text2id2 = header%dstpackagename
+      this%naux = header%naux
+      this%nlist = header%nlist
+
+      if (.not. associated(this%auxtxt)) then
         allocate (this%auxtxt(this%naux))
+      else
+        if (size(this%auxtxt) /= this%naux) then
+          deallocate (this%auxtxt)
+          allocate (this%auxtxt(this%naux))
+        end if
       end if
-    end if
-    !
-    if (this%naux > 0) this%auxtxt(:) = bfr%auxtxt(:)
-    this%nlist = bfr%nlist
-    if (.not. associated(this%id1)) then
-      this%maxlist = this%nlist
-      allocate (this%id1(this%maxlist))
-      allocate (this%id2(this%maxlist))
-      allocate (this%flow(this%maxlist))
-      allocate (this%auxvar(this%naux, this%maxlist))
-    else
-      if (this%nlist > this%maxlist) then
+      !
+      if (this%naux > 0) this%auxtxt(:) = header%auxtxt(:)
+      if (.not. associated(this%id1)) then
         this%maxlist = this%nlist
-        deallocate (this%id1)
-        deallocate (this%id2)
-        deallocate (this%flow)
-        deallocate (this%auxvar)
         allocate (this%id1(this%maxlist))
         allocate (this%id2(this%maxlist))
         allocate (this%flow(this%maxlist))
         allocate (this%auxvar(this%naux, this%maxlist))
+      else
+        if (this%nlist > this%maxlist) then
+          this%maxlist = this%nlist
+          deallocate (this%id1)
+          deallocate (this%id2)
+          deallocate (this%flow)
+          deallocate (this%auxvar)
+          allocate (this%id1(this%maxlist))
+          allocate (this%id2(this%maxlist))
+          allocate (this%flow(this%maxlist))
+          allocate (this%auxvar(this%naux, this%maxlist))
+        end if
       end if
-    end if
+    end select
     !
     do i = 1, this%nlist
       n1 = bfr%nodesrc(i)

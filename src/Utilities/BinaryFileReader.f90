@@ -3,35 +3,43 @@ module BinaryFileReaderModule
   use KindModule, only: I4B, I8B, DP, LGP
   use ErrorUtilModule, only: pstop
   use InputOutputModule, only: fseek_stream
+  use BinaryFileHeaderModule, only: BinaryFileHeaderType, &
+                                    BinaryFileHeaderWrapperType
 
-  public :: BinaryFileHeaderType, BinaryFileReaderType
-
-  type :: BinaryFileHeaderType
-    integer(I4B) :: pos
-    integer(I4B) :: kper, kstp
-    real(DP) :: delt, pertim, totim
-  contains
-    procedure :: get_str
-  end type BinaryFileHeaderType
+  public :: BinaryFileReaderType
 
   type, abstract :: BinaryFileReaderType
     integer(I4B) :: inunit
     type(BinaryFileHeaderType) :: header
     type(BinaryFileHeaderType) :: headernext
-    logical(LGP) :: endoffile
+    integer(I4B) :: total = 0
+    integer(I4B) :: current = 0
+    logical(LGP) :: indexed = .false.
+    logical(LGP) :: endoffile = .false.
+    class(BinaryFileHeaderWrapperType), allocatable :: headers(:)
   contains
+    procedure(build_index_if), deferred :: build_index
     procedure(read_record_if), deferred :: read_record
     procedure :: peek_record
   end type BinaryFileReaderType
 
   abstract interface
-    subroutine read_record_if(this, success, iout)
-      import BinaryFileReaderType
+    subroutine read_record_if(this, header, success, iout)
+      import BinaryFileReaderType, BinaryFileHeaderType
       import I4B, LGP
       class(BinaryFileReaderType), intent(inout) :: this
+      class(BinaryFileHeaderType), intent(out) :: header
       logical(LGP), intent(out) :: success
       integer(I4B), intent(in), optional :: iout
     end subroutine read_record_if
+  end interface
+
+  abstract interface
+    subroutine build_index_if(this, iout)
+      import BinaryFileReaderType, I4B
+      class(BinaryFileReaderType), intent(inout) :: this
+      integer(I4B), intent(in), optional :: iout
+    end subroutine build_index_if
   end interface
 contains
 

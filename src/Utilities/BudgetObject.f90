@@ -12,7 +12,8 @@ module BudgetObjectModule
   use BudgetTermModule, only: BudgetTermType
   use TableModule, only: TableType, table_cr
   use BaseDisModule, only: DisBaseType
-  use BudgetFileReaderModule, only: BudgetFileReaderType
+  use BinaryFileHeaderModule, only: BinaryFileHeaderType
+  use BudgetFileReaderModule, only: BudgetFileReaderType, BudgetFileHeaderType
 
   implicit none
 
@@ -626,6 +627,7 @@ contains
     integer(I4B), intent(in) :: iout
     ! -- local
     logical :: readnext
+    type(BinaryFileHeaderType) :: current, next
     ! -- formats
     character(len=*), parameter :: fmtkstpkper = &
       &"(1x,/1x, a, ' READING BUDGET TERMS FOR KSTP ', i0, ' KPER ', i0)"
@@ -638,6 +640,7 @@ contains
     !    period.  Also do not read if it is the very first time step because
     !    the first chunk of data is read as part of the initialization
     readnext = .true.
+    current = this%bfr%headers(this%bfr%current)%header
     if (kstp * kper == 1) then
       readnext = .false.
     else if (kstp * kper > 1) then
@@ -676,10 +679,11 @@ contains
     ! -- local
     integer(I4B) :: i
     logical :: success
+    class(BinaryFileHeaderType), pointer :: header
     !
     ! -- Read flows from the binary file and copy them into this%budterm(:)
     do i = 1, this%nbudterm
-      call this%bfr%read_record(success, iout)
+      call this%bfr%read_record(header, success, iout)
       call this%budterm(i)%fill_from_bfr(this%bfr, dis)
     end do
   end subroutine fill_from_bfr
