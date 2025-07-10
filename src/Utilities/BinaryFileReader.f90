@@ -21,7 +21,8 @@ module BinaryFileReaderModule
     logical(LGP) :: endoffile
   contains
     procedure(read_record_if), deferred :: read_record
-    procedure :: peek_record
+    procedure, private :: peek_record
+    procedure :: has_next
   end type BinaryFileReaderType
 
   abstract interface
@@ -66,5 +67,13 @@ contains
       end if
     end if
   end subroutine peek_record
+
+  !> @brief Check if there is another record available.
+  function has_next(this) result(has)
+    class(BinaryFileReaderType), intent(in) :: this
+    logical(LGP) :: has
+
+    has = .not. this%endoffile
+  end function has_next
 
 end module BinaryFileReaderModule

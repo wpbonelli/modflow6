@@ -594,7 +594,7 @@ contains
     integer(I4B) :: ipos
     integer(I4B) :: nu, nr
     integer(I4B) :: ip, i
-    logical :: readnext
+    logical :: readnext, hasnext
     ! -- format
     character(len=*), parameter :: fmtkstpkper = &
                  "(1x,/1x,'FMI READING BUDGET TERMS &
@@ -610,14 +610,15 @@ contains
     ! -- new record) if the running model is still in that same stress period,
     ! -- or if that record is the last one in the budget file.
     readnext = .true.
+    hasnext = this%bfr%has_next()
     if (kstp * kper > 1) then
       if (this%bfr%header%kstp == 1) then
         if (this%bfr%headernext%kper == kper + 1) then
           readnext = .false.
-        else if (this%bfr%endoffile) then
+        else if (.not. hasnext) then
           readnext = .false.
         end if
-      else if (this%bfr%endoffile) then
+      else if (.not. hasnext) then
         write (errmsg, '(4x,a)') 'REACHED END OF GWF BUDGET &
           &FILE BEFORE READING SUFFICIENT BUDGET INFORMATION FOR THIS &
           &GWT SIMULATION.'
@@ -750,7 +751,7 @@ contains
     integer(I4B) :: nu, nr, i, ilay
     integer(I4B) :: ncpl
     real(DP) :: val
-    logical :: readnext
+    logical :: readnext, hasnext
     logical :: success
     character(len=*), parameter :: fmtkstpkper = &
                          "(1x,/1x,'FMI READING HEAD FOR &
@@ -764,14 +765,15 @@ contains
     ! -- new record) if the running model is still in that same stress period,
     ! -- or if that record is the last one in the head file.
     readnext = .true.
+    hasnext = this%hfr%has_next()
     if (kstp * kper > 1) then
       if (this%hfr%header%kstp == 1) then
         if (this%hfr%headernext%kper == kper + 1) then
           readnext = .false.
-        else if (this%hfr%endoffile) then
+        else if (.not. hasnext) then
           readnext = .false.
         end if
-      else if (this%hfr%endoffile) then
+      else if (.not. hasnext) then
         write (errmsg, '(4x,a)') 'REACHED END OF GWF HEAD &
           &FILE BEFORE READING SUFFICIENT HEAD INFORMATION FOR THIS &
           &GWT SIMULATION.'

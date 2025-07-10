@@ -641,7 +641,7 @@ contains
     if (kstp * kper == 1) then
       readnext = .false.
     else if (kstp * kper > 1) then
-      if (this%bfr%endoffile) then
+      if (.not. this%bfr%has_next()) then
         readnext = .false.
       else
         if (this%bfr%headernext%kper == kper + 1 .and. &
