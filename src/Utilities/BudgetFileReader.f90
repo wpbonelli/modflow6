@@ -3,7 +3,8 @@ module BudgetFileReaderModule
   use KindModule
   use SimModule, only: store_error, store_error_unit
   use ConstantsModule, only: LINELENGTH
-  use BinaryFileReaderModule, only: BinaryFileReaderType
+  use BinaryFileReaderModule, only: BinaryFileHeaderType, &
+                                    BinaryFileReaderType
 
   implicit none
 
@@ -57,12 +58,15 @@ contains
     integer(I4B) :: kstp_last, kper_last
     integer(I4B) :: maxaux
     logical :: success
+    type(BinaryFileHeaderType) :: next_header
     !
     this%inunit = iu
     this%endoffile = .false.
     this%nbudterms = 0
     ncrbud = 0
     maxaux = 0
+    !
+    call this%build_index(iout)
     !
     ! -- Determine number of budget terms within a time step
     if (iout > 0) &
@@ -75,8 +79,9 @@ contains
       if (.not. success) exit
       this%nbudterms = this%nbudterms + 1
       if (this%naux > maxaux) maxaux = this%naux
-      if (this%header%kstp /= this%headernext%kstp .or. &
-          this%header%kper /= this%headernext%kper) &
+      next_header = this%next_header()
+      if (this%header%kstp /= next_header%kstp .or. &
+          this%header%kper /= next_header%kper) &
         exit
     end do
     kstp_last = this%header%kstp
@@ -105,28 +110,37 @@ contains
       end if
     end do
     rewind (this%inunit)
+
     if (iout > 0) &
       write (iout, '(a, i0, a)') 'Detected ', this%nbudterms, &
       ' unique flow terms in budget file.'
+
   end subroutine initialize
 
   !< @brief read record
   !<
-  subroutine read_record(this, success, iout)
+  subroutine read_record(this, success, iout, header_only)
     ! -- modules
     use InputOutputModule, only: fseek_stream
     ! -- dummy
     class(BudgetFileReaderType), intent(inout) :: this
     logical, intent(out) :: success
     integer(I4B), intent(in), optional :: iout
+    logical, intent(in), optional :: header_only
     ! -- local
     integer(I4B) :: i, n, iostat, iout_opt
+    logical(LGP) :: header_only_opt
     character(len=LINELENGTH) :: errmsg
     !
     if (present(iout)) then
       iout_opt = iout
     else
       iout_opt = 0
+    end if
+    if (present(header_only)) then
+      header_only_opt = header_only
+    else
+      header_only_opt = .false.
     end if
     !
     this%header%kstp = 0
@@ -142,8 +156,6 @@ contains
     this%dstpackagename = ''
 
     success = .true.
-    this%headernext%kstp = 0
-    this%headernext%kper = 0
     read (this%inunit, iostat=iostat) this%header%kstp, this%header%kper, &
       this%budtxt, this%nval, this%idum1, this%idum2
     if (iostat /= 0) then

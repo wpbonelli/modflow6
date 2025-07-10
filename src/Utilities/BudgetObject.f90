@@ -13,6 +13,7 @@ module BudgetObjectModule
   use TableModule, only: TableType, table_cr
   use BaseDisModule, only: DisBaseType
   use BudgetFileReaderModule, only: BudgetFileReaderType
+  use BinaryFileReaderModule, only: BinaryFileHeaderType
 
   implicit none
 
@@ -626,6 +627,7 @@ contains
     integer(I4B), intent(in) :: iout
     ! -- local
     logical :: readnext
+    type(BinaryFileHeaderType) :: next_header
     ! -- formats
     character(len=*), parameter :: fmtkstpkper = &
       &"(1x,/1x, a, ' READING BUDGET TERMS FOR KSTP ', i0, ' KPER ', i0)"
@@ -644,8 +646,9 @@ contains
       if (this%bfr%endoffile) then
         readnext = .false.
       else
-        if (this%bfr%headernext%kper == kper + 1 .and. &
-            this%bfr%headernext%kstp == 1) &
+        next_header = this%bfr%next_header()
+        if (next_header%kper == kper + 1 .and. &
+            next_header%kstp == 1) &
           readnext = .false.
       end if
     end if

@@ -13,6 +13,7 @@ module FlowModelInterfaceModule
   use GridFileReaderModule, only: GridFileReaderType
   use PackageBudgetModule, only: PackageBudgetType
   use BudgetObjectModule, only: BudgetObjectType, budgetobject_cr_bfr
+  use BinaryFileReaderModule, only: BinaryFileHeaderType
 
   implicit none
   private
@@ -595,6 +596,7 @@ contains
     integer(I4B) :: nu, nr
     integer(I4B) :: ip, i
     logical :: readnext
+    type(BinaryFileHeaderType) :: next_header
     ! -- format
     character(len=*), parameter :: fmtkstpkper = &
                  "(1x,/1x,'FMI READING BUDGET TERMS &
@@ -612,7 +614,8 @@ contains
     readnext = .true.
     if (kstp * kper > 1) then
       if (this%bfr%header%kstp == 1) then
-        if (this%bfr%headernext%kper == kper + 1) then
+        next_header = this%bfr%next_header()
+        if (next_header%kper == kper + 1) then
           readnext = .false.
         else if (this%bfr%endoffile) then
           readnext = .false.
@@ -752,6 +755,7 @@ contains
     real(DP) :: val
     logical :: readnext
     logical :: success
+    type(BinaryFileHeaderType) :: next_header
     character(len=*), parameter :: fmtkstpkper = &
                          "(1x,/1x,'FMI READING HEAD FOR &
                          &KSTP ', i0, ' KPER ', i0)"
@@ -766,7 +770,8 @@ contains
     readnext = .true.
     if (kstp * kper > 1) then
       if (this%hfr%header%kstp == 1) then
-        if (this%hfr%headernext%kper == kper + 1) then
+        next_header = this%hfr%next_header()
+        if (next_header%kper == kper + 1) then
           readnext = .false.
         else if (this%hfr%endoffile) then
           readnext = .false.

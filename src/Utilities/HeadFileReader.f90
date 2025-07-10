@@ -36,6 +36,8 @@ contains
     this%endoffile = .false.
     this%nlay = 0
     !
+    call this%build_index(iout)
+    !
     ! -- Read the first head data record to set kstp_last, kstp_last
     call this%read_record(success)
     kstp_last = this%header%kstp
@@ -60,28 +62,34 @@ contains
 
   !< @brief read record
   !<
-  subroutine read_record(this, success, iout)
+  subroutine read_record(this, success, iout, header_only)
     ! -- modules
     use InputOutputModule, only: fseek_stream
     ! -- dummy
     class(HeadFileReaderType), intent(inout) :: this
     logical, intent(out) :: success
     integer(I4B), intent(in), optional :: iout
+    logical, intent(in), optional :: header_only
     ! -- local
+    logical(LGP) :: header_only_opt
     integer(I4B) :: iostat, iout_opt
     integer(I4B) :: ncol, nrow, ilay
+
     !
     if (present(iout)) then
       iout_opt = iout
     else
       iout_opt = 0
     end if
+    if (present(header_only)) then
+      header_only_opt = header_only
+    else
+      header_only_opt = .false.
+    end if
     !
     this%header%kstp = 0
     this%header%kper = 0
     success = .true.
-    this%headernext%kstp = 0
-    this%headernext%kper = 0
     read (this%inunit, iostat=iostat) this%header%kstp, this%header%kper, &
       this%header%pertim, this%header%totim, this%text, ncol, nrow, ilay
     if (iostat /= 0) then
