@@ -662,7 +662,7 @@ contains
     else
       if (iout > 0) &
         write (iout, fmtbudkstpkper) trim(this%name), kstp, kper, &
-        this%bfr%header%kstp, this%bfr%header%kper
+        this%bfr%index%header%kstp, this%bfr%index%header%kper
     end if
   end subroutine bfr_advance
 

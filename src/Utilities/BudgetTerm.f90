@@ -374,12 +374,12 @@ contains
     integer(I4B) :: n2
     real(DP) :: q
     !
-    this%flowtype = bfr%budtxt
+    this%flowtype = bfr%index%header%budtxt
     this%text1id1 = bfr%srcmodelname
     this%text2id1 = bfr%srcpackagename
     this%text1id2 = bfr%dstmodelname
     this%text2id2 = bfr%dstpackagename
-    this%naux = bfr%naux
+    this%naux = bfr%index%header%naux
     !
     if (.not. associated(this%auxtxt)) then
       allocate (this%auxtxt(this%naux))

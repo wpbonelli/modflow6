@@ -611,7 +611,7 @@ contains
     ! -- or if that record is the last one in the budget file.
     readnext = .true.
     if (kstp * kper > 1) then
-      if (this%bfr%header%kstp == 1) then
+      if (this%bfr%index%header%kstp == 1) then
         if (this%bfr%headernext%kper == kper + 1) then
           readnext = .false.
         else if (this%bfr%endoffile) then
@@ -644,7 +644,7 @@ contains
         end if
         !
         ! -- Ensure kper is same between model and budget file
-        if (kper /= this%bfr%header%kper) then
+        if (kper /= this%bfr%index%header%kper) then
           write (errmsg, '(4x,a)') 'PERIOD NUMBER IN BUDGET FILE &
             &DOES NOT MATCH PERIOD NUMBER IN TRANSPORT MODEL.  IF THERE &
             &IS MORE THAN ONE TIME STEP IN THE BUDGET FILE FOR A GIVEN &
@@ -655,7 +655,7 @@ contains
         end if
         !
         ! -- if budget file kstp > 1, then kstp must match
-        if (this%bfr%header%kstp > 1 .and. (kstp /= this%bfr%header%kstp)) then
+        if (this%bfr%index%header%kstp > 1 .and. (kstp /= this%bfr%index%header%kstp)) then
           write (errmsg, '(4x,a)') 'TIME STEP NUMBER IN BUDGET FILE &
             &DOES NOT MATCH TIME STEP NUMBER IN TRANSPORT MODEL.  IF THERE &
             &IS MORE THAN ONE TIME STEP IN THE BUDGET FILE FOR A GIVEN STRESS &
@@ -667,7 +667,7 @@ contains
         !
         ! -- parse based on the type of data, and compress all user node
         !    numbers into reduced node numbers
-        select case (trim(adjustl(this%bfr%budtxt)))
+        select case (trim(adjustl(this%bfr%index%header%budtxt)))
         case ('FLOW-JA-FACE')
           !
           ! -- bfr%flowja contains only reduced connections so there is
@@ -721,7 +721,7 @@ contains
       !
       ! -- write message to indicate that flows are being reused
       write (this%iout, fmtbudkstpkper) kstp, kper, &
-        this%bfr%header%kstp, this%bfr%header%kper
+        this%bfr%index%header%kstp, this%bfr%index%header%kper
       !
       ! -- set the flag to indicate that flows were not updated
       this%iflowsupdated = 0
@@ -765,7 +765,7 @@ contains
     ! -- or if that record is the last one in the head file.
     readnext = .true.
     if (kstp * kper > 1) then
-      if (this%hfr%header%kstp == 1) then
+      if (this%hfr%index%header%kstp == 1) then
         if (this%hfr%headernext%kper == kper + 1) then
           readnext = .false.
         else if (this%hfr%endoffile) then
@@ -798,7 +798,7 @@ contains
         end if
         !
         ! -- Ensure kper is same between model and head file
-        if (kper /= this%hfr%header%kper) then
+        if (kper /= this%hfr%index%header%kper) then
           write (errmsg, '(4x,a)') 'PERIOD NUMBER IN HEAD FILE &
             &DOES NOT MATCH PERIOD NUMBER IN TRANSPORT MODEL.  IF THERE &
             &IS MORE THAN ONE TIME STEP IN THE HEAD FILE FOR A GIVEN STRESS &
@@ -809,7 +809,7 @@ contains
         end if
         !
         ! -- if head file kstp > 1, then kstp must match
-        if (this%hfr%header%kstp > 1 .and. (kstp /= this%hfr%header%kstp)) then
+        if (this%hfr%index%header%kstp > 1 .and. (kstp /= this%hfr%index%header%kstp)) then
           write (errmsg, '(4x,a)') 'TIME STEP NUMBER IN HEAD FILE &
             &DOES NOT MATCH TIME STEP NUMBER IN TRANSPORT MODEL.  IF THERE &
             &IS MORE THAN ONE TIME STEP IN THE HEAD FILE FOR A GIVEN STRESS &
@@ -831,7 +831,7 @@ contains
       end do
     else
       write (this%iout, fmthdskstpkper) kstp, kper, &
-        this%hfr%header%kstp, this%hfr%header%kper
+        this%hfr%index%header%kstp, this%hfr%index%header%kper
     end if
   end subroutine advance_hfr
 

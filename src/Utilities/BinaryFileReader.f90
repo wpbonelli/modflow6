@@ -7,22 +7,42 @@ module BinaryFileReaderModule
   public :: BinaryFileHeaderType, BinaryFileReaderType
 
   type :: BinaryFileHeaderType
-    integer(I4B) :: pos
-    integer(I4B) :: kper, kstp
-    real(DP) :: delt, pertim, totim
+    integer(I4B) :: pos = 0
+    integer(I4B) :: kper, kstp = 0
+    real(DP) :: delt, pertim, totim = 0.0_DP
   contains
     procedure :: get_str
+    procedure :: reset => reset_header
   end type BinaryFileHeaderType
+
+  type, abstract :: BinaryFileIndexType
+    integer(I4B) :: inunit
+    logical(LGP) :: built = .false.
+    integer(I4B) :: total = 0
+    integer(I4B) :: current = 0
+    class(BinaryFileHeaderType), allocatable :: headers(:)
+  contains
+    procedure(read_header_if), deferred :: read_header
+    procedure :: reset
+  end type BinaryFileIndexType
 
   type, abstract :: BinaryFileReaderType
     integer(I4B) :: inunit
-    type(BinaryFileHeaderType) :: header
     type(BinaryFileHeaderType) :: headernext
     logical(LGP) :: endoffile
   contains
     procedure(read_record_if), deferred :: read_record
     procedure :: peek_record
   end type BinaryFileReaderType
+
+  abstract interface
+    subroutine read_header_if(this, eof)
+      import BinaryFileIndexType
+      import I4B, LGP
+      class(BinaryFileIndexType), intent(inout) :: this
+      logical(LGP), intent(out) :: eof
+    end subroutine read_header_if
+  end interface
 
   abstract interface
     subroutine read_record_if(this, success, iout)
@@ -50,6 +70,24 @@ contains
       ')'
     str = trim(str)
   end function get_str
+
+  subroutine reset(this)
+    class(BinaryFileIndexType) :: this
+    this%built = .false.
+    this%total = 0
+    this%current = 0
+    if (allocated(this%headers)) deallocate(this%headers)
+  end subroutine reset
+
+  subroutine reset_header(this)
+    class(BinaryFileHeaderType) :: this
+    this%pos = 0
+    this%kper = 0
+    this%kstp = 0
+    this%delt = 0.0_DP
+    this%pertim = 0.0_DP
+    this%totim = 0.0_DP
+  end subroutine reset_header
 
   !> @brief Peek to see if another record is available.
   subroutine peek_record(this)
