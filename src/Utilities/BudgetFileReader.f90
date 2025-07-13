@@ -2,7 +2,7 @@ module BudgetFileReaderModule
 
   use KindModule
   use SimModule, only: store_error, store_error_unit
-  use ConstantsModule, only: LINELENGTH
+  use ConstantsModule, only: LINELENGTH, LENHUGELINE
   use BinaryFileReaderModule, only: BinaryFileReaderType, BinaryFileHeaderType
 
   implicit none
@@ -13,6 +13,7 @@ module BudgetFileReaderModule
   type, extends(BinaryFileHeaderType) :: BudgetFileHeaderType
     character(len=16) :: budtxt
     integer(I4B) :: nval, idum1, idum2, imeth
+    real(DP) :: delt
     character(len=16) :: srcmodelname, srcpackagename
     character(len=16) :: dstmodelname, dstpackagename
     integer(I4B) :: ndat, naux, nlist
@@ -259,8 +260,9 @@ contains
   function get_str(this) result(str)
     class(BudgetFileHeaderType), intent(in) :: this
     character(len=:), allocatable :: str
+    character(len=LENHUGELINE) :: temp
 
-    write (str, '(*(G0))') &
+    write (temp, '(*(G0))') &
       'Budget file header (pos: ', this%pos, &
       ', kper: ', this%kper, &
       ', kstp: ', this%kstp, &
@@ -280,7 +282,7 @@ contains
       ', naux: ', this%naux, &
       ', nlist: ', this%nlist, &
       ')'
-    str = trim(str)
+    str = trim(temp)
   end function get_str
 
 end module BudgetFileReaderModule

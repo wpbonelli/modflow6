@@ -1,7 +1,7 @@
 module HeadFileReaderModule
 
   use KindModule
-  use ConstantsModule, only: LINELENGTH
+  use ConstantsModule, only: LINELENGTH, LENBIGLINE
   use BinaryFileReaderModule, only: BinaryFileReaderType, BinaryFileHeaderType
 
   implicit none
@@ -155,12 +155,12 @@ contains
   function get_str(this) result(str)
     class(HeadFileHeaderType), intent(in) :: this
     character(len=:), allocatable :: str
+    character(len=LENBIGLINE) :: temp
 
-    write (str, '(*(G0))') &
+    write (temp, '(*(G0))') &
       'Head file header (pos: ', this%pos, &
       ', kper: ', this%kper, &
       ', kstp: ', this%kstp, &
-      ', delt: ', this%delt, &
       ', pertim: ', this%pertim, &
       ', totim: ', this%totim, &
       ', text: ', trim(this%text), &
@@ -168,7 +168,7 @@ contains
       ', nrow: ', this%nrow, &
       ', ilay: ', this%ilay, &
       ')'
-    str = trim(str)
+    str = trim(temp)
   end function get_str
 
 end module HeadFileReaderModule

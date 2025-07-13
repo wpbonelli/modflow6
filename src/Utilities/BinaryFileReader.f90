@@ -6,10 +6,10 @@ module BinaryFileReaderModule
 
   public :: BinaryFileHeaderType, BinaryFileReaderType
 
-  type :: BinaryFileHeaderType
+  type, abstract :: BinaryFileHeaderType
     integer(I4B) :: pos
     integer(I4B) :: kper, kstp
-    real(DP) :: delt, pertim, totim
+    real(DP) :: pertim, totim
   contains
     procedure :: get_str
   end type BinaryFileHeaderType
@@ -20,11 +20,20 @@ module BinaryFileReaderModule
     class(BinaryFileHeaderType), allocatable :: headernext
     logical(LGP) :: endoffile
   contains
+    procedure(read_header_if), deferred :: read_header
     procedure(read_record_if), deferred :: read_record
     procedure :: peek_record
   end type BinaryFileReaderType
 
   abstract interface
+    subroutine read_header_if(this, success, iout)
+      import BinaryFileReaderType
+      import I4B, LGP
+      class(BinaryFileReaderType), intent(inout) :: this
+      logical(LGP), intent(out) :: success
+      integer(I4B), intent(in), optional :: iout
+    end subroutine read_header_if
+
     subroutine read_record_if(this, success, iout)
       import BinaryFileReaderType
       import I4B, LGP
@@ -44,7 +53,6 @@ contains
       'Binary file header (pos: ', this%pos, &
       ', kper: ', this%kper, &
       ', kstp: ', this%kstp, &
-      ', delt: ', this%delt, &
       ', pertim: ', this%pertim, &
       ', totim: ', this%totim, &
       ')'
