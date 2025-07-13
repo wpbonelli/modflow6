@@ -14,6 +14,7 @@ module HeadFileReaderModule
     integer(I4B) :: ncol, nrow, ilay
   contains
     procedure :: get_str
+    procedure :: get_data_size
   end type HeadFileHeaderType
 
   type, extends(BinaryFileReaderType) :: HeadFileReaderType
@@ -70,13 +71,20 @@ contains
 
   !< @brief read header only
   !<
-  subroutine read_header(this, success, iout)
+  subroutine read_header(this, success, iout, seek_next)
+    ! -- modules
+    use InputOutputModule, only: fseek_stream
     ! -- dummy
     class(HeadFileReaderType), intent(inout) :: this
     logical, intent(out) :: success
     integer(I4B), intent(in), optional :: iout
+    logical, intent(in), optional :: seek_next
     ! -- local
     integer(I4B) :: iostat
+    logical :: skip_data
+    !
+    skip_data = .false.
+    if (present(seek_next)) skip_data = seek_next
     !
     success = .true.
     select type (h => this%header)
@@ -93,6 +101,13 @@ contains
         success = .false.
         if (iostat < 0) this%endoffile = .true.
         return
+      end if
+      if (skip_data) then
+        call fseek_stream(this%inunit, h%get_data_size(), 1, iostat)
+        if (iostat /= 0) then
+          success = .false.
+          return
+        end if
       end if
     end select
   end subroutine read_header
@@ -170,5 +185,12 @@ contains
       ')'
     str = trim(str)
   end function get_str
+
+  !> @brief Get the size of the data array in bytes
+  function get_data_size(this) result(data_size)
+    class(HeadFileHeaderType), intent(in) :: this
+    integer(I4B) :: data_size
+    data_size = this%ncol * this%nrow * 8
+  end function get_data_size
 
 end module HeadFileReaderModule

@@ -19,6 +19,7 @@ module BudgetFileReaderModule
     character(len=16), dimension(:), allocatable :: auxtxt
   contains
     procedure :: get_str
+    procedure :: get_data_size
   end type BudgetFileHeaderType
 
   type, extends(BinaryFileReaderType) :: BudgetFileReaderType
@@ -122,14 +123,21 @@ contains
 
   !< @brief read header only
   !<
-  subroutine read_header(this, success, iout)
+  subroutine read_header(this, success, iout, seek_next)
+    ! -- modules
+    use InputOutputModule, only: fseek_stream
     ! -- dummy
     class(BudgetFileReaderType), intent(inout) :: this
     logical, intent(out) :: success
     integer(I4B), intent(in), optional :: iout
+    logical, intent(in), optional :: seek_next
     ! -- local
     integer(I4B) :: iostat
     character(len=LINELENGTH) :: errmsg
+    logical :: skip_data
+    !
+    skip_data = .false.
+    if (present(seek_next)) skip_data = seek_next
     !
     success = .true.
     select type (h => this%header)
@@ -175,6 +183,13 @@ contains
         write (errmsg, '(a, i0)') 'INVALID METHOD CODE DETECTED: ', h%imeth
         call store_error(errmsg)
         call store_error_unit(this%inunit)
+      end if
+      if (skip_data) then
+        call fseek_stream(this%inunit, h%get_data_size(), 1, iostat)
+        if (iostat /= 0) then
+          success = .false.
+          return
+        end if
       end if
     end select
   end subroutine read_header
@@ -282,5 +297,23 @@ contains
       ')'
     str = trim(str)
   end function get_str
+
+  !> @brief Get the size of the data array in bytes
+  function get_data_size(this) result(data_size)
+    class(BudgetFileHeaderType), intent(in) :: this
+    integer(I4B) :: data_size
+    
+    if (this%imeth == 1) then
+      if (trim(adjustl(this%budtxt)) == 'FLOW-JA-FACE') then
+        data_size = this%nval * 8
+      else
+        data_size = this%nval * this%idum1 * abs(this%idum2) * 8
+      end if
+    elseif (this%imeth == 6) then
+      data_size = this%nlist * (4 + 4 + 8 + this%naux * 8)
+    else
+      data_size = 0
+    end if
+  end function get_data_size
 
 end module BudgetFileReaderModule

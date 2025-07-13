@@ -20,11 +20,20 @@ module BinaryFileReaderModule
     class(BinaryFileHeaderType), allocatable :: headernext
     logical(LGP) :: endoffile
   contains
+    procedure(read_header_if), deferred :: read_header
     procedure(read_record_if), deferred :: read_record
     procedure :: peek_record
   end type BinaryFileReaderType
 
   abstract interface
+    subroutine read_header_if(this, success, iout, seek_next)
+      import BinaryFileReaderType
+      import I4B, LGP
+      class(BinaryFileReaderType), intent(inout) :: this
+      logical(LGP), intent(out) :: success
+      integer(I4B), intent(in), optional :: iout
+      logical(LGP), intent(in), optional :: seek_next
+    end subroutine read_header_if
     subroutine read_record_if(this, success, iout)
       import BinaryFileReaderType
       import I4B, LGP
