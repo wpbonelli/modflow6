@@ -1,7 +1,7 @@
 module HeadFileReaderModule
 
   use KindModule
-  use ConstantsModule, only: LINELENGTH
+  use ConstantsModule, only: LINELENGTH, LENHUGELINE
   use BinaryFileReaderModule, only: BinaryFileReaderType, BinaryFileHeaderType
 
   implicit none
@@ -15,6 +15,7 @@ module HeadFileReaderModule
   contains
     procedure :: get_str
     procedure :: get_data_size
+    procedure :: get_header_size
   end type HeadFileHeaderType
 
   type, extends(BinaryFileReaderType) :: HeadFileReaderType
@@ -43,6 +44,9 @@ contains
     this%inunit = iu
     this%endoffile = .false.
     this%nlay = 0
+    this%indexed = .false.
+    this%nrecords = 0
+    this%current = 0
     !
     allocate (HeadFileHeaderType :: this%header)
     allocate (HeadFileHeaderType :: this%headernext)
@@ -95,6 +99,7 @@ contains
       h%ncol = 0
       h%nrow = 0
       h%ilay = 0
+      inquire(this%inunit, pos=h%pos)
       read (this%inunit, iostat=iostat) h%kstp, h%kper, &
         h%pertim, h%totim, h%text, h%ncol, h%nrow, h%ilay
       if (iostat /= 0) then
@@ -164,18 +169,19 @@ contains
     if (allocated(this%head)) deallocate (this%head)
     if (allocated(this%header)) deallocate (this%header)
     if (allocated(this%headernext)) deallocate (this%headernext)
+    if (allocated(this%record_sizes)) deallocate (this%record_sizes)
   end subroutine finalize
 
   !> @brief Get a string representation of the head file header.
   function get_str(this) result(str)
     class(HeadFileHeaderType), intent(in) :: this
     character(len=:), allocatable :: str
+    character(len=LENHUGELINE) :: temp
 
-    write (str, '(*(G0))') &
+    write (temp, '(*(G0))') &
       'Head file header (pos: ', this%pos, &
       ', kper: ', this%kper, &
       ', kstp: ', this%kstp, &
-      ', delt: ', this%delt, &
       ', pertim: ', this%pertim, &
       ', totim: ', this%totim, &
       ', text: ', trim(this%text), &
@@ -183,7 +189,7 @@ contains
       ', nrow: ', this%nrow, &
       ', ilay: ', this%ilay, &
       ')'
-    str = trim(str)
+    str = trim(temp)
   end function get_str
 
   !> @brief Get the size of the data array in bytes
@@ -192,5 +198,11 @@ contains
     integer(I4B) :: data_size
     data_size = this%ncol * this%nrow * 8
   end function get_data_size
+
+  function get_header_size(this) result(header_size)
+    class(HeadFileHeaderType), intent(in) :: this
+    integer(I4B) :: header_size
+    header_size = 2 * I4B + LENHUGELINE + 3 * I4B + 3 * I4B
+  end function get_header_size
 
 end module HeadFileReaderModule

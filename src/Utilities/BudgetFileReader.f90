@@ -2,7 +2,7 @@ module BudgetFileReaderModule
 
   use KindModule
   use SimModule, only: store_error, store_error_unit
-  use ConstantsModule, only: LINELENGTH
+  use ConstantsModule, only: LINELENGTH, LENHUGELINE
   use BinaryFileReaderModule, only: BinaryFileReaderType, BinaryFileHeaderType
 
   implicit none
@@ -11,6 +11,7 @@ module BudgetFileReaderModule
   public :: BudgetFileReaderType, BudgetFileHeaderType
 
   type, extends(BinaryFileHeaderType) :: BudgetFileHeaderType
+    integer(I4B) :: delt
     character(len=16) :: budtxt
     integer(I4B) :: nval, idum1, idum2, imeth
     character(len=16) :: srcmodelname, srcpackagename
@@ -20,6 +21,7 @@ module BudgetFileReaderModule
   contains
     procedure :: get_str
     procedure :: get_data_size
+    procedure :: get_header_size
   end type BudgetFileHeaderType
 
   type, extends(BinaryFileReaderType) :: BudgetFileReaderType
@@ -61,6 +63,9 @@ contains
     this%inunit = iu
     this%endoffile = .false.
     this%nbudterms = 0
+    this%indexed = .false.
+    this%nrecords = 0
+    this%current = 0
     ncrbud = 0
     maxaux = 0
     !
@@ -134,10 +139,10 @@ contains
     ! -- local
     integer(I4B) :: iostat
     character(len=LINELENGTH) :: errmsg
-    logical :: skip_data
+    logical :: seek
     !
-    skip_data = .false.
-    if (present(seek_next)) skip_data = seek_next
+    seek = .false.
+    if (present(seek_next)) seek = seek_next
     !
     success = .true.
     select type (h => this%header)
@@ -158,6 +163,7 @@ contains
       h%nlist = 0
       if (allocated(h%auxtxt)) deallocate (h%auxtxt)
 
+      inquire(this%inunit, pos=h%pos)
       read (this%inunit, iostat=iostat) h%kstp, h%kper, &
         h%budtxt, h%nval, h%idum1, h%idum2
       if (iostat /= 0) then
@@ -166,6 +172,7 @@ contains
         return
       end if
       read (this%inunit) h%imeth, h%delt, h%pertim, h%totim
+      print *, "Read: ", h%get_str()
       if (h%imeth == 6) then
         read (this%inunit) h%srcmodelname
         read (this%inunit) h%srcpackagename
@@ -184,7 +191,7 @@ contains
         call store_error(errmsg)
         call store_error_unit(this%inunit)
       end if
-      if (skip_data) then
+      if (seek) then
         call fseek_stream(this%inunit, h%get_data_size(), 1, iostat)
         if (iostat /= 0) then
           success = .false.
@@ -224,13 +231,13 @@ contains
           read (this%inunit) this%flowja
           this%hasimeth1flowja = .true.
         else
-          h%nval = h%nval * h%idum1 * abs(h%idum2)
+          n = h%get_data_size() / 8  ! Convert bytes to number of reals
           if (allocated(this%flow)) deallocate (this%flow)
-          allocate (this%flow(h%nval))
+          allocate (this%flow(n))
           if (allocated(this%nodesrc)) deallocate (this%nodesrc)
-          allocate (this%nodesrc(h%nval))
+          allocate (this%nodesrc(n))
           read (this%inunit) this%flow
-          do i = 1, h%nval
+          do i = 1, n
             this%nodesrc(i) = i
           end do
         end if
@@ -268,14 +275,16 @@ contains
     if (allocated(this%auxvar)) deallocate (this%auxvar)
     if (allocated(this%header)) deallocate (this%header)
     if (allocated(this%headernext)) deallocate (this%headernext)
+    if (allocated(this%record_sizes)) deallocate (this%record_sizes)
   end subroutine finalize
 
   !> @brief Get a string representation of the budget file header.
   function get_str(this) result(str)
     class(BudgetFileHeaderType), intent(in) :: this
     character(len=:), allocatable :: str
+    character(len=LENHUGELINE) :: temp
 
-    write (str, '(*(G0))') &
+    write (temp, '(*(G0))') &
       'Budget file header (pos: ', this%pos, &
       ', kper: ', this%kper, &
       ', kstp: ', this%kstp, &
@@ -295,25 +304,46 @@ contains
       ', naux: ', this%naux, &
       ', nlist: ', this%nlist, &
       ')'
-    str = trim(str)
+    str = trim(temp)
   end function get_str
 
   !> @brief Get the size of the data array in bytes
   function get_data_size(this) result(data_size)
     class(BudgetFileHeaderType), intent(in) :: this
     integer(I4B) :: data_size
-    
+
     if (this%imeth == 1) then
       if (trim(adjustl(this%budtxt)) == 'FLOW-JA-FACE') then
-        data_size = this%nval * 8
+        ! FLOW-JA-FACE: Just read nval real values directly
+        ! read (this%inunit) this%flowja  where flowja(nval)
+        data_size = this%nval * 8  ! nval reals × 8 bytes per real
       else
+        ! Method 1 other terms: nval gets multiplied by spatial dimensions
+        ! Original logic: n = nval * idum1 * abs(idum2), then read n reals
+        ! So data size = n reals × 8 bytes per real
         data_size = this%nval * this%idum1 * abs(this%idum2) * 8
       end if
     elseif (this%imeth == 6) then
+      ! Method 6: List-based data with nlist records
+      ! Each record: nodesrc(4) + nodedst(4) + flow(8) + naux*auxvar(8 each)
+      ! read (inunit) (nodesrc(n), nodedst(n), flow(n), (auxvar(i,n), i=1,naux), n=1,nlist)
       data_size = this%nlist * (4 + 4 + 8 + this%naux * 8)
     else
       data_size = 0
     end if
   end function get_data_size
+
+  function get_header_size(this) result(header_size)
+    class(BudgetFileHeaderType), intent(in) :: this
+    integer(I4B) :: header_size
+
+    header_size = 2 * I4B + 16 + 4 * I4B + 8 * I4B + &
+                  len_trim(this%budtxt) + &
+                  len_trim(this%srcmodelname) + &
+                  len_trim(this%srcpackagename) + &
+                  len_trim(this%dstmodelname) + &
+                  len_trim(this%dstpackagename) + &
+                  this%naux * 16
+  end function get_header_size
 
 end module BudgetFileReaderModule
