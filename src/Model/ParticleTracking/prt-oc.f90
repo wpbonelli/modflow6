@@ -30,6 +30,12 @@ module PrtOcModule
     logical(LGP), pointer :: trackterminate => null() !< whether to track termination events
     logical(LGP), pointer :: trackweaksink => null() !< whether to track weak sink exit events
     logical(LGP), pointer :: trackusertime => null() !< whether to track user-specified times
+    logical(LGP), pointer :: budget_boundary => null() !< whether to incldue particles terminating at boundary faces in budget
+    logical(LGP), pointer :: budget_weaksink => null() !< whether to include particles terminating in weak sinks in budget
+    logical(LGP), pointer :: budget_no_exits => null() !< whether to include particles terminating in subcells with no exit face in budget
+    logical(LGP), pointer :: budget_stopzone => null() !< whether to include particles terminating in stop zones in budget
+    logical(LGP), pointer :: budget_inactive => null() !< whether to include particles terminating in inactive cells in budget
+    logical(LGP), pointer :: budget_timeout => null() !< whether to include particles terminating due to timeout in budget
     integer(I4B), pointer :: ntracktimes => null() !< number of user-specified tracking times
     logical(LGP), pointer :: dump_event_trace => null() !< whether to dump event trace for debugging
     type(TimeSelectType), pointer :: tracktimes !< user-specified tracking times
@@ -90,6 +96,12 @@ contains
     call mem_allocate(this%trackterminate, 'ITRACKTER', this%memoryPath)
     call mem_allocate(this%trackweaksink, 'ITRACKWSK', this%memoryPath)
     call mem_allocate(this%trackusertime, 'ITRACKTLS', this%memoryPath)
+    call mem_allocate(this%budget_boundary, 'BUDGET_BOUNDARY', this%memoryPath)
+    call mem_allocate(this%budget_weaksink, 'BUDGET_WEAKSINK', this%memoryPath)
+    call mem_allocate(this%budget_no_exits, 'BUDGET_NO_EXITS', this%memoryPath)
+    call mem_allocate(this%budget_stopzone, 'BUDGET_STOPZONE', this%memoryPath)
+    call mem_allocate(this%budget_inactive, 'BUDGET_INACTIVE', this%memoryPath)
+    call mem_allocate(this%budget_timeout, 'BUDGET_TIMEOUT', this%memoryPath)
     call mem_allocate(this%ntracktimes, 'NTRACKTIMES', this%memoryPath)
 
     this%name_model = name_model
@@ -109,6 +121,12 @@ contains
     this%trackterminate = .false.
     this%trackweaksink = .false.
     this%trackusertime = .false.
+    this%budget_boundary = .false.
+    this%budget_weaksink = .false.
+    this%budget_no_exits = .false.
+    this%budget_stopzone = .false.
+    this%budget_inactive = .false.
+    this%budget_timeout = .false.
     this%ntracktimes = 0
 
   end subroutine prt_oc_allocate_scalars
@@ -181,6 +199,12 @@ contains
     call mem_deallocate(this%trackterminate)
     call mem_deallocate(this%trackweaksink)
     call mem_deallocate(this%trackusertime)
+    call mem_deallocate(this%budget_boundary)
+    call mem_deallocate(this%budget_weaksink)
+    call mem_deallocate(this%budget_no_exits)
+    call mem_deallocate(this%budget_stopzone)
+    call mem_deallocate(this%budget_inactive)
+    call mem_deallocate(this%budget_timeout)
     call mem_deallocate(this%ntracktimes)
 
   end subroutine prt_oc_da
@@ -302,6 +326,24 @@ contains
           param_found = .true.
         case ('DEV_DUMP_EVENT_TRACE')
           this%dump_event_trace = .true.
+          param_found = .true.
+        case ('BUDGET_BOUNDARY')
+          this%budget_boundary = .true.
+          param_found = .true.
+        case ('BUDGET_WEAKSINK')
+          this%budget_weaksink = .true.
+          param_found = .true.
+        case ('BUDGET_NO_EXITS')
+          this%budget_no_exits = .true.
+          param_found = .true.
+        case ('BUDGET_STOPZONE')
+          this%budget_stopzone = .true.
+          param_found = .true.
+        case ('BUDGET_INACTIVE')
+          this%budget_inactive = .true.
+          param_found = .true.
+        case ('BUDGET_TIMEOUT')
+          this%budget_timeout = .true.
           param_found = .true.
         case default
           param_found = .false.

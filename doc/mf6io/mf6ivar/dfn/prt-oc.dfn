@@ -268,6 +268,62 @@ optional true
 longname print particle tracking events
 description print a verbose particle tracking event trace to standard output
 
+block options
+name budget_boundary
+type keyword
+reader urword
+optional true
+longname budget boundary termination
+description keyword to indicate that when a particle terminates at a boundary (status code 2), its mass should remain in the model budget
+
+block options
+name budget_weaksink
+type keyword
+reader urword
+optional true
+longname budget weaksink termination
+description keyword to indicate that when a particle terminates in a weak sink (status code 3), its mass should remain in the model budget
+
+block options
+name budget_no_exits
+type keyword
+reader urword
+optional true
+longname budget no exit face termination
+description keyword to indicate that when a particle terminates in a cell with no exit face (status code 5), its mass should remain in the model budget
+
+block options
+name budget_stopzone
+type keyword
+reader urword
+optional true
+longname budget stop zone termination
+description keyword to indicate that when a particle terminates in a cell with no exit face (status code 6), its mass should remain in the model budget
+
+block options
+name budget_inactive
+type keyword
+reader urword
+optional true
+longname track usertime
+description keyword to indicate that when a particle terminates in an inactive cell (status code 7), its mass should remain in the model budget
+
+block options
+name budget_no_exits_sub
+type keyword
+reader urword
+optional true
+longname track usertime
+description keyword to indicate that when a particle terminates in a subcell with no exit face (status code 9), its mass should remain in the model budget
+
+block options
+name budget_timeout
+type keyword
+reader urword
+optional true
+longname track usertime
+description keyword to indicate that when a particle terminates upon timing out (status code 10), its mass should remain in the model budget
+
 # --------------------- prt oc dimensions ------------------
 
 block dimensions

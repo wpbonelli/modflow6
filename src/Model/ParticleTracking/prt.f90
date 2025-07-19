@@ -86,6 +86,7 @@ module PrtModule
     procedure, private :: create_packages
     procedure, private :: create_bndpkgs
     procedure, private :: log_namfile_options
+    procedure, private :: budget_termination_code
 
   end type PrtModelType
 
@@ -461,8 +462,8 @@ contains
       type is (PrtPrpType)
         do np = 1, packobj%nparticles
           istatus = packobj%particles%istatus(np)
-          ! this may need to change if istatus flags change
-          if ((istatus > 0) .and. (istatus /= 8)) then
+          if (istatus == 1 .or. &
+              this%budget_termination_code(istatus)) then
             n = packobj%particles%idomain(np, 2)
             ! Each particle currently assigned unit mass
             this%masssto(n) = this%masssto(n) + DONE
@@ -477,6 +478,24 @@ contains
       this%flowja(idiag) = this%flowja(idiag) + rate
     end do
   end subroutine prt_cq_sto
+
+  logical function budget_termination_code(this, istatus) result(budget)
+    use ParticleModule, only: TERM_BOUNDARY, TERM_WEAKSINK, &
+                              TERM_NO_EXITS, TERM_STOPZONE, &
+                              TERM_INACTIVE, TERM_NO_EXITS_SUB, &
+                              TERM_TIMEOUT
+    class(PrtModelType) :: this
+    integer(I4B), intent(in) :: istatus
+
+    budget = ((istatus == TERM_BOUNDARY .and. this%oc%budget_boundary) .or. &
+              (istatus == TERM_WEAKSINK .and. this%oc%budget_weaksink) .or. &
+              ((istatus == TERM_NO_EXITS .or. &
+                istatus == TERM_NO_EXITS_SUB) .and. &
+               this%oc%budget_no_exits) .or. &
+              (istatus == TERM_STOPZONE .and. this%oc%budget_stopzone) .or. &
+              (istatus == TERM_INACTIVE .and. this%oc%budget_inactive) .or. &
+              (istatus == TERM_TIMEOUT .and. this%oc%budget_timeout))
+  end function budget_termination_code
 
   !> @brief Calculate flows and budget
   !!

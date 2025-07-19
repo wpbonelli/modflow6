@@ -643,22 +643,15 @@ contains
     integer(I4B) :: idiag
     real(DP) :: rrate
 
-    ! If no boundaries, skip flow calculations.
     if (this%nbound <= 0) return
 
-    ! Loop through each boundary calculating flow.
-    do i = 1, this%nbound
+    do i = 1, this%nbound ! release points
       node = this%nodelist(i)
       rrate = DZERO
-      ! If cell is no-flow or constant-head, then ignore it.
-      if (node > 0) then
-        ! Calculate the flow rate into the cell.
-        idiag = this%dis%con%ia(node)
-        rrate = this%rptm(i) * (DONE / delt) ! reciprocal of tstp length
-        flowja(idiag) = flowja(idiag) + rrate
-      end if
-
-      ! Save simulated value to simvals array.
+      if (node < 1) cycle
+      idiag = this%dis%con%ia(node)
+      rrate = this%rptm(i) * (DONE / delt) ! reciprocal of tstp length
+      flowja(idiag) = flowja(idiag) + rrate
       this%simvals(i) = rrate
     end do
   end subroutine prp_cq_simrate
