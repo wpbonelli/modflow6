@@ -30,7 +30,7 @@ module PrtOcModule
     logical(LGP), pointer :: trackterminate => null() !< whether to track termination events
     logical(LGP), pointer :: trackweaksink => null() !< whether to track weak sink exit events
     logical(LGP), pointer :: trackusertime => null() !< whether to track user-specified times
-    logical(LGP), pointer :: budget_boundary => null() !< whether to incldue particles terminating at boundary faces in budget
+    logical(LGP), pointer :: budget_boundary => null() !< whether to include particles terminating at boundary faces in budget
     logical(LGP), pointer :: budget_weaksink => null() !< whether to include particles terminating in weak sinks in budget
     logical(LGP), pointer :: budget_no_exits => null() !< whether to include particles terminating in subcells with no exit face in budget
     logical(LGP), pointer :: budget_stopzone => null() !< whether to include particles terminating in stop zones in budget
