@@ -268,8 +268,8 @@ def check_budget_data(lst: os.PathLike, perlen=1, nper=1, nstp=1):
     mflist = flopy.utils.mflistfile.ListBudget(
         lst, budgetkey="MASS BUDGET FOR ENTIRE MODEL"
     )
-    names = mflist.get_record_names()
-    entries = mflist.entries
+    record_names = mflist.get_record_names()
+    assert record_names, "No records found in the list file."
 
     # check timesteps
     inc = mflist.get_incremental()
@@ -278,13 +278,14 @@ def check_budget_data(lst: os.PathLike, perlen=1, nper=1, nstp=1):
     assert v == exp, f"Last time should be {exp}, found {v}"
 
     # entries should be a subset of names
-    assert all(e in names for e in entries)
+    entries = mflist.entries
+    assert all(e in record_names for e in entries)
 
-    expected_entries = [
+    expected_names = [
         "PRP_IN",
         "PRP_OUT",
     ]
-    assert all(en in names for en in expected_entries)
+    assert all(en in record_names for en in expected_names)
 
 
 def get_model_name(name, mdl):

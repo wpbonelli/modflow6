@@ -29,10 +29,26 @@ from prt_test_utils import (
 )
 
 simname = "prtbud"
-cases = [simname]
+cases = [
+    simname,  # default (no budget options)
+    f"{simname}_2",  # test budget_boundary
+    f"{simname}_3",  # test budget_weaksink  
+    f"{simname}_5_9",  # test budget_no_exits (covers both cell and subcell exits)
+    f"{simname}_6",  # test budget_stopzone
+    f"{simname}_7",  # test budget_inactive
+    f"{simname}_10",  # test budget_timeout
+    f"{simname}_all",  # test all budget options enabled
+]
 
 
 def build_prt_sim(name, gwf_ws, prt_ws, mf6):
+    # Determine which budget options to enable based on test case name
+    budget_boundary = "boundary" in name or "all" in name
+    budget_weaksink = "weaksink" in name or "all" in name
+    budget_no_exits = "no_exits" in name or "all" in name  
+    budget_stopzone = "stopzone" in name or "all" in name
+    budget_inactive = "inactive" in name or "all" in name
+    budget_timeout = "timeout" in name or "all" in name
     # create simulation
     sim = flopy.mf6.MFSimulation(
         sim_name=name,
@@ -90,18 +106,33 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6):
         extend_tracking=True,
     )
 
-    # create output control package
+    # create output control package with budget options
     prt_budget_file = f"{prt_name}.bud"
     prt_track_file = f"{prt_name}.trk"
     prt_track_csv_file = f"{prt_name}.trk.csv"
-    flopy.mf6.ModflowPrtoc(
-        prt,
-        pname="oc",
-        budget_filerecord=[prt_budget_file],
-        track_filerecord=[prt_track_file],
-        trackcsv_filerecord=[prt_track_csv_file],
-        saverecord=[("BUDGET", "ALL")],
-    )
+    oc_kwargs = {
+        "pname": "oc",
+        "budget_filerecord": [prt_budget_file],
+        "track_filerecord": [prt_track_file],
+        "trackcsv_filerecord": [prt_track_csv_file],
+        "saverecord": [("BUDGET", "ALL")],
+    }
+    
+    # Add budget options if enabled
+    if budget_boundary:
+        oc_kwargs["budget_boundary"] = True
+    if budget_weaksink:
+        oc_kwargs["budget_weaksink"] = True
+    if budget_no_exits:
+        oc_kwargs["budget_no_exits"] = True
+    if budget_stopzone:
+        oc_kwargs["budget_stopzone"] = True
+    if budget_inactive:
+        oc_kwargs["budget_inactive"] = True
+    if budget_timeout:
+        oc_kwargs["budget_timeout"] = True
+        
+    flopy.mf6.ModflowPrtoc(prt, **oc_kwargs)
 
     # create the flow model interface
     gwf_name = get_model_name(name, "gwf")
@@ -160,6 +191,8 @@ def build_mp7_sim(name, ws, mp7, gwf):
 
 def build_models(idx, test):
     gwf_sim = HorizontalCase.get_gwf_sim(test.name, test.workspace, test.targets["mf6"])
+    gwf = gwf_sim.get_model()
+    sto = flopy.mf6.ModflowGwfsto(gwf)
     prt_sim = build_prt_sim(
         test.name, test.workspace, test.workspace / "prt", test.targets["mf6"]
     )
@@ -231,13 +264,24 @@ def check_output(idx, test):
     # make sure all mf6 pathline data have correct model and PRP index (1)
     assert all_equal(mf6_pls["imdl"], 1)
     assert all_equal(mf6_pls["iprp"], 1)
+    
+    # report termination statistics for debugging
+    terminated_particles = mf6_pls[mf6_pls["ireason"] > 1]
+    if len(terminated_particles) > 0:
+        termination_counts = terminated_particles["ireason"].value_counts()
+        print(f"Test {name} termination summary: {dict(termination_counts)}")
+    else:
+        print(f"Test {name}: No particles terminated")
 
-    # check budget data were written to mf6 prt list file
+    # check budget data
     check_budget_data(
         prt_ws / f"{name}_prt.lst", HorizontalCase.perlen, HorizontalCase.nper
     )
 
-    # check cell-by-cell particle mass flows
+    # check particle mass budget behavior based on configuration
+    check_mass_budget_behavior(name, "PRP", prt_ws, prt_name, mf6_pls)
+
+    # check cell-by-cell flows
     prt_budget_file = prt_ws / f"{prt_name}.bud"
     prt_bud = flopy.utils.CellBudgetFile(prt_budget_file, precision="double")
     prt_bud_data = prt_bud.get_data(kstpkper=(0, 0))
@@ -287,6 +331,64 @@ def check_output(idx, test):
     # compare mf6 / mp7 pathline data
     assert mf6_pls.shape == mp7_pls.shape
     assert np.allclose(mf6_pls, mp7_pls, atol=1e-3)
+
+
+def check_mass_budget_behavior(name, text, prt_ws, prt_name, mf6_pls):
+    """Check that particle mass is correctly included/excluded from budget based on termination status."""
+    import flopy.utils
+    
+    # Load budget file
+    prt_budget_file = prt_ws / f"{prt_name}.bud"
+    prt_bud = flopy.utils.CellBudgetFile(prt_budget_file, precision="double")
+    
+    # Get budget terms
+    try:
+        bud_data = prt_bud.get_data(text=text)
+        if bud_data:
+            bud = bud_data[0].squeeze()
+            total_mass_in_budget = bud.sum() if bud.size > 0 else 0.0
+        else:
+            total_mass_in_budget = 0.0
+    except:
+        total_mass_in_budget = 0.0
+    
+    # Count total particles released
+    total_particles = len(mf6_pls["irpt"].unique())
+    
+    # Group particles by termination reason (ireason maps to status codes)
+    terminated_particles = mf6_pls[mf6_pls["ireason"] > 1]  # ireason > 1 means terminated
+    termination_counts = terminated_particles["ireason"].value_counts()
+    
+    # Expected mass in budget based on termination configuration
+    expected_mass = 0.0
+    
+    if "boundary" in name and 2 in termination_counts:
+        expected_mass += termination_counts[2]  # TERM_BOUNDARY
+    if "weaksink" in name and 3 in termination_counts:
+        expected_mass += termination_counts[3]  # TERM_WEAKSINK
+    if "no_exits" in name:
+        if 5 in termination_counts:
+            expected_mass += termination_counts[5]  # TERM_NO_EXITS
+        if 9 in termination_counts:
+            expected_mass += termination_counts[9]  # TERM_NO_EXITS_SUB
+    if "stopzone" in name and 6 in termination_counts:
+        expected_mass += termination_counts[6]  # TERM_STOPZONE
+    if "inactive" in name and 7 in termination_counts:
+        expected_mass += termination_counts[7]  # TERM_INACTIVE
+    if "timeout" in name and 10 in termination_counts:
+        expected_mass += termination_counts[10]  # TERM_TIMEOUT
+    if "all" in name:
+        # All terminated particles should have mass in budget
+        expected_mass = len(terminated_particles)
+    
+    # For default case (no budget options), no mass should remain in budget
+    if name == simname:
+        expected_mass = 0.0
+    
+    # Check that actual mass in budget matches expected
+    assert abs(total_mass_in_budget - expected_mass) < 1e-6, \
+        f"Test {name}: Expected {expected_mass} mass in budget, got {total_mass_in_budget}. "\
+        f"Termination counts: {dict(termination_counts)}"
 
 
 def plot_output(idx, test):
