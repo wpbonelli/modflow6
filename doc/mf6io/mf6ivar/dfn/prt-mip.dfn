@@ -9,6 +9,14 @@ mf6internal export_ascii
 longname export array variables to layered ascii files.
 description keyword that specifies input griddata arrays should be written to layered ascii output files.
 
+block options
+name backwards
+type keyword
+reader urword
+optional true
+longname backwards tracking
+description keyword that enables backwards tracking.  When backwards tracking is enabled, release points are interpreted as termination points and particles are tracked backwards to point of release.
+
 # --------------------- prt mip griddata ---------------------
 
 block griddata
