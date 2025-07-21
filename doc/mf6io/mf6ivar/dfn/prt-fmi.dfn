@@ -8,6 +8,14 @@ optional true
 longname save cell-by-cell flows to budget file
 description REPLACE save_flows {'{#1}': 'FMI'}
 
+block options
+name backwards
+type keyword
+reader urword
+optional true
+longname backwards tracking
+description keyword that enables backwards tracking.  When backwards tracking is enabled, release points are interpreted as termination points and particles are tracked backwards to point of release.
+
 # --------------------- prt fmi packagedata ---------------------
 
 block packagedata

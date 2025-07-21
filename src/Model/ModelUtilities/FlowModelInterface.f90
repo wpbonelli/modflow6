@@ -48,6 +48,7 @@ module FlowModelInterfaceModule
     type(BudgetObjectType), pointer :: mvrbudobj => null() !< pointer to the mover budget object
     character(len=16), dimension(:), allocatable :: flowpacknamearray !< array of boundary package names (e.g. LAK-1, SFR-3, etc.)
     character(len=LENVARNAME) :: depvartype = ''
+    logical(LGP) :: backwards
 
   contains
 
@@ -318,6 +319,8 @@ contains
         select case (keyword)
         case ('SAVE_FLOWS')
           this%ipakcb = -1
+        case ('BACKWARDS')
+          this%backwards = .true.
         case default
           write (errmsg, '(a,3(1x,a))') &
             'UNKNOWN', trim(adjustl(this%text)), 'OPTION:', trim(keyword)
@@ -573,6 +576,7 @@ contains
   subroutine initialize_bfr(this)
     class(FlowModelInterfaceType) :: this
     integer(I4B) :: ncrbud
+    ! TODO pass backwards flag to bfr once updated to support it
     call this%bfr%initialize(this%iubud, this%iout, ncrbud)
     ! todo: need to run through the budget terms
     ! and do some checking
@@ -740,6 +744,7 @@ contains
   !> @brief Initialize the head file reader
   subroutine initialize_hfr(this)
     class(FlowModelInterfaceType) :: this
+    ! TODO pass backwards flag to hfr once updated to support it
     call this%hfr%initialize(this%iuhds, this%iout)
     ! todo: need to run through the head terms
     ! and do some checking

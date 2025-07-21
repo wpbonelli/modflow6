@@ -1,6 +1,6 @@
 module PrtFmiModule
 
-  use KindModule, only: DP, I4B
+  use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: DZERO, LENAUXNAME, LENPACKAGENAME
   use SimModule, only: store_error, store_error_unit
   use SimVariablesModule, only: errmsg
@@ -17,29 +17,28 @@ module PrtFmiModule
   character(len=LENPACKAGENAME) :: text = '    PRTFMI'
 
   type, extends(FlowModelInterfaceType) :: PrtFmiType
-
     double precision, allocatable, public :: SourceFlows(:) ! cell source flows array
     double precision, allocatable, public :: SinkFlows(:) ! cell sink flows array
     double precision, allocatable, public :: StorageFlows(:) ! cell storage flows array
     double precision, allocatable, public :: BoundaryFlows(:) ! cell boundary flows array
-
   contains
-
     procedure :: fmi_ad
     procedure :: fmi_df => prtfmi_df
     procedure, private :: accumulate_flows
-
   end type PrtFmiType
 
 contains
 
   !> @brief Create a new PrtFmi object
-  subroutine fmi_cr(fmiobj, name_model, inunit, iout)
+  subroutine fmi_cr(fmiobj, name_model, inunit, iout, backwards)
+    ! modules
+    use BinaryFileReaderModule, only: BinaryFileReaderType
     ! dummy
     type(PrtFmiType), pointer :: fmiobj
     character(len=*), intent(in) :: name_model
     integer(I4B), intent(inout) :: inunit
     integer(I4B), intent(in) :: iout
+    logical(LGP), intent(in), optional :: backwards
     !
     ! Create the object
     allocate (fmiobj)
@@ -54,6 +53,7 @@ contains
     ! Set variables
     fmiobj%inunit = inunit
     fmiobj%iout = iout
+    if (present(backwards)) fmiobj%backwards = backwards
     !
     ! Initialize block parser
     call fmiobj%parser%Initialize(fmiobj%inunit, fmiobj%iout)
