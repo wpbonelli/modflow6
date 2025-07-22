@@ -1,5 +1,5 @@
 """
-Tests particle mass budget tracking with a very
+Test particle face flows between adjacent cells in a
 simple horizontal steady-state flow system. The
 grid is a 1x1x10 horizontal line with 10 columns.
 Particles are released from the left-most cell.

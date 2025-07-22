@@ -1,9 +1,5 @@
 """
-Tests particle mass budget tracking with a very
-simple horizontal steady-state flow system. The
-grid is a 1x1x10 horizontal line with 10 columns.
-Particles are released from the left-most cell.
-Pathlines are compared against a MODPATH 7 model.
+Tests particle mass budget tracking.
 """
 
 import flopy
