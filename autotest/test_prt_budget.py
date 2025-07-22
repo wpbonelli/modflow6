@@ -227,7 +227,7 @@ def build_prt_sim(gwf_ws, prt_ws, mf6):
         trackcsv_filerecord=[prt_trackcsvfile],
         ntracktimes=len(tracktimes),
         tracktimes=[(t,) for t in tracktimes],
-        # printrecord=[("BUDGET", "ALL")],
+        printrecord=[("BUDGET", "ALL")],
         saverecord=[("BUDGET", "ALL")],
     )
     fmi = flopy.mf6.ModflowPrtfmi(
