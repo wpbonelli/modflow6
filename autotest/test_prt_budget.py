@@ -25,7 +25,7 @@ prt_name = get_model_name(simname, "prt")
 years = 550.0
 year_delt = 365.25
 perlen = year_delt * years
-nstp = 100
+nstp = 10
 tsmult = 1.0
 tdis_spd = [[perlen, nstp, tsmult]]
 nper = len(tdis_spd)
@@ -212,7 +212,6 @@ def build_prt_sim(gwf_ws, prt_ws, mf6):
     releasepts = list(particle_data.to_prp(prt.modelgrid))
     prp = flopy.mf6.ModflowPrtprp(
         prt,
-        pname="upstream",
         nreleasepts=len(releasepts),
         packagedata=releasepts,
         perioddata={0: ["FIRST"]},
@@ -271,6 +270,8 @@ def check_output(idx, test):
     prt_pls = pd.read_csv(prt_ws / prt_trackcsvfile, na_filter=False)
     prt_bud = flopy.utils.CellBudgetFile(prt_ws / prt_budgetfile, precision="double")
     prp_bud = prt_bud.get_data(text="PRP")
+    sto_bud = prt_bud.get_data(text="STORAGE")
+    term_bud = prt_bud.get_data(text="TERMINATION")
     assert len(prp_bud) == nstp
     assert len(prp_bud[0]["q"]) == prt_pls.irpt.unique().size
     assert np.all(prp_bud[0]["q"] > 0)
@@ -307,7 +308,7 @@ def plot_output(idx, test):
         conc[99, 0],
         colors="blue",
         linestyles="-",
-    )  ### levels=levels)
+    )
     plt.show()
 
 
