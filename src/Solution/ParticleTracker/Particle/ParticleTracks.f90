@@ -29,7 +29,7 @@ module ParticleTracksModule
   public :: ParticleTrackFileType, &
             ParticleTracksType, &
             ParticleTrackEventSelectionType
-  private :: log_event, save_event
+  private :: save_event
 
   character(len=*), parameter, public :: TRACKHEADER = &
     'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,&
@@ -59,6 +59,7 @@ module ParticleTracksModule
     logical(LGP) :: terminate !< track termination events
     logical(LGP) :: weaksink !< track weak sink exit events
     logical(LGP) :: usertime !< track user-selected times
+    logical(LGP) :: subcellexit !< track subcell exits
   end type ParticleTrackEventSelectionType
 
   !> @brief Manages particle track output (logging/writing).
@@ -150,7 +151,8 @@ contains
                            timestep, &
                            terminate, &
                            weaksink, &
-                           usertime)
+                           usertime, &
+                           subcellexit)
     class(ParticleTracksType) :: this
     logical(LGP), intent(in) :: release
     logical(LGP), intent(in) :: cellexit
@@ -158,12 +160,18 @@ contains
     logical(LGP), intent(in) :: terminate
     logical(LGP), intent(in) :: weaksink
     logical(LGP), intent(in) :: usertime
+    logical(LGP), intent(in), optional :: subcellexit
     this%selected%release = release
     this%selected%cellexit = cellexit
     this%selected%timestep = timestep
     this%selected%terminate = terminate
     this%selected%weaksink = weaksink
     this%selected%usertime = usertime
+    if (present(subcellexit)) then
+      this%selected%subcellexit = subcellexit
+    else
+      this%selected%subcellexit = .false.
+    end if
   end subroutine select_events
 
   !> @brief Check if a given event code is selected for tracking.
@@ -176,7 +184,8 @@ contains
                (this%selected%timestep .and. event_code == 2) .or. &
                (this%selected%terminate .and. event_code == 3) .or. &
                (this%selected%weaksink .and. event_code == 4) .or. &
-               (this%selected%usertime .and. event_code == 5)
+               (this%selected%usertime .and. event_code == 5) .or. &
+               (this%selected%subcellexit .and. event_code == 6)
   end function is_selected
 
   !> @brief Check whether a particle belongs in a given file i.e.
@@ -255,36 +264,6 @@ contains
     should_log = this%iout >= 0
   end function should_log
 
-  !> @brief Print a particle event summary.
-  subroutine log_event(iun, particle, event)
-    integer(I4B), intent(in) :: iun
-    type(ParticleType), pointer, intent(in) :: particle
-    class(ParticleEventType), pointer, intent(in) :: event
-    ! local
-    character(len=:), allocatable :: particlename
-
-    particlename = trim(adjustl(particle%name))
-    if (len_trim(particlename) == 0) particlename = 'anonymous'
-
-    if (iun >= 0) &
-      write (iun, '(*(G0))') &
-      'Particle (Model: ', particle%imdl, &
-      ', Package: ', particle%iprp, &
-      ', Point: ', particle%irpt, ' [', particlename, ']', &
-      ', Time: ', particle%trelease, &
-      ') ', event%get_str(), &
-      ' in (Layer: ', particle%ilay, &
-      ', Cell: ', particle%icu, &
-      ', Zone: ', particle%izone, &
-      ') at (X: ', particle%x, &
-      ', Y: ', particle%y, &
-      ', Z: ', particle%z, &
-      ', Time: ', particle%ttrack, &
-      ', Period: ', event%kper, &
-      ', Timestep: ', event%kstp, &
-      ') with (Status: ', particle%istatus, ')'
-  end subroutine log_event
-
   !> @brief Handle a particle event.
   subroutine handle_event(this, particle, event)
     ! dummy
@@ -296,7 +275,7 @@ contains
     type(ParticleTrackFileType) :: file
 
     if (this%should_log()) &
-      call log_event(this%iout, particle, event)
+      call event%log(this%iout)
 
     if (this%is_selected(event%get_code())) then
       do i = 1, this%ntrackfiles

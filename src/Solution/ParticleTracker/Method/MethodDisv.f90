@@ -24,6 +24,7 @@ module MethodDisvModule
     type(CellDefnType), pointer :: neighbor => null() !< ptr to a neighbor defn
   contains
     procedure, public :: apply => apply_disv !< apply the DISV tracking method
+    procedure, public :: assess !< assess particle conditions
     procedure, public :: deallocate !< deallocate arrays and scalars
     procedure, public :: load => load_disv !< load the cell method
     procedure, public :: load_cell_defn !< load cell definition from the grid
@@ -327,6 +328,15 @@ contains
 
     call this%track(particle, 1, tmax)
   end subroutine apply_disv
+
+  !> @brief Assess status reporting/termination conditions.
+  subroutine assess(this, particle, cell_defn, tmax)
+    class(MethodDisvType), intent(inout) :: this
+    type(ParticleType), pointer, intent(inout) :: particle
+    type(CellDefnType), pointer, intent(inout) :: cell_defn
+    real(DP), intent(in) :: tmax
+    ! noop
+  end subroutine assess
 
   !> @brief Load cell definition from the grid
   subroutine load_cell_defn(this, ic, defn)

@@ -31,7 +31,7 @@ module HashTableModule
   end type BucketType
 
   type :: HashTableType
-    private
+    ! private
     type(BucketType), pointer :: buckets(:) => null()
   contains
     procedure :: add => ht_add

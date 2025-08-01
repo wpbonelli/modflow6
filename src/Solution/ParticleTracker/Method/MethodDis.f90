@@ -22,6 +22,7 @@ module MethodDisModule
     private
   contains
     procedure, public :: apply => apply_dis !< apply the DIS tracking method
+    procedure, public :: assess !< assess particle conditions
     procedure, public :: deallocate !< deallocate arrays and scalars
     procedure, public :: load => load_dis !< load the method
     procedure, public :: pass => pass_dis !< pass the particle to the next domain
@@ -320,6 +321,15 @@ contains
 
     call this%track(particle, 1, tmax)
   end subroutine apply_dis
+
+  !> @brief Assess status reporting/termination conditions.
+  subroutine assess(this, particle, cell_defn, tmax)
+    class(MethodDisType), intent(inout) :: this
+    type(ParticleType), pointer, intent(inout) :: particle
+    type(CellDefnType), pointer, intent(inout) :: cell_defn
+    real(DP), intent(in) :: tmax
+    ! noop
+  end subroutine assess
 
   !> @brief Returns a top elevation based on index iatop
   function get_top(this, iatop) result(top)

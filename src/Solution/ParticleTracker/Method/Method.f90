@@ -2,6 +2,8 @@
 module MethodModule
 
   use KindModule, only: DP, I4B, LGP
+  use ListModule, only: ListType
+  use IteratorModule, only: IteratorType
   use ConstantsModule, only: DZERO
   use ErrorUtilModule, only: pstop
   use SubcellModule, only: SubcellType
@@ -50,6 +52,7 @@ module MethodModule
   contains
     ! Implemented in all subtypes
     procedure(apply), deferred :: apply
+    procedure(assess), deferred :: assess
     procedure(deallocate), deferred :: deallocate
     ! Overridden in subtypes that delegate
     procedure :: pass
@@ -60,7 +63,6 @@ module MethodModule
     procedure :: try_pass
     ! Event firing methods
     procedure :: release
-    procedure :: cellexit
     procedure :: terminate
     procedure :: timestep
     procedure :: weaksink
@@ -76,6 +78,16 @@ module MethodModule
       type(ParticleType), pointer, intent(inout) :: particle
       real(DP), intent(in) :: tmax
     end subroutine apply
+    subroutine assess(this, particle, cell_defn, tmax)
+      import DP
+      import MethodType
+      import ParticleType
+      import CellDefnType
+      class(MethodType), intent(inout) :: this
+      type(ParticleType), pointer, intent(inout) :: particle
+      type(CellDefnType), pointer, intent(inout) :: cell_defn
+      real(DP), intent(in) :: tmax
+    end subroutine assess
     subroutine deallocate (this)
       import MethodType
       class(MethodType), intent(inout) :: this
@@ -175,17 +187,8 @@ contains
 
     allocate (ReleaseEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine release
-
-  !> @brief Particle exits a cell.
-  subroutine cellexit(this, particle)
-    class(MethodType), intent(inout) :: this
-    type(ParticleType), pointer, intent(inout) :: particle
-    class(ParticleEventType), pointer :: event
-
-    allocate (CellExitEventType :: event)
-    call this%events%dispatch(particle, event)
-  end subroutine cellexit
 
   !> @brief Particle terminates.
   subroutine terminate(this, particle, status)
@@ -198,6 +201,7 @@ contains
     if (present(status)) particle%istatus = status
     allocate (TerminationEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine terminate
 
   !> @brief Time step ends.
@@ -208,6 +212,7 @@ contains
 
     allocate (TimeStepEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine timestep
 
   !> @brief Particle leaves a weak sink.
@@ -218,6 +223,7 @@ contains
 
     allocate (WeakSinkEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine weaksink
 
   !> @brief User-defined tracking time occurs.
@@ -228,6 +234,7 @@ contains
 
     allocate (UserTimeEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine usertime
 
 end module MethodModule

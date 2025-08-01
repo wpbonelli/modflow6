@@ -83,8 +83,13 @@ contains
     event%time = particle%ttrack
     event%kper = per
     event%kstp = stp
+    event%icu = particle%icu
+    event%ilay = particle%ilay
+    event%izone = particle%izone
+    event%x = particle%x
+    event%y = particle%y
+    event%z = particle%z
     call this%consumer%handle_event(particle, event)
-    deallocate (event)
   end subroutine dispatch
 
   !> @brief Destroy the dispatcher.

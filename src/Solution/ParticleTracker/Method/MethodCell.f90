@@ -1,11 +1,14 @@
 module MethodCellModule
 
   use KindModule, only: DP, I4B, LGP
+  use ErrorUtilModule, only: pstop
   use ConstantsModule, only: DONE, DZERO
   use MethodModule, only: MethodType
   use ParticleModule, only: ParticleType
-  use ParticleEventModule, only: ParticleEventType
+  use ParticleEventModule, only: ParticleEventType, &
+                                 CellExitEventType
   use CellDefnModule, only: CellDefnType
+  use IteratorModule, only: IteratorType
   implicit none
 
   private
@@ -13,10 +16,79 @@ module MethodCellModule
 
   type, abstract, extends(MethodType) :: MethodCellType
   contains
-    procedure, public :: check
+    procedure, public :: cellexit
+    procedure, public :: assess
   end type MethodCellType
 
 contains
+
+  !> @brief Particle exits a cell.
+  subroutine cellexit(this, particle)
+    class(MethodCellType), intent(inout) :: this
+    type(ParticleType), pointer, intent(inout) :: particle
+    class(ParticleEventType), pointer :: event
+
+    allocate (CellExitEventType :: event)
+    select type (event)
+    type is (CellExitEventType)
+      event%exit_face = particle%iboundary(2)
+      call check_cycle(particle, event)
+      call store_event(particle, event)
+    end select
+    call this%events%dispatch(particle, event)
+  end subroutine cellexit
+
+  !> @brief Check for cycles in the particle's path.
+  subroutine check_cycle(particle, event)
+    class(ParticleType), intent(inout) :: particle !< particle
+    class(CellExitEventType), pointer, intent(in) :: event !< particle event to check for
+    ! local
+    class(IteratorType), allocatable :: itr
+    logical(LGP) :: found_cycle
+
+    found_cycle = .false.
+    itr = particle%history%Iterator()
+    do while (itr%has_next())
+      call itr%next()
+      select type (prev => itr%value())
+      class is (CellExitEventType)
+        if (event%icu == prev%icu .and. &
+            event%ilay == prev%ilay .and. &
+            event%izone == prev%izone .and. &
+            event%exit_face == prev%exit_face .and. &
+            event%exit_face /= 0) then
+          found_cycle = .true.
+          exit
+        end if
+      end select
+    end do
+
+    if (found_cycle) then
+      print *, "Cycle in particle path:"
+      itr = particle%history%Iterator()
+      do while (itr%has_next())
+        call itr%next()
+        select type (e => itr%value())
+        class is (ParticleEventType)
+          print *, e%get_str(time=.false.)
+        end select
+      end do
+      call pstop(1, "Particle cycling detected")
+    end if
+  end subroutine check_cycle
+
+  !> @brief Store the cell exit event in the particle's history.
+  subroutine store_event(particle, event)
+    class(ParticleType), intent(inout) :: particle
+    class(CellExitEventType), pointer, intent(in) :: event
+    ! local
+    class(*), pointer :: p
+
+    p => event
+    call particle%history%Add(p)
+    if (particle%history%Count() > 6) &
+      call particle%history%remove_node_by_index(1, .true.)
+  end subroutine store_event
 
   !> @brief Check reporting/terminating conditions before tracking
   !! the particle across the cell.
@@ -25,7 +97,7 @@ contains
   !! tracking the particle or terminate it, as well as whether to
   !! record any output data as per selected reporting conditions.
   !<
-  subroutine check(this, particle, cell_defn, tmax)
+  subroutine assess(this, particle, cell_defn, tmax)
     ! modules
     use TdisModule, only: endofsimulation, totimc, totim
     use ParticleModule, only: TERM_WEAKSINK, TERM_NO_EXITS, &
@@ -164,6 +236,6 @@ contains
       return
     end if
 
-  end subroutine check
+  end subroutine assess
 
 end module MethodCellModule

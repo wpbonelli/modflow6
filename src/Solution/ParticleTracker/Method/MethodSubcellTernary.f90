@@ -4,6 +4,7 @@ module MethodSubcellTernaryModule
   use ErrorUtilModule, only: pstop
   use GeomUtilModule, only: clamp_bary, skew
   use MethodModule, only: MethodType
+  use MethodSubcellModule, only: MethodSubcellType
   use CellModule, only: CellType
   use SubcellModule, only: SubcellType
   use SubcellTriModule, only: SubcellTriType, create_subcell_tri
@@ -19,7 +20,7 @@ module MethodSubcellTernaryModule
   public :: create_method_subcell_ternary
 
   !> @brief Ternary triangular subcell tracking method.
-  type, extends(MethodType) :: MethodSubcellTernaryType
+  type, extends(MethodSubcellType) :: MethodSubcellTernaryType
     integer(I4B), public, pointer :: zeromethod
   contains
     procedure, public :: apply => apply_mst
@@ -304,7 +305,7 @@ contains
     if (event_code == TIMESTEP) then
       call this%timestep(particle)
     else if (event_code == CELLEXIT) then
-      call this%cellexit(particle)
+      call this%subcellexit(particle)
     end if
   end subroutine track_subcell
 

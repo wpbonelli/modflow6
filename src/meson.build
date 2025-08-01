@@ -333,6 +333,7 @@ modflow_sources = files(
     'Solution' / 'ParticleTracker' / 'Method' / 'MethodDisv.f90',
     'Solution' / 'ParticleTracker' / 'Method' / 'MethodPool.f90',
     'Solution' / 'ParticleTracker' / 'Method' / 'MethodCellPassToBot.f90',
+    'Solution' / 'ParticleTracker' / 'Method' / 'MethodSubcell.f90',
     'Solution' / 'ParticleTracker' / 'Method' / 'MethodSubcellPollock.f90',
     'Solution' / 'ParticleTracker' / 'Method' / 'MethodSubcellPool.f90',
     'Solution' / 'ParticleTracker' / 'Method' / 'MethodSubcellTernary.f90',

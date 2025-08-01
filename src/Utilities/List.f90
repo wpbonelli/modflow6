@@ -42,7 +42,7 @@ module ListModule
     procedure, private :: get_current_item
     procedure, private :: get_item_by_index
     procedure, private :: get_node_by_index
-    procedure, private :: remove_node_by_index
+    procedure :: remove_node_by_index
     procedure, private :: remove_this_node
     ! Finalization is not supported in gfortran (as of 4.10.0)
     !final :: clear_list

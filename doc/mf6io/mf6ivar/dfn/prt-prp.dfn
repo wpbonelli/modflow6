@@ -281,6 +281,15 @@ longname coordinate checking method
 description approach for verifying that release point coordinates are in the cell with the specified ID. By default, release point coordinates are checked at release time.
 default eager
 
+block options
+name cycle_detection_window
+type integer
+reader urword
+optional true
+longname cycle detection window size
+description integer value defining the size of the window (number of adjacent exit events) used for cycle detection. Repeated cell exit events (i.e., exiting the same cell through the same face) will trigger program termination with error. Such a cycle is typically only valid over multiple time steps; within one time step (i.e. one application of the tracking method) it almost always indicates a programmer error. A larger window size provides more robust cycle detection but uses more memory. The default value is 10.
+default_value 10
+
 # --------------------- prt prp dimensions ---------------------
 
 block dimensions

@@ -927,19 +927,18 @@ contains
     real(DP) :: tmax
     integer(I4B) :: iprp
 
+    ! Loop over PRP packages and particles within them.
     ! A single particle is reused in the tracking loops
     ! to avoid allocating and deallocating it each time.
     ! get() and put() retrieve and store particle state.
-    call create_particle(particle)
-    ! Loop over PRP packages and particles within them.
     iprp = 0
+    call create_particle(particle)
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       select type (packobj)
       type is (PrtPrpType)
         iprp = iprp + 1
         do np = 1, packobj%nparticles
-          ! Get the particle from the store
           call packobj%particles%get(particle, this%id, iprp, np)
           ! If particle is permanently unreleased, cycle.
           ! Raise a termination event if we haven't yet.
@@ -983,11 +982,11 @@ contains
               (particle%ttrack == particle%tstop .or. &
                (endofsimulation .and. particle%iextend == 0))) &
             call this%method%terminate(particle, status=TERM_TIMEOUT)
-          ! Return the particle to the store
           call packobj%particles%put(particle, np)
         end do
       end select
     end do
+    call particle%destroy()
     deallocate (particle)
   end subroutine prt_solve
 
