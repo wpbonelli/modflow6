@@ -64,8 +64,10 @@ contains
     type is (DisvType)
       nlay = dis%nlay
     end select
-    if (particle%ilay == nlay) &
+    if (particle%ilay == nlay) then
       call this%terminate(particle, status=TERM_NO_EXITS)
+      return
+    end if
 
     call this%cellexit(particle)
   end subroutine apply_ptb

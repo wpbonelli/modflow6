@@ -1,6 +1,6 @@
 module MethodSubcellModule
   use KindModule, only: DP, I4B
-  use MethodModule, only: MethodType
+  use MethodCellModule, only: MethodCellType
   use ParticleModule, only: ParticleType
   use CellDefnModule, only: CellDefnType
   use ParticleEventModule, only: ParticleEventType, SubcellExitEventType
@@ -8,7 +8,7 @@ module MethodSubcellModule
   private
   public :: MethodSubcellType
 
-  type, abstract, extends(MethodType) :: MethodSubcellType
+  type, abstract, extends(MethodCellType) :: MethodSubcellType
   contains
     procedure, public :: assess
     procedure, public :: subcellexit
