@@ -27,10 +27,9 @@ module ParticleEventsModule
   end type ParticleEventDispatcherType
 
   abstract interface
-    subroutine handle_event(this, particle, event)
+    subroutine handle_event(this, event)
       import ParticleEventConsumerType, ParticleType, ParticleEventType
       class(ParticleEventConsumerType), intent(inout) :: this
-      type(ParticleType), pointer, intent(in) :: particle
       class(ParticleEventType), pointer, intent(in) :: event
     end subroutine handle_event
   end interface
@@ -79,19 +78,32 @@ contains
       end if
     end if
 
-    event%particle => particle
-    event%time = particle%ttrack
-    event%kper = per
-    event%kstp = stp
-    call this%consumer%handle_event(particle, event)
+    event%particle_id%imdl = particle%imdl
+    event%particle_id%iprp = particle%iprp
+    event%particle_id%irpt = particle%irpt
+    event%particle_id%trelease = particle%trelease
+    event%particle_id%name = trim(adjustl(particle%name))
+    event%tdis_coords%kper = per
+    event%tdis_coords%kstp = stp
+    event%grid_coords%ilay = particle%ilay
+    event%grid_coords%icu = particle%icu
+    event%grid_coords%izone = particle%izone
+    event%time_coords%ttrack = particle%ttrack
+    call particle%get_model_coords( &
+      event%space_coords%x, &
+      event%space_coords%y, &
+      event%space_coords%z)
+    event%istatus = particle%istatus
+    event%ireason = event%get_code()
+
+    call this%consumer%handle_event(event)
     deallocate (event)
   end subroutine dispatch
 
   !> @brief Destroy the dispatcher.
   subroutine destroy(this)
     class(ParticleEventDispatcherType), intent(inout) :: this
-    if (associated(this%consumer)) &
-      deallocate (this%consumer)
+    if (associated(this%consumer)) deallocate (this%consumer)
   end subroutine destroy
 
 end module ParticleEventsModule
