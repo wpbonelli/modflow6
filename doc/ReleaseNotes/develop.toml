@@ -62,3 +62,8 @@ description = "Add DEPENDENT\\_VARIABLE\\_SCALING option to scale the dependent 
 section = "fixes"
 subsection = "solution"
 description = "The Particle Tracking (PRT) Model previously reported cell exit events when a dry particle stranded in a partially saturated cell was dropped to the water table, as occurs with DRY\\_TRACKING\\_METHOD DROP (the default). An event is no longer reported at this time."
+
+[[items]]
+section = "features"
+subsection = "solution"
+description = "Added robust cycle detection to the particle tracking solution. Detection is accomplished by maintaining a history of recent cell transitions. The size of this window is configurable via an optional new CYCLE\\_DETECTION\\_WINDOW option to the PRT model's Particle Release Package, defaulting to the 5 most recent cell exit events."

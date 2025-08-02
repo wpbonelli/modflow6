@@ -61,7 +61,6 @@ module MethodModule
     procedure :: try_pass
     ! Event firing methods
     procedure :: release
-    procedure :: cellexit
     procedure :: terminate
     procedure :: timestep
     procedure :: weaksink
@@ -186,17 +185,8 @@ contains
 
     allocate (ReleaseEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine release
-
-  !> @brief Particle exits a cell.
-  subroutine cellexit(this, particle)
-    class(MethodType), intent(inout) :: this
-    type(ParticleType), pointer, intent(inout) :: particle
-    class(ParticleEventType), pointer :: event
-
-    allocate (CellExitEventType :: event)
-    call this%events%dispatch(particle, event)
-  end subroutine cellexit
 
   !> @brief Particle terminates.
   subroutine terminate(this, particle, status)
@@ -209,6 +199,7 @@ contains
     if (present(status)) particle%istatus = status
     allocate (TerminationEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine terminate
 
   !> @brief Time step ends.
@@ -219,6 +210,7 @@ contains
 
     allocate (TimeStepEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine timestep
 
   !> @brief Particle leaves a weak sink.
@@ -229,6 +221,7 @@ contains
 
     allocate (WeakSinkEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine weaksink
 
   !> @brief User-defined tracking time occurs.
@@ -239,6 +232,7 @@ contains
 
     allocate (UserTimeEventType :: event)
     call this%events%dispatch(particle, event)
+    deallocate (event)
   end subroutine usertime
 
 end module MethodModule

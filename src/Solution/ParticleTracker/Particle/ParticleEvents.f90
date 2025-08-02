@@ -61,6 +61,7 @@ contains
     class(ParticleEventType), pointer, intent(inout) :: event
     ! local
     integer(I4B) :: per, stp
+    real(DP) :: x, y, z
 
     ! If tracking time falls exactly on a boundary between time steps,
     ! report the previous time step for this datum. This is to follow
@@ -78,6 +79,12 @@ contains
       end if
     end if
 
+    ! Convert to model coordinates if we need to
+    x = particle%x
+    y = particle%y
+    z = particle%z
+    call particle%get_model_coords(x, y, z)
+
     event%kper = per
     event%kstp = stp
     event%imdl = particle%imdl
@@ -88,10 +95,13 @@ contains
     event%izone = particle%izone
     event%trelease = particle%trelease
     event%ttrack = particle%ttrack
+    event%x = x
+    event%y = y
+    event%z = z
     event%istatus = particle%istatus
-    call particle%get_model_coords(event%x, event%y, event%z)
+
+    ! Call the consumer's event handler
     call this%consumer%handle_event(particle, event)
-    deallocate (event)
   end subroutine dispatch
 
   !> @brief Destroy the dispatcher.

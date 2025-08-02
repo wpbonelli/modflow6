@@ -191,7 +191,6 @@ contains
 
       z = particle%z
       call this%map_neighbor(cell%defn, inface, z)
-
       particle%iboundary(2) = inface
       particle%idomain(3:) = 0
       particle%iboundary(3:) = 0

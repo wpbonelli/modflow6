@@ -60,6 +60,7 @@ module PrtPrpModule
     integer(I4B), pointer :: ifrctrn => null() !< force ternary solution for quad grids
     integer(I4B), pointer :: iexmeth => null() !< method for iterative solution of particle exit location and time in generalized Pollock's method
     integer(I4B), pointer :: ichkmeth => null() !< method for checking particle release coordinates are in the specified cells, 0 = none, 1 = eager
+    integer(I4B), pointer :: icycwin => null() !< cycle detection window size
     real(DP), pointer :: extol => null() !< tolerance for iterative solution of particle exit location and time in generalized Pollock's method
     real(DP), pointer :: rttol => null() !< tolerance for coincident particle release times
     real(DP), pointer :: rtfreq => null() !< frequency for regularly spaced release times
@@ -172,6 +173,7 @@ contains
     call mem_deallocate(this%ifrctrn)
     call mem_deallocate(this%iexmeth)
     call mem_deallocate(this%ichkmeth)
+    call mem_deallocate(this%icycwin)
     call mem_deallocate(this%extol)
     call mem_deallocate(this%rttol)
     call mem_deallocate(this%rtfreq)
@@ -263,6 +265,7 @@ contains
     call mem_allocate(this%ifrctrn, 'IFRCTRN', this%memoryPath)
     call mem_allocate(this%iexmeth, 'IEXMETH', this%memoryPath)
     call mem_allocate(this%ichkmeth, 'ICHKMETH', this%memoryPath)
+    call mem_allocate(this%icycwin, 'ICYCWIN', this%memoryPath)
     call mem_allocate(this%extol, 'EXTOL', this%memoryPath)
     call mem_allocate(this%rttol, 'RTTOL', this%memoryPath)
     call mem_allocate(this%rtfreq, 'RTFREQ', this%memoryPath)
@@ -287,6 +290,7 @@ contains
     this%ifrctrn = 0
     this%iexmeth = 0
     this%ichkmeth = 1
+    this%icycwin = 5
     this%extol = DEM5
     this%rttol = DSAME * DEP9
     this%rtfreq = DZERO
@@ -544,6 +548,7 @@ contains
     particle%ifrctrn = this%ifrctrn
     particle%iexmeth = this%iexmeth
     particle%iextend = this%iextend
+    particle%icycwin = this%icycwin
     particle%extol = this%extol
   end subroutine initialize_particle
 
@@ -839,6 +844,11 @@ contains
         call store_error(errmsg)
         call this%parser%StoreErrorUnit()
       end select
+      found = .true.
+    case ('CYCLE_DETECTION_WINDOW')
+      this%icycwin = this%parser%GetInteger()
+      if (this%icycwin < 0) &
+        call store_error('CYCLE_DETECTION_WINDOW MUST BE NON-NEGATIVE')
       found = .true.
     case default
       found = .false.

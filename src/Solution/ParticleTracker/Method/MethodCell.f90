@@ -1,11 +1,13 @@
 module MethodCellModule
 
   use KindModule, only: DP, I4B, LGP
+  use ErrorUtilModule, only: pstop
   use ConstantsModule, only: DONE, DZERO
   use MethodModule, only: MethodType
-  use ParticleModule, only: ParticleType
-  use ParticleEventModule, only: ParticleEventType
+  use ParticleModule, only: ParticleType, TERM_NO_EXITS, TERM_BOUNDARY
+  use ParticleEventModule, only: ParticleEventType, CellExitEventType
   use CellDefnModule, only: CellDefnType
+  use IteratorModule, only: IteratorType
   implicit none
 
   private
@@ -14,6 +16,9 @@ module MethodCellModule
   type, abstract, extends(MethodType) :: MethodCellType
   contains
     procedure, public :: assess
+    procedure, public :: cellexit
+    procedure, public :: check_cycle
+    procedure, public :: store_event
   end type MethodCellType
 
 contains
@@ -164,5 +169,98 @@ contains
     end if
 
   end subroutine assess
+
+  !> @brief Particle exits a cell.
+  subroutine cellexit(this, particle)
+    class(MethodCellType), intent(inout) :: this
+    type(ParticleType), pointer, intent(inout) :: particle
+    class(ParticleEventType), pointer :: event
+
+    allocate (CellExitEventType :: event)
+    select type (event)
+    type is (CellExitEventType)
+      event%exit_face = particle%iboundary(2)
+    end select
+    call this%events%dispatch(particle, event)
+    call this%check_cycle(particle, event)
+    call this%store_event(particle, event)
+  end subroutine cellexit
+
+  !> @brief Check for cycles in the particle's path.
+  subroutine check_cycle(this, particle, event)
+    ! dummy
+    class(MethodCellType), intent(inout) :: this
+    type(ParticleType), pointer, intent(inout) :: particle !< particle
+    class(ParticleEventType), pointer, intent(in) :: event !< particle event to check for
+    ! local
+    class(IteratorType), allocatable :: itr
+    class(ParticleEventType), pointer :: evt_ptr
+    logical(LGP) :: found_cycle, found_boundary
+    integer(I4B) :: i_back
+
+    found_cycle = .false.
+    found_boundary = .false.
+    select type (event)
+    type is (CellExitEventType)
+      itr = particle%history%Iterator()
+      do while (itr%has_next())
+        call itr%next()
+        select type (prev => itr%value())
+        class is (CellExitEventType)
+          if (event%icu == prev%icu .and. &
+              event%ilay == prev%ilay .and. &
+              event%izone == prev%izone .and. &
+              event%exit_face == prev%exit_face .and. &
+              event%exit_face /= 0) then
+            if (event%exit_face == 7) then
+              ! the exit face is 7, we have a boundary exit in
+              ! a well and we should not consider this a cycle
+              found_boundary = .true.
+            else
+              found_cycle = .true.
+            end if
+            exit
+          end if
+        end select
+      end do
+    end select
+    if (found_boundary) return
+    if (found_cycle) then
+      print *, "Detected duplicate cell exit events:"
+      i_back = particle%history%Count() - 1
+      itr = particle%history%Iterator()
+      do while (itr%has_next())
+        call itr%next()
+        select type (e => itr%value())
+        class is (ParticleEventType)
+          evt_ptr => e
+          print *, i_back, "ago:"
+          call evt_ptr%log(0)
+          i_back = i_back - 1
+        end select
+      end do
+      print *, "Current:"
+      call event%log(0)
+      call this%terminate(particle, status=TERM_NO_EXITS)
+    end if
+  end subroutine check_cycle
+
+  !> @brief Store the cell exit event in the particle's history.
+  subroutine store_event(this, particle, event)
+    ! dummy
+    class(MethodCellType), intent(inout) :: this
+    type(ParticleType), pointer, intent(inout) :: particle
+    class(ParticleEventType), pointer, intent(in) :: event
+    ! local
+    class(*), pointer :: p
+
+    select type (event)
+    type is (CellExitEventType)
+      p => event
+      call particle%history%Add(p)
+      if (particle%history%Count() > particle%icycwin) &
+        call particle%history%RemoveNode(1, .true.)
+    end select
+  end subroutine store_event
 
 end module MethodCellModule
