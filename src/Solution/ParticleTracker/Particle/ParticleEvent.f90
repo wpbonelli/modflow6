@@ -23,7 +23,6 @@ module ParticleEventModule
     enumerator :: TERMINATE = 3 !< particle terminated
     enumerator :: WEAKSINK = 4 !< particle entered a weak sink
     enumerator :: USERTIME = 5 !< user-specified tracking time
-    enumerator :: SUBCELLEXIT = 6 !< particle exited a subcell
   end enum
 
   !> @brief Base type for particle events.
@@ -82,7 +81,6 @@ contains
     type is (TerminationEventType); code = 3
     type is (WeakSinkEventType); code = 4
     type is (UserTimeEventType); code = 5
-    type is (SubcellExitEventType); code = 6
     class default; call pstop(1, "unknown event type")
     end select
   end function get_code
@@ -93,7 +91,7 @@ contains
 
     select type (this)
     type is (ReleaseEventType); str = "released"
-    type is (FeatExitEventType); str = "exited grid feature"
+    type is (CellExitEventType); str = "exited cell"
     type is (TimeStepEventType); str = "completed timestep"
     type is (TerminationEventType); str = "terminated"
     type is (WeakSinkEventType); str = "exited weak sink"

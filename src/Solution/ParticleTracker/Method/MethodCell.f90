@@ -4,12 +4,9 @@ module MethodCellModule
   use ErrorUtilModule, only: pstop
   use ConstantsModule, only: DONE, DZERO
   use MethodModule, only: MethodType
-<<<<<<< HEAD
-  use ParticleModule, only: ParticleType
-=======
   use ParticleModule, only: ParticleType, TERM_NO_EXITS, TERM_BOUNDARY
->>>>>>> 211ced1e (feat(prt): add cycle detection)
-  use ParticleEventModule, only: ParticleEventType, CellExitEventType
+  use ParticleEventModule, only: ParticleEventType
+  use CellExitEventModule, only: CellExitEventType
   use CellDefnModule, only: CellDefnType
   use IteratorModule, only: IteratorType
   implicit none
@@ -21,11 +18,8 @@ module MethodCellModule
   contains
     procedure, public :: assess
     procedure, public :: cellexit
-<<<<<<< HEAD
-=======
     procedure, public :: check_cycle
     procedure, public :: store_event
->>>>>>> 211ced1e (feat(prt): add cycle detection)
   end type MethodCellType
 
 contains
