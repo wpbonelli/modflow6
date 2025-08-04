@@ -142,7 +142,7 @@ jobs:
       - name: Build MF6
         working-directory: modflow6
         run: |
-          pixi run setup builddir
+          pixi run setup builddir -Dbuildtype=debug
           pixi run build builddir
           pixi run setup-mf5to6 builddir
           pixi run build-mf5to6 builddir
