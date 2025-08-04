@@ -1,13 +1,7 @@
 module ParticleEventsModule
   use KindModule, only: DP, I4B, LGP
   use ParticleModule, only: ParticleType
-  use ParticleEventModule, only: ParticleEventType, &
-                                 ReleaseEventType, &
-                                 CellExitEventType, &
-                                 TimestepEventType, &
-                                 TerminationEventType, &
-                                 WeakSinkEventType, &
-                                 UserTimeEventType
+  use ParticleEventModule, only: ParticleEventType
   implicit none
 
   private

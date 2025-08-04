@@ -7,13 +7,13 @@ module MethodModule
   use SubcellModule, only: SubcellType
   use ParticleModule, only: ParticleType
   use ParticleEventsModule, only: ParticleEventDispatcherType
-  use ParticleEventModule, only: ParticleEventType, &
-                                 ReleaseEventType, &
-                                 TimeStepEventType, &
-                                 TerminationEventType, &
-                                 WeakSinkEventType, &
-                                 UserTimeEventType, &
-                                 CellExitEventType
+  use ParticleEventModule, only: ParticleEventType
+  use ReleaseEventModule, only: ReleaseEventType
+  use TimeStepEventModule, only: TimeStepEventType
+  use TerminationEventModule, only: TerminationEventType
+  use WeakSinkEventModule, only: WeakSinkEventType
+  use UserTimeEventModule, only: UserTimeEventType
+  use SubCellExitEventModule, only: SubCellExitEventType
   use BaseDisModule, only: DisBaseType
   use PrtFmiModule, only: PrtFmiType
   use CellModule, only: CellType

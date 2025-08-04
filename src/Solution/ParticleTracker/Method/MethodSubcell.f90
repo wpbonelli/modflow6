@@ -3,7 +3,8 @@ module MethodSubcellModule
   use MethodCellModule, only: MethodCellType
   use ParticleModule, only: ParticleType
   use CellDefnModule, only: CellDefnType
-  use ParticleEventModule, only: ParticleEventType, SubcellExitEventType
+  use ParticleEventModule, only: ParticleEventType
+  use SubCellExitEventModule, only: SubCellExitEventType
 
   private
   public :: MethodSubcellType
