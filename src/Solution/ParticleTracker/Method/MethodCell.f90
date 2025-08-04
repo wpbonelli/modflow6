@@ -195,11 +195,10 @@ contains
     ! local
     class(IteratorType), allocatable :: itr
     class(ParticleEventType), pointer :: evt_ptr
-    logical(LGP) :: found_cycle, found_boundary
+    logical(LGP) :: found_cycle
     integer(I4B) :: i_back
 
     found_cycle = .false.
-    found_boundary = .false.
     select type (event)
     type is (CellExitEventType)
       itr = particle%history%Iterator()
@@ -212,19 +211,15 @@ contains
               event%izone == prev%izone .and. &
               event%exit_face == prev%exit_face .and. &
               event%exit_face /= 0) then
-            if (event%exit_face == 7) then
-              ! the exit face is 7, we have a boundary exit in
-              ! a well and we should not consider this a cycle
-              found_boundary = .true.
-            else
-              found_cycle = .true.
-            end if
+            ! the exit face is 7, we have a boundary exit in
+            ! a well and we should not consider this a cycle
+            if (event%exit_face == 7) cycle
+            found_cycle = .true.
             exit
           end if
         end select
       end do
     end select
-    if (found_boundary) return
     if (found_cycle) then
       print *, "Detected duplicate cell exit events:"
       i_back = particle%history%Count() - 1
