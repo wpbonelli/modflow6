@@ -186,16 +186,17 @@ contains
 
     if (this%forms_cycle(particle, event)) then
       call this%terminate(particle, status=TERM_BOUNDARY)
+    else
+      call this%store_event(particle, event)
     end if
-    call this%store_event(particle, event)
   end subroutine cellexit
 
   !> @brief Check if the event forms a cycle in the particle path.
   function forms_cycle(this, particle, event) result(found_cycle)
     ! dummy
     class(MethodCellType), intent(inout) :: this
-    type(ParticleType), pointer, intent(inout) :: particle !< particle
-    class(ParticleEventType), pointer, intent(in) :: event !< particle event to check for
+    type(ParticleType), pointer, intent(inout) :: particle
+    class(ParticleEventType), pointer, intent(in) :: event
     ! local
     class(IteratorType), allocatable :: itr
     logical(LGP) :: found_cycle
@@ -208,7 +209,7 @@ contains
         call itr%next()
         select type (prev => itr%value())
         class is (CellExitEventType)
-          ! Check for exact cycle (same cell + same exit face)
+          ! exact cycle (same cell + same exit face)
           if (event%icu == prev%icu .and. &
               event%ilay == prev%ilay .and. &
               event%izone == prev%izone .and. &
@@ -217,8 +218,8 @@ contains
             found_cycle = .true.
             exit
           end if
-          ! Also check for revisiting same cell through vertical faces
-          ! which commonly creates cycles in layered models
+          ! revisiting a well cell through vertical faces
+          ! is a common cause of cycles in layered models
           if (event%icu == prev%icu .and. &
               event%ilay == prev%ilay .and. &
               event%izone == prev%izone .and. &
