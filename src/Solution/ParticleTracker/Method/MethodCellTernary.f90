@@ -163,7 +163,6 @@ contains
     integer(I4B) :: i
     real(DP) :: x, y, z, xO, yO
     real(DP), allocatable :: xs(:), ys(:)
-    class(*), pointer :: p
 
     call this%assess(particle, this%cell%defn, tmax)
     if (.not. particle%advancing) return

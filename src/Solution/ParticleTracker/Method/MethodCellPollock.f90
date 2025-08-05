@@ -129,7 +129,6 @@ contains
     real(DP) :: zOrigin
     real(DP) :: sinrot
     real(DP) :: cosrot
-    class(*), pointer :: p
 
     call this%assess(particle, this%cell%defn, tmax)
     if (.not. particle%advancing) return
