@@ -18,7 +18,7 @@ module MethodCellModule
   contains
     procedure, public :: assess
     procedure, public :: cellexit
-    procedure, public :: check_cycle
+    procedure, public :: forms_cycle
     procedure, public :: store_event
   end type MethodCellType
 
@@ -183,21 +183,22 @@ contains
       event%exit_face = particle%iboundary(2)
     end select
     call this%events%dispatch(particle, event)
-    call this%check_cycle(particle, event)
+
+    if (this%forms_cycle(particle, event)) then
+      call this%terminate(particle, status=TERM_BOUNDARY)
+    end if
     call this%store_event(particle, event)
   end subroutine cellexit
 
-  !> @brief Check for cycles in the particle's path.
-  subroutine check_cycle(this, particle, event)
+  !> @brief Check if the event forms a cycle in the particle path.
+  function forms_cycle(this, particle, event) result(found_cycle)
     ! dummy
     class(MethodCellType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle !< particle
     class(ParticleEventType), pointer, intent(in) :: event !< particle event to check for
     ! local
     class(IteratorType), allocatable :: itr
-    class(ParticleEventType), pointer :: evt_ptr
     logical(LGP) :: found_cycle
-    integer(I4B) :: i_back
 
     found_cycle = .false.
     select type (event)
@@ -207,41 +208,33 @@ contains
         call itr%next()
         select type (prev => itr%value())
         class is (CellExitEventType)
+          ! Check for exact cycle (same cell + same exit face)
           if (event%icu == prev%icu .and. &
               event%ilay == prev%ilay .and. &
               event%izone == prev%izone .and. &
               event%exit_face == prev%exit_face .and. &
               event%exit_face /= 0) then
-            ! the exit face is 7, we have a boundary exit in
-            ! a well and we should not consider this a cycle
-            if (event%exit_face == 7) cycle
+            found_cycle = .true.
+            exit
+          end if
+          ! Also check for revisiting same cell through vertical faces
+          ! which commonly creates cycles in layered models
+          if (event%icu == prev%icu .and. &
+              event%ilay == prev%ilay .and. &
+              event%izone == prev%izone .and. &
+              (event%exit_face == 6 .or. event%exit_face == 7) .and. &
+              event%exit_face /= 0) then
             found_cycle = .true.
             exit
           end if
         end select
       end do
     end select
-    if (found_cycle) then
-      print *, "Detected duplicate cell exit events:"
-      i_back = particle%history%Count() - 1
-      itr = particle%history%Iterator()
-      do while (itr%has_next())
-        call itr%next()
-        select type (e => itr%value())
-        class is (ParticleEventType)
-          evt_ptr => e
-          print *, i_back, "ago:"
-          call evt_ptr%log(0)
-          i_back = i_back - 1
-        end select
-      end do
-      print *, "Current:"
-      call event%log(0)
-      call this%terminate(particle, status=TERM_NO_EXITS)
-    end if
-  end subroutine check_cycle
+  end function forms_cycle
 
-  !> @brief Store the cell exit event in the particle's history.
+  !> @brief Save the event in the particle's history.
+  !! Acts like a queue, the oldest event is removed
+  !! when the event count exceeds the maximum size.
   subroutine store_event(this, particle, event)
     ! dummy
     class(MethodCellType), intent(inout) :: this

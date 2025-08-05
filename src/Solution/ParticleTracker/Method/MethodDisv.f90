@@ -92,6 +92,7 @@ contains
         ! Cell is active but dry, so select and initialize pass-to-bottom
         ! cell method and set cell method pointer
         call method_cell_ptb%init( &
+          this%iout, &
           fmi=this%fmi, &
           cell=this%cell, &
           events=this%events, &
@@ -100,6 +101,7 @@ contains
       else if (particle%ifrctrn > 0) then
         ! Force the ternary method
         call method_cell_tern%init( &
+          this%iout, &
           fmi=this%fmi, &
           cell=this%cell, &
           events=this%events, &
@@ -111,6 +113,7 @@ contains
         call cell_poly_to_rect(cell, rect)
         base => rect
         call method_cell_plck%init( &
+          this%iout, &
           fmi=this%fmi, &
           cell=base, &
           events=this%events, &
@@ -122,6 +125,7 @@ contains
         call cell_poly_to_quad(cell, quad)
         base => quad
         call method_cell_quad%init( &
+          this%iout, &
           fmi=this%fmi, &
           cell=base, &
           events=this%events, &
@@ -130,6 +134,7 @@ contains
       else
         ! Default to the ternary method
         call method_cell_tern%init( &
+          this%iout, &
           fmi=this%fmi, &
           cell=this%cell, &
           events=this%events, &
@@ -168,22 +173,6 @@ contains
       ic = dis%con%ja(ipos)
       icu = dis%get_nodeuser(ic)
       call get_jk(icu, dis%ncpl, dis%nlay, icpl, ilay)
-
-      ! if returning to a cell through the bottom
-      ! face after previously leaving it through
-      ! that same face, we've entered a cycle
-      ! as can occur e.g. in wells. terminate
-      ! in the previous cell.
-      if (ic == particle%icp .and. inface == 7 .and. ilay < particle%ilay) then
-        particle%idomain(2) = particle%icp
-        particle%izone = particle%izp
-        call this%terminate(particle, &
-                            status=TERM_BOUNDARY)
-        return
-      else
-        particle%icp = particle%idomain(2)
-        particle%izp = particle%izone
-      end if
 
       particle%idomain(2) = ic
       particle%icu = icu

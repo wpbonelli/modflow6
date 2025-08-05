@@ -295,6 +295,8 @@ contains
     select type (dis => this%dis)
     type is (DisType)
       call method_dis%init( &
+        ! this%iout, &
+        0, &
         fmi=this%fmi, &
         events=this%events, &
         izone=this%mip%izone, &
@@ -305,6 +307,8 @@ contains
       this%method => method_dis
     type is (DisvType)
       call method_disv%init( &
+        ! this%iout, &
+        0, &
         fmi=this%fmi, &
         events=this%events, &
         izone=this%mip%izone, &

@@ -12,6 +12,7 @@ module MethodCellTernaryModule
   use GeomUtilModule, only: area, transform
   use ConstantsModule, only: DZERO, DONE, DTWO, DSIX
   use GeomUtilModule, only: point_in_polygon
+  use CellExitEventModule, only: CellExitEventType
   implicit none
 
   private
@@ -90,6 +91,7 @@ contains
     end select
 
     call method_subcell_tern%init( &
+      this%iout, &
       fmi=this%fmi, &
       cell=this%cell, &
       subcell=this%subcell, &
@@ -161,17 +163,15 @@ contains
     integer(I4B) :: i
     real(DP) :: x, y, z, xO, yO
     real(DP), allocatable :: xs(:), ys(:)
+    class(*), pointer :: p
 
-    ! (Re)allocate type-bound arrays
+    call this%assess(particle, this%cell%defn, tmax)
+    if (.not. particle%advancing) return
+
     select type (cell => this%cell)
     type is (CellPolyType)
-      call this%assess(particle, this%cell%defn, tmax)
-      if (.not. particle%advancing) return
-
-      ! Number of vertices
       this%nverts = cell%defn%npolyverts
 
-      ! (Re)allocate type-bound arrays
       if (allocated(this%xvert)) then
         deallocate (this%xvert)
         deallocate (this%yvert)
@@ -243,7 +243,9 @@ contains
       call particle%reset_transform()
     end select
 
-    if (particle%iboundary(2) > 0) call this%cellexit(particle)
+    if (particle%iboundary(2) > 0) then
+      call this%cellexit(particle)
+    end if
   end subroutine apply_mct
 
   !> @brief Loads a triangular subcell from the polygonal cell

@@ -13,7 +13,6 @@ module TimeStepEventModule
   contains
     procedure :: get_code
     procedure :: get_verb
-    procedure :: get_str
   end type TimeStepEventType
 
 contains
@@ -29,11 +28,5 @@ contains
     character(len=:), allocatable :: verb
     verb = 'completed timestep'
   end function get_verb
-
-  function get_str(this) result(str)
-    class(TimeStepEventType), intent(in) :: this
-    character(len=:), allocatable :: str
-    str = this%ParticleEventType%get_str()
-  end function get_str
 
 end module TimeStepEventModule

@@ -150,6 +150,7 @@ contains
       call this%load_cell(ic, cell)
       if (this%fmi%ibdgwfsat0(ic) == 0) then
         call method_cell_ptb%init( &
+          this%iout, &
           fmi=this%fmi, &
           cell=this%cell, &
           events=this%events, &
@@ -157,6 +158,7 @@ contains
         submethod => method_cell_ptb
       else
         call method_cell_plck%init( &
+          this%iout, &
           fmi=this%fmi, &
           cell=this%cell, &
           events=this%events, &
@@ -204,22 +206,6 @@ contains
       icu = dis%get_nodeuser(ic)
       call get_ijk(icu, dis%nrow, dis%ncol, dis%nlay, &
                    irow, icol, ilay)
-
-      ! if returning to a cell through the bottom
-      ! face after previously leaving it through
-      ! that same face, we've entered a cycle
-      ! as can occur e.g. in wells. terminate
-      ! in the previous cell.
-      if (ic == particle%icp .and. inface == 7 .and. ilay < particle%ilay) then
-        particle%idomain(2) = particle%icp
-        particle%izone = particle%izp
-        call this%terminate(particle, &
-                            status=TERM_BOUNDARY)
-        return
-      else
-        particle%icp = particle%idomain(2)
-        particle%izp = particle%izone
-      end if
 
       ! update node numbers and layer
       particle%idomain(2) = ic

@@ -13,7 +13,6 @@ module WeakSinkEventModule
   contains
     procedure :: get_code
     procedure :: get_verb
-    procedure :: get_str
   end type WeakSinkEventType
 
 contains
@@ -29,11 +28,5 @@ contains
     character(len=:), allocatable :: verb
     verb = 'exited weak sink'
   end function get_verb
-
-  function get_str(this) result(str)
-    class(WeakSinkEventType), intent(in) :: this
-    character(len=:), allocatable :: str
-    str = this%ParticleEventType%get_str()
-  end function get_str
 
 end module WeakSinkEventModule
