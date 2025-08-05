@@ -62,6 +62,7 @@ contains
       call this%load_subcell(particle, subcell)
     end select
     call method_subcell_plck%init( &
+      this%iout, &
       fmi=this%fmi, &
       cell=this%cell, &
       subcell=this%subcell, &
@@ -207,11 +208,11 @@ contains
     ! local
     double precision :: xOrigin, yOrigin, zOrigin, sinrot, cosrot
 
+    call this%assess(particle, this%cell%defn, tmax)
+    if (.not. particle%advancing) return
+
     select type (cell => this%cell)
     type is (CellRectQuadType)
-      call this%assess(particle, this%cell%defn, tmax)
-      if (.not. particle%advancing) return
-
       ! Transform model coordinates to local cell coordinates
       ! (translated/rotated but not scaled relative to model)
       xOrigin = cell%xOrigin
@@ -230,6 +231,10 @@ contains
                               sinrot, cosrot, invert=.true.)
       call particle%reset_transform()
     end select
+
+    if (particle%iboundary(2) > 0) then
+      call this%cellexit(particle)
+    end if
   end subroutine apply_mcpq
 
   !> @brief Load the rectangular subcell from the rectangular cell

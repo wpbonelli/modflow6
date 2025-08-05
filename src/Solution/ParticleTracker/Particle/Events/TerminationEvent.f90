@@ -13,7 +13,6 @@ module TerminationEventModule
   contains
     procedure :: get_code
     procedure :: get_verb
-    procedure :: get_str
   end type TerminationEventType
 
 contains
@@ -29,11 +28,5 @@ contains
     character(len=:), allocatable :: verb
     verb = 'terminated'
   end function get_verb
-
-  function get_str(this) result(str)
-    class(TerminationEventType), intent(in) :: this
-    character(len=:), allocatable :: str
-    str = this%ParticleEventType%get_str()
-  end function get_str
 
 end module TerminationEventModule

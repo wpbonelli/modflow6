@@ -38,6 +38,7 @@ module MethodModule
   type, abstract :: MethodType
     character(len=40), pointer, public :: name !< method name
     logical(LGP), public :: delegates !< whether the method delegates
+    integer(I4B) :: iout = 0 !< output number for logging
     type(PrtFmiType), pointer, public :: fmi => null() !< ptr to fmi
     class(CellType), pointer, public :: cell => null() !< ptr to the current cell
     class(SubcellType), pointer, public :: subcell => null() !< ptr to the current subcell
@@ -94,9 +95,10 @@ module MethodModule
 
 contains
 
-  subroutine init(this, fmi, cell, subcell, events, tracktimes, &
+  subroutine init(this, iout, fmi, cell, subcell, events, tracktimes, &
                   izone, flowja, porosity, retfactor)
     class(MethodType), intent(inout) :: this
+    integer(I4B), intent(in) :: iout
     type(PrtFmiType), intent(in), pointer, optional :: fmi
     class(CellType), intent(in), pointer, optional :: cell
     class(SubcellType), intent(in), pointer, optional :: subcell
@@ -107,6 +109,7 @@ contains
     real(DP), intent(in), pointer, optional :: porosity(:)
     real(DP), intent(in), pointer, optional :: retfactor(:)
 
+    this%iout = iout
     if (present(fmi)) this%fmi => fmi
     if (present(cell)) this%cell => cell
     if (present(subcell)) this%subcell => subcell

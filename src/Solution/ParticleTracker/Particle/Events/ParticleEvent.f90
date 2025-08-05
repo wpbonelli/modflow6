@@ -29,7 +29,7 @@ module ParticleEventModule
   !!
   !! Events may be identical except for their type/code, reflecting the
   !! fact that several events of interest may occur at a given moment.
-  type :: ParticleEventType
+  type, abstract :: ParticleEventType
     integer(I4B) :: imdl, iprp, irpt ! release model, package, and point
     real(DP) :: trelease = 0.0_DP ! release time
     integer(I4B) :: kper = 0, kstp = 0 ! period and step
@@ -38,27 +38,28 @@ module ParticleEventModule
     real(DP) :: x = 0.0_DP, y = 0.0_DP, z = 0.0_DP ! particle position
     integer(I4B) :: istatus = -1 ! status code
   contains
-    procedure :: get_code
-    procedure :: get_verb
+    procedure(get_code_if), deferred :: get_code
+    procedure(get_verb_if), deferred :: get_verb
     procedure :: get_str
     procedure :: log
   end type ParticleEventType
 
+  abstract interface
+    function get_code_if(this) result(code)
+      IMPORT I4B
+      IMPORT ParticleEventType
+      class(ParticleEventType), intent(in) :: this
+      integer(I4B) :: code
+    end function get_code_if
+
+    function get_verb_if(this) result(verb)
+      IMPORT ParticleEventType
+      class(ParticleEventType), intent(in) :: this
+      character(len=:), allocatable :: verb
+    end function get_verb_if
+  end interface
+
 contains
-  function get_code(this) result(code)
-    class(ParticleEventType), intent(in) :: this
-    integer(I4B) :: code
-    code = -1
-    call pstop(1, 'get_code not implemented for ParticleEventType')
-  end function get_code
-
-  function get_verb(this) result(verb)
-    class(ParticleEventType), intent(in) :: this
-    character(len=:), allocatable :: verb
-    verb = 'event'
-    call pstop(1, 'get_verb not implemented for ParticleEventType')
-  end function get_verb
-
   function get_str(this) result(str)
     class(ParticleEventType), intent(in) :: this
     character(len=:), allocatable :: str

@@ -9,6 +9,7 @@ module MethodCellPollockModule
   use CellRectModule, only: CellRectType, create_cell_rect
   use SubcellRectModule, only: SubcellRectType, create_subcell_rect
   use ParticleModule, only: ParticleType
+  use CellExitEventModule, only: CellExitEventType
   implicit none
 
   private
@@ -64,6 +65,7 @@ contains
       call this%load_subcell(particle, subcell)
     end select
     call method_subcell_plck%init( &
+      this%iout, &
       cell=this%cell, &
       subcell=this%subcell, &
       events=this%events, &
@@ -127,12 +129,13 @@ contains
     real(DP) :: zOrigin
     real(DP) :: sinrot
     real(DP) :: cosrot
+    class(*), pointer :: p
+
+    call this%assess(particle, this%cell%defn, tmax)
+    if (.not. particle%advancing) return
 
     select type (cell => this%cell)
     type is (CellRectType)
-      call this%assess(particle, this%cell%defn, tmax)
-      if (.not. particle%advancing) return
-
       ! Transform model coordinates to local cell coordinates
       ! (translated/rotated but not scaled relative to model)
       xOrigin = cell%xOrigin
@@ -152,7 +155,10 @@ contains
       call particle%reset_transform()
     end select
 
-    if (particle%iboundary(2) > 0) call this%cellexit(particle)
+    if (particle%iboundary(2) > 0) then
+      call this%cellexit(particle)
+    end if
+
   end subroutine apply_mcp
 
   !> @brief Loads the lone rectangular subcell from the rectangular cell
