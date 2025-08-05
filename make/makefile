@@ -32,11 +32,11 @@ SOURCEDIR25=../src/Solution/ParticleTracker
 SOURCEDIR26=../src/Solution/ParticleTracker/Domain
 SOURCEDIR27=../src/Solution/ParticleTracker/Method
 SOURCEDIR28=../src/Solution/ParticleTracker/Particle
-SOURCEDIR29=../src/Timing
-SOURCEDIR30=../src/Utilities
-SOURCEDIR31=../src/Utilities/ArrayRead
-SOURCEDIR32=../src/Utilities/Export
-SOURCEDIR33=../src/Utilities/Export/tmp
+SOURCEDIR29=../src/Solution/ParticleTracker/Particle/Events
+SOURCEDIR30=../src/Timing
+SOURCEDIR31=../src/Utilities
+SOURCEDIR32=../src/Utilities/ArrayRead
+SOURCEDIR33=../src/Utilities/Export
 SOURCEDIR34=../src/Utilities/Idm
 SOURCEDIR35=../src/Utilities/Idm/mf6blockfile
 SOURCEDIR36=../src/Utilities/Idm/netcdf
@@ -290,6 +290,7 @@ $(OBJDIR)/TimeArraySeriesManager.o \
 $(OBJDIR)/PackageMover.o \
 $(OBJDIR)/Obs.o \
 $(OBJDIR)/NumericalPackage.o \
+$(OBJDIR)/Particle.o \
 $(OBJDIR)/PackageBudget.o \
 $(OBJDIR)/HeadFileReader.o \
 $(OBJDIR)/GridFileReader.o \
@@ -302,16 +303,23 @@ $(OBJDIR)/Dis2d.o \
 $(OBJDIR)/BudgetObject.o \
 $(OBJDIR)/BoundaryPackage.o \
 $(OBJDIR)/CellDefn.o \
-$(OBJDIR)/Particle.o \
+$(OBJDIR)/ParticleEvent.o \
 $(OBJDIR)/sort.o \
 $(OBJDIR)/FlowModelInterface.o \
 $(OBJDIR)/Cell.o \
-$(OBJDIR)/ParticleEvent.o \
+$(OBJDIR)/WeakSinkEvent.o \
+$(OBJDIR)/UserTimeEvent.o \
+$(OBJDIR)/TimeStepEvent.o \
 $(OBJDIR)/TimeSelect.o \
+$(OBJDIR)/TerminationEvent.o \
 $(OBJDIR)/Subcell.o \
+$(OBJDIR)/SubcellExitEvent.o \
+$(OBJDIR)/ReleaseEvent.o \
 $(OBJDIR)/prt-fmi.o \
 $(OBJDIR)/ParticleEvents.o \
 $(OBJDIR)/Method.o \
+$(OBJDIR)/CellExitEvent.o \
+$(OBJDIR)/MethodCell.o \
 $(OBJDIR)/TernarySolveUtils.o \
 $(OBJDIR)/SubcellTri.o \
 $(OBJDIR)/MethodSubcell.o \
@@ -322,7 +330,6 @@ $(OBJDIR)/TimeStepSelect.o \
 $(OBJDIR)/LinearAlgebraUtils.o \
 $(OBJDIR)/SfrCrossSectionUtils.o \
 $(OBJDIR)/MethodSubcellPool.o \
-$(OBJDIR)/MethodCell.o \
 $(OBJDIR)/CellPoly.o \
 $(OBJDIR)/CellRectQuad.o \
 $(OBJDIR)/CellRect.o \
