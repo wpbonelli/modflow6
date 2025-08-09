@@ -3,7 +3,7 @@ module ReleaseEventModule
   use ConstantsModule, only: LENHUGELINE
   use ErrorUtilModule, only: pstop
   use ParticleModule, only: ParticleType
-  use ParticleEventModule, only: ParticleEventType
+  use ParticleEventModule, only: ParticleEventType, RELEASE
   implicit none
 
   private
@@ -20,7 +20,7 @@ contains
   function get_code(this) result(code)
     class(ReleaseEventType), intent(in) :: this
     integer(I4B) :: code
-    code = 0
+    code = RELEASE
   end function get_code
 
   function get_verb(this) result(verb)

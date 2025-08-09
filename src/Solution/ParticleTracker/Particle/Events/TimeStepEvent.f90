@@ -3,7 +3,7 @@ module TimeStepEventModule
   use ConstantsModule, only: LENHUGELINE
   use ErrorUtilModule, only: pstop
   use ParticleModule, only: ParticleType
-  use ParticleEventModule, only: ParticleEventType
+  use ParticleEventModule, only: ParticleEventType, TIMESTEP
   implicit none
 
   private
@@ -20,7 +20,7 @@ contains
   function get_code(this) result(code)
     class(TimeStepEventType), intent(in) :: this
     integer(I4B) :: code
-    code = 2
+    code = TIMESTEP
   end function get_code
 
   function get_verb(this) result(verb)

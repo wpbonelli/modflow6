@@ -3,7 +3,7 @@ module UserTimeEventModule
   use ConstantsModule, only: LENHUGELINE
   use ErrorUtilModule, only: pstop
   use ParticleModule, only: ParticleType
-  use ParticleEventModule, only: ParticleEventType
+  use ParticleEventModule, only: ParticleEventType, USERTIME
   implicit none
 
   private
@@ -20,7 +20,7 @@ contains
   function get_code(this) result(code)
     class(UserTimeEventType), intent(in) :: this
     integer(I4B) :: code
-    code = 5
+    code = USERTIME
   end function get_code
 
   function get_verb(this) result(verb)

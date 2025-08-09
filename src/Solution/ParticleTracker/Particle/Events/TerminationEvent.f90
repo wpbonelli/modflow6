@@ -3,7 +3,7 @@ module TerminationEventModule
   use ConstantsModule, only: LENHUGELINE
   use ErrorUtilModule, only: pstop
   use ParticleModule, only: ParticleType
-  use ParticleEventModule, only: ParticleEventType
+  use ParticleEventModule, only: ParticleEventType, TERMINATE
   implicit none
 
   private
@@ -20,7 +20,7 @@ contains
   function get_code(this) result(code)
     class(TerminationEventType), intent(in) :: this
     integer(I4B) :: code
-    code = 3
+    code = TERMINATE
   end function get_code
 
   function get_verb(this) result(verb)

@@ -36,8 +36,7 @@ contains
     use TdisModule, only: endofsimulation, totimc, totim
     use ParticleModule, only: TERM_WEAKSINK, TERM_NO_EXITS, &
                               TERM_STOPZONE, TERM_INACTIVE
-    use ParticleEventModule, only: FEATEXIT, TERMINATE, &
-                                   TIMESTEP, WEAKSINK, USERTIME
+    use ParticleEventModule, only: TERMINATE, TIMESTEP, WEAKSINK, USERTIME
     ! dummy
     class(MethodCellType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
