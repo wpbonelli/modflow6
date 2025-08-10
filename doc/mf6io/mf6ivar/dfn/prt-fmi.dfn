@@ -8,6 +8,16 @@ optional true
 longname save cell-by-cell flows to budget file
 description REPLACE save_flows {'{#1}': 'FMI'}
 
+block options
+name internal_iflowface_method
+type string
+valid stop ignore
+reader urword
+optional true
+mf6internal iffmeth
+longname internal assigned boundary face tracking method
+description is a string determining how tracking should proceed in cells containing boundary packages assigning IFLOWFACE to faces adjacent to active cells. The default value STOP allows tracking through the boundary cell, then terminates particles on reaching an assigned face. IGNORE ignores internal boundary face assignments, mimicking the behavior of MODPATH 7, and prints a warning.
+
 # --------------------- prt fmi packagedata ---------------------
 
 block packagedata

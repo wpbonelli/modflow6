@@ -225,8 +225,8 @@ contains
           print *, "Back ", nhist - i + 1, ": ", prev%get_text()
         end select
       end do
-      print *, "Current :", event%get_text()
-      call pstop(1, 'Cyclic pathline detected, aborting')
+      print *, "Current           : ", event%get_text()
+      call pstop(1, 'Aborting')
     else
       call this%store_event(particle, event)
     end if

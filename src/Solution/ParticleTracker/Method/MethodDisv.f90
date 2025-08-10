@@ -240,15 +240,12 @@ contains
       ! boundary face, so terminate the particle.
       ! todo AMP: reconsider when multiple models supported
       if (cell%defn%facenbr(particle%iboundary(LEVEL_FEATURE)) .eq. 0) then
-        call this%terminate(particle, &
-                            status=TERM_BOUNDARY)
+        call this%terminate(particle, status=TERM_BOUNDARY)
       else
-        ! Otherwise, load cell properties into the
-        ! particle. It may be marked to terminate.
+        call this%check_internal_boundary(particle, cell)
+        if (.not. particle%advancing) return
         call this%load_particle(cell, particle)
         if (.not. particle%advancing) return
-
-        ! Update intercell mass flows
         call this%update_flowja(cell, particle)
       end if
     end select

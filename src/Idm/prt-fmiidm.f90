@@ -13,6 +13,7 @@ module PrtFmiInputModule
 
   type PrtFmiParamFoundType
     logical :: save_flows = .false.
+    logical :: iffmeth = .false.
     logical :: flowtype = .false.
     logical :: filein = .false.
     logical :: fname = .false.
@@ -37,6 +38,24 @@ module PrtFmiInputModule
     'KEYWORD', & ! type
     '', & ! shape
     'save cell-by-cell flows to budget file', & ! longname
+    .false., & ! required
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    prtfmi_iffmeth = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'FMI', & ! subcomponent
+    'OPTIONS', & ! block
+    'INTERNAL_IFLOWFACE_METHOD', & ! tag name
+    'IFFMETH', & ! fortran variable
+    'STRING', & ! type
+    '', & ! shape
+    'internal assigned boundary face tracking method', & ! longname
     .false., & ! required
     .false., & ! multi-record
     .false., & ! preserve case
@@ -102,6 +121,7 @@ module PrtFmiInputModule
     prt_fmi_param_definitions(*) = &
     [ &
     prtfmi_save_flows, &
+    prtfmi_iffmeth, &
     prtfmi_flowtype, &
     prtfmi_filein, &
     prtfmi_fname &

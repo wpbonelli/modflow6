@@ -83,4 +83,12 @@ section = "fixes"
 subsection = "internal"
 description = "Clarified the definition of the rtp parameter in the SFR PACKAGEDATA block."
 
+[[items]]
+section = "fixes"
+subsection = "solution"
+description = "Fixed potential infinite loop conditions related to inadequate handling of boundary faces assigned with IFLOWFACE."
 
+[[items]]
+section = "features"
+subsection = "solution"
+description = "Added an option INTERNAL\\_IFLOWFACE\\_METHOD to the PRT Model's FMI package, determining how to proceed for particles in cells with IFLOWFACE assigned boundary face adjacent to an active cell (i.e. 'internal' boundary faces). Options are: STOP at internal assigned boundary face(s) after tracking through the cell (the default), or IGNORE internal assigned boundary face(s) like MP7, issuing a warning."
