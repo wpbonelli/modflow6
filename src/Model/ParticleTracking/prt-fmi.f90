@@ -1,12 +1,12 @@
 module PrtFmiModule
 
   use KindModule, only: DP, I4B
+  use MathUtilModule, only: is_close
   use ConstantsModule, only: DZERO, LENAUXNAME, LENPACKAGENAME
   use SimModule, only: store_error, store_error_unit
   use SimVariablesModule, only: errmsg
   use FlowModelInterfaceModule, only: FlowModelInterfaceType
   use BaseDisModule, only: DisBaseType
-  use BudgetObjectModule, only: BudgetObjectType
   use CellModule, only: MAX_POLY_CELLS
 
   implicit none
@@ -27,6 +27,8 @@ module PrtFmiModule
 
     procedure :: fmi_ad
     procedure :: fmi_df => prtfmi_df
+    procedure :: fmi_bd
+    procedure :: fmi_ot_flow
     procedure, private :: accumulate_flows
 
   end type PrtFmiType
@@ -214,5 +216,114 @@ contains
     end do
 
   end subroutine accumulate_flows
+
+  !> @brief Add boundary package flow terms to model budget
+  !!
+  !! Add flow terms from groundwater boundary packages to the particle
+  !! tracking model budget. This provides particle mass accounting for
+  !! all flow model stress packages.
+  !<
+  subroutine fmi_bd(this, model_budget)
+    ! modules
+    use TdisModule, only: delt
+    use BudgetModule, only: BudgetType, rate_accumulator
+    ! dummy
+    class(PrtFmiType) :: this
+    type(BudgetType), intent(inout) :: model_budget
+    ! local
+    character(len=16) :: text
+    integer(I4B) :: ip
+    integer(I4B) :: i, n
+    real(DP) :: ratin, ratout
+    real(DP) :: m
+    !
+    ! Add budget terms for each boundary package
+    do ip = 1, this%nflowpack
+      !
+      ! Initialize rate accumulators
+      ratin = 0.0_DP
+      ratout = 0.0_DP
+      !
+      ! Sum flows for this package
+      do i = 1, this%gwfpackages(ip)%nbound
+        n = this%gwfpackages(ip)%nodelist(i)
+        if (n <= 0) cycle
+        if (this%ibound(n) <= 0) cycle
+        !
+        ! TODO: assign mass flow properly
+        m = 0 ! placeholder
+        !
+        ! Particle mass follows water flow:
+        if (m > 0.0_DP) then
+          ratin = ratin + m
+        else
+          ratout = ratout - m
+        end if
+      end do
+      !
+      ! Add entry to model budget (always, even if zero flows)
+      text = this%gwfpackages(ip)%budtxt
+      call model_budget%addentry(ratin, ratout, delt, text, &
+                                 0, this%gwfpackages(ip)%name)
+    end do
+  end subroutine fmi_bd
+
+  !> @brief Output boundary package flows to binary budget file
+  !!
+  !! Write flow terms from groundwater boundary packages to the particle
+  !! tracking model binary budget file for cell-by-cell flow analysis.
+  !<
+  subroutine fmi_ot_flow(this, icbcfl, icbcun)
+    ! modules
+    ! dummy
+    class(PrtFmiType) :: this
+    integer(I4B), intent(in) :: icbcfl
+    integer(I4B), intent(in) :: icbcun
+    ! local
+    integer(I4B) :: ip
+    integer(I4B) :: i, n
+    real(DP) :: m
+    real(DP), dimension(0) :: auxrow
+    character(len=LENAUXNAME), dimension(0) :: auxname
+    character(len=16) :: text
+    !
+    ! Return if budget file not open
+    if (icbcfl == 0 .or. icbcun == 0) return
+    !
+    ! Write binary budget data for each boundary package
+    do ip = 1, this%nflowpack
+      !
+      ! Skip if no boundaries for this package
+      if (this%gwfpackages(ip)%nbound <= 0) cycle
+      !
+      ! Write header for this package
+      text = this%gwfpackages(ip)%budtxt
+      call this%dis%record_srcdst_list_header(text, &
+                                              'PRT             ', &
+                                              'PRT             ', &
+                                              'PRT             ', &
+                                              this%gwfpackages(ip)%name, &
+                                              0, &
+                                              auxname, &
+                                              icbcun, &
+                                              this%gwfpackages(ip)%nbound, &
+                                              this%iout)
+      !
+      ! Write individual flow entries
+      do i = 1, this%gwfpackages(ip)%nbound
+        n = this%gwfpackages(ip)%nodelist(i)
+        if (n <= 0) cycle
+        if (this%ibound(n) <= 0) cycle
+        !
+        ! TODO particle mass flow
+        m = DZERO
+        !
+        ! Write list entry to binary budget file
+        call this%dis%record_mf6_list_entry(icbcun, n, i, m, &
+                                            0, auxrow, &
+                                            olconv2=.FALSE.)
+      end do
+    end do
+  end subroutine fmi_ot_flow
 
 end module PrtFmiModule

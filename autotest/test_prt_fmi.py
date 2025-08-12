@@ -277,9 +277,10 @@ def check_output(idx, test):
 
     # check cell-by-cell particle mass budget file
 
-    assert len(prt_bud_data) == 2
-    assert prt_bud_data[0].shape == (1, 1, 460)
-    assert prt_bud_data[1].shape == (9,)
+    assert len(prt_bud_data) == 3
+    assert prt_bud_data[0].shape == (1, 1, 460)  # face flows
+    assert prt_bud_data[1].shape == (2,)  # CHD
+    assert prt_bud_data[2].shape == (9,)  # PRP
 
     # check mf6 prt particle track data were written to binary/CSV files
     # and that different formats are equal

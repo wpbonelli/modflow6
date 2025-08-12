@@ -85,6 +85,7 @@ module PrtModule
     procedure, private :: prt_ot_printflow
     procedure, private :: prt_ot_dv
     procedure, private :: prt_ot_bdsummary
+    procedure, private :: write_termination_flows
     procedure, private :: prt_cq_sto_term
     procedure, private :: create_packages
     procedure, private :: create_bndpkgs
@@ -528,6 +529,9 @@ contains
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_bd(this%budget)
     end do
+    !
+    ! Add boundary package flows from flow model interface
+    call this%fmi%fmi_bd(this%budget)
   end subroutine prt_bd
 
   !> @brief Print and/or save model output.
@@ -586,6 +590,13 @@ contains
 
     ! Save PRT flows
     call this%prt_ot_saveflow(this%dis%nja, this%flowja, icbcfl, icbcun)
+
+    ! Save FMI boundary package flows
+    call this%fmi%fmi_ot_flow(icbcfl, icbcun)
+
+    ! Save termination flows
+    call this%write_termination_flows(icbcfl, icbcun)
+
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_ot_model_flows(icbcfl=icbcfl, ibudfl=0, icbcun=icbcun)
@@ -727,6 +738,99 @@ contains
     ! Write to budget csv
     call this%budget%writecsv(totim)
   end subroutine prt_ot_bdsummary
+
+  !> @brief Write termination flows to binary budget file
+  !!
+  !! Write particle termination flows (particles leaving the system)
+  !! to the binary budget file for cell-by-cell analysis.
+  !<
+  subroutine write_termination_flows(this, icbcfl, icbcun)
+    ! modules
+    use ConstantsModule, only: LENAUXNAME
+    use PrtPrpModule, only: PrtPrpType
+    use ParticleModule, only: ParticleType
+    ! dummy
+    class(PrtModelType) :: this
+    integer(I4B), intent(in) :: icbcfl
+    integer(I4B), intent(in) :: icbcun
+    ! local
+    class(BndType), pointer :: packobj
+    type(ParticleType), pointer :: particle
+    integer(I4B) :: ip, np, iprp
+    integer(I4B) :: n
+    integer(I4B) :: nterminated
+    real(DP), dimension(:), allocatable :: termination_mass
+    real(DP) :: mass
+    real(DP), dimension(0) :: auxrow
+    character(len=LENAUXNAME), dimension(0) :: auxname
+    character(len=16) :: text
+    !
+    ! Return if flows will not be saved
+    if (icbcfl == 0) return
+    if (icbcun == 0) return
+    !
+    ! Allocate array to accumulate termination mass by cell
+    allocate (termination_mass(this%dis%nodes))
+    termination_mass = 0.0_DP
+    nterminated = 0
+    !
+    ! Create a single particle for reuse
+    call create_particle(particle)
+    !
+    ! Loop over PRP packages and accumulate terminated particle mass
+    iprp = 0
+    do ip = 1, this%bndlist%Count()
+      packobj => GetBndFromList(this%bndlist, ip)
+      select type (packobj)
+      type is (PrtPrpType)
+        iprp = iprp + 1
+        do np = 1, packobj%nparticles
+          ! Get particle from store
+          call packobj%particles%get(particle, this%id, iprp, np)
+          !
+          ! Check if particle terminated (status > 1)
+          if (particle%istatus > 1) then
+            ! Get particle location and mass
+            n = particle%izone ! current cell number
+            if (n > 0 .and. n <= this%dis%nodes) then
+              mass = 1.0_DP ! assume unit mass per particle
+              termination_mass(n) = termination_mass(n) + mass
+              nterminated = nterminated + 1
+            end if
+          end if
+        end do
+      end select
+    end do
+    !
+    ! Write to binary budget file if any particles terminated
+    if (nterminated > 0) then
+      !
+      ! Write header
+      text = '    TERMINATION'
+      call this%dis%record_srcdst_list_header(text, &
+                                              'PRT             ', &
+                                              'PRT             ', &
+                                              'PRT             ', &
+                                              'TERMINATION     ', &
+                                              0, &
+                                              auxname, &
+                                              icbcun, &
+                                              nterminated, &
+                                              this%iout)
+      !
+      ! Write entries for cells with terminated particles
+      do n = 1, this%dis%nodes
+        if (termination_mass(n) > 0.0_DP) then
+          call this%dis%record_mf6_list_entry(icbcun, n, n, termination_mass(n), &
+                                              0, auxrow, &
+                                              olconv2=.FALSE.)
+        end if
+      end do
+    end if
+    !
+    ! Cleanup
+    deallocate (termination_mass)
+  end subroutine write_termination_flows
 
   !> @brief Deallocate
   subroutine prt_da(this)

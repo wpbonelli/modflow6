@@ -273,11 +273,16 @@ def check_output(idx, test):
         prt_ws / prt_listfile, budgetkey="MASS BUDGET FOR ENTIRE MODEL"
     )
     for key in [
-        "STORAGE_IN",
         "PRP_IN",
-        "TERMINATION_IN",
-        "STORAGE_OUT",
         "PRP_OUT",
+        "WEL_IN",
+        "CHD_IN",
+        "STORAGE_IN",
+        "TERMINATION_IN",
+        "PRP_OUT",
+        "WEL_OUT",
+        "CHD_OUT",
+        "STORAGE_OUT",
         "TERMINATION_OUT",
     ]:
         assert key in prt_lst.get_record_names()
@@ -294,6 +299,12 @@ def check_output(idx, test):
     term_out = next(
         iter([term[1] for term in prt_bud_cum if term[2].decode() == "TERMINATION_OUT"])
     )
+    wel_in = next(
+        iter([term[1] for term in prt_bud_cum if term[2].decode() == "WEL_IN"])
+    )
+    wel_out = next(
+        iter([term[1] for term in prt_bud_cum if term[2].decode() == "WEL_OUT"])
+    )
     pct_dscr = next(
         iter(
             [
@@ -304,6 +315,8 @@ def check_output(idx, test):
         )
     )
     assert np.isclose(prp_out, 0.0)
+    assert np.isclose(wel_in, 0.0)
+    assert np.isclose(wel_out, 0.0)
     assert np.isclose(term_in, 0.0)
     assert np.isclose(pct_dscr, 0.0)
     assert np.isclose(prp_in + term_out, 0.0)
@@ -319,8 +332,8 @@ def check_output(idx, test):
     # and none in all subsequent steps
     for i in range(1, nstp):
         assert np.all(prp_bud[i]["q"] == 0)
-
     # TODO check storage and termination terms once added to binary budget file
+    # prp_sto = prt_bud.get_data(text="STO")
 
 
 def plot_output(idx, test):

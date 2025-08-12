@@ -241,11 +241,13 @@ def check_output(idx, test):
     prt_budget_file = prt_ws / f"{prt_name}.bud"
     prt_bud = flopy.utils.CellBudgetFile(prt_budget_file, precision="double")
     prt_bud_data = prt_bud.get_data(kstpkper=(0, 0))
-    assert len(prt_bud_data) == 2
+    assert len(prt_bud_data) == 3
     flowja = prt_bud.get_data(text="FLOW-JA-FACE")[0][0, 0, :]
     prp = prt_bud.get_data(text="PRP")[0].squeeze()
+    chd = prt_bud.get_data(text="CHD")[0].squeeze()
     assert flowja.shape == (28,)
-    assert prp.shape == (9,)
+    assert prp.shape == (2,)
+    assert chd.shape == (9,)
     frf, fff, flf = get_structured_faceflows(
         flowja,
         grb_file=gwf_ws / f"{gwf_name}.dis.grb",
