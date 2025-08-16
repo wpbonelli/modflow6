@@ -11,7 +11,6 @@ module CellExitEventModule
   public :: CellExitEventType
 
   type, extends(FeatExitEventType) :: CellExitEventType
-    integer(I4B) :: exit_face ! face through which the particle exited
   contains
     procedure :: get_code
     procedure :: get_verb
@@ -46,7 +45,7 @@ contains
       ' in layer ', this%ilay, &
       ', cell ', this%icu, &
       ', zone ', this%izone, &
-      ' through face ', this%exit_face, &
+      ' through face ', this%iface, &
       ' at x ', this%x, &
       ', y ', this%y, &
       ', z ', this%z, &

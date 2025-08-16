@@ -181,17 +181,16 @@ contains
     class(*), pointer :: prev
 
     allocate (CellExitEventType :: event)
-    select type (event)
-    type is (CellExitEventType)
-      event%exit_face = particle%iboundary(LEVEL_FEATURE)
-    end select
     call this%events%dispatch(particle, event)
+
+    ! cycle detection disabled by default
     if (particle%icycwin == 0) then
       deallocate (event)
       return
     end if
+
+    ! detect cycles and log/abort if found
     if (this%forms_cycle(particle, event)) then
-      ! print event history
       print *, "Cyclic pathline detected"
       nhist = particle%history%Count()
       do i = 1, nhist
@@ -229,8 +228,8 @@ contains
           if (event%icu == prev%icu .and. &
               event%ilay == prev%ilay .and. &
               event%izone == prev%izone .and. &
-              event%exit_face == prev%exit_face .and. &
-              event%exit_face /= 0) then
+              event%iface == prev%iface .and. &
+              event%iface /= 0) then
             found_cycle = .true.
             exit
           end if

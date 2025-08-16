@@ -48,7 +48,7 @@ contains
       ', cell ', this%icu, &
       ', subcell ', this%isc, &
       ', zone ', this%izone, &
-      ' through face ', this%exit_face, &
+      ' through subcell face ', this%exit_face, &
       ' at x ', this%x, &
       ', y ', this%y, &
       ', z ', this%z, &

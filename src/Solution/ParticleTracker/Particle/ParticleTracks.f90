@@ -40,11 +40,11 @@ module ParticleTracksModule
   private :: save_event
 
   character(len=*), parameter, public :: TRACKHEADER = &
-    'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,&
+    'kper,kstp,imdl,iprp,irpt,ilay,icell,iface,izone,&
     &istatus,ireason,trelease,t,x,y,z,name'
 
   character(len=*), parameter, public :: TRACKDTYPES = &
-    '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
+    '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
     &<i4,<i4,<f8,<f8,<f8,<f8,<f8,|S40'
 
   !> @brief Output file containing all or some particle pathlines.
@@ -232,6 +232,7 @@ contains
         event%irpt, &
         event%ilay, &
         event%icu, &
+        event%iface, &
         event%izone, &
         event%istatus, &
         event%get_code(), &
@@ -250,6 +251,7 @@ contains
         event%irpt, &
         event%ilay, &
         event%icu, &
+        event%iface, &
         event%izone, &
         event%istatus, &
         event%get_code(), &

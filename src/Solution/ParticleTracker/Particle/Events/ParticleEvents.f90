@@ -79,8 +79,10 @@ contains
     event%iprp = particle%iprp
     event%irpt = particle%irpt
     event%ilay = particle%ilay
-    event%icu = particle%icu
+    event%icell = particle%itrdomain(2)
+    event%iface = particle%iboundary(2)
     event%izone = particle%izone
+    event%icu = particle%icu
     event%trelease = particle%trelease
     event%ttrack = particle%ttrack
     event%x = x

@@ -117,7 +117,7 @@ module ParticleModule
     integer(I4B), dimension(:, :), pointer, public, contiguous :: iboundary !< array of indices for tracking domain boundaries
     integer(I4B), dimension(:), pointer, public, contiguous :: icu !< cell number (user)
     integer(I4B), dimension(:), pointer, public, contiguous :: ilay !< layer
-    integer(I4B), dimension(:), pointer, public, contiguous :: izone !< current zone number
+    integer(I4B), dimension(:), pointer, public, contiguous :: izone !< zone number
     integer(I4B), dimension(:), pointer, public, contiguous :: izp !< previous zone number
     integer(I4B), dimension(:), pointer, public, contiguous :: istatus !< particle status
     real(DP), dimension(:), pointer, public, contiguous :: x !< model x coord of particle
