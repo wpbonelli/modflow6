@@ -182,6 +182,11 @@ contains
           exitFace = 5
         else if (vz .gt. DZERO) then
           exitFace = 6
+          ! if cell is partially saturated, prohibit particle exiting top face
+          if (this%cell%defn%sat > DZERO .and. this%cell%defn%sat < DONE) then
+            particle%advancing = .false.
+            return
+          end if
         end if
       end if
     else
