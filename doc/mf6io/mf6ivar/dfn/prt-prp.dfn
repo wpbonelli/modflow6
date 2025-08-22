@@ -245,6 +245,7 @@ longname file keyword
 description name of the release times file.  RELEASE\_TIMES and RELEASE\_TIMESFILE are mutually exclusive.
 removed 6.6.0
 
+# todo rename STAY to STRAND
 block options
 name dry_tracking_method
 type string

@@ -210,16 +210,16 @@ contains
       ! that same face, we've entered a cycle
       ! as can occur e.g. in wells. terminate
       ! in the previous cell.
-      if (ic == particle%icp .and. inface == 7 .and. ilay < particle%ilay) then
-        particle%itrdomain(LEVEL_FEATURE) = particle%icp
-        particle%izone = particle%izp
-        call this%terminate(particle, &
-                            status=TERM_BOUNDARY)
-        return
-      else
-        particle%icp = particle%itrdomain(LEVEL_FEATURE)
-        particle%izp = particle%izone
-      end if
+      ! if (ic == particle%icp .and. inface == 7 .and. ilay < particle%ilay) then
+      !   particle%itrdomain(LEVEL_FEATURE) = particle%icp
+      !   particle%izone = particle%izp
+      !   call this%terminate(particle, &
+      !                       status=TERM_BOUNDARY)
+      !   return
+      ! else
+      !   particle%icp = particle%itrdomain(LEVEL_FEATURE)
+      !   particle%izp = particle%izone
+      ! end if
 
       ! update node numbers and layer
       particle%itrdomain(LEVEL_FEATURE) = ic

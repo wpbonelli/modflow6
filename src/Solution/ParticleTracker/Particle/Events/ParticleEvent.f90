@@ -26,6 +26,8 @@ module ParticleEventModule
     enumerator :: TERMINATE = 3 !< particle terminated
     enumerator :: WEAKSINK = 4 !< particle entered a weak sink
     enumerator :: USERTIME = 5 !< user-specified tracking time
+    enumerator :: DROP = 6 !< particle was dropped to water table
+    enumerator :: STRAND = 7 !< particle was stranded by water table (TODO: report both for STAY/STRAND and STOP)
   end enum
 
   !> @brief Base type for particle events.

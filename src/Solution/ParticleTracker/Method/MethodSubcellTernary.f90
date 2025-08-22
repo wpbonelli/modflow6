@@ -238,6 +238,7 @@ contains
         exitFace = 4
       else
         exitFace = 5
+        ! TODO: move this to base subcell method and intercept at pass time!
         ! if cell is partially saturated, prohibit particle exiting top face
         if (this%cell%defn%sat > DZERO .and. this%cell%defn%sat < DONE) then
           particle%advancing = .false.
