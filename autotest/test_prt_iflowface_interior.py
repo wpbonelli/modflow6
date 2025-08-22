@@ -5,7 +5,7 @@ in the middle. Modified from `test_prt_iflowface_stopzone.py`.
 A single particle is placed near the left side of the grid. The well is centrally
 located. IFLOWFACE is assigned to the well's right face.
 
-Exercises the `INTERNAL_ASSIGNED_BOUNDARY_FACE_METHOD` option in the PRT FMI package.
+Exercises the `INTERNAL_IFLOWFACE_METHOD` option in the PRT FMI package.
 
 This test compares PRT and MP7 models.
 """
