@@ -1,13 +1,12 @@
 """
-Tests particle tracking in "dry" conditions.
+Tests particle tracking above the water table with Newton.
 
-The PRP package provides the `DRY` option
-to specify how particles should behave in
-dry conditions when the flow model enables
-the Newton formulation.
+The PRP package provides the `DRY_TRACKING_METHOD` option
+to specify how particles should behave in dry cells given
+a flow model using the Newton formulation, in which cells
+stay active when dry.
 
-This test case is adapted from the example
-simulation provided by @javgs-bd in
+This test case is adapted from @javgs-bd's example:
 https://github.com/MODFLOW-ORG/modflow6/issues/2014.
 """
 
@@ -36,7 +35,8 @@ cases = [
     # expect termination with status 7 immediately in 1st time step
     simname + "_stop",
     # expect particles to remain in release positions until the water
-    # table rises to meet them
+    # table rises to meet them. STAY is deprecated for STRAND but the
+    # sim name is too long with 6 extra characters, so STAY it stays
     simname + "_stay",
 ]
 

@@ -248,12 +248,12 @@ removed 6.6.0
 block options
 name dry_tracking_method
 type string
-valid drop stop stay
+valid drop stop strand
 reader urword
 optional true
 mf6internal idrymeth
-longname what to do in dry-but-active cells
-description is a string indicating how particles should behave in dry-but-active cells (as can occur with the Newton formulation).  The value can be ``DROP'', ``STOP'', or ``STAY''.  The default is ``DROP'', which passes particles vertically and instantaneously to the water table. ``STOP'' causes particles to terminate. ``STAY'' causes particles to remain stationary but active.
+longname tracking method for dry-but-active cells
+description is a string indicating how particles should behave in dry-but-active cells (as can occur with the Newton formulation).  The value can be ``DROP'', ``STOP'', or ``STRAND''.  The default is ``DROP'', which passes particles vertically and instantaneously to the water table. ``STOP'' causes particles to terminate. ``STRAND'' causes particles to remain stationary but active. ``STAY'' is available as a deprecated alias for ``STRAND'', available until MODFLOW 6.8.0, in which version it will be removed.
 
 block options
 name dev_forceternary

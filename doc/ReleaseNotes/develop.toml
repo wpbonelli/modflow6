@@ -83,4 +83,7 @@ section = "fixes"
 subsection = "internal"
 description = "Clarified the definition of the rtp parameter in the SFR PACKAGEDATA block."
 
-
+[[items]]
+section = "fixes"
+subsection = "internal"
+description = "Deprecated the STAY value for the PRT Model PRP Package's DRY\\_TRACKING\\_METHOD option, in favor of new value STRAND. STAY will be supported until MF6.8."

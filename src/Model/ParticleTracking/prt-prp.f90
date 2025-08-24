@@ -45,7 +45,7 @@ module PrtPrpModule
     integer(I4B), pointer :: istopweaksink => null() !< weak sink option: 0 = no stop, 1 = stop
     integer(I4B), pointer :: istopzone => null() !< optional stop zone number: 0 = no stop zone
     integer(I4B), pointer :: idrape => null() !< drape option: 0 = do not drape, 1 = drape to topmost active cell
-    integer(I4B), pointer :: idrymeth => null() !< dry tracking method: 0 = drop, 1 = stop, 2 = stay
+    integer(I4B), pointer :: idrymeth => null() !< dry tracking method: 0 = drop, 1 = stop, 2 = strand
     integer(I4B), pointer :: itrkout => null() !< binary track file
     integer(I4B), pointer :: itrkhdr => null() !< track header file
     integer(I4B), pointer :: itrkcsv => null() !< CSV track file
@@ -70,8 +70,8 @@ module PrtPrpModule
     real(DP), pointer, contiguous :: rptm(:) => null() !< total mass released from point
     character(len=LENBOUNDNAME), pointer, contiguous :: rptname(:) => null() !< release point names
   contains
-    procedure :: prp_allocate_arrays
-    procedure :: prp_allocate_scalars
+    procedure :: allocate_arrays => prp_allocate_arrays
+    procedure :: allocate_scalars => prp_allocate_scalars
     procedure :: bnd_ar => prp_ar
     procedure :: bnd_ad => prp_ad
     procedure :: bnd_rp => prp_rp
@@ -79,12 +79,12 @@ module PrtPrpModule
     procedure :: bnd_da => prp_da
     procedure :: define_listlabel
     procedure :: prp_set_pointers
+    procedure :: prp_log_options
     procedure :: source_options => prp_options
     procedure :: source_dimensions => prp_dimensions
-    procedure :: prp_log_options
-    procedure :: prp_packagedata
-    procedure :: prp_releasetimes
-    procedure :: prp_load_releasetimefrequency
+    procedure :: source_release_points
+    procedure :: source_schedule_explicit
+    procedure :: source_schedule_regular
     procedure :: release
     procedure :: log_release
     procedure :: validate_release_point
@@ -115,18 +115,13 @@ contains
       "(1x, /1x, 'PRP PARTICLE RELEASE POINT PACKAGE', &
        &' INPUT READ FROM MEMPATH: ', a, /)"
 
-    ! allocate the object and assign values to object variables
     allocate (prpobj)
     packobj => prpobj
 
-    ! create name and memory path
     call packobj%set_names(ibcnum, namemodel, pakname, ftype, input_mempath)
     prpobj%text = text
 
-    ! allocate scalars
-    call prpobj%prp_allocate_scalars()
-
-    ! initialize package
+    call prpobj%allocate_scalars()
     call packobj%pack_initialize()
 
     packobj%inunit = inunit
@@ -136,21 +131,18 @@ contains
     packobj%ncolbnd = 4
     packobj%iscloc = 1
 
-    ! store pointer to flow model interface
     prpobj%fmi => fmi
 
-    ! if prp is enabled, print a message identifying it
     if (inunit > 0) write (iout, fmtheader) input_mempath
+
   end subroutine prp_create
 
   !> @brief Deallocate memory
   subroutine prp_da(this)
     class(PrtPrpType) :: this
 
-    ! Deallocate parent
     call this%BndExtType%bnd_da()
 
-    ! Deallocate scalars
     call mem_deallocate(this%ilocalz)
     call mem_deallocate(this%iextend)
     call mem_deallocate(this%offset)
@@ -175,7 +167,6 @@ contains
     call mem_deallocate(this%rttol)
     call mem_deallocate(this%rtfreq)
 
-    ! Deallocate arrays
     call mem_deallocate(this%rptx)
     call mem_deallocate(this%rpty)
     call mem_deallocate(this%rptz)
@@ -183,11 +174,12 @@ contains
     call mem_deallocate(this%rptm)
     call mem_deallocate(this%rptname, 'RPTNAME', this%memoryPath)
 
-    ! Deallocate objects
     call this%particles%destroy(this%memoryPath)
     call this%schedule%destroy()
+
     deallocate (this%particles)
     deallocate (this%schedule)
+
   end subroutine prp_da
 
   !> @ brief Set pointers to model variables
@@ -218,7 +210,6 @@ contains
       this%nreleasepoints, &
       this%memoryPath)
 
-    ! Allocate arrays
     call mem_allocate(this%rptx, this%nreleasepoints, 'RPTX', this%memoryPath)
     call mem_allocate(this%rpty, this%nreleasepoints, 'RPTY', this%memoryPath)
     call mem_allocate(this%rptz, this%nreleasepoints, 'RPTZ', this%memoryPath)
@@ -229,20 +220,18 @@ contains
     call mem_allocate(this%rptname, LENBOUNDNAME, this%nreleasepoints, &
                       'RPTNAME', this%memoryPath)
 
-    ! Initialize arrays
     do nps = 1, this%nreleasepoints
       this%rptm(nps) = DZERO
     end do
+
   end subroutine prp_allocate_arrays
 
   !> @brief Allocate scalars
   subroutine prp_allocate_scalars(this)
     class(PrtPrpType) :: this
 
-    ! Allocate parent's scalars
     call this%BndExtType%allocate_scalars()
 
-    ! Allocate scalars for this type
     call mem_allocate(this%ilocalz, 'ILOCALZ', this%memoryPath)
     call mem_allocate(this%iextend, 'IEXTEND', this%memoryPath)
     call mem_allocate(this%offset, 'OFFSET', this%memoryPath)
@@ -267,7 +256,6 @@ contains
     call mem_allocate(this%rttol, 'RTTOL', this%memoryPath)
     call mem_allocate(this%rtfreq, 'RTFREQ', this%memoryPath)
 
-    ! Set values
     this%ilocalz = 0
     this%iextend = 0
     this%offset = DZERO
@@ -296,9 +284,9 @@ contains
 
   !> @ brief Allocate and read period data
   subroutine prp_ar(this)
-    ! dummy variables
+    ! dummy
     class(PrtPrpType), intent(inout) :: this
-    ! local variables
+    ! local
     integer(I4B) :: n
 
     call this%obs%obs_ar()
@@ -311,6 +299,7 @@ contains
     do n = 1, this%nreleasepoints
       this%nodelist(n) = this%rptnode(n)
     end do
+
   end subroutine prp_ar
 
   !> @brief Advance a time step and release particles if scheduled.
@@ -372,9 +361,10 @@ contains
         call this%release(ip, t)
       end do
     end do
+
   end subroutine prp_ad
 
-  !> @brief Log the release scheduled for this time step.
+  !> @brief Log the release schedule for this time step.
   subroutine log_release(this)
     class(PrtPrpType), intent(inout) :: this !< prp
     if (this%iprpak > 0) then
@@ -388,7 +378,7 @@ contains
   !!
   !! Terminate with an error if the release point lies outside the
   !! given cell, or if the point is above or below the grid top or
-  !! bottom, respectively.
+  !! bottom, respectively. TODO: check top and bottom of the cell.
   !<
   subroutine validate_release_point(this, ic, x, y, z)
     class(PrtPrpType), intent(inout) :: this !< this instance
@@ -398,6 +388,7 @@ contains
     real(DP), allocatable :: polyverts(:, :)
 
     call this%fmi%dis%get_polyverts(ic, polyverts)
+
     if (.not. point_in_polygon(x, y, polyverts)) then
       write (errmsg, '(a,g0,a,g0,a,i0)') &
         'Error: release point (x=', x, ', y=', y, ') is not in cell ', &
@@ -418,7 +409,9 @@ contains
       call store_error(errmsg, terminate=.false.)
       call store_error_filename(this%input_fname)
     end if
+
     deallocate (polyverts)
+
   end subroutine validate_release_point
 
   !> Release a particle at the specified time.
@@ -547,6 +540,7 @@ contains
     particle%iextend = this%iextend
     particle%icycwin = this%icycwin
     particle%extol = this%extol
+
   end subroutine initialize_particle
 
   !> @ brief Read and prepare period data for particle input
@@ -564,7 +558,6 @@ contains
     character(len=LINELENGTH), allocatable :: lines(:)
     integer(I4B) :: n
 
-    ! set pointer to last and next period loaded
     call mem_setptr(iper, 'IPER', this%input_mempath)
     call mem_setptr(ionper, 'IONPER', this%input_mempath)
 
@@ -585,22 +578,19 @@ contains
       return
     end if
 
-    ! set input context pointers
     call mem_setptr(nlist, 'NBOUND', this%input_mempath)
     call mem_setptr(settings, 'SETTING', this%input_mempath)
 
-    ! allocate and set input
     allocate (lines(nlist))
     do n = 1, nlist
       lines(n) = settings(n)
     end do
 
-    ! update schedule
     if (size(lines) > 0) &
       call this%schedule%advance(lines=lines)
 
-    ! cleanup
     deallocate (lines)
+
   end subroutine prp_rp
 
   !> @ brief Calculate flow between package and model.
@@ -621,13 +611,11 @@ contains
     ! If no boundaries, skip flow calculations.
     if (this%nbound <= 0) return
 
-    ! Loop through each boundary calculating flow.
     do i = 1, this%nbound
       node = this%nodelist(i)
       rrate = DZERO
-      ! If cell is no-flow or constant-head, then ignore it.
+      ! If cell is no-flow or constant-head, ignore it.
       if (node > 0) then
-        ! Calculate the flow rate into the cell.
         idiag = this%dis%con%ia(node)
         rrate = this%rptm(i) * (DONE / delt) ! reciprocal of tstp length
         flowja(idiag) = flowja(idiag) + rrate
@@ -666,26 +654,25 @@ contains
 
   !> @ brief Set options specific to PrtPrpType
   subroutine prp_options(this)
-    ! -- modules
+    ! modules
     use ConstantsModule, only: LENVARNAME, DZERO, MNORMAL
     use MemoryManagerExtModule, only: mem_set_value
     use OpenSpecModule, only: access, form
     use InputOutputModule, only: getunit, openfile
     use PrtPrpInputModule, only: PrtPrpParamFoundType
-    ! -- dummy variables
+    ! dummy
     class(PrtPrpType), intent(inout) :: this
-    ! -- local variables
-    character(len=LENVARNAME), dimension(3) :: drytrack_method = &
-      &[character(len=LENVARNAME) :: 'DROP', 'STOP', 'STAY']
-    character(len=LENVARNAME), dimension(2) :: coorcheck_method = &
-      &[character(len=LENVARNAME) :: 'NONE', 'EAGER']
+    ! local
     character(len=LINELENGTH) :: trackfile, trackcsvfile, fname
     type(PrtPrpParamFoundType) :: found
+    ! formats
+    character(len=LENVARNAME), dimension(4) :: drytrack_method = &
+      &[character(len=LENVARNAME) :: 'DROP', 'STOP', 'STRAND', 'STAY']
+    character(len=LENVARNAME), dimension(2) :: coorcheck_method = &
+      &[character(len=LENVARNAME) :: 'NONE', 'EAGER']
 
-    ! -- source base class options
     call this%BndExtType%source_options()
 
-    ! -- update defaults from input context
     call mem_set_value(this%stoptime, 'STOPTIME', this%input_mempath, &
                        found%stoptime)
     call mem_set_value(this%stoptraveltime, 'STOPTRAVELTIME', &
@@ -720,15 +707,20 @@ contains
                        coorcheck_method, found%ichkmeth)
     call mem_set_value(this%icycwin, 'ICYCWIN', this%input_mempath, found%icycwin)
 
-    ! update internal state and validate input
     if (found%idrymeth) then
       if (this%idrymeth == 0) then
         write (errmsg, '(a)') 'Unsupported dry tracking method. &
-          &DRY_TRACKING_METHOD must be "DROP", "STOP", or "STAY"'
+          &DRY_TRACKING_METHOD must be "DROP", "STOP", or "STRAND"'
         call store_error(errmsg)
       else
-        ! adjust for method zero indexing
-        this%idrymeth = this%idrymeth - 1
+        this%idrymeth = this%idrymeth - 1 ! zero indexing
+        if (this%idrymeth == 3) then
+          this%idrymeth = 2
+          write (warnmsg, '(a)') 'Warning: DRY_TRACKING_METHOD STAY &
+            &is deprecated and will be removed in a future version. &
+            &Use STRAND instead.'
+          call store_warning(warnmsg)
+        end if
       end if
     end if
 
@@ -769,13 +761,11 @@ contains
         call store_error('CYCLE_DETECTION_WINDOW MUST BE NON-NEGATIVE')
     end if
 
-    ! fileout options
     if (found%trackfile) then
       this%itrkout = getunit()
       call openfile(this%itrkout, this%iout, trackfile, 'DATA(BINARY)', &
                     form, access, filstat_opt='REPLACE', &
                     mode_opt=MNORMAL)
-      ! open and write ascii header spec file
       this%itrkhdr = getunit()
       fname = trim(trackfile)//'.hdr'
       call openfile(this%itrkhdr, this%iout, fname, 'CSV', &
@@ -790,29 +780,23 @@ contains
       write (this%itrkcsv, '(a)') TRACKHEADER
     end if
 
-    ! terminate if any errors were detected
-    if (count_errors() > 0) then
+    if (count_errors() > 0) &
       call store_error_filename(this%input_fname)
-    end if
 
-    ! log found options
     call this%prp_log_options(found, trackfile, trackcsvfile)
-
-    ! Create release schedule now that we know
-    ! the coincident release time tolerance
     this%schedule => create_release_schedule(tolerance=this%rttol)
+
   end subroutine prp_options
 
-  !> @ brief Log options specific to PrtPrpType
+  !> @ brief Log options
   subroutine prp_log_options(this, found, trackfile, trackcsvfile)
-    ! -- modules
+    ! modules
     use PrtPrpInputModule, only: PrtPrpParamFoundType
-    ! -- dummy variables
+    ! dummy
     class(PrtPrpType), intent(inout) :: this
     type(PrtPrpParamFoundType), intent(in) :: found
     character(len=*), intent(in) :: trackfile
     character(len=*), intent(in) :: trackcsvfile
-    ! -- local variables
     ! formats
     character(len=*), parameter :: fmttrkbin = &
       "(4x, 'PARTICLE TRACKS WILL BE SAVED TO BINARY FILE: ', a, /4x, &
@@ -822,31 +806,25 @@ contains
     &'OPENED ON UNIT: ', I0)"
 
     write (this%iout, '(1x,a)') 'PROCESSING PARTICLE INPUT DIMENSIONS'
-
-    if (found%ifrctrn) then
+    if (found%ifrctrn) &
       write (this%iout, '(4x,a)') &
-        'IF DISV, TRACKING WILL USE THE TERNARY METHOD REGARDLESS OF CELL TYPE'
-    end if
-
-    if (found%trackfile) then
+      'IF DISV, TRACKING WILL USE THE TERNARY METHOD REGARDLESS OF CELL TYPE'
+    if (found%trackfile) &
       write (this%iout, fmttrkbin) trim(adjustl(trackfile)), this%itrkout
-    end if
-
-    if (found%trackcsvfile) then
+    if (found%trackcsvfile) &
       write (this%iout, fmttrkcsv) trim(adjustl(trackcsvfile)), this%itrkcsv
-    end if
-
     write (this%iout, '(1x,a)') 'END OF PARTICLE INPUT DIMENSIONS'
+
   end subroutine prp_log_options
 
-  !> @ brief Set dimensions specific to PrtPrpType
+  !> @ brief Load dimensions
   subroutine prp_dimensions(this)
-    ! -- modules
+    ! modules
     use MemoryManagerExtModule, only: mem_set_value
     use PrtPrpInputModule, only: PrtPrpParamFoundType
-    ! -- dummy variables
+    ! dummy
     class(PrtPrpType), intent(inout) :: this
-    ! -- local variables
+    ! local
     type(PrtPrpParamFoundType) :: found
 
     call mem_set_value(this%nreleasepoints, 'NRELEASEPTS', this%input_mempath, &
@@ -859,21 +837,18 @@ contains
     write (this%iout, '(4x,a,i0)') 'NRELEASETIMES = ', this%nreleasetimes
     write (this%iout, '(1x,a)') 'END OF PARTICLE INPUT DIMENSIONS'
 
-    ! set maxbound and nbound to nreleasepts
     this%maxbound = this%nreleasepoints
     this%nbound = this%nreleasepoints
 
-    ! allocate arrays for prp package
-    call this%prp_allocate_arrays()
+    call this%allocate_arrays()
+    call this%source_release_points()
+    call this%source_schedule_explicit()
+    call this%source_schedule_regular()
 
-    ! read packagedata and releasetimes blocks
-    call this%prp_packagedata()
-    call this%prp_releasetimes()
-    call this%prp_load_releasetimefrequency()
   end subroutine prp_dimensions
 
-  !> @brief Load package data (release points).
-  subroutine prp_packagedata(this)
+  !> @brief Load release points.
+  subroutine source_release_points(this)
     use MemoryManagerModule, only: mem_setptr
     use GeomUtilModule, only: get_node
     use CharacterStringModule, only: CharacterStringType
@@ -891,7 +866,6 @@ contains
     integer(I4B), dimension(:), pointer :: cellid
     integer(I4B) :: n, noder, nodeu, rptno
 
-    ! set input context pointers
     call mem_setptr(irptno, 'IRPTNO', this%input_mempath)
     call mem_setptr(cellids, 'CELLID', this%input_mempath)
     call mem_setptr(xrpts, 'XRPT', this%input_mempath)
@@ -899,7 +873,6 @@ contains
     call mem_setptr(zrpts, 'ZRPT', this%input_mempath)
     call mem_setptr(boundnames, 'BOUNDNAME', this%input_mempath)
 
-    ! allocate and initialize temporary variables
     allocate (nboundchk(this%nreleasepoints))
     do n = 1, this%nreleasepoints
       nboundchk(n) = 0
@@ -911,7 +884,6 @@ contains
     do n = 1, size(irptno)
 
       rptno = irptno(n)
-
       if (rptno < 1 .or. rptno > this%nreleasepoints) then
         write (errmsg, '(a,i0,a,i0,a)') &
           'Expected ', this%nreleasepoints, ' release points. &
@@ -920,13 +892,9 @@ contains
         cycle
       end if
 
-      ! increment nboundchk
       nboundchk(rptno) = nboundchk(rptno) + 1
-
-      ! set cellid
       cellid => cellids(:, n)
 
-      ! set node user
       if (this%dis%ndim == 1) then
         nodeu = cellid(1)
       elseif (this%dis%ndim == 2) then
@@ -940,7 +908,6 @@ contains
                          this%dis%mshape(3))
       end if
 
-      ! set noder
       noder = this%dis%get_nodenumber(nodeu, 1)
       if (noder <= 0) then
         cycle
@@ -953,12 +920,10 @@ contains
         cycle
       end if
 
-      ! set coordinates
       this%rptx(rptno) = xrpts(n)
       this%rpty(rptno) = yrpts(n)
       this%rptz(rptno) = zrpts(n)
 
-      ! set default boundname
       write (cno, '(i9.9)') rptno
       bndName = 'PRP'//cno
 
@@ -970,7 +935,6 @@ contains
         bndName = ''
       end if
 
-      ! set boundname
       this%rptname(rptno) = bndName
     end do
 
@@ -991,17 +955,15 @@ contains
       end if
     end do
 
-    ! terminate if any errors were detected
-    if (count_errors() > 0) then
+    if (count_errors() > 0) &
       call store_error_filename(this%input_fname)
-    end if
 
-    ! cleanup
     deallocate (nboundchk)
-  end subroutine prp_packagedata
 
-  !> @brief Load explicitly specified release times.
-  subroutine prp_releasetimes(this)
+  end subroutine source_release_points
+
+  !> @brief Load explicit release times.
+  subroutine source_schedule_explicit(this)
     use MemoryManagerModule, only: mem_setptr, get_isize
     ! dummy
     class(PrtPrpType), intent(inout) :: this
@@ -1011,13 +973,9 @@ contains
     real(DP), allocatable :: times(:)
 
     if (this%nreleasetimes <= 0) return
-
-    ! allocate times array
     allocate (times(this%nreleasetimes))
 
-    ! check if input array was read
     call get_isize('TIME', this%input_mempath, isize)
-
     if (isize <= 0) then
       errmsg = "RELEASTIMES block expected when &
         &NRELEASETIMES dimension is non-zero."
@@ -1025,59 +983,45 @@ contains
       call store_error_filename(this%input_fname)
     end if
 
-    ! set input context pointer
     call mem_setptr(time, 'TIME', this%input_mempath)
 
-    ! set input data
     do n = 1, size(time)
       times(n) = time(n)
     end do
 
-    ! register times with the release schedule
     call this%schedule%time_select%extend(times)
-
-    ! make sure times strictly increase
     if (.not. this%schedule%time_select%increasing()) then
       errmsg = "RELEASTIMES block entries must strictly increase."
       call store_error(errmsg)
       call store_error_filename(this%input_fname)
     end if
 
-    ! deallocate
     deallocate (times)
-  end subroutine prp_releasetimes
 
-  !> @brief Load regularly spaced release times if configured.
-  subroutine prp_load_releasetimefrequency(this)
-    ! modules
+  end subroutine source_schedule_explicit
+
+  !> @brief Load periodic release times.
+  subroutine source_schedule_regular(this)
     use TdisModule, only: totalsimtime
-    ! dummy
     class(PrtPrpType), intent(inout) :: this
-    ! local
     real(DP), allocatable :: times(:)
 
-    ! check if a release time frequency is configured
     if (this%rtfreq <= DZERO) return
 
-    ! create array of regularly-spaced release times
     times = arange( &
             start=DZERO, &
             stop=totalsimtime, &
             step=this%rtfreq)
 
-    ! register times with release schedule
     call this%schedule%time_select%extend(times)
-
-    ! make sure times strictly increase
     if (.not. this%schedule%time_select%increasing()) then
       errmsg = "Release times must strictly increase"
       call store_error(errmsg)
       call store_error_filename(this%input_fname)
     end if
 
-    ! deallocate
     deallocate (times)
 
-  end subroutine prp_load_releasetimefrequency
+  end subroutine source_schedule_regular
 
 end module PrtPrpModule
