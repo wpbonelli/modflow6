@@ -149,6 +149,7 @@ contains
       if (particle%idrymeth == 0) then
         ! drop to water table
         particle%z = cell_defn%top
+        call this%watertable(particle)
       else if (particle%idrymeth == 1) then
         ! stop
         call this%terminate(particle, status=TERM_INACTIVE)

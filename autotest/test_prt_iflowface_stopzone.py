@@ -263,6 +263,7 @@ def build_prt_sim(
         stop_at_weak_sink=stop_at_weak_sink,
         extend_tracking=extend,
         istopzone=istopzone,
+        dry_tracking_method="stop"
     )
     # Instantiate the MODFLOW 6 prt output control package
     budgetfile_prt = f"{prt_name}.cbc"
@@ -282,6 +283,7 @@ def build_prt_sim(
         track_release=True,
         track_terminate=True,
         track_exit=True,
+        track_watertable=True,
     )
 
     gwf_ws = gwf.model_ws

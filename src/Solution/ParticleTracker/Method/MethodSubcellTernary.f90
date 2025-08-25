@@ -64,7 +64,7 @@ contains
 
   !> @brief Track a particle across a triangular subcell.
   subroutine track_subcell(this, subcell, particle, tmax)
-    use ParticleModule, only: ACTIVE, TERM_NO_EXITS_SUB
+    use ParticleModule, only: ACTIVE, TERM_NO_EXITS_SUB, TERM_BOUNDARY
     use ParticleEventModule, only: FEATEXIT, TERMINATE, TIMESTEP, USERTIME, &
                                    WATERTABLE
     ! dummy
@@ -135,7 +135,7 @@ contains
     real(DP) :: betexit
     integer(I4B) :: event_code
     integer(I4B) :: i
-    logical(LGP) :: at_water_table
+    logical(LGP) :: at_watertable, partially_sat
 
     ! Set solution method
     if (particle%iexmeth == 0) then
@@ -303,22 +303,27 @@ contains
     particle%z = z
     particle%ttrack = t
 
-    ! If the particle is at the water table and the cell is not fully
-    ! saturated, it hasn't left the cell.
-    at_water_table = (exitFace == 5 .and. &
-                      this%fmi%gwfsat(this%cell%defn%icell) < DONE .and. &
-                      is_close(z, ztop, symmetric=.false.))
+    at_watertable = (exitFace == 5 .and. is_close(z, ztop, symmetric=.false.))
+    partially_sat = this%fmi%gwfsat(this%cell%defn%icell) < DONE
 
-    if (at_water_table) event_code = WATERTABLE
+    ! Save particle track record(s). Water-table event might occur
+    ! with another. Timestep & exit events are mutually exclusive.
+    ! If particle is at water table and cell partially saturated,
+    ! it hasn't left the cell. but it might need to be terminated.
+    if (at_watertable) then
+      if (partially_sat) particle%advancing = .false.
+      call this%watertable(particle)
+      if (particle%idrymeth == 1) & ! stop
+        call this%terminate(particle, status=TERM_BOUNDARY)
+    end if
 
     if (event_code == TIMESTEP) then
       call this%timestep(particle)
-    else if (event_code == FEATEXIT) then
+    else if (event_code == FEATEXIT .and. particle%advancing) then
       particle%iboundary(LEVEL_SUBFEATURE) = exitFace
       call this%subcellexit(particle)
-    else if (event_code == WATERTABLE) then
-      call this%watertable(particle)
     end if
+
   end subroutine track_subcell
 
   !> @brief Do calculations related to analytical z solution
