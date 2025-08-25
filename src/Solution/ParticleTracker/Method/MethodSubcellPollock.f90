@@ -9,6 +9,7 @@ module MethodSubcellPollockModule
   use BaseDisModule, only: DisBaseType
   use CellModule, only: CellType
   use ConstantsModule, only: DZERO, DONE
+  use MathUtilModule, only: is_close
   implicit none
   private
   public :: MethodSubcellPollockType
@@ -120,6 +121,7 @@ contains
     real(DP) :: initialZ
     integer(I4B) :: exitFace
     integer(I4B) :: event_code
+    logical(LGP) :: at_water_table
 
     event_code = -1
 
@@ -273,13 +275,25 @@ contains
     particle%y = y * subcell%dy
     particle%z = z * subcell%dz
     particle%ttrack = t
-    particle%iboundary(LEVEL_SUBFEATURE) = exitFace
+
+    ! If the particle is at the water table and the cell is not fully
+    ! saturated, it hasn't left the cell.
+    at_water_table = (exitFace == 6 .and. &
+                      this%fmi%gwfsat(this%cell%defn%icell) < DONE .and. &
+                      is_close(z, DONE, symmetric=.false.))
+
+    if (.not. at_water_table) &
+      particle%iboundary(LEVEL_SUBFEATURE) = exitFace
 
     ! Save particle track record
     if (event_code == TIMESTEP) then
       call this%timestep(particle)
     else if (event_code == FEATEXIT) then
-      call this%subcellexit(particle)
+      if (at_water_table) then
+        particle%advancing = .false.
+      else
+        call this%subcellexit(particle)
+      end if
     end if
 
   end subroutine track_subcell

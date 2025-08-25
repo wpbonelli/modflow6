@@ -134,6 +134,7 @@ contains
     real(DP) :: betexit
     integer(I4B) :: event_code
     integer(I4B) :: i
+    logical(LGP) :: at_water_table
 
     ! Set solution method
     if (particle%iexmeth == 0) then
@@ -300,12 +301,24 @@ contains
     particle%y = y
     particle%z = z
     particle%ttrack = t
-    particle%iboundary(LEVEL_SUBFEATURE) = exitFace
+
+    ! If the particle is at the water table and the cell is not fully
+    ! saturated, it hasn't left the cell.
+    at_water_table = (exitFace == 5 .and. &
+                      this%fmi%gwfsat(this%cell%defn%icell) < DONE .and. &
+                      is_close(z, ztop, symmetric=.false.))
+
+    if (.not. at_water_table) &
+      particle%iboundary(LEVEL_SUBFEATURE) = exitFace
 
     if (event_code == TIMESTEP) then
       call this%timestep(particle)
     else if (event_code == FEATEXIT) then
-      call this%subcellexit(particle)
+      if (at_water_table) then
+        particle%advancing = .false.
+      else
+        call this%subcellexit(particle)
+      end if
     end if
   end subroutine track_subcell
 
