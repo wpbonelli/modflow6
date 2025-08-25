@@ -14,6 +14,7 @@ module MethodModule
   use WeakSinkEventModule, only: WeakSinkEventType
   use UserTimeEventModule, only: UserTimeEventType
   use FeatExitEventModule, only: FeatExitEventType
+  use WaterTableEventModule, only: WaterTableEventType
   use BaseDisModule, only: DisBaseType
   use PrtFmiModule, only: PrtFmiType
   use CellModule, only: CellType
@@ -82,6 +83,7 @@ module MethodModule
     procedure :: timestep
     procedure :: weaksink
     procedure :: usertime
+    procedure :: watertable
   end type MethodType
 
   abstract interface
@@ -254,5 +256,16 @@ contains
     call this%events%dispatch(particle, event)
     deallocate (event)
   end subroutine usertime
+
+  !> @brief Particle reaches the water table.
+  subroutine watertable(this, particle)
+    class(MethodType), intent(inout) :: this
+    type(ParticleType), pointer, intent(inout) :: particle
+    class(ParticleEventType), pointer :: event
+    particle%advancing = .false.
+    allocate (WaterTableEventType :: event)
+    call this%events%dispatch(particle, event)
+    deallocate (event)
+  end subroutine watertable
 
 end module MethodModule

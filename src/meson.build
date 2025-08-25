@@ -357,6 +357,7 @@ modflow_sources = files(
     'Solution' / 'ParticleTracker' / 'Particle' / 'Events' / 'FeatExitEvent.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'Events' / 'CellExitEvent.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'Events' / 'TerminationEvent.f90',
+    'Solution' / 'ParticleTracker' / 'Particle' / 'Events' / 'WaterTableEvent.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'Events' / 'WeakSinkEvent.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'Events' / 'ReleaseEvent.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'Events' / 'TimeStepEvent.f90',

@@ -65,7 +65,8 @@ contains
   !> @brief Track a particle across a triangular subcell.
   subroutine track_subcell(this, subcell, particle, tmax)
     use ParticleModule, only: ACTIVE, TERM_NO_EXITS_SUB
-    use ParticleEventModule, only: FEATEXIT, TERMINATE, TIMESTEP, USERTIME
+    use ParticleEventModule, only: FEATEXIT, TERMINATE, TIMESTEP, USERTIME, &
+                                   WATERTABLE
     ! dummy
     class(MethodSubcellTernaryType), intent(inout) :: this
     class(SubcellTriType), intent(in) :: subcell
@@ -308,17 +309,15 @@ contains
                       this%fmi%gwfsat(this%cell%defn%icell) < DONE .and. &
                       is_close(z, ztop, symmetric=.false.))
 
-    if (.not. at_water_table) &
-      particle%iboundary(LEVEL_SUBFEATURE) = exitFace
+    if (at_water_table) event_code = WATERTABLE
 
     if (event_code == TIMESTEP) then
       call this%timestep(particle)
     else if (event_code == FEATEXIT) then
-      if (at_water_table) then
-        particle%advancing = .false.
-      else
-        call this%subcellexit(particle)
-      end if
+      particle%iboundary(LEVEL_SUBFEATURE) = exitFace
+      call this%subcellexit(particle)
+    else if (event_code == WATERTABLE) then
+      call this%watertable(particle)
     end if
   end subroutine track_subcell
 

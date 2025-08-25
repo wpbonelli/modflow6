@@ -13,6 +13,7 @@ module ParticleEventModule
   public :: TERMINATE
   public :: WEAKSINK
   public :: USERTIME
+  public :: WATERTABLE
 
   !> @brief Particle event enumeration.
   !!
@@ -26,6 +27,7 @@ module ParticleEventModule
     enumerator :: TERMINATE = 3 !< particle terminated
     enumerator :: WEAKSINK = 4 !< particle entered a weak sink
     enumerator :: USERTIME = 5 !< user-specified tracking time
+    enumerator :: WATERTABLE = 6 !< particle reached the water table
   end enum
 
   !> @brief Base type for particle events.
