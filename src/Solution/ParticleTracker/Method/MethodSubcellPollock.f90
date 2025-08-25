@@ -283,7 +283,7 @@ contains
     ! Save particle track record(s). Water-table event might occur
     ! with another. Timestep & exit events are mutually exclusive.
     ! If particle is at water table and cell partially saturated,
-    ! it hasn't left the cell. but it might need to be terminated.
+    ! it hasn't left the cell, but it might need to be terminated.
     if (at_watertable) then
       if (partially_sat) particle%advancing = .false.
       call this%watertable(particle)

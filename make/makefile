@@ -316,6 +316,7 @@ $(OBJDIR)/sort.o \
 $(OBJDIR)/FlowModelInterface.o \
 $(OBJDIR)/Cell.o \
 $(OBJDIR)/WeakSinkEvent.o \
+$(OBJDIR)/WaterTableEvent.o \
 $(OBJDIR)/UserTimeEvent.o \
 $(OBJDIR)/TimeStepEvent.o \
 $(OBJDIR)/TimeSelect.o \
