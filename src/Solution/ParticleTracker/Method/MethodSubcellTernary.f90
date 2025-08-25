@@ -64,7 +64,7 @@ contains
 
   !> @brief Track a particle across a triangular subcell.
   subroutine track_subcell(this, subcell, particle, tmax)
-    use ParticleModule, only: ACTIVE, TERM_NO_EXITS_SUB
+    use ParticleModule, only: ACTIVE, TERM_NO_EXITS_SUB, TERM_BOUNDARY
     use ParticleEventModule, only: FEATEXIT, TERMINATE, TIMESTEP, USERTIME
     ! dummy
     class(MethodSubcellTernaryType), intent(inout) :: this
@@ -134,6 +134,7 @@ contains
     real(DP) :: betexit
     integer(I4B) :: event_code
     integer(I4B) :: i
+    logical(LGP) :: at_watertable, partially_sat
 
     ! Set solution method
     if (particle%iexmeth == 0) then
@@ -300,13 +301,25 @@ contains
     particle%y = y
     particle%z = z
     particle%ttrack = t
-    particle%iboundary(LEVEL_SUBFEATURE) = exitFace
+
+    at_watertable = (exitFace == 5 .and. is_close(z, ztop, symmetric=.false.))
+    partially_sat = this%fmi%gwfsat(this%cell%defn%icell) < DONE
+
+    ! If particle is at water table and cell partially saturated,
+    ! it hasn't left the cell, but it might need to be terminated.
+    if (at_watertable) then
+      if (partially_sat) particle%advancing = .false.
+      if (particle%idrymeth == 1) & ! stop
+        call this%terminate(particle, status=TERM_BOUNDARY)
+    end if
 
     if (event_code == TIMESTEP) then
       call this%timestep(particle)
-    else if (event_code == FEATEXIT) then
+    else if (event_code == FEATEXIT .and. particle%advancing) then
+      particle%iboundary(LEVEL_SUBFEATURE) = exitFace
       call this%subcellexit(particle)
     end if
+
   end subroutine track_subcell
 
   !> @brief Do calculations related to analytical z solution

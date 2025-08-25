@@ -147,6 +147,7 @@ contains
       end if
     else if (dry_particle .and. this%name /= "passtobottom") then
       if (particle%idrymeth == 0) then
+        print *, "particle dropped to water table ", particle%irpt
         ! drop to water table
         particle%z = cell_defn%top
       else if (particle%idrymeth == 1) then

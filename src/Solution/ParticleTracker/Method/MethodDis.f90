@@ -12,7 +12,6 @@ module MethodDisModule
   use PrtFmiModule, only: PrtFmiType
   use DisModule, only: DisType
   use GeomUtilModule, only: get_ijk, get_jk
-  use MathUtilModule, only: is_close
   implicit none
 
   private
@@ -204,22 +203,6 @@ contains
       icu = dis%get_nodeuser(ic)
       call get_ijk(icu, dis%nrow, dis%ncol, dis%nlay, &
                    irow, icol, ilay)
-
-      ! if returning to a cell through the bottom
-      ! face after previously leaving it through
-      ! that same face, we've entered a cycle
-      ! as can occur e.g. in wells. terminate
-      ! in the previous cell.
-      if (ic == particle%icp .and. inface == 7 .and. ilay < particle%ilay) then
-        particle%itrdomain(LEVEL_FEATURE) = particle%icp
-        particle%izone = particle%izp
-        call this%terminate(particle, &
-                            status=TERM_BOUNDARY)
-        return
-      else
-        particle%icp = particle%itrdomain(LEVEL_FEATURE)
-        particle%izp = particle%izone
-      end if
 
       ! update node numbers and layer
       particle%itrdomain(LEVEL_FEATURE) = ic

@@ -169,22 +169,6 @@ contains
       icu = dis%get_nodeuser(ic)
       call get_jk(icu, dis%ncpl, dis%nlay, icpl, ilay)
 
-      ! if returning to a cell through the bottom
-      ! face after previously leaving it through
-      ! that same face, we've entered a cycle
-      ! as can occur e.g. in wells. terminate
-      ! in the previous cell.
-      if (ic == particle%icp .and. inface == 7 .and. ilay < particle%ilay) then
-        particle%itrdomain(LEVEL_FEATURE) = particle%icp
-        particle%izone = particle%izp
-        call this%terminate(particle, &
-                            status=TERM_BOUNDARY)
-        return
-      else
-        particle%icp = particle%itrdomain(LEVEL_FEATURE)
-        particle%izp = particle%izone
-      end if
-
       particle%itrdomain(LEVEL_FEATURE) = ic
       particle%icu = icu
       particle%ilay = ilay

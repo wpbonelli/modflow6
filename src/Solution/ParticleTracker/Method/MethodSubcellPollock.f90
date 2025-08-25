@@ -9,6 +9,7 @@ module MethodSubcellPollockModule
   use BaseDisModule, only: DisBaseType
   use CellModule, only: CellType
   use ConstantsModule, only: DZERO, DONE
+  use MathUtilModule, only: is_close
   implicit none
   private
   public :: MethodSubcellPollockType
@@ -86,7 +87,8 @@ contains
   !<
   subroutine track_subcell(this, subcell, particle, tmax)
     use TdisModule, only: endofsimulation
-    use ParticleModule, only: ACTIVE, TERM_NO_EXITS_SUB, TERM_TIMEOUT
+    use ParticleModule, only: ACTIVE, TERM_NO_EXITS_SUB, TERM_TIMEOUT, &
+                              TERM_BOUNDARY
     use ParticleEventModule, only: TIMESTEP, FEATEXIT
     ! dummy
     class(MethodSubcellPollockType), intent(inout) :: this
@@ -120,6 +122,7 @@ contains
     real(DP) :: initialZ
     integer(I4B) :: exitFace
     integer(I4B) :: event_code
+    logical(LGP) :: at_watertable, partially_sat
 
     event_code = -1
 
@@ -273,12 +276,22 @@ contains
     particle%y = y * subcell%dy
     particle%z = z * subcell%dz
     particle%ttrack = t
-    particle%iboundary(LEVEL_SUBFEATURE) = exitFace
 
-    ! Save particle track record
+    at_watertable = (exitFace == 6 .and. is_close(z, DONE, symmetric=.false.))
+    partially_sat = this%fmi%gwfsat(this%cell%defn%icell) < DONE
+
+    ! If particle is at water table and cell partially saturated,
+    ! it hasn't left the cell, but it might need to be terminated.
+    if (at_watertable) then
+      if (partially_sat) particle%advancing = .false.
+      if (particle%idrymeth == 1) & ! stop
+        call this%terminate(particle, status=TERM_BOUNDARY)
+    end if
+
     if (event_code == TIMESTEP) then
       call this%timestep(particle)
-    else if (event_code == FEATEXIT) then
+    else if (event_code == FEATEXIT .and. particle%advancing) then
+      particle%iboundary(LEVEL_SUBFEATURE) = exitFace
       call this%subcellexit(particle)
     end if
 

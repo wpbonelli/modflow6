@@ -15,11 +15,13 @@ import os
 from warnings import warn
 
 import flopy
+import matplotlib.cm as cm
 import matplotlib.colors as clt
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
+from flopy.utils import HeadFile
 from framework import TestFramework
 from prt_test_utils import get_model_name
 
@@ -387,8 +389,10 @@ def check_output(idx, test, snapshot):
     elif "stop" in name:
         assert len(actual[actual.ireason == 0]) == nparts  # release
     elif "stay" in name:
-        assert len(actual[actual.ireason == 0]) == nparts  # release
-        assert len(actual[actual.t == user_time]) == nparts  # user time
+        # expect as many release points as particles
+        assert len(actual[actual.ireason == 0]) == nparts
+        # expect a user time event for each particle
+        assert len(actual[actual.t == user_time]) == nparts
     else:
         # immediate termination, permanently unreleased
         assert len(actual) == nparts
@@ -477,8 +481,58 @@ def check_output(idx, test, snapshot):
         p.show()
 
 
+def plot_output(idx, test):
+    name = test.name
+    gwf_ws = test.workspace / "gwf"
+    prt_ws = test.workspace / "prt"
+    gwf_name = get_model_name(name, "gwf")
+    prt_name = get_model_name(name, "prt")
+    gwf_sim = test.sims[0]
+    gwf = gwf_sim.get_model(gwf_name)
+    mg = gwf.modelgrid
+    drape = "drp" in name
+
+    # check mf6 output files exist
+    gwf_head_file = f"{gwf_name}.hds"
+    prt_track_csv_file = f"{prt_name}.csv"
+
+    # extract head, budget, and specific discharge results from GWF model
+    hds = HeadFile(gwf_ws / gwf_head_file).get_data()
+    bud = gwf.output.budget()
+    spdis = bud.get_data(text="DATA-SPDIS")[0]
+    qx, qy, qz = flopy.utils.postprocessing.get_specific_discharge(spdis, gwf)
+
+    # load mf6 pathline results
+    mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
+
+    # set up plot
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(10, 10))
+    ax.set_aspect("equal")
+
+    # plot mf6 pathlines in map view
+    pmv = flopy.plot.PlotMapView(modelgrid=mg, ax=ax)
+    pmv.plot_grid()
+    pmv.plot_array(hds[0], alpha=0.1)
+    pmv.plot_vector(qx, qy, normalize=True, color="white")
+    mf6_plines = mf6_pls.groupby(["iprp", "irpt", "trelease"])
+    for ipl, ((iprp, irpt, trelease), pl) in enumerate(mf6_plines):
+        pl.plot(
+            title=f"MF6 pathlines{' (drape)' if drape else ''}",
+            kind="line",
+            x="x",
+            y="y",
+            ax=ax,
+            legend=False,
+            color=cm.plasma(ipl / len(mf6_plines)),
+        )
+
+    # view/save plot
+    plt.show()
+    plt.savefig(prt_ws / f"{name}.png")
+
+
 @pytest.mark.parametrize("idx, name", enumerate(cases))
-def test_mf6model(idx, name, function_tmpdir, targets, array_snapshot):
+def test_mf6model(idx, name, function_tmpdir, targets, array_snapshot, plot):
     dry_tracking_methods = ["drop", "stop", "stay"]
     if any(t in name for t in dry_tracking_methods):
         dry_tracking_method = name[-4:]
@@ -491,6 +545,7 @@ def test_mf6model(idx, name, function_tmpdir, targets, array_snapshot):
         workspace=function_tmpdir,
         build=lambda t: build_models(idx, t, newton, drape, dry_tracking_method),
         check=lambda t: check_output(idx, t, array_snapshot),
+        plot=lambda t: plot_output(idx, t) if plot else None,
         targets=targets,
         compare=None,
     )
