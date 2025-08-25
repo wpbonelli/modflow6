@@ -205,7 +205,7 @@ type keyword
 reader urword
 optional true
 longname track watertable intersections
-decsription keyword to indicate that particle tracking output is to be written when a particle intersects the water table
+description keyword to indicate that particle tracking output is to be written when a particle intersects the water table
 
 block options
 name track_timesrecord
