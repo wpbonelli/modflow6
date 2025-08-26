@@ -526,7 +526,7 @@ contains
 
     ! assignment of BoundaryFlows to faceflow below assumes clockwise
     ! ordering of faces, with face 1 being the "western" face
-    ioffset = (defn%icell - 1) * 10
+    ioffset = (defn%icell - 1) * MAX_POLY_CELLS
     defn%faceflow(1) = defn%faceflow(1) + &
                        this%fmi%BoundaryFlows(ioffset + 4)
     defn%faceflow(2) = defn%faceflow(2) + &
@@ -537,9 +537,9 @@ contains
                        this%fmi%BoundaryFlows(ioffset + 1)
     defn%faceflow(5) = defn%faceflow(1)
     defn%faceflow(6) = defn%faceflow(6) + &
-                       this%fmi%BoundaryFlows(ioffset + 9)
+                       this%fmi%BoundaryFlows(ioffset + MAX_POLY_CELLS - 1)
     defn%faceflow(7) = defn%faceflow(7) + &
-                       this%fmi%BoundaryFlows(ioffset + 10)
+                       this%fmi%BoundaryFlows(ioffset + MAX_POLY_CELLS)
   end subroutine load_boundary_flows_to_defn_rect
 
   !> @brief Load boundary flows from the grid into rectangular quadcell.
@@ -560,7 +560,7 @@ contains
     real(DP) :: qbf
     integer(I4B) :: irectvert(5)
 
-    ioffset = (defn%icell - 1) * 10
+    ioffset = (defn%icell - 1) * MAX_POLY_CELLS
 
     ! Polygon faces in positions 1 through npolyverts
     do n = 1, 4
@@ -600,11 +600,11 @@ contains
     ! Bottom in position npolyverts+2
     m = m + 1
     defn%faceflow(m) = defn%faceflow(m) + &
-                       this%fmi%BoundaryFlows(ioffset + 9)
+                       this%fmi%BoundaryFlows(ioffset + MAX_POLY_CELLS - 1)
     ! Top in position npolyverts+3
     m = m + 1
     defn%faceflow(m) = defn%faceflow(m) + &
-                       this%fmi%BoundaryFlows(ioffset + 10)
+                       this%fmi%BoundaryFlows(ioffset + MAX_POLY_CELLS)
 
   end subroutine load_boundary_flows_to_defn_rect_quad
 

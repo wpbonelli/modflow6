@@ -2,7 +2,7 @@
 1D unconfined model with a constant head boundary on the left,
 5 RIV boundary cells on the right with the same stage, and recharge.
 
-Particles are placed in every cell center. There are several cases
+Particles are placed at every cell center. There are several cases
 with extended tracking off, and several identical cases with it on.
 
 The cases exercise different combinations of IFLOWFACE, either none

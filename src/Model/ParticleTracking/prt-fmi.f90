@@ -190,9 +190,8 @@ contains
       call this%initialize_gwfterms_from_gwfbndlist()
     end if
 
-    ! Set flag that stops dry flows from being deactivated in a GWE
-    ! transport model since conduction will still be simulated.
-    ! 0: GWE (skip deactivation step); 1: GWT (default: use existing code)
+    ! Set flag that stops dry flows from being deactivated
+    ! TODO: consider if relevant to PRT
     this%idryinactive = idryinactive
 
     ! Allocate arrays
@@ -260,7 +259,7 @@ contains
           iflowface = NINT(this%gwfpackages(ip)%auxvar(iauxiflowface, ib))
           if (this%iffmeth /= 1 .and. iflowface > 0) &
             call this%mark_boundary_face(i, iflowface)
-          ! this maps bot -2 -> 9, top -1 -> 10; see note re: max faces below
+          ! maps bot -2 -> MAX_POLY_CELLS - 1, top -1 -> MAX_POLY_CELLS
           if (iflowface < 0) iflowface = iflowface + MAX_POLY_CELLS + 1
         end if
         if (this%iffmeth /= 1 .and. iflowface > 0) then
