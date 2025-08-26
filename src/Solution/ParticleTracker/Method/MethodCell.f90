@@ -58,7 +58,7 @@ contains
   !<
   subroutine assess(this, particle, cell_defn, tmax)
     ! modules
-    use TdisModule, only: endofsimulation, totimc, totim
+    use TdisModule, only: kper, kstp, endofsimulation, totimc, totim
     use ParticleModule, only: TERM_WEAKSINK, TERM_NO_EXITS, &
                               TERM_STOPZONE, TERM_INACTIVE
     use ParticleEventModule, only: TERMINATE, TIMESTEP, WEAKSINK, USERTIME
@@ -98,7 +98,26 @@ contains
       end if
     end if
 
+    ! raise water table event if the particle was dry last time step and
+    ! now it's wet (means the water table rose up to/above it this step)
+    if (.not. (kper == 1 .and. kstp == 1) .and. &
+        .not. (dry_cell .or. dry_particle) .and. &
+        .not. particle%wet) then
+      print *, "water table rose up to particle ", particle%irpt
+      call this%watertable(particle)
+      particle%wet = .true.
+    end if
+
     if (dry_cell) then
+      ! raise water table event if particle was wet
+      ! last time step (means the water table fell
+      ! below it this step).
+      if (particle%wet) then
+        print *, "water table fell below particle ", particle%irpt
+        call this%watertable(particle)
+        particle%wet = .false.
+      end if
+
       if (particle%idrymeth == 0) then
         ! drop to cell bottom. handled by pass
         ! to bottom method, nothing to do here
@@ -146,9 +165,20 @@ contains
         end if
       end if
     else if (dry_particle .and. this%name /= "passtobottom") then
+      ! raise water table event if particle was wet
+      ! last time step (means the water table fell
+      ! below it this step).
+      if (particle%wet) then
+        print *, "water table fell below particle ", particle%irpt
+        call this%watertable(particle)
+        particle%wet = .false.
+      end if
+
       if (particle%idrymeth == 0) then
+        print *, "particle dropped to water table ", particle%irpt
         ! drop to water table
         particle%z = cell_defn%top
+        particle%wet = .true.
         call this%watertable(particle)
       else if (particle%idrymeth == 1) then
         ! stop
@@ -185,6 +215,8 @@ contains
           end do
         end if
       end if
+    else
+      particle%wet = .true.
     end if
 
     if (no_exit_face) then

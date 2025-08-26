@@ -50,13 +50,15 @@ module ParticleModule
   !!
   !! Particles are identified by composite key, i.e.,
   !! combinations of properties imdl, iprp, irpt, and
-  !! trelease. An optional label may be provided, but
-  !! need not be unique
+  !! trelease. An optional name may be provided for a
+  !! release point, but need not be unique. Note that
+  !! the name is associated not with any particle but
+  !! with the release point.
   !<
   type ParticleType
     private
     ! identity
-    character(len=LENBOUNDNAME), public :: name = '' !< optional particle name
+    character(len=LENBOUNDNAME), public :: name = '' !< optional release point name
     integer(I4B), public :: imdl !< index of model the particle originated in
     integer(I4B), public :: iprp !< index of release package the particle is from
     integer(I4B), public :: irpt !< index of release point the particle is from
@@ -64,8 +66,17 @@ module ParticleModule
     ! stop criteria
     integer(I4B), public :: istopweaksink !< weak sink option (0: do not stop, 1: stop)
     integer(I4B), public :: istopzone !< stop zone number
+    ! tracking options
     integer(I4B), public :: idrymeth !< dry tracking method
+    integer(I4B), public :: ifrctrn !< whether to force solving the particle with the ternary method
+    integer(I4B), public :: iexmeth !< method for iterative solution of particle exit location and time in generalized Pollock's method
+    integer(I4B), public :: iextend !< whether to extend tracking beyond the end of the simulation
+    integer(I4B), public :: icycwin !< cycle detection window size
+    real(DP), public :: extol !< tolerance for iterative solution of particle exit location and time in generalized Pollock's method
     ! state
+    logical(LGP), public :: transformed !< whether coordinates have been transformed from model to local
+    logical(LGP), public :: advancing !< whether particle is still being tracked for current time step
+    logical(LGP), public :: wet = .false. !< true if particle is at/below the water table, false if above
     integer(I4B), public :: itrdomain(MAX_LEVEL) !< tracking domain indices
     integer(I4B), public :: iboundary(MAX_LEVEL) !< tracking domain boundary indices
     integer(I4B), public :: icu !< user cell number
@@ -83,13 +94,6 @@ module ParticleModule
     real(DP), public :: zorigin !< z origin for coordinate transformation from model to local
     real(DP), public :: sinrot !< sine of rotation angle for coordinate transformation from model to local
     real(DP), public :: cosrot !< cosine of rotation angle for coordinate transformation from model to local
-    real(DP), public :: extol !< tolerance for iterative solution of particle exit location and time in generalized Pollock's method
-    logical(LGP), public :: transformed !< whether coordinates have been transformed from model to local
-    logical(LGP), public :: advancing !< whether particle is still being tracked for current time step
-    integer(I4B), public :: ifrctrn !< whether to force solving the particle with the ternary method
-    integer(I4B), public :: iexmeth !< method for iterative solution of particle exit location and time in generalized Pollock's method
-    integer(I4B), public :: iextend !< whether to extend tracking beyond the end of the simulation
-    integer(I4B), public :: icycwin !< cycle detection window size
     type(ListType), public, pointer :: history !< history of particle positions (for cycle detection)
   contains
     procedure, public :: destroy => destroy_particle
@@ -102,15 +106,22 @@ module ParticleModule
   type ParticleStoreType
     private
     ! identity
-    character(len=LENBOUNDNAME), dimension(:), pointer, public, contiguous :: name !< optional particle label
+    character(len=LENBOUNDNAME), dimension(:), pointer, public, contiguous :: name !< optional release point name
     integer(I4B), dimension(:), pointer, public, contiguous :: imdl !< index of model particle originated in
     integer(I4B), dimension(:), pointer, public, contiguous :: iprp !< index of release package the particle originated in
     integer(I4B), dimension(:), pointer, public, contiguous :: irpt !< index of release point in the particle release package the particle originated in
-    ! stopping criteria
+    ! stop criteria
     integer(I4B), dimension(:), pointer, public, contiguous :: istopweaksink !< weak sink option: 0 = do not stop, 1 = stop
     integer(I4B), dimension(:), pointer, public, contiguous :: istopzone !< stop zone number
-    integer(I4B), dimension(:), pointer, public, contiguous :: idrymeth !< stop in dry cells
+    ! tracking options
+    integer(I4B), dimension(:), pointer, public, contiguous :: idrymeth !< dry tracking method
+    integer(I4B), dimension(:), pointer, public, contiguous :: ifrctrn !< force ternary method
+    integer(I4B), dimension(:), pointer, public, contiguous :: iexmeth !< method for iterative solution of particle exit location and time in generalized Pollock's method
+    integer(LGP), dimension(:), pointer, public, contiguous :: iextend !< whether to extend tracking beyond the end of the simulation
+    integer(I4B), dimension(:), pointer, public, contiguous :: icycwin !< cycle detection window size
+    real(DP), dimension(:), pointer, public, contiguous :: extol !< tolerance for iterative solution of particle exit location and time in generalized Pollock's method
     ! state
+    integer(I4B), dimension(:), pointer, public, contiguous :: iwet !< true if particle is at/below the water table, false if above
     integer(I4B), dimension(:, :), pointer, public, contiguous :: itrdomain !< array of indices for domains in the tracking domain hierarchy
     integer(I4B), dimension(:, :), pointer, public, contiguous :: iboundary !< array of indices for tracking domain boundaries
     integer(I4B), dimension(:), pointer, public, contiguous :: icu !< cell number (user)
@@ -123,11 +134,6 @@ module ParticleModule
     real(DP), dimension(:), pointer, public, contiguous :: trelease !< particle release time
     real(DP), dimension(:), pointer, public, contiguous :: tstop !< particle stop time
     real(DP), dimension(:), pointer, public, contiguous :: ttrack !< current tracking time
-    integer(I4B), dimension(:), pointer, public, contiguous :: ifrctrn !< force ternary method
-    integer(I4B), dimension(:), pointer, public, contiguous :: iexmeth !< method for iterative solution of particle exit location and time in generalized Pollock's method
-    real(DP), dimension(:), pointer, public, contiguous :: extol !< tolerance for iterative solution of particle exit location and time in generalized Pollock's method
-    integer(LGP), dimension(:), pointer, public, contiguous :: extend !< whether to extend tracking beyond the end of the simulation
-    integer(I4B), dimension(:), pointer, public, contiguous :: icycwin !< cycle detection window size
   contains
     procedure, public :: destroy
     procedure, public :: num_stored
@@ -138,24 +144,35 @@ module ParticleModule
 
 contains
 
-  !> @brief Create a new particle
+  !> @brief Create a new particle.
   subroutine create_particle(particle)
     type(ParticleType), pointer :: particle !< particle
     allocate (particle)
     allocate (particle%history)
   end subroutine create_particle
 
-  !> @brief Allocate particle store
+  !> @brief Create a new particle store.
   subroutine create_particle_store(store, np, mempath)
     type(ParticleStoreType), pointer :: store !< store
     integer(I4B), intent(in) :: np !< number of particles
     character(*), intent(in) :: mempath !< path to memory
 
     allocate (store)
-    call mem_allocate(store%imdl, np, 'PLIMDL', mempath)
-    call mem_allocate(store%irpt, np, 'PLIRPT', mempath)
-    call mem_allocate(store%iprp, np, 'PLIPRP', mempath)
     call mem_allocate(store%name, LENBOUNDNAME, np, 'PLNAME', mempath)
+    call mem_allocate(store%imdl, np, 'PLIMDL', mempath)
+    call mem_allocate(store%iprp, np, 'PLIPRP', mempath)
+    call mem_allocate(store%irpt, np, 'PLIRPT', mempath)
+    call mem_allocate(store%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
+    call mem_allocate(store%istopzone, np, 'PLISTOPZONE', mempath)
+    call mem_allocate(store%idrymeth, np, 'PLIDRYMETH', mempath)
+    call mem_allocate(store%ifrctrn, np, 'PLIFRCTRN', mempath)
+    call mem_allocate(store%iexmeth, np, 'PLIEXMETH', mempath)
+    call mem_allocate(store%iextend, np, 'PLIEXTEND', mempath)
+    call mem_allocate(store%icycwin, np, 'PLICYCWIN', mempath)
+    call mem_allocate(store%extol, np, 'PLEXTOL', mempath)
+    call mem_allocate(store%iwet, np, 'PLWET', mempath)
+    call mem_allocate(store%itrdomain, np, MAX_LEVEL, 'PLIDOMAIN', mempath)
+    call mem_allocate(store%iboundary, np, MAX_LEVEL, 'PLIBOUNDARY', mempath)
     call mem_allocate(store%icu, np, 'PLICU', mempath)
     call mem_allocate(store%ilay, np, 'PLILAY', mempath)
     call mem_allocate(store%izone, np, 'PLIZONE', mempath)
@@ -166,27 +183,28 @@ contains
     call mem_allocate(store%trelease, np, 'PLTRELEASE', mempath)
     call mem_allocate(store%tstop, np, 'PLTSTOP', mempath)
     call mem_allocate(store%ttrack, np, 'PLTTRACK', mempath)
-    call mem_allocate(store%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
-    call mem_allocate(store%istopzone, np, 'PLISTOPZONE', mempath)
-    call mem_allocate(store%idrymeth, np, 'PLIDRYMETH', mempath)
-    call mem_allocate(store%ifrctrn, np, 'PLIFRCTRN', mempath)
-    call mem_allocate(store%iexmeth, np, 'PLIEXMETH', mempath)
-    call mem_allocate(store%extol, np, 'PLEXTOL', mempath)
-    call mem_allocate(store%extend, np, 'PLIEXTEND', mempath)
-    call mem_allocate(store%icycwin, np, 'PLICYCWIN', mempath)
-    call mem_allocate(store%itrdomain, np, MAX_LEVEL, 'PLIDOMAIN', mempath)
-    call mem_allocate(store%iboundary, np, MAX_LEVEL, 'PLIBOUNDARY', mempath)
   end subroutine create_particle_store
 
-  !> @brief Destroy particle store after use.
+  !> @brief Destroy particle store.
   subroutine destroy(this, mempath)
     class(ParticleStoreType), intent(inout) :: this !< store
     character(*), intent(in) :: mempath !< path to memory
 
+    call mem_deallocate(this%name, 'PLNAME', mempath)
     call mem_deallocate(this%imdl, 'PLIMDL', mempath)
     call mem_deallocate(this%iprp, 'PLIPRP', mempath)
     call mem_deallocate(this%irpt, 'PLIRPT', mempath)
-    call mem_deallocate(this%name, 'PLNAME', mempath)
+    call mem_deallocate(this%istopweaksink, 'PLISTOPWEAKSINK', mempath)
+    call mem_deallocate(this%istopzone, 'PLISTOPZONE', mempath)
+    call mem_deallocate(this%idrymeth, 'PLIDRYMETH', mempath)
+    call mem_deallocate(this%ifrctrn, 'PLIFRCTRN', mempath)
+    call mem_deallocate(this%iexmeth, 'PLIEXMETH', mempath)
+    call mem_deallocate(this%iextend, 'PLIEXTEND', mempath)
+    call mem_deallocate(this%icycwin, 'PLICYCWIN', mempath)
+    call mem_deallocate(this%extol, 'PLEXTOL', mempath)
+    call mem_deallocate(this%iwet, 'PLWET', mempath)
+    call mem_deallocate(this%itrdomain, 'PLIDOMAIN', mempath)
+    call mem_deallocate(this%iboundary, 'PLIBOUNDARY', mempath)
     call mem_deallocate(this%icu, 'PLICU', mempath)
     call mem_deallocate(this%ilay, 'PLILAY', mempath)
     call mem_deallocate(this%izone, 'PLIZONE', mempath)
@@ -197,25 +215,15 @@ contains
     call mem_deallocate(this%trelease, 'PLTRELEASE', mempath)
     call mem_deallocate(this%tstop, 'PLTSTOP', mempath)
     call mem_deallocate(this%ttrack, 'PLTTRACK', mempath)
-    call mem_deallocate(this%istopweaksink, 'PLISTOPWEAKSINK', mempath)
-    call mem_deallocate(this%istopzone, 'PLISTOPZONE', mempath)
-    call mem_deallocate(this%idrymeth, 'PLIDRYMETH', mempath)
-    call mem_deallocate(this%ifrctrn, 'PLIFRCTRN', mempath)
-    call mem_deallocate(this%iexmeth, 'PLIEXMETH', mempath)
-    call mem_deallocate(this%extol, 'PLEXTOL', mempath)
-    call mem_deallocate(this%extend, 'PLIEXTEND', mempath)
-    call mem_deallocate(this%icycwin, 'PLICYCWIN', mempath)
-    call mem_deallocate(this%itrdomain, 'PLIDOMAIN', mempath)
-    call mem_deallocate(this%iboundary, 'PLIBOUNDARY', mempath)
   end subroutine destroy
 
-  !> @brief Destroy a particle after use.
+  !> @brief Destroy particle after use.
   subroutine destroy_particle(particle)
     class(ParticleType), intent(inout) :: particle !< particle
     deallocate (particle%history)
   end subroutine destroy_particle
 
-  !> @brief Reallocate particle storage to the given size.
+  !> @brief Reallocate particle storage.
   subroutine resize(this, np, mempath)
     ! dummy
     class(ParticleStoreType), intent(inout) :: this !< particle store
@@ -223,10 +231,21 @@ contains
     character(*), intent(in) :: mempath !< path to memory
 
     ! resize arrays
+    call mem_reallocate(this%name, LENBOUNDNAME, np, 'PLNAME', mempath)
     call mem_reallocate(this%imdl, np, 'PLIMDL', mempath)
     call mem_reallocate(this%iprp, np, 'PLIPRP', mempath)
     call mem_reallocate(this%irpt, np, 'PLIRPT', mempath)
-    call mem_reallocate(this%name, LENBOUNDNAME, np, 'PLNAME', mempath)
+    call mem_reallocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
+    call mem_reallocate(this%istopzone, np, 'PLISTOPZONE', mempath)
+    call mem_reallocate(this%idrymeth, np, 'PLIDRYMETH', mempath)
+    call mem_reallocate(this%ifrctrn, np, 'PLIFRCTRN', mempath)
+    call mem_reallocate(this%iexmeth, np, 'PLIEXMETH', mempath)
+    call mem_reallocate(this%iextend, np, 'PLIEXTEND', mempath)
+    call mem_reallocate(this%icycwin, np, 'PLICYCWIN', mempath)
+    call mem_reallocate(this%extol, np, 'PLEXTOL', mempath)
+    call mem_reallocate(this%iwet, np, 'PLWET', mempath)
+    call mem_reallocate(this%itrdomain, np, MAX_LEVEL, 'PLIDOMAIN', mempath)
+    call mem_reallocate(this%iboundary, np, MAX_LEVEL, 'PLIBOUNDARY', mempath)
     call mem_reallocate(this%icu, np, 'PLICU', mempath)
     call mem_reallocate(this%ilay, np, 'PLILAY', mempath)
     call mem_reallocate(this%izone, np, 'PLIZONE', mempath)
@@ -237,22 +256,15 @@ contains
     call mem_reallocate(this%trelease, np, 'PLTRELEASE', mempath)
     call mem_reallocate(this%tstop, np, 'PLTSTOP', mempath)
     call mem_reallocate(this%ttrack, np, 'PLTTRACK', mempath)
-    call mem_reallocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
-    call mem_reallocate(this%istopzone, np, 'PLISTOPZONE', mempath)
-    call mem_reallocate(this%idrymeth, np, 'PLIDRYMETH', mempath)
-    call mem_reallocate(this%ifrctrn, np, 'PLIFRCTRN', mempath)
-    call mem_reallocate(this%iexmeth, np, 'PLIEXMETH', mempath)
-    call mem_reallocate(this%extol, np, 'PLEXTOL', mempath)
-    call mem_reallocate(this%extend, np, 'PLIEXTEND', mempath)
-    call mem_reallocate(this%icycwin, np, 'PLICYCWIN', mempath)
-    call mem_reallocate(this%itrdomain, np, MAX_LEVEL, 'PLIDOMAIN', mempath)
-    call mem_reallocate(this%iboundary, np, MAX_LEVEL, 'PLIBOUNDARY', mempath)
   end subroutine resize
 
   !> @brief Load a particle from the particle store.
   !!
   !! This routine is used to initialize a particle for tracking.
-  !! The advancing flag and coordinate transformation are reset.
+  !! The advancing flag and coordinate transformation are reset,
+  !! as they are not persistent between each application of the
+  !! tracking method. The wet flag is loaded from the store; it
+  !! informs us if the particle was stranded by the water table.
   !<
   subroutine get(this, particle, imdl, iprp, ip)
     class(ParticleStoreType), intent(inout) :: this !< particle store
@@ -263,14 +275,28 @@ contains
 
     call particle%reset_transform()
     call particle%history%Clear()
+
+    particle%name = this%name(ip)
     particle%imdl = imdl
     particle%iprp = iprp
     particle%irpt = this%irpt(ip)
     particle%ip = ip
-    particle%name = this%name(ip)
     particle%istopweaksink = this%istopweaksink(ip)
     particle%istopzone = this%istopzone(ip)
     particle%idrymeth = this%idrymeth(ip)
+    particle%ifrctrn = this%ifrctrn(ip)
+    particle%iexmeth = this%iexmeth(ip)
+    particle%iextend = this%iextend(ip)
+    particle%icycwin = this%icycwin(ip)
+    particle%extol = this%extol(ip)
+    particle%advancing = .true.
+    particle%wet = this%iwet(ip) == 1
+    print *, "particle wet status: ", particle%wet
+    particle%itrdomain(1:MAX_LEVEL) = &
+      this%itrdomain(ip, 1:MAX_LEVEL)
+    particle%itrdomain(1) = imdl
+    particle%iboundary(1:MAX_LEVEL) = &
+      this%iboundary(ip, 1:MAX_LEVEL)
     particle%icu = this%icu(ip)
     particle%ilay = this%ilay(ip)
     particle%izone = this%izone(ip)
@@ -281,17 +307,6 @@ contains
     particle%trelease = this%trelease(ip)
     particle%tstop = this%tstop(ip)
     particle%ttrack = this%ttrack(ip)
-    particle%advancing = .true.
-    particle%itrdomain(1:MAX_LEVEL) = &
-      this%itrdomain(ip, 1:MAX_LEVEL)
-    particle%itrdomain(1) = imdl
-    particle%iboundary(1:MAX_LEVEL) = &
-      this%iboundary(ip, 1:MAX_LEVEL)
-    particle%ifrctrn = this%ifrctrn(ip)
-    particle%iexmeth = this%iexmeth(ip)
-    particle%extol = this%extol(ip)
-    particle%iextend = this%extend(ip)
-    particle%icycwin = this%icycwin(ip)
   end subroutine get
 
   !> @brief Save a particle's state to the particle store.
@@ -300,13 +315,31 @@ contains
     class(ParticleType), intent(in) :: particle !< particle
     integer(I4B), intent(in) :: ip !< particle index
 
+    this%name(ip) = particle%name
     this%imdl(ip) = particle%imdl
     this%iprp(ip) = particle%iprp
     this%irpt(ip) = particle%irpt
-    this%name(ip) = particle%name
     this%istopweaksink(ip) = particle%istopweaksink
     this%istopzone(ip) = particle%istopzone
     this%idrymeth(ip) = particle%idrymeth
+    this%ifrctrn(ip) = particle%ifrctrn
+    this%iexmeth(ip) = particle%iexmeth
+    this%iextend(ip) = particle%iextend
+    this%icycwin(ip) = particle%icycwin
+    this%extol(ip) = particle%extol
+    if (particle%wet) then
+      this%iwet(ip) = 1
+    else
+      this%iwet(ip) = 0
+    end if
+    this%itrdomain( &
+      ip, &
+      1:MAX_LEVEL) = &
+      particle%itrdomain(1:MAX_LEVEL)
+    this%iboundary( &
+      ip, &
+      1:MAX_LEVEL) = &
+      particle%iboundary(1:MAX_LEVEL)
     this%icu(ip) = particle%icu
     this%ilay(ip) = particle%ilay
     this%izone(ip) = particle%izone
@@ -317,19 +350,6 @@ contains
     this%trelease(ip) = particle%trelease
     this%tstop(ip) = particle%tstop
     this%ttrack(ip) = particle%ttrack
-    this%itrdomain( &
-      ip, &
-      1:MAX_LEVEL) = &
-      particle%itrdomain(1:MAX_LEVEL)
-    this%iboundary( &
-      ip, &
-      1:MAX_LEVEL) = &
-      particle%iboundary(1:MAX_LEVEL)
-    this%ifrctrn(ip) = particle%ifrctrn
-    this%iexmeth(ip) = particle%iexmeth
-    this%extol(ip) = particle%extol
-    this%extend(ip) = particle%iextend
-    this%icycwin(ip) = particle%icycwin
   end subroutine put
 
   !> @brief Transform particle coordinates.
