@@ -292,24 +292,32 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     ! local
     type(CellRectType), pointer :: cell
+    integer(I4B) :: iface
+    logical(LGP) :: no_neighbors, on_top_face, partly_sat
 
     select type (c => this%cell)
     type is (CellRectType)
       cell => c
-      ! If the entry face has no neighbors it's a
-      ! boundary face, so terminate the particle.
-      ! todo AMP: reconsider when multiple models supported
-      if (cell%defn%facenbr(particle%iboundary(LEVEL_FEATURE)) .eq. 0) then
-        call this%terminate(particle, &
-                            status=TERM_BOUNDARY)
-      else
-        ! Update old to new cell properties
-        call this%load_particle(cell, particle)
-        if (.not. particle%advancing) return
+      iface = particle%iboundary(LEVEL_FEATURE)
+      no_neighbors = cell%defn%facenbr(iface) == 0
+      on_top_face = iface == (this%fmi%max_faces + 1)
+      partly_sat = this%fmi%gwfsat(cell%defn%icell) < DONE
 
-        ! Update intercell mass flows
-        call this%update_flowja(cell, particle)
+      ! if at top and the cell is partially saturated,
+      ! we're at the water table, not the cell top, so
+      ! don't pass it upwards. leave it where it is and
+      ! keep tracking it on the next time step.
+      if (on_top_face .and. partly_sat) return
+
+      ! todo AMP: reconsider when multiple models supported
+      if (no_neighbors) then
+        call this%terminate(particle, status=TERM_BOUNDARY)
+        return
       end if
+
+      call this%load_particle(cell, particle)
+      if (.not. particle%advancing) return
+      call this%update_flowja(cell, particle)
     end select
   end subroutine pass_dis
 
