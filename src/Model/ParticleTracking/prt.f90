@@ -4,7 +4,7 @@ module PrtModule
   use InputOutputModule, only: ParseLine, upcase, lowcase
   use ConstantsModule, only: LENFTYPE, LENMEMPATH, DZERO, DONE, &
                              LENPAKLOC, LENPACKAGETYPE, LENBUDTXT, MNORMAL, &
-                             LINELENGTH
+                             LINELENGTH, LENAUXNAME
   use VersionModule, only: write_listfile_header
   use NumericalModelModule, only: NumericalModelType
   use BaseModelModule, only: BaseModelType
@@ -18,7 +18,7 @@ module PrtModule
   use PrtOcModule, only: PrtOcType
   use BudgetModule, only: BudgetType
   use ListModule, only: ListType
-  use ParticleModule, only: ParticleType, create_particle, TERM_UNRELEASED
+  use ParticleModule, only: ParticleType, create_particle, ACTIVE, TERM_UNRELEASED
   use ParticleEventsModule, only: ParticleEventDispatcherType, &
                                   ParticleEventConsumerType
   use ParticleTracksModule, only: ParticleTracksType, &
@@ -26,6 +26,8 @@ module PrtModule
   use SimModule, only: count_errors, store_error, store_error_filename
   use MemoryManagerModule, only: mem_allocate
   use MethodModule, only: MethodType, LEVEL_FEATURE
+  use HashTableModule, only: HashTableType, hash_table_cr, hash_table_da
+  use ArrayHandlersModule, only: ExpandArray
 
   implicit none
 
@@ -35,9 +37,9 @@ module PrtModule
   public :: PRT_NBASEPKG, PRT_NMULTIPKG
   public :: PRT_BASEPKG, PRT_MULTIPKG
 
-  integer(I4B), parameter :: NBDITEMS = 1
+  integer(I4B), parameter :: NBDITEMS = 2
   character(len=LENBUDTXT), dimension(NBDITEMS) :: budtxt
-  data budtxt/'         STORAGE'/
+  data budtxt/'         STORAGE', '     TERMINATION'/
 
   !> @brief Particle tracking (PRT) model
   type, extends(NumericalModelType) :: PrtModelType
@@ -60,6 +62,10 @@ module PrtModule
     real(DP), dimension(:), pointer, contiguous :: masssto => null() !< particle mass storage in cells, new value
     real(DP), dimension(:), pointer, contiguous :: massstoold => null() !< particle mass storage in cells, old value
     real(DP), dimension(:), pointer, contiguous :: ratesto => null() !< particle mass storage rate in cells
+    real(DP), dimension(:), pointer, contiguous :: masstrm => null() !< particle mass terminating in cells, new value
+    real(DP), dimension(:), pointer, contiguous :: masstrmold => null() !< particle mass terminating in cells, old value
+    real(DP), dimension(:), pointer, contiguous :: ratetrm => null() !< particle mass termination rate in cells
+    type(HashTableType), pointer :: trm_ids => null() !< terminated particle ids
   contains
     ! Override BaseModelType procs
     procedure :: model_df => prt_df
@@ -82,7 +88,7 @@ module PrtModule
     procedure, private :: prt_ot_printflow
     procedure, private :: prt_ot_dv
     procedure, private :: prt_ot_bdsummary
-    procedure, private :: prt_cq_sto
+    procedure, private :: prt_cq_budterms
     procedure, private :: create_packages
     procedure, private :: create_bndpkgs
     procedure, private :: log_namfile_options
@@ -183,6 +189,9 @@ contains
 
     ! Create model packages
     call this%create_packages()
+
+    ! Create hash table for terminated particle ids
+    call hash_table_cr(this%trm_ids)
 
     ! Log options
     if (this%iout > 0) then
@@ -357,9 +366,10 @@ contains
     irestore = 0
     if (iFailedStepRetry > 0) irestore = 1
 
-    ! Copy masssto into massstoold
+    ! Update look-behind mass
     do n = 1, this%dis%nodes
       this%massstoold(n) = this%masssto(n)
+      this%masstrmold(n) = this%masstrm(n)
     end do
 
     ! Advance fmi
@@ -416,8 +426,8 @@ contains
       this%flowja(i) = this%flowja(i) * tled
     end do
 
-    ! Particle mass storage
-    call this%prt_cq_sto()
+    ! Particle mass budget terms
+    call this%prt_cq_budterms()
 
     ! Go through packages and call cq routines. Just a formality.
     do ip = 1, this%bndlist%Count()
@@ -431,8 +441,8 @@ contains
     call csr_diagsum(this%dis%con%ia, this%flowja)
   end subroutine prt_cq
 
-  !> @brief Calculate particle mass storage
-  subroutine prt_cq_sto(this)
+  !> @brief Calculate particle mass budget terms
+  subroutine prt_cq_budterms(this)
     ! modules
     use TdisModule, only: delt
     use PrtPrpModule, only: PrtPrpType
@@ -444,9 +454,14 @@ contains
     integer(I4B) :: n
     integer(I4B) :: np
     integer(I4B) :: idiag
+    integer(I4B) :: iprp
     integer(I4B) :: istatus
     real(DP) :: tled
-    real(DP) :: rate
+    real(DP) :: ratesto, ratetrm
+    character(len=:), allocatable :: particle_id
+    type(ParticleType), pointer :: particle
+
+    call create_particle(particle)
 
     ! Reciprocal of time step size.
     tled = DONE / delt
@@ -462,8 +477,7 @@ contains
       type is (PrtPrpType)
         do np = 1, packobj%nparticles
           istatus = packobj%particles%istatus(np)
-          ! this may need to change if istatus flags change
-          if ((istatus > 0) .and. (istatus /= TERM_UNRELEASED)) then
+          if (istatus == ACTIVE) then
             n = packobj%particles%itrdomain(np, LEVEL_FEATURE)
             ! Each particle currently assigned unit mass
             this%masssto(n) = this%masssto(n) + DONE
@@ -472,12 +486,48 @@ contains
       end select
     end do
     do n = 1, this%dis%nodes
-      rate = -(this%masssto(n) - this%massstoold(n)) * tled
-      this%ratesto(n) = rate
+      ratesto = -(this%masssto(n) - this%massstoold(n)) * tled
+      this%ratesto(n) = ratesto
       idiag = this%dis%con%ia(n)
-      this%flowja(idiag) = this%flowja(idiag) + rate
+      this%flowja(idiag) = this%flowja(idiag) + ratesto
     end do
-  end subroutine prt_cq_sto
+
+    ! Particle mass termination rate
+    iprp = 0
+    do n = 1, this%dis%nodes
+      this%masstrm(n) = DZERO
+      this%ratetrm(n) = DZERO
+    end do
+    do ip = 1, this%bndlist%Count()
+      packobj => GetBndFromList(this%bndlist, ip)
+      select type (packobj)
+      type is (PrtPrpType)
+        iprp = iprp + 1
+        do np = 1, packobj%nparticles
+          istatus = packobj%particles%istatus(np)
+          call packobj%particles%get(particle, this%id, iprp, np)
+          particle_id = particle%get_id()
+          if (istatus > ACTIVE) then
+            if (this%trm_ids%get(particle_id) == 0) then
+              n = packobj%particles%itrdomain(np, LEVEL_FEATURE)
+              ! Each particle currently assigned unit mass
+              this%masstrm(n) = this%masstrm(n) + DONE
+            else
+              call this%trm_ids%add(particle_id, 1)
+            end if
+          end if
+        end do
+      end select
+    end do
+    do n = 1, this%dis%nodes
+      ratetrm = -(this%masstrm(n) - this%masstrmold(n)) * tled
+      this%ratetrm(n) = ratetrm
+    end do
+
+    call particle%destroy()
+    deallocate (particle)
+
+  end subroutine prt_cq_budterms
 
   !> @brief Calculate flows and budget
   !!
@@ -500,13 +550,19 @@ contains
     real(DP) :: rout
 
     ! Budget routines (start by resetting).  Sole purpose of this section
-    !    is to add in and outs to model budget.  All ins and out for a model
-    !    should be added here to this%budget.  In a subsequent exchange call,
-    !    exchange flows might also be added.
+    ! is to add in and outs to model budget.  All ins and out for a model
+    ! should be added here to this%budget.  In a subsequent exchange call,
+    ! exchange flows might also be added.
     call this%budget%reset()
+    ! storage term
     call rate_accumulator(this%ratesto, rin, rout)
     call this%budget%addentry(rin, rout, delt, budtxt(1), &
                               isuppress_output, '             PRT')
+    ! termination term
+    call rate_accumulator(this%ratetrm, rin, rout)
+    call this%budget%addentry(rin, rout, delt, budtxt(2), &
+                              isuppress_output, '             PRT')
+    ! boundary packages
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_bd(this%budget)
@@ -605,6 +661,16 @@ contains
     integer(I4B), intent(in) :: icbcun
     ! local
     integer(I4B) :: ibinun
+    integer(I4B) :: naux
+    real(DP), dimension(0) :: auxrow
+    character(len=LENAUXNAME), dimension(0) :: auxname
+    logical(LGP) :: header_written
+    integer(I4B) :: i, nn
+    real(DP) :: m
+    integer(I4B) :: nsto, ntrm
+    logical(LGP), allocatable :: msto_mask(:), mtrm_mask(:)
+    integer(I4B), allocatable :: msto_nns(:), mtrm_nns(:)
+    real(DP), allocatable :: msto_vals(:), mtrm_vals(:)
 
     ! Set unit number for binary output
     if (this%ipakcb < 0) then
@@ -616,10 +682,63 @@ contains
     end if
     if (icbcfl == 0) ibinun = 0
 
-    ! Write the face flows if requested
-    if (ibinun /= 0) then
-      call this%dis%record_connection_array(flowja, ibinun, this%iout)
-    end if
+    ! Return if nothing to do
+    if (ibinun == 0) return
+
+    ! Write mass face flows
+    call this%dis%record_connection_array(flowja, ibinun, this%iout)
+
+    ! Write mass storage term
+    naux = 0
+    header_written = .false.
+    msto_mask = this%masssto > DZERO
+    msto_vals = pack(this%masssto, msto_mask)
+    msto_nns = [(i, i=1, size(this%masssto))]
+    msto_nns = pack(msto_nns, msto_mask)
+    nsto = size(msto_nns)
+    do i = 1, nsto
+      nn = msto_nns(i)
+      m = msto_vals(i)
+      if (.not. header_written) then
+        call this%dis%record_srcdst_list_header(budtxt(1), &
+                                                'PRT             ', &
+                                                'PRT             ', &
+                                                'PRT             ', &
+                                                'STORAGE         ', &
+                                                naux, auxname, ibinun, &
+                                                nsto, this%iout)
+        header_written = .true.
+      end if
+      call this%dis%record_mf6_list_entry(ibinun, nn, nn, m, &
+                                          0, auxrow, &
+                                          olconv2=.false.)
+    end do
+
+    ! Write mass termination term
+    header_written = .false.
+    mtrm_mask = this%masstrm > DZERO
+    mtrm_vals = pack(this%masstrm, mtrm_mask)
+    mtrm_nns = [(i, i=1, size(this%masstrm))]
+    mtrm_nns = pack(mtrm_nns, mtrm_mask)
+    ntrm = size(mtrm_nns)
+    do i = 1, ntrm
+      nn = mtrm_nns(i)
+      m = mtrm_vals(i)
+      if (.not. header_written) then
+        call this%dis%record_srcdst_list_header(budtxt(2), &
+                                                'PRT             ', &
+                                                'PRT             ', &
+                                                'PRT             ', &
+                                                'TERMINATION     ', &
+                                                naux, auxname, ibinun, &
+                                                ntrm, this%iout)
+        header_written = .true.
+      end if
+      call this%dis%record_mf6_list_entry(ibinun, nn, nn, m, &
+                                          0, auxrow, &
+                                          olconv2=.false.)
+    end do
+
   end subroutine prt_ot_saveflow
 
   !> @brief Print intercell flows
@@ -769,6 +888,9 @@ contains
     call mem_deallocate(this%masssto)
     call mem_deallocate(this%massstoold)
     call mem_deallocate(this%ratesto)
+    call mem_deallocate(this%masstrm)
+    call mem_deallocate(this%masstrmold)
+    call mem_deallocate(this%ratetrm)
 
     call this%tracks%destroy()
     deallocate (this%events)
@@ -823,6 +945,12 @@ contains
                       'MASSSTOOLD', this%memoryPath)
     call mem_allocate(this%ratesto, this%dis%nodes, &
                       'RATESTO', this%memoryPath)
+    call mem_allocate(this%masstrm, this%dis%nodes, &
+                      'MASSTRM', this%memoryPath)
+    call mem_allocate(this%masstrmold, this%dis%nodes, &
+                      'MASSTRMOLD', this%memoryPath)
+    call mem_allocate(this%ratetrm, this%dis%nodes, &
+                      'RATETRM', this%memoryPath)
     ! explicit model, so these must be manually allocated
     call mem_allocate(this%x, this%dis%nodes, 'X', this%memoryPath)
     call mem_allocate(this%rhs, this%dis%nodes, 'RHS', this%memoryPath)
@@ -831,6 +959,9 @@ contains
       this%masssto(n) = DZERO
       this%massstoold(n) = DZERO
       this%ratesto(n) = DZERO
+      this%masstrm(n) = DZERO
+      this%masstrmold(n) = DZERO
+      this%ratetrm(n) = DZERO
       this%x(n) = DZERO
       this%rhs(n) = DZERO
       this%ibound(n) = 1
