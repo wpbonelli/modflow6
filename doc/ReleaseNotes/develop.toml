@@ -93,3 +93,7 @@ section = "fixes"
 subsection = "parallel"
 description = "Fixes a memory exception that has occurred when running parallel solute transport on Windows without the dispersion package. This has no effect on the simulation results other than causing a premature termination in some cases."
 
+[[items]]
+section = "fixes"
+subsection = "solution"
+description = "Cyclic particle pathlines were possible in Newton models with DRY\\_TRACKING\\_METHOD DROP (the default) in the presence of numerically insignificant upward flows in partially saturated cells. This occurred because PRT did not distinguish the water table from the cell top, so a particle at the water table in a partially saturated cell could obtain an exit solution through the cell's top face, jump to the dry cell above, then drop back down, and so on. Particles are now prevented from exiting through the top face of partially saturated cells. If a particle reaches the water table, its behavior now depends on whether the cell top is an assigned boundary face. If so, the particle will terminate. If not, it will stay there until tracking resumes the next time step."
