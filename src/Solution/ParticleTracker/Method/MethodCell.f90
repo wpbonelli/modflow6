@@ -30,7 +30,7 @@ contains
     class(MethodCellType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     integer(I4B) :: nextlevel, ic, iface
-    logical(LGP) :: advancing, on_top_face, partly_sat
+    logical(LGP) :: advancing, on_face, on_top_face, partly_sat
 
     if (.not. particle%advancing) then
       advancing = .false.
@@ -41,6 +41,7 @@ contains
 
     ic = particle%itrdomain(LEVEL_FEATURE)
     iface = particle%iboundary(LEVEL_FEATURE)
+    on_face = iface > 0
     on_top_face = iface == (this%fmi%max_faces + 1) ! cell is closed
     partly_sat = this%fmi%gwfsat(this%cell%defn%icell) < DONE
 
@@ -58,8 +59,7 @@ contains
       return
     end if
 
-    ! if we're on a boundary face, raise an exit event
-    if (particle%iboundary(nextlevel - 1) /= 0) then
+    if (on_face) then
       advancing = .false.
       call this%cellexit(particle)
     end if
