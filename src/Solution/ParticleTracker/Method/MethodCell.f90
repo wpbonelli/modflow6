@@ -35,6 +35,7 @@ contains
     if (.not. particle%advancing) then
       advancing = .false.
       particle%iboundary = 0
+      return
     end if
 
     call this%pass(particle)
@@ -42,7 +43,7 @@ contains
     ic = particle%itrdomain(LEVEL_FEATURE)
     iface = particle%iboundary(LEVEL_FEATURE)
     on_face = iface > 0
-    on_top_face = iface == (this%fmi%max_faces + 1) ! cell is closed
+    on_top_face = this%fmi%max_faces == (iface - 1) ! cell is closed
     partly_sat = this%fmi%gwfsat(this%cell%defn%icell) < DONE
 
     ! if at top and the cell is partially saturated,
@@ -53,9 +54,8 @@ contains
     if (on_top_face .and. partly_sat) then
       advancing = .false.
       particle%advancing = .false.
-      if (this%fmi%is_boundary_face(ic, iface - 1)) then ! cell is closed
+      if (this%fmi%is_boundary_face(ic, iface - 1)) & ! cell is closed
         call this%terminate(particle, status=TERM_BOUNDARY)
-      end if
       return
     end if
 
