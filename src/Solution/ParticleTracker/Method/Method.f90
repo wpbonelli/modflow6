@@ -230,6 +230,7 @@ contains
     class(MethodType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     class(ParticleEventType), pointer :: event
+    particle%advancing = .false.
     allocate (TimeStepEventType :: event)
     call this%events%dispatch(particle, event)
     deallocate (event)
