@@ -17,23 +17,21 @@ module PrtFmiModule
   character(len=LENPACKAGENAME) :: text = '    PRTFMI'
 
   type, extends(FlowModelInterfaceType) :: PrtFmiType
-
-    integer(I4B) :: max_faces !< maximum number of faces for grid cell polygons
+    private
     real(DP), allocatable, public :: SourceFlows(:) ! cell source flows array
     real(DP), allocatable, public :: SinkFlows(:) ! cell sink flows array
     real(DP), allocatable, public :: StorageFlows(:) ! cell storage flows array
     real(DP), allocatable, public :: BoundaryFlows(:) ! cell boundary flows array
-    integer(I4B), allocatable, public :: BoundaryFaces(:) ! bitmask of assigned boundary faces
-
+    integer(I4B), allocatable, public :: BoundaryFaces(:) ! cell boundary face bitmask
+    integer(I4B), public :: max_faces !< maximum number of faces for grid cell polygons
   contains
-
-    procedure :: fmi_ad
-    procedure :: fmi_df => prtfmi_df
-    procedure, private :: accumulate_flows
+    procedure, public :: fmi_ad
+    procedure, public :: fmi_df => prtfmi_df
+    procedure, public :: is_boundary_face
+    procedure, public :: is_net_out_boundary_face
+    procedure :: accumulate_flows
+    procedure :: get_bit_pos
     procedure :: mark_boundary_face
-    procedure :: is_boundary_face
-    procedure :: is_net_out_boundary_face
-
   end type PrtFmiType
 
 contains
@@ -153,11 +151,11 @@ contains
     ! dummy
     class(PrtFmiType) :: this
     ! local
-    integer(I4B) :: j, i, ip, ib
+    integer(I4B) :: j, ic, ip, ib
     integer(I4B) :: ioffset, iflowface, iauxiflowface, iface
     real(DP) :: qbnd
     character(len=LENAUXNAME) :: auxname
-    integer(I4B) :: naux
+    integer(I4B) :: naux, nfaces
 
     this%StorageFlows = DZERO
     if (this%igwfstrgss /= 0) &
@@ -182,9 +180,9 @@ contains
         end do
       end if
       do ib = 1, this%gwfpackages(ip)%nbound
-        i = this%gwfpackages(ip)%nodelist(ib)
-        if (i <= 0) cycle
-        if (this%ibound(i) <= 0) cycle
+        ic = this%gwfpackages(ip)%nodelist(ib)
+        if (ic <= 0) cycle
+        if (this%ibound(ic) <= 0) cycle
         qbnd = this%gwfpackages(ip)%get_flow(ib)
         ! todo, after initial release: default iflowface values for different packages
         iflowface = 0 ! iflowface number
@@ -192,26 +190,26 @@ contains
         if (iauxiflowface > 0) then
           iflowface = NINT(this%gwfpackages(ip)%auxvar(iauxiflowface, ib))
           iface = iflowface
-          ! maps bot -2 -> max_faces - 1, top -1 -> max_faces
-          if (iface < 0) iface = iface + this%max_faces + 1
+          nfaces = this%dis%get_npolyverts(ic) + 2
+          ! maps bot -2 -> nfaces - 1, top -1 -> nfaces
+          if (iface < 0) iface = iface + nfaces + 1
         end if
         if (iface > 0) then
-          call this%mark_boundary_face(i, iface)
-          ioffset = (i - 1) * this%max_faces
+          call this%mark_boundary_face(ic, iface)
+          ioffset = (ic - 1) * this%max_faces
           this%BoundaryFlows(ioffset + iface) = &
             this%BoundaryFlows(ioffset + iface) + qbnd
         else if (qbnd .gt. DZERO) then
-          this%SourceFlows(i) = this%SourceFlows(i) + qbnd
+          this%SourceFlows(ic) = this%SourceFlows(ic) + qbnd
         else if (qbnd .lt. DZERO) then
-          this%SinkFlows(i) = this%SinkFlows(i) + qbnd
+          this%SinkFlows(ic) = this%SinkFlows(ic) + qbnd
         end if
       end do
     end do
 
   end subroutine accumulate_flows
 
-  !> @brief Mark a face as a boundary face.
-  subroutine mark_boundary_face(this, ic, iface)
+  function get_bit_pos(this, ic, iface) result(bit_pos)
     class(PrtFmiType) :: this
     integer(I4B), intent(in) :: ic !< node number (reduced)
     integer(I4B), intent(in) :: iface !< face number
@@ -234,7 +232,19 @@ contains
       print *, 'Expected a value in range [0, 31]'
       call pstop(1)
     end if
-    this%BoundaryFaces(ic) = ibset(this%BoundaryFaces(ic), bit_pos)
+  end function get_bit_pos
+
+  !> @brief Mark a face as a boundary face.
+  subroutine mark_boundary_face(this, ic, iface)
+    class(PrtFmiType) :: this
+    integer(I4B), intent(in) :: ic !< node number (reduced)
+    integer(I4B), intent(in) :: iface !< face number
+
+    this%BoundaryFaces(ic) = ibset( &
+                             this%BoundaryFaces(ic), &
+                             this%get_bit_pos(ic, iface))
+
+    print *, 'Marking cell ', ic, ' face ', iface, ' as boundary face.'
   end subroutine mark_boundary_face
 
   !> @brief Check if a face is assigned to a boundary package.
@@ -243,27 +253,10 @@ contains
     integer(I4B), intent(in) :: ic !< node number (reduced)
     integer(I4B), intent(in) :: iface !< face number
     logical(LGP) :: is_boundary
-    ! local
-    integer(I4B) :: bit_pos
 
-    is_boundary = .false.
-    if (ic <= 0 .or. ic > this%dis%nodes) then
-      print *, 'Invalid cell number: ', ic
-      print *, 'Expected a value in range [1, ', this%dis%nodes, ']'
-      call pstop(1)
-    end if
-    if (iface <= 0) then
-      print *, 'Invalid face number: ', iface
-      print *, 'Expected a value in range [1, ', this%max_faces, ']'
-      call pstop(1)
-    end if
-    bit_pos = iface - 1 ! bit position 0-based
-    if (bit_pos < 0 .or. bit_pos > 31) then
-      print *, 'Invalid bitmask position: ', iface
-      print *, 'Expected a value in range [0, 31]'
-      call pstop(1)
-    end if
-    is_boundary = btest(this%BoundaryFaces(ic), bit_pos)
+    is_boundary = btest( &
+                  this%BoundaryFaces(ic), &
+                  this%get_bit_pos(ic, iface))
   end function is_boundary_face
 
   !> @brief Check if a face is an assigned boundary with net outflow.
@@ -272,30 +265,10 @@ contains
     integer(I4B), intent(in) :: ic !< node number (reduced)
     integer(I4B), intent(in) :: iface !< face number
     logical(LGP) :: is_net_out_boundary
-    ! local
-    integer(I4B) :: bit_pos
-    integer(I4B) :: ioffset
 
     is_net_out_boundary = .false.
-    if (ic <= 0 .or. ic > this%dis%nodes) then
-      print *, 'Invalid cell number: ', ic
-      print *, 'Expected a value in range [1, ', this%dis%nodes, ']'
-      call pstop(1)
-    end if
-    if (iface <= 0) then
-      print *, 'Invalid face number: ', iface
-      print *, 'Expected a value in range [1, ', this%max_faces, ']'
-      call pstop(1)
-    end if
-    bit_pos = iface - 1 ! bit position 0-based
-    if (bit_pos < 0 .or. bit_pos > 31) then
-      print *, 'Invalid bitmask position: ', iface
-      print *, 'Expected a value in range [0, 31]'
-      call pstop(1)
-    end if
-    if (.not. btest(this%BoundaryFaces(ic), bit_pos)) return
-    ioffset = (ic - 1) * this%max_faces
-    if (this%BoundaryFlows(ioffset + iface) < DZERO) &
+    if (.not. this%is_boundary_face(ic, iface)) return
+    if (this%BoundaryFlows(((ic - 1) * this%max_faces) + iface) < DZERO) &
       is_net_out_boundary = .true.
   end function is_net_out_boundary_face
 
