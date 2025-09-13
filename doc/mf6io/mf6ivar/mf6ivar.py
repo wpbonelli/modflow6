@@ -116,21 +116,6 @@
 #   output control rewritten entirely, and implemented in the code
 #
 
-# DEFINITION FILE KEYWORDS
-# block :: name of block
-# name :: variable name
-# in_record :: optional True or False, False if not specified
-# type :: recarray, record, keyword, integer, double precision, keystring
-# tagged :: optional True or False, True if not specified.
-#           If tagged, then keyword comes before value
-# shape :: (size), optional, only required for arrays
-# valid :: description of valid values
-# reader :: urword, readarray, u1dint, ...
-# optional :: optional True or False, False if not specified
-# longname :: long name for variable
-# description :: description for variable, REPLACE tag indicates that
-#                description will come from common.dfn
-
 
 import os
 import re
@@ -325,10 +310,8 @@ def write_block(vardict, block, blk_var_list, varexcludeprefix=None, indent=None
                 # because it is part of a record
                 addv = False
             if v.get("block_variable", "") == "true":
-                # do not separately include this variable
-                # because it is part of a record
                 addv = False
-            if v.get("deprecated", "") != "" or v.get("removed", "") != "":
+            if v.get("deprecated", "") != "" or v.get("removed", "") != "" or v.get("prerelease", "") != "":
                 addv = False
             if addv:
                 ts = block_entry(name, block, vardict, prefix="  " + prepend)
@@ -377,6 +360,8 @@ def write_desc(vardict, block, blk_var_list, varexcludeprefix=None):
                 addv = False
             if v.get("removed", "") != "":
                 addv = False
+            if v.get("prerelease", "") != "":
+                addv = False
             if addv:
                 if v["type"] == "keyword":
                     n = name.upper()
@@ -421,6 +406,7 @@ def write_desc(vardict, block, blk_var_list, varexcludeprefix=None):
                         if (
                             "removed" in vardict[(vn, block)]
                             or "deprecated" in vardict[(vn, block)]
+                            or "prerelease" in vardict[(vn, block)]
                         ):
                             continue
                         blockentry = block_entry(vn, block, vardict, "")
@@ -451,6 +437,8 @@ def write_desc_md(vardict, block, blk_var_list, varexcludeprefix=None):
             if v.get("deprecated", "") != "":
                 addv = False
             if v.get("removed", "") != "":
+                addv = False
+            if v.get("prerelease", "") != "":
                 addv = False
             if addv:
                 if v["type"] == "keyword":
