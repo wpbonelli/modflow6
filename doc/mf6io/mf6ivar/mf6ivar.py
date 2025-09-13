@@ -311,7 +311,11 @@ def write_block(vardict, block, blk_var_list, varexcludeprefix=None, indent=None
                 addv = False
             if v.get("block_variable", "") == "true":
                 addv = False
-            if v.get("deprecated", "") != "" or v.get("removed", "") != "" or v.get("prerelease", "") != "":
+            if (
+                v.get("deprecated", "") != ""
+                or v.get("removed", "") != ""
+                or v.get("prerelease", "") != ""
+            ):
                 addv = False
             if addv:
                 ts = block_entry(name, block, vardict, prefix="  " + prepend)
