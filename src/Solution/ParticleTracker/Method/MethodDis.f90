@@ -13,6 +13,7 @@ module MethodDisModule
   use DisModule, only: DisType
   use GeomUtilModule, only: get_ijk, get_jk
   use MathUtilModule, only: is_close
+  use MethodUtilModule, only: cell_is_dry, cell_is_sat
   implicit none
 
   private
@@ -516,6 +517,40 @@ contains
                        this%fmi%BoundaryFlows(ioffset + this%fmi%max_faces)
   end subroutine load_boundary_flows_to_defn
 
+  ! AMP:
+
+  ! !> @brief Prevent upward flow through the water table.
+  ! !!
+  ! !! Unless the top face is an assigned boundary with outflow,
+  ! !! a cell containing the water table should not have upward
+  ! !! flow through the top (i.e. the water table). But this is
+  ! !! occasionally possible due to numerical noise in the flow
+  ! !! results of Newton models. Trap for this and disallow it.
+  ! !!
+  ! !! Assumes cell properties and flows are already loaded.
+  ! !<
+  ! subroutine cap_wt_flow(this, defn)
+  !   class(MethodDisType), intent(inout) :: this
+  !   type(CellDefnType), intent(inout) :: defn
+  !   ! local
+  !   integer(I4B) :: ic
+
+  !   ! If the cell contains a water table that is not an
+  !   ! assigned boundary face with upward flow, cap the flow
+  !   ! at zero. The cell contains a water table if it's saturated
+  !   ! and its top neighbor is dry. Saturation and dryness are
+  !   ! determined using threshold-based criteria to account for
+  !   ! possible numerical noise.
+  !   ic = defn%icell
+  !   if (cell_is_sat(this, ic)) then
+  !     if (.not. cell_is_dry(this, defn%facenbr(7))) then
+  !       return
+  !       if (.not. this%fmi%is_boundary_face(ic, this%fmi%max_faces)) then
+  !         defn%faceflow(7) = max(DZERO, defn%faceflow(7))
+  !   end if
+
+  ! end subroutine cap_wt_flow
+
   !> @brief Prevent upward flow through the water table.
   !!
   !! Unless the top face is an assigned boundary with outflow,
@@ -531,19 +566,21 @@ contains
     type(CellDefnType), intent(inout) :: defn
     ! local
     integer(I4B) :: ic
-    logical(LGP) :: partly_sat, table_top, bound_top, has_table
 
-    ! If the cell contains the water table and the top face isn't an
-    ! assigned boundary, max top face flow to 0 i.e. no upward flow.
-
+    ! If the cell is saturated and its top neighbor isn't dry,
+    ! it can't contain a water table of appreciable thickness.
     ic = defn%icell
-    partly_sat = this%fmi%gwfsat(ic) < DONE
-    table_top = is_close(this%fmi%dis%top(ic), this%fmi%gwfhead(ic))
-    has_table = partly_sat .or. table_top ! whether cell contains water table
-    bound_top = this%fmi%is_boundary_face(ic, this%fmi%max_faces)
+    if (cell_is_sat(this, ic)) then
+      if (.not. cell_is_dry(this, defn%facenbr(7))) &
+        return
+    end if
 
-    if (has_table .and. .not. bound_top) &
-      defn%faceflow(7) = max(DZERO, defn%faceflow(7))
+    ! If the top face is an assigned boundary, allow upward flow.
+    if (this%fmi%is_boundary_face(ic, this%fmi%max_faces)) &
+      return
+
+    ! Cap upward flow through the water table at 0.
+    defn%faceflow(7) = max(DZERO, defn%faceflow(7))
 
   end subroutine cap_wt_flow
 
