@@ -45,6 +45,7 @@ module MethodSubcellTernaryModule
   !> @brief Ternary triangular subcell tracking method.
   type, extends(MethodSubcellType) :: MethodSubcellTernaryType
     integer(I4B), public, pointer :: zeromethod
+    integer(I4B), public :: icellold = -1 !< last cell for which vertical solution was computed
     type(BarycentricExitSolutionType), public :: exit_solutions(2) !< candidate exit solutions
   contains
     procedure, public :: find_exits
@@ -290,16 +291,27 @@ contains
       call clamp_bary(alpi, beti, gami, pad=DSAME * DEP3)
 
       ! Do calculations related to the analytical z solution.
-      ! (TODO: just once for each cell? store at cell-level?)
-      ! Clamp the relative z coordinate to the unit interval.
-      zirel = (particle%z - subcell%zbot) / subcell%dz
-      if (zirel > DONE) then
-        zirel = DONE
-      else if (zirel < DZERO) then
-        zirel = DZERO
+      ! Reuse the prior solution if the cell has not changed.
+      if (this%cell%defn%icell /= this%icellold) then
+        this%icellold = this%cell%defn%icell
+        ! Clamp the relative z coordinate to the unit interval.
+        zirel = (particle%z - subcell%zbot) / subcell%dz
+        if (zirel > DONE) then
+          zirel = DONE
+        else if (zirel < DZERO) then
+          zirel = DZERO
+        end if
+        print *, "computing new vertical solution for cell ", this%icellold
+        print *, "subcell%vzbot=", subcell%vzbot, " subcell%vztop=", subcell%vztop
+        print *, "subcell%dz=", subcell%dz, " zirel=", zirel
+        ! Calculate an analytical vertical exit solution
+        this%exit_solutions(1) = find_vertical_exit(subcell%vzbot, subcell%vztop, &
+                                                    subcell%dz, zirel)
+      else
+        print *, "reusing vertical solution for cell ", this%icellold
+        print *, "subcell%vzbot=", subcell%vzbot, " subcell%vztop=", subcell%vztop
+        print *, "subcell%dz=", subcell%dz, " zirel=", zirel
       end if
-      this%exit_solutions(1) = find_vertical_exit(subcell%vzbot, subcell%vztop, &
-                                                  subcell%dz, zirel)
 
       ! Calculate a semi-analytical lateral exit solution
       itrifaceenter = particle%iboundary(LEVEL_SUBFEATURE) - 1
