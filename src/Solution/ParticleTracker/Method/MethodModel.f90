@@ -31,7 +31,7 @@ contains
     class(MethodModelType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellDefnType), pointer, intent(inout) :: cell_defn
-    real(DP), intent(in) :: tmax
+    real(DP), intent(in), optional :: tmax
     ! noop
   end subroutine assess
 

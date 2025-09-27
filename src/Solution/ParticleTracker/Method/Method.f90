@@ -108,7 +108,7 @@ module MethodModule
       class(MethodType), intent(inout) :: this
       type(ParticleType), pointer, intent(inout) :: particle
       type(CellDefnType), pointer, intent(inout) :: cell_defn
-      real(DP), intent(in) :: tmax
+      real(DP), intent(in), optional :: tmax
     end subroutine assess
     subroutine deallocate (this)
       import MethodType

@@ -35,12 +35,15 @@ contains
   !! or top face of a partially saturated cell, terminate.
   !<
   subroutine try_pass(this, particle, nextlevel, advancing)
+    ! modules
+    use ParticleModule, only: TERM_STOPZONE
+    ! dummy
     class(MethodCellType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     logical(LGP) :: advancing
     integer(I4B) :: nextlevel
     ! local
-    integer(I4B) :: ic, iboundary, icellface
+    integer(I4B) :: iboundary, ic, icellface
 
     if (.not. particle%advancing) then
       advancing = .false.
@@ -54,11 +57,16 @@ contains
     icellface = this%iboundary_to_icellface(iboundary)
     if (icellface <= 0) return
 
-    ! on a cell face, done advancing. raise an exit event
+    ! on a cell face, done advancing. raise an exit event, then
+    ! assess whether to raise any other events and/or terminate
     advancing = .false.
     call this%cellexit(particle)
 
-    ! assigned boundary face with net outflow? terminate
+    if (particle%izone > 0 .and. particle%istopzone == particle%izone) then
+      call this%terminate(particle, status=TERM_STOPZONE)
+      return
+    end if
+
     ic = particle%itrdomain(LEVEL_FEATURE)
     if (this%fmi%is_net_out_boundary_face(ic, icellface)) then
       call this%terminate(particle, status=TERM_BOUNDARY)
@@ -84,29 +92,27 @@ contains
     class(MethodCellType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     type(CellDefnType), pointer, intent(inout) :: cell_defn
-    real(DP), intent(in) :: tmax
+    real(DP), intent(in), optional :: tmax
     ! local
     logical(LGP) :: dry_cell, dry_particle, no_exit_face, stop_zone, weak_sink
     integer(I4B) :: i
     real(DP) :: t, ttrackmax
 
-    dry_cell = cell_defn%isatstat == SATURATION_DRY
-    dry_particle = particle%z > cell_defn%top
-    no_exit_face = cell_defn%inoexitface > 0
-    stop_zone = cell_defn%izone > 0 .and. particle%istopzone == cell_defn%izone
-    weak_sink = cell_defn%iweaksink > 0
-
     particle%izone = cell_defn%izone
+    stop_zone = cell_defn%izone > 0 .and. particle%istopzone == cell_defn%izone
     if (stop_zone) then
       call this%terminate(particle, status=TERM_STOPZONE)
       return
     end if
 
+    no_exit_face = cell_defn%inoexitface > 0
+    dry_cell = cell_defn%isatstat == SATURATION_DRY
     if (no_exit_face .and. .not. dry_cell) then
       call this%terminate(particle, status=TERM_NO_EXITS)
       return
     end if
 
+    weak_sink = cell_defn%iweaksink > 0
     if (weak_sink) then
       if (particle%istopweaksink > 0) then
         call this%terminate(particle, status=TERM_WEAKSINK)
@@ -116,6 +122,7 @@ contains
       end if
     end if
 
+    dry_particle = particle%z > cell_defn%top
     if (dry_cell) then
       if (particle%idrymeth == 0) then
         ! drop to cell bottom. handled by pass
@@ -143,17 +150,19 @@ contains
         particle%ttrack = totim
         call this%timestep(particle)
 
-        ! record user tracking times
-        call this%tracktimes%advance()
-        if (this%tracktimes%any()) then
-          do i = this%tracktimes%selection(1), this%tracktimes%selection(2)
-            t = this%tracktimes%times(i)
-            if (t < totimc) cycle
-            if (t >= tmax) exit
-            particle%ttrack = t
-            call this%usertime(particle)
-            if (t > ttrackmax) ttrackmax = t
-          end do
+        if (present(tmax)) then
+          ! record user tracking times
+          call this%tracktimes%advance()
+          if (this%tracktimes%any()) then
+            do i = this%tracktimes%selection(1), this%tracktimes%selection(2)
+              t = this%tracktimes%times(i)
+              if (t < totimc) cycle
+              if (t >= tmax) exit
+              particle%ttrack = t
+              call this%usertime(particle)
+              if (t > ttrackmax) ttrackmax = t
+            end do
+          end if
         end if
 
         ! terminate if last period/step
@@ -191,16 +200,18 @@ contains
         call this%timestep(particle)
 
         ! record user tracking times
-        call this%tracktimes%advance()
-        if (this%tracktimes%any()) then
-          do i = this%tracktimes%selection(1), this%tracktimes%selection(2)
-            t = this%tracktimes%times(i)
-            if (t < totimc) cycle
-            if (t >= tmax) exit
-            particle%ttrack = t
-            call this%usertime(particle)
-            if (t > ttrackmax) ttrackmax = t
-          end do
+        if (present(tmax)) then
+          call this%tracktimes%advance()
+          if (this%tracktimes%any()) then
+            do i = this%tracktimes%selection(1), this%tracktimes%selection(2)
+              t = this%tracktimes%times(i)
+              if (t < totimc) cycle
+              if (t >= tmax) exit
+              particle%ttrack = t
+              call this%usertime(particle)
+              if (t > ttrackmax) ttrackmax = t
+            end do
+          end if
         end if
       end if
     end if
