@@ -1,5 +1,6 @@
 name: MODFLOW 6 compiler checks
 on:
+  push:
   # workflow_dispatch trigger to start release via GitHub UI or CLI, see
   # https://docs.github.com/en/actions/managing-workflow-runs/manually-running-a-workflow
   workflow_dispatch:
@@ -229,6 +230,9 @@ jobs:
           echo "$cols" > long_test.csv
           cat new/comp*.csv >> long_comp.csv
           cat new/test*.csv >> long_test.csv
+          cat long_comp.csv
+          echo
+          cat long_test.csv
 
       - name: Make wide CSV and MD tables
         working-directory: .github/compat
