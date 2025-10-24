@@ -202,6 +202,24 @@ longname stress period number
 description REPLACE iper {}
 
 block period
+name perioddata
+type recarray printsavesetting
+shape
+reader urword
+longname
+description
+
+block period
+name printsavesetting
+type keystring printrecord saverecord
+shape
+tagged false
+in_record true
+reader urword
+longname
+description enables printing or saving a variable for certain time steps
+
+block period
 name saverecord
 type record save rtype ocsetting
 shape
