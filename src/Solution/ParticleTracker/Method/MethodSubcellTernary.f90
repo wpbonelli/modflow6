@@ -131,8 +131,7 @@ contains
     exit_face = this%exit_solutions(exit_soln)%iboundary
     dtexit = this%exit_solutions(exit_soln)%dt
     if (dtexit < DZERO) then
-      call this%terminate(particle, status=TERM_NO_EXITS_SUB)
-      return
+      call pstop(1, "texit is negative (unexpected)") ! shouldn't get here
     end if
     texit = t0 + dtexit
 

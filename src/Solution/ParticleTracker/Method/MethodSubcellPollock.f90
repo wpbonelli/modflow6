@@ -149,6 +149,9 @@ contains
     else
       exit_face = this%exit_solutions(exit_soln)%iboundary
       dtexit = this%exit_solutions(exit_soln)%dt
+      if (dtexit < DZERO) then
+        call pstop(1, "texit is negative (unexpected)") ! shouldn't get here
+      end if
     end if
     texit = particle%ttrack + dtexit
 
