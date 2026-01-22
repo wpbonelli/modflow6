@@ -464,7 +464,6 @@ def plot_output(idx, test):
 
 
 @pytest.mark.snapshot
-@pytest.mark.developmode
 @pytest.mark.parametrize("idx, name", enumerate(cases))
 @pytest.mark.parametrize("shift", [False, True])
 def test_mf6model(idx, name, shift, function_tmpdir, targets, array_snapshot, plot):
