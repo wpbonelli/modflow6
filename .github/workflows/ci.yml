@@ -348,7 +348,7 @@ jobs:
         if: runner.os == 'macOS'
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: 14.5
+          xcode-version: '15.1.0'
 
       # static link gfortran libs
       - name: Hide dylibs (macOS)
