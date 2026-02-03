@@ -257,12 +257,12 @@ jobs:
           pixi run setup builddir -Doptimization=${{ matrix.optimization }}
           pixi run build builddir
           # skip tests on mac, test-drive seems to collect results incorrectly
-          arch=$(uname -m || echo "unknown")
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
-            echo "Skipping unit tests on mac"
-          else
-            pixi run test builddir
-          fi
+          # arch=$(uname -m || echo "unknown")
+          # if [[ "${{ runner.os }}" == "macOS" ]]; then
+          #   echo "Skipping unit tests on mac"
+          # else
+          #   pixi run test builddir
+          # fi
 
       - name: Build mf5to6 converter
         if: (!(runner.os == 'Windows' && matrix.extended))

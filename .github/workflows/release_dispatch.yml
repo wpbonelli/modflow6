@@ -161,7 +161,7 @@ jobs:
           echo "patch=$patch" >> $GITHUB_OUTPUT
   make_dist:
     name: Make distribution
-    uses: MODFLOW-ORG/modflow6/.github/workflows/release.yml@develop
+    uses: wpbonelli/modflow6/.github/workflows/release.yml@ci
     needs: set_options
     with:
       # If the workflow is manually triggered, the maintainer must manually set approve=true to approve a release.
