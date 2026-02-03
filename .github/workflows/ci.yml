@@ -344,12 +344,11 @@ jobs:
         working-directory: modflow6
         run: pixi run install
 
-      # debugging
-      - name: Check xcode version
+      - name: Set xcode version (macOS)
         if: runner.os == 'macOS'
-        run: |
-          xcode-select -p
-          xcrun --show-sdk-version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 14.5
 
       # static link gfortran libs
       - name: Hide dylibs (macOS)

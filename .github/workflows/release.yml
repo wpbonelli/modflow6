@@ -218,6 +218,12 @@ jobs:
           fi
           echo "filters=$filters" >> $GITHUB_OUTPUT
 
+      - name: Set xcode version (macOS)
+        if: runner.os == 'macOS'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 14.5
+
       # static link gfortran libs
       - name: Hide dylibs (macOS)
         if: runner.os == 'macOS'
