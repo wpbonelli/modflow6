@@ -93,19 +93,17 @@ jobs:
         working-directory: modflow6
         run: pixi run install
 
-      - name: Set GCC_LIBPATH
+      # static link gfortran libs
+      - name: Hide dylibs (macOS)
         if: runner.os == 'macOS'
         run: |
-          echo "GCC_LIBPATH=$(brew --prefix)" >> $GITHUB_ENV
-
-      - name: Hide dylibs on macOS
-        if: runner.os == 'macOS'
-        run: |
-          version=${{ matrix.version }}
-          libpath="${{ env.GCC_LIBPATH }}/opt/gcc@$version/lib/gcc/$version"
+          version="${{ matrix.version }}"
+          brew_prefix="$(brew --prefix)"
+          libpath="$brew_prefix/opt/gcc@$version/lib/gcc/$version"
           mv $libpath/libgfortran.5.dylib $libpath/libgfortran.5.dylib.bak
-          mv $libpath/libquadmath.0.dylib $libpath/libquadmath.0.dylib.bak
+          mv $libpath/libquadmath.0.dylib $libpath/libquadmath.0.dylib.bak 
 
+      # use classic xcode linker
       - name: Set LDFLAGS (macOS)
         if: runner.os == 'macOS'
         run: |

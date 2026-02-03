@@ -344,6 +344,24 @@ jobs:
         working-directory: modflow6
         run: pixi run install
 
+      # debugging
+      - name: Check xcode version
+        if: runner.os == 'macOS'
+        run: |
+          xcode-select -p
+          xcrun --show-sdk-version
+
+      # static link gfortran libs
+      - name: Hide dylibs (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          version="${{ env.FC_V }}"
+          brew_prefix="$(brew --prefix)"
+          libpath="$brew_prefix/opt/gcc@$version/lib/gcc/$version"
+          mv $libpath/libgfortran.5.dylib $libpath/libgfortran.5.dylib.bak
+          mv $libpath/libquadmath.0.dylib $libpath/libquadmath.0.dylib.bak 
+
+      # use classic xcode linker
       - name: Set LDFLAGS (macOS)
         if: runner.os == 'macOS'
         run: |

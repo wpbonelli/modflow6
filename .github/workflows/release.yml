@@ -208,8 +208,8 @@ jobs:
             # run only parallel/extended tests in developmode, run all tests in releasemode
             filters="test_par or test_netcdf"
           fi
-          # comparison fails on macos-14 with optimization=1
-          if [[ "${{ matrix.os }}" == "macos-14" ]]; then
+          # comparison fails on macos with optimization=1
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
             if [[ "$filters" != "" ]]; then
               filters="$filters and not test028_sfr_rewet"
             else
@@ -218,28 +218,22 @@ jobs:
           fi
           echo "filters=$filters" >> $GITHUB_OUTPUT
 
-      - name: Set GCC_LIBPATH
-        if: runner.os == 'macOS'
-        run: |
-          echo "GCC_LIBPATH=$(brew --prefix)" >> $GITHUB_ENV
-
-      # for statically linked gfortran mac build
+      # static link gfortran libs
       - name: Hide dylibs (macOS)
         if: runner.os == 'macOS'
         run: |
           version="${{ matrix.version }}"
-          libpath="${{ env.GCC_LIBPATH }}/opt/gcc@$version/lib/gcc/$version"
+          brew_prefix="$(brew --prefix)"
+          libpath="$brew_prefix/opt/gcc@$version/lib/gcc/$version"
           mv $libpath/libgfortran.5.dylib $libpath/libgfortran.5.dylib.bak
           mv $libpath/libquadmath.0.dylib $libpath/libquadmath.0.dylib.bak 
 
+      # use classic xcode linker
       - name: Set LDFLAGS (macOS)
         if: runner.os == 'macOS'
         run: |
-          os_ver=$(sw_vers -productVersion | cut -d'.' -f1)
-          if (( "$os_ver" > 12 )); then
-            ldflags="$LDFLAGS -Wl,-ld_classic"
-            echo "LDFLAGS=$ldflags" >> $GITHUB_ENV
-          fi
+          ldflags="$LDFLAGS -Wl,-ld_classic"
+          echo "LDFLAGS=$ldflags" >> $GITHUB_ENV
 
       - name: Get executables
         if: inputs.run_tests == true && runner.os != 'Windows'
@@ -254,10 +248,10 @@ jobs:
         run: |
           pixi run setup builddir -Doptimization=${{ matrix.optimization }}
           pixi run build builddir
-          # skip tests on arm mac, test-drive seems to collect results incorrectly
+          # skip tests on mac, test-drive seems to collect results incorrectly
           arch=$(uname -m || echo "unknown")
-          if [[ "${{ runner.os }}" == "macOS" ]] && [[ "$arch" == "arm64" ]]; then
-            echo "Skipping unit tests on ARM mac"
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            echo "Skipping unit tests on mac"
           else
             pixi run test builddir
           fi
