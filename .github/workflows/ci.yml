@@ -277,12 +277,15 @@ jobs:
           # arm mac, release mode
           - os: macos-14
             debug: false
+            xcode-version: '15.1.0'
           # arm mac, debug mode
           - os: macos-14
             debug: true
+            xcode-version: '15.1.0'
           # intel mac, release mode
           - os: macos-15-intel
             debug: false
+            xcode-version: '16.1.0'
           # ubuntu, release mode
           - os: ubuntu-22.04
             debug: false
@@ -348,7 +351,7 @@ jobs:
         if: runner.os == 'macOS'
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.1.0'
+          xcode-version: ${{ matrix.xcode-version }}
 
       # static link gfortran libs
       - name: Hide dylibs (macOS)
