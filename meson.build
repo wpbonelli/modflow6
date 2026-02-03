@@ -24,6 +24,7 @@ fc_id = fc.get_id()
 message('Compiler ID:', fc_id)
 compile_args = []
 link_args = []
+extra_deps = []
 
 # Command line options for gfortran
 if fc_id == 'gcc'
@@ -38,7 +39,14 @@ if fc_id == 'gcc'
                    '-Wno-maybe-uninitialized',   # "Uninitialized" flags produce false positives with allocatables
                    '-Wno-uninitialized',
                    ]
-  
+
+  # Link quadmath library on macOS (required for gfortran runtime)
+  # Preventive measure for any code that might trigger quad-precision I/O paths
+  if build_machine.system() == 'darwin'
+    quadmath_dep = fc.find_library('quadmath', required: true, static: true)
+    extra_deps += [quadmath_dep]
+  endif
+
   # Define OS with gfortran for OS specific code
   # These are identical to pre-defined macros available with ifort
   system = build_machine.system()
