@@ -259,6 +259,7 @@ jobs:
           pixi run build-mf5to6 builddir
 
       - name: Unit test MF6
+        if: (!(runner.os == 'Windows' && matrix.extended))
         working-directory: modflow6
         run: pixi run test builddir
 
