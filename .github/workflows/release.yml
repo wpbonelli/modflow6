@@ -251,7 +251,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: pixi run get-exes -s
 
-      - name: Build binaries
+      - name: Build MF6
         if: (!(runner.os == 'Windows' && matrix.extended))
         working-directory: modflow6
         run: |
@@ -286,6 +286,11 @@ jobs:
           RELEASEMODE: ${{ inputs.releasemode }}
           MARKERS: ${{ steps.set_markers.outputs.markers }}
           FILTERS: ${{ steps.set_filters.outputs.filters }}
+
+      - name: Show build log
+        if: failure()
+        working-directory: modflow6
+        run: cat builddir/meson-logs/meson-log.txt
 
       - name: Copy deps to bin dir
         if: runner.os == 'Windows' && matrix.extended

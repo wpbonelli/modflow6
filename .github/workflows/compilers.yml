@@ -117,13 +117,24 @@ jobs:
           ldflags="$LDFLAGS -Wl,-ld_classic"
           echo "LDFLAGS=$ldflags" >> $GITHUB_ENV
 
-      - name: Build modflow6
+      - name: Build MF6
         working-directory: modflow6
         run: |
           pixi run setup builddir
           pixi run build builddir
+
+      - name: Build mf5to6 converter
+        working-directory: modflow6
+        run: |
           pixi run setup-mf5to6 builddir
           pixi run build-mf5to6 builddir
+
+      - name: Check architecture (macOS)
+        working-directory: modflow6/bin
+        if: runner.os == 'macOS'
+        run: |
+          otool -L mf6
+          lipo -info mf6 
 
       - name: Show build log
         if: failure()
