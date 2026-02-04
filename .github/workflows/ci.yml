@@ -375,8 +375,7 @@ jobs:
         working-directory: modflow6
         run: pixi run update-version
 
-      - name: Build MF6
-        working-directory: modflow6
+      - name: Set setupargs
         run: |
           setupargs=""
           if [[ "${{ matrix.debug }}" == "true" ]]; then
@@ -384,10 +383,26 @@ jobs:
           elif [[ "${{ matrix.os }}" == "macos-14" ]]; then
             setupargs="-Doptimization=1"
           fi
-          pixi run setup builddir $setupargs
+          echo "MESON_SETUP_ARGS=$setupargs" >> $GITHUB_ENV
+
+      - name: Build MF6
+        working-directory: modflow6
+        run: |
+          pixi run setup builddir $MESON_SETUP_ARGS
           pixi run build builddir
-          pixi run setup-mf5to6 builddir $setupargs
+
+      - name: Build mf5to6 converter
+        working-directory: modflow6
+        run: |
+          pixi run setup-mf5to6 builddir $MESON_SETUP_ARGS
           pixi run build-mf5to6 builddir
+
+      - name: Check architecture (macOS)
+        working-directory: modflow6/bin
+        if: runner.os == 'macOS'
+        run: |
+          otool -L mf6
+          lipo -info mf6 
 
       - name: Show build log
         if: failure()
