@@ -126,6 +126,14 @@ jobs:
           repository: MODFLOW-ORG/modflow6-examples
           path: modflow6-examples
 
+      - name: Setup ${{ matrix.compiler }} ${{ matrix.version }}
+        if: (!(runner.os == 'Windows' && matrix.extended))
+        id: setup-fortran
+        uses: fortran-lang/setup-fortran@v1
+        with:
+          compiler: ${{ matrix.compiler }}
+          version: ${{ matrix.version }}
+
       - name: Setup pixi
         uses: prefix-dev/setup-pixi@v0.9.4
         with:
@@ -140,14 +148,6 @@ jobs:
         if: matrix.extended
         working-directory: modflow6
         run: pixi run pip install xarray netcdf4
-
-      - name: Setup ${{ matrix.compiler }} ${{ matrix.version }}
-        if: (!(runner.os == 'Windows' && matrix.extended))
-        id: setup-fortran
-        uses: fortran-lang/setup-fortran@v1
-        with:
-          compiler: ${{ matrix.compiler }}
-          version: ${{ matrix.version }}
       
       - name: Set version number
         id: set_version
@@ -289,8 +289,7 @@ jobs:
           mv $libpath/libquadmath.0.dylib.bak $libpath/libquadmath.0.dylib
 
       - name: Unit test MF6
-        # temporarily skip macOS.. why don't these fail in the normal CI?
-        if: (!(runner.os == 'Windows' && matrix.extended) && !(runner.os == 'macOS'))
+        if: (!(runner.os == 'Windows' && matrix.extended))
         working-directory: modflow6
         run: pixi run test builddir
 
