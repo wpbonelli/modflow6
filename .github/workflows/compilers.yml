@@ -129,23 +129,6 @@ jobs:
           pixi run setup-mf5to6 builddir
           pixi run build-mf5to6 builddir
 
-      - name: Restore dylibs (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          version="${{ matrix.version }}"
-          brew_prefix="$(brew --prefix)"
-          libpath="$brew_prefix/opt/gcc@$version/lib/gcc/$version"
-          mv $libpath/libgcc_s.1.1.dylib.bak $libpath/libgcc_s.1.1.dylib
-          mv $libpath/libgfortran.5.dylib.bak $libpath/libgfortran.5.dylib
-          mv $libpath/libquadmath.0.dylib.bak $libpath/libquadmath.0.dylib
-
-      - name: Check architecture (macOS)
-        working-directory: modflow6/bin
-        if: runner.os == 'macOS'
-        run: |
-          otool -L mf6
-          lipo -info mf6 
-
       - name: Show build log
         if: failure()
         working-directory: modflow6
@@ -155,9 +138,26 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v6
         with:
-          name: meson-log.txt
+          name: ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.version }}-meson-log.txt
           path: modflow6/builddir/meson-logs/meson-log.txt
+
+      - name: Check arch/libs (macOS)
+        if: success() && runner.os == 'macOS'
+        working-directory: modflow6/bin
+        run: |
+          otool -L mf6
+          lipo -info mf6 
     
+      - name: Restore dylibs (macOS)
+        if: success() && runner.os == 'macOS'
+        run: |
+          version="${{ matrix.version }}"
+          brew_prefix="$(brew --prefix)"
+          libpath="$brew_prefix/opt/gcc@$version/lib/gcc/$version"
+          mv $libpath/libgcc_s.1.1.dylib.bak $libpath/libgcc_s.1.1.dylib
+          mv $libpath/libgfortran.5.dylib.bak $libpath/libgfortran.5.dylib
+          mv $libpath/libquadmath.0.dylib.bak $libpath/libquadmath.0.dylib
+
       - name: Unit test programs
         if: success()
         working-directory: modflow6

@@ -259,10 +259,24 @@ jobs:
           pixi run setup-mf5to6 builddir -Doptimization=${{ matrix.optimization }}
           pixi run build-mf5to6 builddir
 
-      - name: Unit test MF6
-        if: (!(runner.os == 'Windows' && matrix.extended) && !(runner.os == 'macOS'))
+      - name: Show build log
+        if: failure()
         working-directory: modflow6
-        run: pixi run test builddir
+        run: cat builddir/meson-logs/meson-log.txt
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.version }}-meson-log.txt
+          path: modflow6/builddir/meson-logs/meson-log.txt
+
+      - name: Check arch/libs (macOS)
+        if: runner.os == 'macOS'
+        working-directory: modflow6/bin
+        run: |
+          otool -L mf6
+          lipo -info mf6 
 
       - name: Restore dylibs (macOS)
         if: runner.os == 'macOS'
@@ -274,12 +288,11 @@ jobs:
           mv $libpath/libgfortran.5.dylib.bak $libpath/libgfortran.5.dylib
           mv $libpath/libquadmath.0.dylib.bak $libpath/libquadmath.0.dylib
 
-      - name: Check architecture (macOS)
-        working-directory: modflow6/bin
-        if: runner.os == 'macOS'
-        run: |
-          otool -L mf6
-          lipo -info mf6 
+      - name: Unit test MF6
+        # temporarily skip macOS.. why don't these fail in the normal CI?
+        if: (!(runner.os == 'Windows' && matrix.extended) && !(runner.os == 'macOS'))
+        working-directory: modflow6
+        run: pixi run test builddir
 
       - name: Get executables
         if: inputs.run_tests == true && runner.os != 'Windows'
@@ -302,12 +315,7 @@ jobs:
           MARKERS: ${{ steps.set_markers.outputs.markers }}
           FILTERS: ${{ steps.set_filters.outputs.filters }}
 
-      - name: Show build log
-        if: failure()
-        working-directory: modflow6
-        run: cat builddir/meson-logs/meson-log.txt
-
-      - name: Copy deps to bin dir
+      - name: Copy deps to bin dir (Windows)
         if: runner.os == 'Windows' && matrix.extended
         working-directory: modflow6/bin
         shell: cmd
@@ -343,7 +351,7 @@ jobs:
 
           :: remove rebuilt and downloaded dirs
           if exist rebuilt rd /s /q rebuilt
-          if exist rebuilt rd /s /q downloaded
+          if exist downloaded rd /s /q downloaded
 
       - name: Upload binaries
         uses: actions/upload-artifact@v6
