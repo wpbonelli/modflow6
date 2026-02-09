@@ -12,4 +12,4 @@ myst-parser
 sphinx_rtd_theme>=1
 pytest
 filelock
-modflow-devtools
+modflow-devtools>=1.7.0,<2
