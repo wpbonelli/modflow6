@@ -267,6 +267,19 @@ jobs:
       - name: Download artifacts
         uses: dawidd6/action-download-artifact@v14
 
+      - name: Generate programs registry
+        working-directory: modflow6
+        run: |
+          version=$(python distribution/update_version.py -g)
+          python -m modflow_devtools.programs.make_registry \
+            --dists "../mf*/mf*.zip" \
+            --programs mf6 zbud6 mf5to6 libmf6 \
+            --version $version \
+            --repo ${{ github.repository }} \
+            --compute-hashes \
+            --output ../programs.toml \
+            --verbose
+
       - name: Draft release
         working-directory: modflow6
         env:
@@ -283,4 +296,4 @@ jobs:
       
           Visit the USGS "MODFLOW and Related Programs" site for information on MODFLOW 6 and related software: https://doi.org/10.5066/F76Q1VQV
           '
-          gh release create "$version" ../mf*/mf*.zip ../release_notes/release.pdf --target master --title "$title" --notes "$notes" --draft --latest
+          gh release create "$version" ../mf*/mf*.zip ../release_notes/release.pdf ../programs.toml --target master --title "$title" --notes "$notes" --draft --latest
