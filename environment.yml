@@ -30,6 +30,7 @@ dependencies:
       - git+https://github.com/Deltares/xmipy.git
       - git+https://github.com/MODFLOW-ORG/modflowapi.git
   - pooch
+  - pydantic
   - pyshp
   - pytest!=8.1.0
   - pytest-benchmark

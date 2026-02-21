@@ -26,6 +26,7 @@ numpy = "<2.0.0"    # modflowapi has a resriction on the numpy version
 pandas = "*"
 pip = "*"
 pooch = "*"
+pydantic = "*"
 pydotplus = "*"
 pyshp = "*"
 pytest = "!=8.1.0"
