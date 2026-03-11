@@ -12,6 +12,7 @@ module IdmExgDfnSelectorModule
   use ExgGwfgweInputModule
   use ExgGwegweInputModule
   use ExgGwfprtInputModule
+  use ExgPrtprtInputModule
   use ExgOlfgwfInputModule
 
   implicit none
@@ -62,6 +63,8 @@ contains
       call set_param_pointer(input_definition, exg_gwegwe_param_definitions)
     case ('GWFPRT')
       call set_param_pointer(input_definition, exg_gwfprt_param_definitions)
+    case ('PRTPRT')
+      call set_param_pointer(input_definition, exg_prtprt_param_definitions)
     case ('OLFGWF')
       call set_param_pointer(input_definition, exg_olfgwf_param_definitions)
     case default
@@ -88,6 +91,8 @@ contains
       call set_param_pointer(input_definition, exg_gwegwe_aggregate_definitions)
     case ('GWFPRT')
       call set_param_pointer(input_definition, exg_gwfprt_aggregate_definitions)
+    case ('PRTPRT')
+      call set_param_pointer(input_definition, exg_prtprt_aggregate_definitions)
     case ('OLFGWF')
       call set_param_pointer(input_definition, exg_olfgwf_aggregate_definitions)
     case default
@@ -114,6 +119,8 @@ contains
       call set_block_pointer(input_definition, exg_gwegwe_block_definitions)
     case ('GWFPRT')
       call set_block_pointer(input_definition, exg_gwfprt_block_definitions)
+    case ('PRTPRT')
+      call set_block_pointer(input_definition, exg_prtprt_block_definitions)
     case ('OLFGWF')
       call set_block_pointer(input_definition, exg_olfgwf_block_definitions)
     case default
@@ -139,6 +146,8 @@ contains
       multi_package = exg_gwegwe_multi_package
     case ('GWFPRT')
       multi_package = exg_gwfprt_multi_package
+    case ('PRTPRT')
+      multi_package = exg_prtprt_multi_package
     case ('OLFGWF')
       multi_package = exg_olfgwf_multi_package
     case default
@@ -167,6 +176,8 @@ contains
       call set_subpkg_pointer(subpackages, exg_gwegwe_subpackages)
     case ('GWFPRT')
       call set_subpkg_pointer(subpackages, exg_gwfprt_subpackages)
+    case ('PRTPRT')
+      call set_subpkg_pointer(subpackages, exg_prtprt_subpackages)
     case ('OLFGWF')
       call set_subpkg_pointer(subpackages, exg_olfgwf_subpackages)
     case default
@@ -192,6 +203,8 @@ contains
     case ('GWEGWE')
       integrated = .true.
     case ('GWFPRT')
+      integrated = .true.
+    case ('PRTPRT')
       integrated = .true.
     case ('OLFGWF')
       integrated = .true.

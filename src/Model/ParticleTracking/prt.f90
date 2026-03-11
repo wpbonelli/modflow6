@@ -18,7 +18,8 @@ module PrtModule
   use PrtOcModule, only: PrtOcType
   use BudgetModule, only: BudgetType
   use ListModule, only: ListType
-  use ParticleModule, only: ParticleType, create_particle, ACTIVE, TERM_UNRELEASED
+  use ParticleModule, only: ParticleType, create_particle, ACTIVE, TERM_UNRELEASED, &
+                            TERM_BOUNDARY, ParticleStoreType, create_particle_store
   use ParticleEventsModule, only: ParticleEventDispatcherType, &
                                   ParticleEventConsumerType
   use ParticleTracksModule, only: ParticleTracksType, &
@@ -65,6 +66,11 @@ module PrtModule
     real(DP), dimension(:), pointer, contiguous :: masstrm => null() !< particle mass terminating in cells, new value
     real(DP), dimension(:), pointer, contiguous :: ratetrm => null() !< particle mass termination rate in cells
     type(HashTableType), pointer :: trm_ids => null() !< terminated particle ids
+    ! Cross-model particle exchange (PRT-PRT exchange support)
+    type(ParticleStoreType), pointer, public :: outbox => null() !< particles that exited model boundary
+    type(ParticleStoreType), pointer, public :: inbox => null()  !< particles received from neighbour model
+    integer(I4B), public :: noutbox = 0 !< number of valid entries in outbox
+    integer(I4B), public :: ninbox = 0  !< number of valid entries in inbox
   contains
     ! Override BaseModelType procs
     procedure :: model_df => prt_df
@@ -76,6 +82,8 @@ module PrtModule
     procedure :: model_ot => prt_ot
     procedure :: model_da => prt_da
     procedure :: model_solve => prt_solve
+    ! Cross-model exchange support
+    procedure :: has_pending => prt_has_pending
 
     ! Private utilities
     procedure :: allocate_scalars
@@ -243,6 +251,7 @@ contains
     use PrtPrpModule, only: PrtPrpType
     use PrtMipModule, only: PrtMipType
     use MethodPoolModule, only: method_dis, method_disv
+    use MemoryHelperModule, only: create_mem_path
     ! dummy
     class(PrtModelType) :: this
     ! locals
@@ -329,6 +338,14 @@ contains
 
     ! Set verbose tracing if requested
     if (this%oc%dump_event_trace) this%tracks%iout = 0
+
+    ! Initialise cross-model exchange buffers to size 0
+    call create_particle_store(this%outbox, 0, &
+                               create_mem_path(this%name, 'PRTPRTOUT'))
+    call create_particle_store(this%inbox, 0, &
+                               create_mem_path(this%name, 'PRTPRTIN'))
+    this%noutbox = 0
+    this%ninbox = 0
   end subroutine prt_ar
 
   !> @brief Read and prepare (calls package read and prepare routines)
@@ -820,6 +837,7 @@ contains
   subroutine prt_da(this)
     ! modules
     use MemoryManagerModule, only: mem_deallocate
+    use MemoryHelperModule, only: create_mem_path
     use MemoryManagerExtModule, only: memorystore_remove
     use SimVariablesModule, only: idm_context
     use MethodPoolModule, only: destroy_method_pool
@@ -879,6 +897,16 @@ contains
     call this%tracks%destroy()
     deallocate (this%events)
     deallocate (this%tracks)
+
+    ! Cross-model exchange buffers
+    if (associated(this%outbox)) then
+      call this%outbox%destroy(create_mem_path(this%name, 'PRTPRTOUT'))
+      deallocate (this%outbox)
+    end if
+    if (associated(this%inbox)) then
+      call this%inbox%destroy(create_mem_path(this%name, 'PRTPRTIN'))
+      deallocate (this%inbox)
+    end if
 
     call this%ExplicitModelType%model_da()
   end subroutine prt_da
@@ -940,6 +968,12 @@ contains
       this%ratetrm(n) = DZERO
     end do
   end subroutine allocate_arrays
+
+  !> @brief Return .true. if this model has inbox particles awaiting tracking.
+  logical function prt_has_pending(this)
+    class(PrtModelType), intent(in) :: this
+    prt_has_pending = (this%ninbox > 0)
+  end function prt_has_pending
 
   !> @brief Create boundary condition packages for this model
   subroutine package_create(this, filtyp, ipakid, ipaknum, pakname, mempath, &
@@ -1021,16 +1055,21 @@ contains
   subroutine prt_solve(this)
     use TdisModule, only: totimc, delt, endofsimulation
     use PrtPrpModule, only: PrtPrpType
-    use ParticleModule, only: ACTIVE, TERM_UNRELEASED, TERM_TIMEOUT
+    use ParticleModule, only: ACTIVE, TERM_UNRELEASED, TERM_TIMEOUT, TERM_BOUNDARY
     use ParticleEventModule, only: RELEASE, TERMINATE
+    use MemoryHelperModule, only: create_mem_path
     ! dummy
     class(PrtModelType) :: this
     ! local
     integer(I4B) :: np, ip
+    integer(I4B) :: ninbox_local
     class(BndType), pointer :: packobj
     type(ParticleType), pointer :: particle
     real(DP) :: tmax
     integer(I4B) :: iprp
+    character(len=LINELENGTH) :: outbox_path
+
+    outbox_path = create_mem_path(this%name, 'PRTPRTOUT')
 
     ! A single particle is reused in the tracking loops
     ! to avoid allocating and deallocating it each time.
@@ -1047,12 +1086,6 @@ contains
           ! Get the particle from the store
           call packobj%particles%get(particle, this%id, iprp, np)
           ! If particle is permanently unreleased, cycle.
-          ! Raise a termination event if we haven't yet.
-          ! TODO: when we have generic dynamic vectors,
-          ! consider terminating permanently unreleased
-          ! in PRP instead of here. For now, status -8
-          ! indicates the permanently unreleased event
-          ! is not yet recorded, status 8 it has been.
           if (particle%istatus == (-1 * TERM_UNRELEASED)) then
             call this%method%terminate(particle, status=TERM_UNRELEASED)
             call packobj%particles%put(particle, np)
@@ -1062,9 +1095,7 @@ contains
           ! If the particle was released this time step, emit a release event
           if (particle%trelease >= totimc) call this%method%release(particle)
           ! Maximum time is the end of the time step or the particle
-          ! stop time, whichever comes first, unless it's the final
-          ! time step and the extend option is on, in which case
-          ! it's just the particle stop time.
+          ! stop time, whichever comes first.
           if (endofsimulation .and. particle%extend) then
             tmax = particle%tstop
           else
@@ -1072,14 +1103,16 @@ contains
           end if
           ! Apply the tracking method until the maximum time.
           call this%method%apply(particle, tmax)
-          ! If the particle timed out, terminate it.
-          ! "Timed out" means it's still active but
-          !   - it reached its stop time, or
-          !   - the simulation is over.
-          ! We can't detect timeout within the tracking
-          ! method because the method just receives the
-          ! maximum time with no context on what it is.
-          ! TODO maybe think about changing that?
+          ! If the particle hit a model boundary, buffer it in the
+          ! outbox for handoff to the neighbouring model's inbox.
+          ! The particle stays TERM_BOUNDARY in the PRP store so
+          ! it will be skipped on future passes within model 1.
+          if (particle%istatus == TERM_BOUNDARY) then
+            this%noutbox = this%noutbox + 1
+            call this%outbox%resize(this%noutbox, outbox_path)
+            call this%outbox%put(particle, this%noutbox)
+          end if
+          ! If timed out, terminate it.
           if (particle%istatus <= ACTIVE .and. &
               (particle%ttrack == particle%tstop .or. endofsimulation)) &
             call this%method%terminate(particle, status=TERM_TIMEOUT)
@@ -1088,6 +1121,32 @@ contains
         end do
       end select
     end do
+
+    ! Process inbox particles received from a neighbouring model.
+    ! ninbox is reset to 0 once we have consumed the current batch.
+    ninbox_local = this%ninbox
+    this%ninbox = 0
+    do np = 1, ninbox_local
+      call this%inbox%get(particle, this%id, this%inbox%iprp(np), np)
+      if (endofsimulation .and. particle%extend) then
+        tmax = particle%tstop
+      else
+        tmax = min(totimc + delt, particle%tstop)
+      end if
+      call this%method%apply(particle, tmax)
+      ! If this inbox particle also hits a boundary, queue it again.
+      if (particle%istatus == TERM_BOUNDARY) then
+        this%noutbox = this%noutbox + 1
+        call this%outbox%resize(this%noutbox, outbox_path)
+        call this%outbox%put(particle, this%noutbox)
+      else if (particle%istatus <= ACTIVE .and. &
+               (particle%ttrack == particle%tstop .or. endofsimulation)) then
+        call this%method%terminate(particle, status=TERM_TIMEOUT)
+      end if
+      ! Update inbox entry with final state (for diagnostics)
+      call this%inbox%put(particle, np)
+    end do
+
     call particle%destroy()
     deallocate (particle)
   end subroutine prt_solve

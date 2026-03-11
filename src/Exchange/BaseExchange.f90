@@ -27,6 +27,9 @@ module BaseExchangeModule
     procedure :: exg_fp
     procedure :: exg_da
     procedure :: connects_model
+    !> @brief Transfer pending particles between models. Default is a no-op;
+    !! PRT-PRT exchange overrides this to implement the particle handoff.
+    procedure :: do_transfer
   end type BaseExchangeType
 
   abstract interface
@@ -88,6 +91,12 @@ contains
     ! -- dummy
     class(BaseExchangeType) :: this
   end subroutine exg_da
+
+  !> @brief Transfer particles between connected models (no-op by default).
+  !<
+  subroutine do_transfer(this)
+    class(BaseExchangeType), intent(inout) :: this
+  end subroutine do_transfer
 
   !> @brief Should return true when the exchange should be added to the
   !! solution where the model resides

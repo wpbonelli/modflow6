@@ -39,6 +39,7 @@ module ExplicitSolutionModule
   type, extends(BaseSolutionType) :: ExplicitSolutionType
     character(len=LENMEMPATH) :: memoryPath !< the path for storing solution variables in the memory manager
     type(ListType), pointer :: modellist !< list of models in solution
+    type(ListType), pointer :: exchangelist !< list of exchanges in solution
     integer(I4B), pointer :: id !< solution number
     integer(I4B), pointer :: iu !< input file unit
     real(DP), pointer :: ttsoln !< timer - total solution time
@@ -94,7 +95,7 @@ contains
     exp_sol%name = solutionname
     exp_sol%memoryPath = create_mem_path(solutionname)
     allocate (exp_sol%modellist)
-    !todo: do we need this?  allocate (exp_sol%exchangelist)
+    allocate (exp_sol%exchangelist)
     call exp_sol%allocate_scalars()
     call AddBaseSolutionToList(basesolutionlist, solbase)
     exp_sol%id = id
@@ -178,6 +179,8 @@ contains
     ! -- lists
     call this%modellist%Clear()
     deallocate (this%modellist)
+    call this%exchangelist%Clear()
+    deallocate (this%exchangelist)
 
     ! -- Scalars
     call mem_deallocate(this%id)
@@ -243,6 +246,10 @@ contains
   end subroutine prepareSolve
 
   !> @ brief Solve each model
+  !!
+  !! Drives an outer handoff loop: models solve, then any PRT-PRT exchanges
+  !! transfer boundary-exiting particles into neighbour inboxes, and the
+  !! loop repeats until no model has pending inbox particles.
   !<
   subroutine solve(this, kiter)
     ! -- dummy variables
@@ -250,14 +257,44 @@ contains
     integer(I4B), intent(in) :: kiter !< Picard iteration (1 for explicit)
     ! -- local variables
     class(ExplicitModelType), pointer :: mp => null()
-    integer(I4B) :: im
+    class(BaseExchangeType), pointer :: ep => null()
+    class(*), pointer :: obj => null()
+    integer(I4B) :: im, ie
+    logical :: any_pending
     real(DP) :: ttsoln
 
     call code_timer(0, ttsoln, this%ttsoln)
-    do im = 1, this%modellist%Count()
-      mp => GetExplicitModelFromList(this%modellist, im)
-      call mp%model_solve()
+
+    ! Outer handoff loop: repeat until no model has inbox particles.
+    do
+      ! Solve every model in the solution.
+      do im = 1, this%modellist%Count()
+        mp => GetExplicitModelFromList(this%modellist, im)
+        call mp%model_solve()
+      end do
+
+      ! Let every exchange transfer its outbox particles to neighbour inboxes.
+      do ie = 1, this%exchangelist%Count()
+        obj => this%exchangelist%GetItem(ie)
+        select type (obj)
+        class is (BaseExchangeType)
+          ep => obj
+          call ep%do_transfer()
+        end select
+      end do
+
+      ! Continue only while at least one model has inbox particles ready.
+      any_pending = .false.
+      do im = 1, this%modellist%Count()
+        mp => GetExplicitModelFromList(this%modellist, im)
+        if (mp%has_pending()) then
+          any_pending = .true.
+          exit
+        end if
+      end do
+      if (.not. any_pending) exit
     end do
+
     call code_timer(1, ttsoln, this%ttsoln)
     this%icnvg = 1
   end subroutine solve
@@ -333,6 +370,9 @@ contains
   subroutine add_exchange(this, exchange)
     class(ExplicitSolutionType) :: this
     class(BaseExchangeType), pointer, intent(in) :: exchange
+    class(*), pointer :: obj
+    obj => exchange
+    call this%exchangelist%Add(obj)
   end subroutine add_exchange
 
   !> @ brief Get list of exchanges
@@ -340,6 +380,7 @@ contains
   function get_exchanges(this) result(exchanges)
     class(ExplicitSolutionType) :: this
     type(ListType), pointer :: exchanges
+    exchanges => this%exchangelist
   end function get_exchanges
 
 end module ExplicitSolutionModule

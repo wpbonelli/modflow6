@@ -32,9 +32,19 @@ module ExplicitModelModule
     procedure :: allocate_scalars
     procedure :: allocate_arrays
     procedure :: set_idsoln
+    !> @brief Return true if the model has particles pending transfer
+    !! to or from a neighboring model. Default returns false; PRT overrides.
+    procedure :: has_pending
   end type ExplicitModelType
 
 contains
+
+  !> @brief Return true if the model has particles pending exchange transfer.
+  !< Default is false; particle-tracking models override this.
+  logical function has_pending(this)
+    class(ExplicitModelType), intent(in) :: this
+    has_pending = .false.
+  end function has_pending
 
   !> @ brief Advance the model
   subroutine model_ad(this)

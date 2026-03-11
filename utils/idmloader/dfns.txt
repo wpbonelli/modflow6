@@ -110,6 +110,7 @@ exg-gwtgwt.dfn
 exg-gwfgwe.dfn
 exg-gwegwe.dfn
 exg-gwfprt.dfn
+exg-prtprt.dfn
 exg-olfgwf.dfn
 utl-hpc.dfn
 utl-ncf.dfn
