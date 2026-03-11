@@ -30,6 +30,7 @@ module GwfGwfExchangeModule
   use SimVariablesModule, only: errmsg, model_loc_idx
   use TableModule, only: TableType, table_cr
   use MatrixBaseModule
+  use DisvGeom, only: DisvGeomType
 
   implicit none
 
@@ -275,6 +276,8 @@ contains
     class(GwfExchangeType) :: this !<  GwfExchangeType
     ! -- local
     logical(LGP) :: has_k22, has_spdis, has_vsc
+    integer(I4B) :: n, m, ncount
+    logical(LGP), dimension(:), allocatable :: checked_conns
     !
     ! Periodic boundary condition in exchange don't allow XT3D (=interface model)
     if (this%v_model1 == this%v_model2) then
@@ -354,6 +357,29 @@ contains
         ' in both of the connected models.'
       call store_error(errmsg, terminate=.TRUE.)
     end if
+    !
+    ! At most one horizontal connection is allowed between any two cells.
+    allocate (checked_conns(this%nexg))
+    checked_conns = .false.
+    do n = 1, this%nexg
+      if (checked_conns(n)) cycle
+      ncount = 0
+      do m = 1, this%nexg
+        if (this%nodem1(m) == this%nodem1(n) .and. &
+            this%nodem2(m) == this%nodem2(n)) then
+          ncount = ncount + 1
+          checked_conns(m) = .true.
+        end if
+      end do
+      if (ncount > 1) then
+        write (errmsg, '(a,a,a,a,i0,a,i0,a,i0,a)') &
+          'GWF-GWF exchange ', trim(this%name), ' requires at most one ', &
+          ' connection between cells ', this%nodem1(n), &
+          ' (model 1) and ', this%nodem2(n), ' (model 2): ', ncount, &
+          ' connections defined for this cell pair.'
+        call store_error(errmsg, terminate=.true.)
+      end if
+    end do
   end subroutine validate_exchange
 
   !> @ brief Add connections

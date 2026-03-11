@@ -249,7 +249,9 @@ contains
   subroutine validate_exchange(this)
     ! -- dummy
     class(GweExchangeType) :: this !<  GweExchangeType
-    !
+    ! -- local
+    integer(I4B) :: n, m, ncount
+    logical(LGP), dimension(:), allocatable :: checked_conns
 
     ! Ensure gwfmodel names were entered
     if (this%gwfmodelname1 == '') then
@@ -296,6 +298,29 @@ contains
         ' auxiliary variable because XT3D is enabled'
       call store_error(errmsg)
     end if
+    !
+    ! At most one horizontal connection is allowed between any two cells.
+    allocate (checked_conns(this%nexg))
+    checked_conns = .false.
+    do n = 1, this%nexg
+      if (checked_conns(n)) cycle
+      ncount = 0
+      do m = 1, this%nexg
+        if (this%nodem1(m) == this%nodem1(n) .and. &
+            this%nodem2(m) == this%nodem2(n)) then
+          ncount = ncount + 1
+          checked_conns(m) = .true.
+        end if
+      end do
+      if (ncount > 1) then
+        write (errmsg, '(a,a,a,a,i0,a,i0,a,i0,a)') &
+          'GWE-GWE exchange ', trim(this%name), ' requires at most one ', &
+          ' connection between cells ', this%nodem1(n), &
+          ' (model 1) and ', this%nodem2(n), ' (model 2): ', ncount, &
+          ' connections defined for this cell pair.'
+        call store_error(errmsg, terminate=.true.)
+      end if
+    end do
     !
     if (count_errors() > 0) then
       call ustop()
