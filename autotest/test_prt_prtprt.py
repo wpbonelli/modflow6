@@ -215,7 +215,7 @@ def build_models(idx, test):
     flopy.mf6.ModflowPrtoc(
         prtl,
         pname="oc",
-        track_filerecord=f"{prt_name('left')}.trk",
+        # track_filerecord=f"{prt_name('left')}.trk",
         trackcsv_filerecord=f"{prt_name('left')}.trk.csv",
     )
     # FMI: link to GWF-left flow output
@@ -248,7 +248,7 @@ def build_models(idx, test):
     flopy.mf6.ModflowPrtoc(
         prtr,
         pname="oc",
-        track_filerecord=f"{prt_name('right')}.trk",
+        #track_filerecord=f"{prt_name('right')}.trk",
         trackcsv_filerecord=f"{prt_name('right')}.trk.csv",
     )
     flopy.mf6.ModflowPrtfmi(

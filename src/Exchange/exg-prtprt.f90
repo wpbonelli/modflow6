@@ -30,7 +30,7 @@
 !<
 module PrtPrtExchangeModule
 
-  use KindModule, only: DP, I4B
+  use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: LENPACKAGENAME, LINELENGTH, LENMEMPATH
   use ListsModule, only: basemodellist, baseexchangelist
   use SimModule, only: store_error, count_errors
@@ -65,6 +65,7 @@ module PrtPrtExchangeModule
     procedure :: exg_df
     procedure :: exg_ar
     procedure :: exg_da
+    procedure :: connects_model !< override: return true when model is one of our two
     procedure :: do_transfer !< override base no-op with particle handoff
     procedure, private :: set_model_pointers
     procedure, private :: allocate_scalars
@@ -107,6 +108,25 @@ contains
     exchange%m1id = model_loc_idx(m1_id)
     exchange%m2id = model_loc_idx(m2_id)
   end subroutine prtprt_cr
+
+  ! -----------------------------------------------------------------------
+  !> @brief Return true if model is one of the two models connected by this exchange.
+  function connects_model(this, model) result(is_connected)
+    class(PrtPrtExchangeType) :: this
+    class(BaseModelType), pointer, intent(in) :: model
+    logical(LGP) :: is_connected
+
+    ! only connected when model is GwfModelType of course
+    is_connected = .false.
+    select type (model)
+    class is (PrtModelType)
+      if (associated(this%prtmodel1, model)) then
+        is_connected = .true.
+      else if (associated(this%prtmodel2, model)) then
+        is_connected = .true.
+      end if
+    end select
+  end function connects_model
 
   ! -----------------------------------------------------------------------
   !> @brief Define phase: store model pointers.

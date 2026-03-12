@@ -250,13 +250,16 @@ contains
     use ConstantsModule, only: DHNOFLO
     use PrtPrpModule, only: PrtPrpType
     use PrtMipModule, only: PrtMipType
-    use MethodPoolModule, only: method_dis, method_disv
+    use MethodDisModule, only: MethodDisType, create_method_dis
+    use MethodDisvModule, only: MethodDisvType, create_method_disv
     use MemoryHelperModule, only: create_mem_path
     ! dummy
     class(PrtModelType) :: this
     ! locals
     integer(I4B) :: ip, nprp
     class(BndType), pointer :: packobj
+    type(MethodDisType), pointer :: my_dis => null()
+    type(MethodDisvType), pointer :: my_disv => null()
 
     ! Set up basic packages
     call this%fmi%fmi_ar(this%ibound)
@@ -309,10 +312,13 @@ contains
     if (this%oc%itrkcsv > 0) &
       call this%tracks%init_file(this%oc%itrkcsv, csv=.true.)
 
-    ! Set up the tracking method
+    ! Set up the tracking method (allocate a new instance per model so that
+    ! multiple PRT models do not share a single singleton whose events
+    ! dispatcher and FMI pointer would be overwritten by each successive init).
     select type (dis => this%dis)
     type is (DisType)
-      call method_dis%init( &
+      call create_method_dis(my_dis)
+      call my_dis%init( &
         fmi=this%fmi, &
         events=this%events, &
         izone=this%mip%izone, &
@@ -320,9 +326,10 @@ contains
         porosity=this%mip%porosity, &
         retfactor=this%mip%retfactor, &
         tracktimes=this%oc%tracktimes)
-      this%method => method_dis
+      this%method => my_dis
     type is (DisvType)
-      call method_disv%init( &
+      call create_method_disv(my_disv)
+      call my_disv%init( &
         fmi=this%fmi, &
         events=this%events, &
         izone=this%mip%izone, &
@@ -330,7 +337,7 @@ contains
         porosity=this%mip%porosity, &
         retfactor=this%mip%retfactor, &
         tracktimes=this%oc%tracktimes)
-      this%method => method_disv
+      this%method => my_disv
     end select
 
     ! Subscribe track output manager to events
@@ -866,6 +873,11 @@ contains
     deallocate (this%oc)
 
     ! Method objects
+    if (associated(this%method)) then
+      call this%method%deallocate()
+      deallocate (this%method)
+      this%method => null()
+    end if
     call destroy_method_subcell_pool()
     call destroy_method_cell_pool()
     call destroy_method_pool()
