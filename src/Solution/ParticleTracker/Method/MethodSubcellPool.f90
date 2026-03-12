@@ -16,16 +16,20 @@ contains
 
   !> @brief Create the subcell method pool
   subroutine create_method_subcell_pool()
-    call create_method_subcell_pollock(method_subcell_plck)
-    call create_method_subcell_ternary(method_subcell_tern)
+    if (.not. associated(method_subcell_plck)) then
+      call create_method_subcell_pollock(method_subcell_plck)
+      call create_method_subcell_ternary(method_subcell_tern)
+    end if
   end subroutine create_method_subcell_pool
 
   !> @brief Destroy the subcell method pool
   subroutine destroy_method_subcell_pool()
-    call method_subcell_plck%deallocate()
-    deallocate (method_subcell_plck)
-    call method_subcell_tern%deallocate()
-    deallocate (method_subcell_tern)
+    if (associated(method_subcell_plck)) then
+      call method_subcell_plck%deallocate()
+      deallocate (method_subcell_plck)
+      call method_subcell_tern%deallocate()
+      deallocate (method_subcell_tern)
+    end if
   end subroutine destroy_method_subcell_pool
 
 end module MethodSubcellPoolModule

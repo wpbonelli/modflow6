@@ -114,6 +114,7 @@ contains
 
     allocate (file)
     file%iun = iun
+    write(*,*) "PT nr ", iun
     if (present(csv)) file%csv = csv
     if (present(iprp)) file%iprp = iprp
     this%ntrackfiles = size(this%files)
@@ -229,6 +230,8 @@ contains
     type(ParticleType), pointer, intent(in) :: particle
     class(ParticleEventType), pointer, intent(in) :: event
     logical(LGP), intent(in) :: csv
+
+    print *, "======", iun 
 
     if (csv) then
       write (iun, '(*(G0,:,","))') &

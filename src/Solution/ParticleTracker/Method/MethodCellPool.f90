@@ -20,22 +20,26 @@ contains
 
   !> @brief Create the cell method pool
   subroutine create_method_cell_pool()
-    call create_method_cell_pollock(method_cell_plck)
-    call create_method_cell_quad(method_cell_quad)
-    call create_method_cell_ternary(method_cell_tern)
-    call create_method_cell_ptb(method_cell_ptb)
+    if (.not. associated(method_cell_plck)) then
+      call create_method_cell_pollock(method_cell_plck)
+      call create_method_cell_quad(method_cell_quad)
+      call create_method_cell_ternary(method_cell_tern)
+      call create_method_cell_ptb(method_cell_ptb)
+    end if
   end subroutine create_method_cell_pool
 
   !> @brief Destroy the cell method pool
   subroutine destroy_method_cell_pool()
-    call method_cell_plck%deallocate()
-    deallocate (method_cell_plck)
-    call method_cell_quad%deallocate()
-    deallocate (method_cell_quad)
-    call method_cell_tern%deallocate()
-    deallocate (method_cell_tern)
-    call method_cell_ptb%deallocate()
-    deallocate (method_cell_ptb)
+    if (associated(method_cell_plck)) then
+      call method_cell_plck%deallocate()
+      deallocate (method_cell_plck)
+      call method_cell_quad%deallocate()
+      deallocate (method_cell_quad)
+      call method_cell_tern%deallocate()
+      deallocate (method_cell_tern)
+      call method_cell_ptb%deallocate()
+      deallocate (method_cell_ptb)
+    end if
   end subroutine destroy_method_cell_pool
 
 end module MethodCellPoolModule

@@ -15,16 +15,20 @@ contains
 
   !> @brief Create the method pool
   subroutine create_method_pool()
-    call create_method_dis(method_dis)
-    call create_method_disv(method_disv)
+    if (.not. associated(method_dis)) then
+      call create_method_dis(method_dis)
+      call create_method_disv(method_disv)
+    end if
   end subroutine create_method_pool
 
   !> @brief Destroy the method pool
   subroutine destroy_method_pool()
-    call method_dis%deallocate()
-    deallocate (method_dis)
-    call method_disv%deallocate()
-    deallocate (method_disv)
+    if (associated(method_dis)) then
+      call method_dis%deallocate()
+      deallocate (method_dis)
+      call method_disv%deallocate()
+      deallocate (method_disv)
+    end if
   end subroutine destroy_method_pool
 
 end module MethodPoolModule
