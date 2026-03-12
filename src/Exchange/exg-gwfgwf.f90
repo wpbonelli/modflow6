@@ -30,6 +30,7 @@ module GwfGwfExchangeModule
   use SimVariablesModule, only: errmsg, model_loc_idx
   use TableModule, only: TableType, table_cr
   use MatrixBaseModule
+  use DisvGeom, only: DisvGeomType, count_shared_edges
 
   implicit none
 
@@ -354,7 +355,68 @@ contains
         ' in both of the connected models.'
       call store_error(errmsg, terminate=.TRUE.)
     end if
+    !
+    ! Check for split faces in DISV grids
+    call this%validate_disv_split_faces()
   end subroutine validate_exchange
+
+  subroutine validate_disv_split_faces(this)
+    use ConstantsModule, only: DISU
+    class(GwfExchangeType) :: this
+    integer(I4B) :: n, nedges
+    integer(I4B) :: nodem1, nodem2
+    integer(I4B) :: istart1, istop1, istart2, istop2
+    type(DisvGeomType) :: cell1, cell2
+    logical :: is_disv1, is_disv2
+    !
+    ! Only check if both models use DISV
+    is_disv1 = .false.
+    is_disv2 = .false.
+    if (associated(this%gwfmodel1)) then
+      if (this%gwfmodel1%dis%idis == DISU) is_disv1 = .true.
+    end if
+    if (associated(this%gwfmodel2)) then
+      if (this%gwfmodel2%dis%idis == DISU) is_disv2 = .true.
+    end if
+    if (.not. (is_disv1 .and. is_disv2)) return
+    !
+    ! Check each exchange connection for split faces
+    do n = 1, this%nexg
+      if (this%ihc(n) /= 1) cycle  ! Only check horizontal connections
+      !
+      nodem1 = this%nodem1(n)
+      nodem2 = this%nodem2(n)
+      !
+      ! Get vertex lists from both cells
+      call cell1%init(this%gwfmodel1%dis%nvert, &
+                      this%gwfmodel1%dis%vertices, &
+                      this%gwfmodel1%dis%cellxy, &
+                      this%gwfmodel1%dis%iavert, &
+                      this%gwfmodel1%dis%javert, &
+                      nodem1)
+      call cell2%init(this%gwfmodel2%dis%nvert, &
+                      this%gwfmodel2%dis%vertices, &
+                      this%gwfmodel2%dis%cellxy, &
+                      this%gwfmodel2%dis%iavert, &
+                      this%gwfmodel2%dis%javert, &
+                      nodem2)
+      !
+      nedges = cell1%count_shared_edges_wrapper(cell2)
+      if (nedges > 1) then
+        write (errmsg, '(a,a,a,i0,a,i0,a,i0,a)') &
+          'Split face detected in GWF-GWF exchange ', &
+          trim(this%name), ' between cells ', nodem1, &
+          ' (model 1) and ', nodem2, ' (model 2): ', nedges, &
+          ' shared edges.'
+        call store_error(errmsg)
+        write (errmsg, '(a)') &
+          'DISV grids do not support split faces where '// &
+          'additional vertices are placed on shared cell boundaries.'
+        call store_error(errmsg, terminate=.TRUE.)
+      end if
+    end do
+  end subroutine validate_disv_split_faces
+
 
   !> @ brief Add connections
   !!

@@ -5,7 +5,7 @@ module DisvGeom
   implicit none
   private
   public :: DisvGeomType
-  public :: line_unit_vector, shared_edge
+  public :: line_unit_vector, shared_edge, count_shared_edges
 
   type DisvGeomType
 
@@ -267,6 +267,33 @@ contains
     call line_unit_vector(x1, y1, z1, x2, y2, z2, xcomp, ycomp, zcomp, &
                           conlen)
   end subroutine connection_vector
+
+  !> @brief Count the number of shared edges between two cells
+  !<
+  function count_shared_edges(ivlist1, ivlist2) result(nedges)
+    ! -- dummy
+    integer(I4B), dimension(:) :: ivlist1
+    integer(I4B), dimension(:) :: ivlist2
+    ! -- return
+    integer(I4B) :: nedges
+    ! -- local
+    integer(I4B) :: nv1
+    integer(I4B) :: nv2
+    integer(I4B) :: il1
+    integer(I4B) :: il2
+    !
+    nedges = 0
+    nv1 = size(ivlist1)
+    nv2 = size(ivlist2)
+    do il1 = 1, nv1 - 1
+      do il2 = nv2, 2, -1
+        if (ivlist1(il1) == ivlist2(il2) .and. &
+            ivlist1(il1 + 1) == ivlist2(il2 - 1)) then
+          nedges = nedges + 1
+        end if
+      end do
+    end do
+  end function count_shared_edges
 
   !> @brief Return true if this shares a horizontal edge with cell2
   !<

@@ -5,6 +5,7 @@ module ConnectionsModule
   use ConstantsModule, only: LENMODELNAME, LENMEMPATH, DHALF, DONE
   use MessageModule, only: write_message
   use SimVariablesModule, only: errmsg
+  use SimModule, only: store_error
   use BlockParserModule, only: BlockParserType
   use GeomUtilModule, only: get_node
 
@@ -1351,8 +1352,19 @@ contains
             if (nrsize > 0) mr = nodereduced(mr)
             if (mr <= 0) cycle
             call cell2%set_nodered(mr)
-            if (cell1%shares_edge(cell2)) then
+            nedges = cell1%count_shared_edges(cell2)
+            if (nedges == 1) then
               call sparse%addconnection(nr, mr, 1)
+            else if (nedges > 1) then
+              write (errmsg, '(a,i0,a,i0,a,i0,a)') &
+                'Split face detected between DISV cells ', nr, &
+                ' and ', mr, ' (', nedges, &
+                ' shared faces). Cells cannot share multiple faces.'
+              call store_error(errmsg)
+              write (errmsg, '(a)') &
+                'DISV grids do not support split faces where '// &
+                'additional vertices are placed on shared cell boundaries.'
+              call store_error(errmsg, terminate=.TRUE.)
             end if
           end do
         end do
