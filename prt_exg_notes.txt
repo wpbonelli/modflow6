@@ -1,0 +1,7 @@
+- do_transfer() routine should not be on base exchange type, only on prt-prt exg type
+- or, we need some distinctino between an exchange that transfers discrete objects (like particles) vs an exchange that allows solving equations across the interface between models
+- need to implement exchange/connection linking like the other non-matching exchanges
+	- link_connections
+	- gwfconn2prtconn
+- use the existing particle event mechanism.. need to make it generic, i.e. use proc pointers instead of an explicit consumer class, then have another consumer of particle events that determines whether to place particles in the outbox or terminate them
+- has_pending doesn't seem like it belongs on explicit model, it seems PRT-specific, how can we scope this more properly or solve it in a different way

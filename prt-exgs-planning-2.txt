@@ -1,0 +1,1350 @@
+
+╭─── Claude Code v2.0.76 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                  Welcome back wes!                 │ started                 │
+│                                                    │ Run /init to create a … │
+│                     * ▐▛███▜▌ *                    │ ─────────────────────── │
+│                    * ▝▜█████▛▘ *                   │ Recent activity         │
+│                     *  ▘▘ ▝▝  *                    │ No recent activity      │
+│                                                    │                         │
+│  Sonnet 4.5 · Claude Pro · wpbonelli@gmail.com's   │                         │
+│  Organization                                      │                         │
+│                   ~\dev\modflow6                   │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+> Have a look at `prt_exg_notes.txt`. These are some notes I took on this PR
+ branch. Do you understand the recommendations I'm making? Ask any questions
+ you need to. 
+
+● I'll read your notes to understand the recommendations you're making.
+
+● Read(prt_exg_notes.txt)
+  ⎿  Read 8 lines
+
+● I understand the general direction of your recommendations. Let me ask a few clarifying questions to make sure I fully grasp what you're proposing:
+
+  1. do_transfer() placement: You're suggesting this should either be:
+    - Moved exclusively to the PRT-PRT exchange type (not on the base exchange), OR
+    - We need a way to distinguish "discrete object transfer exchanges" from "equation-solving exchanges"
+
+  Do you have a preference between these two approaches? Are there other exchange types that might need discrete object transfer in the future?
+  2. Exchange/connection linking (gwfconn2prtconn): I assume this is similar to how GWF-GWT or GWF-GWE exchanges link connections between models. Are you saying the PRT-PRT exchange should follow the same pattern where:
+    - A GWF-GWF exchange defines the connections
+    - Then a PRT-PRT exchange links to those same connections via gwfconn2prtconn mapping?
+  3. Generic particle event mechanism: Currently there's an explicit consumer class for particle events. You want to replace this with procedure pointers so multiple consumers can handle events differently. Is the idea that:
+    - One consumer handles "normal" particle events
+    - Another consumer specifically handles the outbox placement vs termination decision for exchanged particles?
+  4. has_pending on explicit model: Where do you think this state should live instead? On the PRT model type? Or handled through the event mechanism you mentioned?
+
+> Re 1, yes either moved to the PRT-PRT type, or to a discrete object 
+transfer exchange type, separate from the equation-solving exchange type
+Re 2, yes, that's right.
+Re 3, yes, as you say, except where you say "normal", consider it rather an 
+output handler. One consumer for writing events to output files, one for 
+doing the exchange-related tasks (outbox/termination).
+Re 4, I'm open to any suggestions you deem appropriate.
+
+Look at the code closely to get a feel for the architecture. Ask more 
+questions if you need to. See if you can see clearly how to proceed with 
+each of these items. 
+
+● I'll explore the codebase to understand the architecture and see how to proceed with each recommendation.
+
+● Explore(Explore exchange architecture)
+  ⎿  Done (39 tool uses · 73.1k tokens · 4m 39s)                           
+
+● Excellent! Now I have a clear picture. Let me read a few more specific files to understand the implementation details, then I'll outline how to proceed.
+
+● Read(src\Model\ParticleTracking\prt.f90)
+  ⎿  Read 50 lines
+
+● Search(pattern: "outbox", path: "src\Model\ParticleTracking")
+  ⎿  Found 1 file (ctrl+o to expand)
+
+● Search(pattern: "TERM_BOUNDARY", path: "src", glob: "*.f90", output_mode:
+        "content", head_limit: 20)
+  ⎿  Found 16 lines (ctrl+o to expand)
+
+● Search(pattern: "noutbox\s*=", path: "src\Model\ParticleTracking\prt.f90",
+        output_mode: "content")
+  ⎿  Found 35 lines (ctrl+o to expand)
+
+● Read(src\Model\ParticleTracking\prt.f90)
+  ⎿  Read 80 lines
+
+● Search(pattern: "ParticleEventConsumer", path: "src")
+  ⎿  Found 3 files (ctrl+o to expand)
+
+● Search(pattern: "subscribe|dispatch", path:
+        "src\Model\ParticleTracking\prt.f90", output_mode: "content")
+  ⎿  Found 17 lines (ctrl+o to expand)
+
+● Read(src\Solution\ParticleTracker\Particle\ParticleTracks.f90)
+  ⎿  Read 100 lines
+
+● Search(pattern: "call.*events%dispatch", path: "src\Solution\ParticleTracker",
+         output_mode: "content", head_limit: 15)
+  ⎿  Found 8 lines (ctrl+o to expand)
+
+● Read(src\Exchange\exg-gwfgwt.f90)
+  ⎿  Read 80 lines
+
+● Read(src\Exchange\exg-gwfprt.f90)
+  ⎿  Read 100 lines
+
+● Read(src\Exchange\exg-prtprt.f90)
+  ⎿  Read 120 lines
+
+● Search(pattern: "gwfmodelname", path: "src\Exchange", output_mode: "content",
+        head_limit: 30)
+  ⎿  Found 30 lines (ctrl+o to expand)
+
+● Perfect! Now I have a clear understanding of the architecture. Let me summarize what I've learned and outline how to proceed with each recommendation:
+
+  Current Architecture Understanding
+
+  Event System:
+  - ParticleEventDispatcherType dispatches events to subscribed consumers
+  - ParticleTracksType is currently the only consumer - handles output/logging
+  - Events are dispatched from tracking methods (Method.f90) when particles reach significant states
+
+  Outbox Population:
+  - Currently hardcoded in prt_solve() at lines 1122-1125 and 1150-1153
+  - When particle%istatus == TERM_BOUNDARY, directly increments noutbox and adds to outbox
+  - This tight coupling is the problem
+
+  Exchange Linking Pattern (GWT/GWE):
+  - GWT-GWT and GWE-GWE exchanges have gwfmodelname1/gwfmodelname2 fields
+  - gwfconn2gwtconn() searches connections to find matching GWF-GWF ↔ GWT-GWT pairs
+  - Matching criteria: model name correspondence + identical nodem1/nodem2 arrays
+  - link_connections() establishes pointers to share data between matched connections
+
+  ---
+  Implementation Questions
+
+  1. do_transfer() placement:
+  I see two reasonable approaches:
+  - Option A: Remove from BaseExchangeType, add only to PrtPrtExchangeType
+  - Option B: Create intermediate DiscreteObjectExchangeType that has do_transfer(), with PrtPrtExchangeType extending it
+
+  Option A is simpler. Option B adds flexibility if future discrete object models are planned. Which do you prefer?
+
+  2. Connection linking for PRT-PRT:
+  Following the GWT pattern, I would:
+  - Add gwfmodelname1 and gwfmodelname2 to PrtPrtExchangeType
+  - Implement gwfconn2prtconn() in exg-gwfprt.f90 (similar to gwfconn2gwtconn)
+  - Implement link_connections() to establish pointers
+
+  Question: What data should link_connections() link between GWF-GWF and PRT-PRT connections? The GWT version links simvals (flow rates) and mover budgets. For PRT, is it just establishing the topology relationship, or are there flow fields that need linking too?
+
+  3. Generic particle event mechanism:
+  I would:
+  - Create a new ParticleExchangeConsumerType that extends ParticleEventConsumerType
+  - In its handle_event(), check if event is a termination with TERM_BOUNDARY status
+  - If so, determine whether to place in outbox or permanently terminate
+  - Subscribe this consumer alongside ParticleTracksType in prt_ar()
+  - Remove the outbox logic from prt_solve() (lines 1122-1125, 1150-1153)
+
+  Question: What determines whether a TERM_BOUNDARY particle goes to outbox vs permanent termination? Is it based on whether the boundary face is connected to another model via a PRT-PRT exchange? If so, the consumer would need access to exchange information.
+
+  4. has_pending() placement:
+  Options I see:
+  - Option A: Keep on ExplicitModel (status quo) - provides polymorphism for future discrete object models
+  - Option B: Remove from ExplicitModel, check outbox directly in ExplicitSolution
+  - Option C: Move the check to the exchange level - exchanges track pending state
+
+  Which approach do you prefer? I lean toward Option A (keep it) if we're going with a discrete object exchange hierarchy, or Option B if we're keeping it PRT-specific.
+
+  Let me know your preferences and I can proceed with a detailed implementation plan!
+
+> 1: just move it to the PRT PRT exchange
+2: we need to link flow fields too
+3: why not make the PRT PRT exchange itself the consumer?
+4: I'm liking option C, if possible
+
+don't make a detailed plan just yet, let's finish talking it out first 
+
+● Good, this is getting clearer. Let me ask a few follow-up questions:
+
+  For #2 (flow field linking):
+  What specific flow fields need to be linked between GWF-GWF and PRT-PRT connections? I see that GWT links simvals (intercell flows) and mover budgets. For particles, do we need the actual flow rates across the boundary, or are there other fields? Is this for determining particle movement across the exchange boundary?
+
+  For #3 (exchange as consumer):
+  I need to understand the mechanics of how this works:
+  - When a particle hits TERM_BOUNDARY, how do we identify which boundary face/cell it exited from?
+  - The exchange has nodem1/nodem2 arrays - are these the cells on the boundary?
+  - Does the particle carry its exit cell index (icu) that we can match against the exchange data?
+  - If there are multiple PRT-PRT exchanges connected to the same model, each exchange would subscribe to that model's events and check "is this my boundary?" - correct?
+
+  For #4 (exchange tracking pending):
+  - Should has_pending() be added to BaseExchangeType with a default false implementation (like do_transfer()), then overridden in PrtPrtExchangeType?
+  - Or keep it polymorphic another way?
+  - In ExplicitSolution, we'd loop through exchanges instead of models to check for pending work?
+
+> 2: yes, exactly.
+3: read exg-connections.txt, it might answer some of your questions
+4: ok, I'm convinced that pending stuff can stay on the explicit model 
+
+● Read(exg-connections.txt)
+  ⎿  Read 653 lines
+
+● Good, this previous conversation is very helpful context! I can see the inbox/outbox mechanism is already in place and do_transfer() already handles the basic transfer.
+
+  Now I better understand the architecture. A few more questions about making the PRT-PRT exchange the event consumer:
+
+  For #3 (exchange as event consumer):
+
+  Looking at the current code in prt_solve() (lines 1122-1125), when a particle gets TERM_BOUNDARY status, it's immediately placed in the outbox. If we move this to the exchange as an event consumer:
+
+  1. Event data: When a particle terminates with TERM_BOUNDARY, does the event or particle carry information about which cell it exited from? Looking at the ParticleType, it has icu (current cell). Is that sufficient for the exchange to check "is this cell in my boundary list (nodem1 or nodem2)?"
+  2. Multiple exchanges: If a model has multiple PRT-PRT exchanges (connecting to different neighbor models on different boundaries), each exchange would subscribe to events and check "is this my boundary cell?" Whichever exchange claims it would handle the outbox placement. If no exchange claims it (e.g., external boundary), it truly terminates. Is that the pattern?
+  3. Outbox ownership: Currently outbox lives on the PRT model. If the exchange is determining what goes in it, should outbox move to the exchange itself? Or does each exchange add particles to the model's shared outbox, and then in do_transfer() each exchange only processes the particles relevant to its boundaries?
+  4. Geometric/probabilistic selection: From the previous conversation, this logic belongs in do_transfer() when mapping cells across refinement. That stays the same, right?
+
+> Re 1, yes, icu should be sufficient. To answer your first question, the 
+event and the particle both carry some info, there's some redundancy.
+Re 2, let's assume there will be at most a single PRT PRT exchange between 
+any two neighboring models
+Re 3, I think these mailboxes should move to the PRT PRT exchange, as should
+ the transfer routine
+Re 4, yes, if the design makes sense, let's use it 
+
+● Good, that clarifies a lot. A few more questions to understand the full architecture:
+
+  Inbox/Outbox ownership:
+
+  If inbox/outbox move to the PRT-PRT exchange, I'm thinking:
+  - Each exchange has outbox/inbox for both directions (e.g., outbox_m1to2, inbox_m1to2, outbox_m2to1, inbox_m2to1)
+  - Or maybe simpler: outbox1, outbox2, inbox1, inbox2 corresponding to model1 and model2
+
+  But then:
+  1. How does the model consume inbox particles? Currently prt_solve() has a loop processing this%inbox (lines 1137-1160). If inbox moves to the exchange, does the model need to query its connected exchanges for inbox particles? Or does do_transfer() push particles back into model-level storage?
+  2. Event consumer logic: When the exchange (as consumer) receives a TERM_BOUNDARY event:
+    - Check if particle%icu is in nodem1 (particle in model1 exiting to model2) → add to outbox1
+    - Check if particle%icu is in nodem2 (particle in model2 exiting to model1) → add to outbox2
+    - If no match, ignore the event (not this exchange's boundary - could be external boundary or another exchange)
+
+  Is that right?
+  3. Unclaimed TERM_BOUNDARY particles: If a particle gets TERM_BOUNDARY but no exchange claims it (external domain boundary), should it stay TERM_BOUNDARY in the PRP store (permanent termination), or do we need explicit handling to convert TERM_BOUNDARY → some final terminated status?
+  4. has_pending(): If we keep it on the explicit model (#4 from earlier), does the model query its connected exchanges to see if they have pending inbox particles for it?
+
+> You're right, the mailboxes should stay on the models.\
+
+Correct re: event consumer logic.
+
+We really shouldn't assign the TERM_BOUNDARY status until it's confirmed 
+that there is no exchange through which to pass the particle. 
+
+● Ah, that's an important point. So we need to determine whether a boundary is an exchange boundary BEFORE assigning the status.
+
+  How should this work? I see a few options:
+
+  Option A: Mark exchange boundaries in advance
+  - During exchange setup, mark which cells/connections are exchange boundaries (in FMI or some data structure accessible to the tracking method)
+  - When particle exits a cell, tracking method checks: "is this an exchange boundary?"
+    - Yes → assign TERM_BOUNDARY, dispatch event, exchange consumer adds to outbox
+    - No → assign different permanent termination status (what status? TERM_EXTERNAL?)
+
+  Option B: Query via event response
+  - Tracking method detects boundary exit but doesn't terminate yet (sets a pending state?)
+  - Dispatch a "boundary check" event
+  - Exchange consumer responds if it claims the boundary
+  - Based on response, assign TERM_BOUNDARY or permanent termination
+
+  Option C: Check in model solve loop
+  - Tracking method marks particle as "exited boundary" without termination status
+  - Model checks against its connected exchanges: "do any exchanges claim this cell?"
+  - If yes → set TERM_BOUNDARY and add to exchange's outbox
+  - If no → set permanent termination status
+
+  Which pattern aligns better with the existing architecture? Option A seems cleanest if we can mark exchange boundaries during setup.
+
+  Also: what should the permanent termination status be for particles that truly exit the domain (non-exchange boundaries)?
+
+> Option A is reasonable, but where would we store this exchange boundary 
+knowledge? Note that we store info about assigned boundary faces in FMI with
+ an integer bitmask. Could we do something similar?
+
+I"m also intrigued by option B. Could we introduce this new intermediate 
+event type, raised when a particle reaches a boundary, and it's yet unkown 
+whether it should terminate or be transferred through an exchange, and the 
+exchange consumer could dispatch a claimed event which the model could 
+subscribe to, to remove the particle from its internal storage, or a 
+termination event, for the output consumer to process as usual. Basically 
+leveraging the event system for the event response. Would something like 
+that work? 
+
+● Option B is intriguing! Let me think through how the event response would work:
+
+  Option B Flow (as I understand it):
+
+  1. Particle reaches boundary during tracking
+  2. Dispatch BOUNDARY_REACHED event (or similar - new event type)
+  3. Exchange consumer receives it, checks if particle%icu is in nodem1/nodem2
+    - If claimed: Adds to outbox, dispatches CLAIMED event (or TERM_BOUNDARY event for the exchange)
+    - If not claimed: Does nothing
+  4. Some consumer (model? output handler?) receives the response and handles accordingly
+
+  Questions about the mechanics:
+
+  1. Who dispatches the response event? The exchange would need access to an event dispatcher. Would it use the model's dispatcher? Or would exchanges have their own dispatchers?
+  2. What sets particle status?
+    - Does the exchange set particle%istatus = TERM_BOUNDARY when it claims it?
+    - Or does status remain ACTIVE and the exchange just adds to outbox?
+    - For unclaimed boundaries, what status gets set (TERM_EXTERNAL or something)?
+  3. How does the model know if claimed?
+    - Does the model subscribe to CLAIMED events to know "don't permanently terminate this one"?
+    - Or after dispatching BOUNDARY_REACHED, does the model check the particle's status to see if it changed?
+
+  For Option A (bitmask):
+  Could we add an exchange boundary bitmask to FMI (alongside existing boundary masks)? During exchange setup, we'd mark which connections/faces are exchange boundaries. Then the tracking method checks the mask when a particle exits and knows whether to set TERM_BOUNDARY vs permanent termination.
+
+  Which approach do you think fits better with the event system architecture?
+
+> You've got it, except if not claimed, the exchange can raise a termination
+ event. And the exchange itself can be dispatcher, right? The exchange can 
+manage particle state. TERM_BOUNDARY is when the exchange raises the 
+termination event. The claimed event is separate and the particle status 
+remains active in that case. The model doesn't need to terminate the 
+particles, but yes it does subscribe to claimed events so it knows which 
+particles to remove from its internal storage.
+
+I'm liking this. I don't love the idea of the methods needing to know a 
+bunch of ad hoc info about certain faces, although I guess we already have 
+the precedent. 
+
+● Excellent! This is elegant. Let me make sure I have the flow right:
+
+  Event Flow:
+
+  1. Tracking method detects boundary exit → dispatches BOUNDARY_REACHED event
+  2. Exchange (subscribed to events) receives it, checks if claimed:
+    - Claimed: Adds particle to outbox (status stays ACTIVE), dispatches CLAIMED event
+    - Not claimed: Sets status to TERM_BOUNDARY, dispatches TERMINATE event
+  3. Model (subscribed to CLAIMED events) receives CLAIMED → removes particle from internal storage
+  4. Output handler (subscribed to TERMINATE events) receives TERMINATE → writes termination record
+
+  Architecture questions:
+
+  1. Event dispatcher topology: Does the exchange need its own dispatcher, or does everything go through the model's event dispatcher (this%events)?
+    - Option A: Model's dispatcher is central hub. Exchange subscribes to it, receives BOUNDARY_REACHED, then dispatches CLAIMED/TERMINATE back to same dispatcher
+    - Option B: Exchange has its own dispatcher. Model and output handler subscribe to both model's dispatcher AND exchange's dispatcher
+  2. Multiple exchanges: If a model has multiple PRT-PRT exchanges, all would be subscribed. When BOUNDARY_REACHED is dispatched, each checks if it claims the particle. Only one should claim it (or none). Is there any concern about race conditions or need for ordering?
+  3. New event types: We'd need to add:
+    - BOUNDARY_REACHED (or similar name)
+    - CLAIMED (or similar name)
+    - Keep existing TERMINATE event type?
+
+  Does Option A (central dispatcher on model) make sense, or do you prefer separate dispatchers?
+
+> Yes, you've got the idea. One note, I think in step 3 the model should 
+just mark the particle for removal at first, since the event will be handled
+ during the tracking loop. Then after the inner explicit solve is done, 
+remove any marked particles from the model's storage. Make sense?
+
+I think everything can go through the model's dispatcher, do you agree?
+
+We can assume at most one PRT PRT exchange between two given models.
+
+Yes, exactly re: event types. 
+
+● Yes, that makes sense. You can't remove particles from storage while iterating through it. Mark them, then clean up afterward.
+
+  And yes, everything through the model's dispatcher keeps it simple.
+
+  So the complete flow would be:
+
+  1. During tracking: Particle reaches boundary → dispatch BOUNDARY_REACHED
+  2. Exchange consumer: Receives event, checks if claimed:
+    - Claimed: add to outbox (status=ACTIVE), dispatch CLAIMED
+    - Not claimed: set status=TERM_BOUNDARY, dispatch TERMINATE
+  3. Model consumer: Receives CLAIMED → marks particle for removal
+  4. Output consumer: Receives TERMINATE → writes termination record
+  5. After tracking loop: Model removes marked particles from internal storage
+
+  Implementation questions:
+
+  1. Where does BOUNDARY_REACHED get dispatched? In the tracking methods (MethodDis, MethodDisv, etc.) when they detect boundary exit? Or in the model's tracking loop when it detects the particle has exited?
+  2. Which model's dispatcher? If a particle is in model1 and exits toward model2, it dispatches to model1's dispatcher, and the exchange is subscribed to both model1's and model2's dispatchers?
+  3. Particle removal: Currently particles are stored in PRP package particles stores. When marked for removal, do we:
+    - Actually remove from the store?
+    - Or just set a flag and skip them in future iterations?
+
+  Should I start outlining the implementation steps, or do we need to clarify more?
+
+> Re 1, dispatch the boundary reached event exactly where the termination at
+ boundary event is dispatched now
+Re 2, yes, I think that'll work?
+Re 3, I think we should actually remove them, although that'd get a bit 
+messy given how they're stored in a structure of arrays. I guess we can just
+ mark the indices for skipping, maybe? Or yeah, add a flag saying a particle
+ has "flown the nest", so to speak? 
+
+● Got it. So for particles that have been claimed by an exchange:
+  - Add a flag to ParticleType (or track indices separately in the model) to mark "transferred to exchange"
+  - In future iterations, skip these marked particles
+  - They stay in the PRP store but are inactive
+
+  That avoids the complexity of restructuring the arrays.
+
+  Let me summarize the architecture we've settled on:
+
+  Architecture Summary
+
+  1. do_transfer() placement:
+  - Remove from BaseExchangeType
+  - Keep only on PrtPrtExchangeType
+
+  2. GWF-PRT exchange linking:
+  - Implement gwfconn2prtconn() to find matching GWF-GWF connections
+  - Implement link_connections() to link flow fields (simvals)
+  - These provide flow data for tracking to boundary
+
+  3. Event-based boundary handling:
+  - New event type: BOUNDARY_REACHED (dispatched where TERM_BOUNDARY currently is in Methods)
+  - PRT-PRT exchange subscribes to both models' event dispatchers
+  - Exchange checks if boundary is claimed:
+    - Claimed: Add to outbox (status=ACTIVE), dispatch CLAIMED event
+    - Not claimed: Set status=TERM_BOUNDARY, dispatch TERMINATE event
+  - Model subscribes to CLAIMED events, marks particles for skipping
+  - Output handler subscribes to TERMINATE events
+
+  4. has_pending() and mailboxes:
+  - has_pending() stays on explicit model
+  - inbox/outbox stay on models
+
+  Does this capture everything correctly? Ready to start planning implementation?
+
+> Excellent. I think we're ready. Regarding your last point about 
+inbox/outbox on models, I think eventually we'll only need an inbox. The 
+final step after what we've described above is an "exchange PRP", a special 
+PRP package that "adopts" particles coming in from other models. This is 
+natural because the PRP maintains the particle store at the moment. This 
+exchange PRP could have index 0, and always exist, regardless if any 
+exchanges are setup, it'd just be empty and non-functional usually. Make 
+sense? 
+
+● Yes, that makes perfect sense! The exchange PRP is a cleaner abstraction:
+
+  - Regular PRP packages (index 1, 2, 3...) handle user-defined particle releases
+  - Exchange PRP (index 0) handles particles transferred from neighboring models via exchanges
+  - The tracking loop processes all PRPs uniformly, including the exchange PRP
+  - Exchanges populate the exchange PRP's particle store directly when transferring
+
+  This eliminates the need for the outbox entirely:
+  - Particle reaches boundary → BOUNDARY_REACHED event
+  - Exchange claims it → adds directly to the exchange PRP in the destination model
+  - Model marks source particle as transferred/skip
+  - Next iteration: exchange PRP particles get tracked normally
+
+  Question: Should we implement the exchange PRP as part of this refactoring, or keep inbox/outbox for now and make the exchange PRP a follow-up step? The exchange PRP seems like it would simplify things, but I want to make sure we're not biting off too much at once.
+
+  Also, when you say "the final step after what we've described" - does that mean:
+  1. First refactor: event-based boundary handling with inbox/outbox
+  2. Second refactor: replace inbox with exchange PRP
+
+  Or should we go straight to the exchange PRP design?
+
+> Yes, let's implement the exchange PRP here. Let's go for it all. I think 
+we're ready to make a planning doc 
+  ⎿  Interrupted · What should Claude do instead?
+
+> /export prt-exgs-planning.txt 
+  ⎿  Conversation exported to: prt-exgs-planning.txt
+
+> If you agree, go for it 
+
+● I agree! Let me create a comprehensive planning document.
+  ⎿  Interrupted · What should Claude do instead?
+
+> Did you get stuck? 
+
+● No, sorry! Let me write the planning document now.
+
+● Write(prt-exg-refactor-plan.txt)
+  ⎿  Wrote 1 lines to prt-exg-refactor-plan.txt                          
+      1 PRT Exchange Refactoring Plan
+      2 ==============================
+      3 Date: 2026-03-16
+      4 Branch: prt-claude-exg
+      5 ## Summary
+      6 Refactor PRT exchange architecture to:
+      7 1. Move do_transfer() from BaseExchangeType to PrtPrtExchangeType
+         only
+
+● I've created a comprehensive planning document at prt-exg-refactor-plan.txt. It covers:
+
+  - Architecture overview with event-based boundary handling and exchange PRP
+  - 10 implementation tasks broken down into specific subtasks
+  - 5-phase implementation order
+  - Design decisions and trade-offs
+  - Open questions that need resolution
+  - All files that will be modified
+  - Success criteria
+
+  Take a look and let me know if you want to adjust anything before we start implementing!
+
+> Excellent. I have a question, now, perhaps you can answer it. Will it be 
+problematic for the exchange and the model to be event consumers? We won't 
+run into something like the diamond problem, will we? Since they will need 
+to extend the consumer type. 
+
+● Good catch! Yes, this could be a problem. Fortran doesn't support multiple inheritance, so we can't have:
+
+  type, extends(BaseExchangeType, ParticleEventConsumerType) :: PrtPrtExchangeType
+
+  Looking at the existing code, ParticleTracksType already extends ParticleEventConsumerType, so it's a separate consumer object, not the model itself.
+
+  We should follow the same pattern:
+
+  Solution: Separate consumer objects with back-pointers
+
+  1. For the exchange: Create PrtPrtExchangeEventConsumerType that:
+    - Extends ParticleEventConsumerType
+    - Contains a pointer back to the PrtPrtExchangeType
+    - Implements handle_event() which delegates to the exchange's logic
+  2. For the model: Create PrtModelEventConsumerType that:
+    - Extends ParticleEventConsumerType
+    - Contains a pointer back to the PrtModelType
+    - Implements handle_event() for CLAIMED events
+
+  This way:
+  - PrtPrtExchangeType stays as extends(BaseExchangeType) (no inheritance change)
+  - PrtModelType stays as extends(ExplicitModelType) (no inheritance change)
+  - The separate consumer objects subscribe to the dispatcher and delegate back
+
+  Does this approach work for you? It's the same pattern already used with ParticleTracksType.
+
+> This works, but it seems a bit kludgy, don't you think? Introducing these 
+custom types just for the event system. I wonder if we could switch to 
+procedure-pointer based event system and avoid this, but that might entail 
+even more refactoring. 
+
+● You're absolutely right - it is kludgy. And looking back at your original notes, you mentioned wanting "proc pointers instead of an explicit consumer class" for exactly this reason.
+
+  Procedure-pointer approach would:
+
+  Pros:
+  - No wrapper types needed
+  - Exchange/model methods can be callbacks directly
+  - More flexible - any procedure matching the signature can subscribe
+  - Cleaner conceptually
+
+  Cons:
+  - Requires refactoring existing event system
+  - Need to update ParticleEventDispatcherType to store procedure pointers
+  - Need to update ParticleTracksType (currently extends consumer) to register callbacks instead
+  - More changes to working code
+
+  The refactoring would involve:
+
+  1. Change ParticleEventDispatcherType%subscribe() to accept procedure pointers instead of consumer objects
+  2. Store list of procedure pointers instead of consumer objects
+  3. Update ParticleTracksType to register a callback method instead of being a consumer
+  4. Exchange and model register their callback methods directly
+
+  It's probably not that much more work than the wrapper types, and it's a cleaner design that follows your original vision. Plus we're already doing significant refactoring here.
+
+  My take: If we're going to refactor the event system anyway (adding new event types, new consumers), now might be the right time to do it properly with procedure pointers rather than accumulating more kludges.
+
+  What do you think? Should we add this to the plan, or stick with wrapper types to minimize scope?
+
+> Let's add this to the plan. I think now is the right time. This should 
+perhaps happen first. Are you sure it can be done? Note how the consumer 
+types manage a bunch of state right now. They can continue to do that with 
+the procedure pointer approach, right? Or are there problems I'm not seeing?
+ 
+
+● Good question - let me think through this carefully.
+
+  The state problem:
+  - ParticleTracksType has state: file handles, event selection flags, etc.
+  - With procedure pointers alone, we lose access to that state
+  - We need the object AND its method
+
+  Solution: Context pointer pattern
+
+  Store both a procedure pointer AND a pointer to the owning object:
+
+  abstract interface
+    subroutine event_callback(context, particle, event)
+      import :: ParticleType, ParticleEventType
+      class(*), pointer :: context  ! pointer to object with state
+      type(ParticleType), intent(inout) :: particle
+      class(ParticleEventType), intent(in) :: event
+    end subroutine
+  end interface
+
+  type :: EventSubscription
+    procedure(event_callback), pointer, nopass :: callback
+    class(*), pointer :: context  ! the object that owns the callback
+  end type
+
+  When subscribing:
+  call dispatcher%subscribe(my_callback, self)  ! pass both procedure and object
+
+  In the callback:
+  subroutine tracks_callback(context, particle, event)
+    class(*), pointer :: context
+    type(ParticleTracksType), pointer :: tracks
+
+    select type(context)
+    type is (ParticleTracksType)
+      tracks => context
+      ! now can access tracks%files, tracks%selected, etc.
+    end select
+
+    ! handle event using tracks state...
+  end subroutine
+
+  So yes, it works! Consumers keep all their state as objects. The procedure pointer approach just changes:
+  - How they register (procedure + context instead of object only)
+  - How they're invoked (dispatcher calls procedure(context, ...) instead of context%handle_event(...))
+
+  Does this address your concern? Should I update the plan to include refactoring the event system this way?
+
+> Ok, great. Where would the `tracks_callback` (and other callbacks) be 
+defined? In which module? 
+
+● Good question. I think the cleanest approach is:
+
+  Module procedures in each consumer's module
+
+  - tracks_handle_event in ParticleTracksModule (alongside ParticleTracksType)
+  - exchange_handle_event in PrtPrtExchangeModule (alongside PrtPrtExchangeType)
+  - model_handle_event in PrtModule (alongside PrtModelType)
+
+  They'd be regular module procedures (not type-bound), with signature:
+
+  subroutine tracks_handle_event(context, particle, event)
+    class(*), pointer :: context
+    type(ParticleType), intent(inout) :: particle
+    class(ParticleEventType), intent(in) :: event
+    type(ParticleTracksType), pointer :: tracks
+
+    select type(context)
+    type is (ParticleTracksType)
+      tracks => context
+    end select
+
+    ! use tracks state...
+  end subroutine
+
+  When subscribing:
+  call this%events%subscribe(tracks_handle_event, this%tracks)
+
+  Why module procedures instead of type-bound?
+  - The callback signature has context as first arg (not implicit this)
+  - Keeps related code together in the module
+  - Can still access all the object's state via the context pointer
+  - Simpler than trying to make them type-bound with NOPASS
+
+  Does this structure make sense?
+
+> Excellent. This sounds good. Can you add it to the plan? 
+
+● Read(prt-exg-refactor-plan.txt)
+  ⎿  Read 382 lines
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 1 line                                                        
+       7  ## Summary
+       8  
+       9  Refactor PRT exchange architecture to:
+      10 +0. Refactor event system to use procedure pointers instead of c
+         +onsumer type hierarchy                                         
+      11  1. Move do_transfer() from BaseExchangeType to PrtPrtExchangeTy
+          pe only
+      12  2. Implement connection linking (gwfconn2prtconn, link_connecti
+          ons) for GWF-PRT exchange
+      13  3. Replace hardcoded outbox logic with generic event-based mech
+          anism
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 58 lines                                                      
+       55  
+       56  ## Implementation Tasks
+       57  
+       58 +### Task 0: Refactor Event System to Use Procedure Pointers   
+       59 +                                                              
+       60 +Files: src/Solution/ParticleTracker/Particle/Events/ParticleEv
+          +ents.f90                                                      
+       61 +                                                              
+       62 +**Problem:** Current consumer type hierarchy is inflexible. To
+          + make exchange and model event consumers, we'd need wrapper ty
+          +pes with back-pointers (kludgy). Procedure pointers with conte
+          +xt allow objects to register callbacks directly without inheri
+          +tance constraints.                                            
+       63 +                                                              
+       64 +0.1. Define abstract interface for event callbacks            
+       65 +     - New interface in ParticleEvents.f90:                   
+       66 +       ```fortran                                             
+       67 +       abstract interface                                     
+       68 +         subroutine event_callback(context, particle, event)  
+       69 +           import :: ParticleType, ParticleEventType          
+       70 +           class(*), pointer :: context  ! pointer to object w
+          +ith state                                                     
+       71 +           type(ParticleType), intent(inout) :: particle      
+       72 +           class(ParticleEventType), intent(in) :: event      
+       73 +         end subroutine                                       
+       74 +       end interface                                          
+       75 +       ```                                                    
+       76 +                                                              
+       77 +0.2. Create EventSubscription type                            
+       78 +     - Replaces storing consumer objects                      
+       79 +     - Contains both procedure pointer and context pointer:   
+       80 +       ```fortran                                             
+       81 +       type :: EventSubscription                              
+       82 +         procedure(event_callback), pointer, nopass :: callbac
+          +k                                                             
+       83 +         class(*), pointer :: context                         
+       84 +       end type                                               
+       85 +       ```                                                    
+       86 +                                                              
+       87 +0.3. Update ParticleEventDispatcherType                       
+       88 +     - Replace `consumers` list with `subscriptions` list     
+       89 +     - Change subscribe() signature:                          
+       90 +       ```fortran                                             
+       91 +       subroutine subscribe(this, callback, context)          
+       92 +         procedure(event_callback) :: callback                
+       93 +         class(*), pointer :: context                         
+       94 +       ```                                                    
+       95 +     - Update dispatch() to call: `subscription%callback(subsc
+          +ription%context, particle, event)`                            
+       96 +                                                              
+       97 +0.4. Remove ParticleEventConsumerType                         
+       98 +     - No longer needed                                       
+       99 +     - Delete abstract base type                              
+      100 +                                                              
+      101 +0.5. Update ParticleTracksType                                
+      102 +     - Remove `extends(ParticleEventConsumerType)`            
+      103 +     - Keep all state (files, selection flags, etc.)          
+      104 +     - Create module procedure `tracks_handle_event(context, p
+          +article, event)` in ParticleTracksModule                      
+      105 +     - In tracks initialization, register callback:           
+      106 +       ```fortran                                             
+      107 +       call this%events%subscribe(tracks_handle_event, this%tr
+          +acks)                                                         
+      108 +       ```                                                    
+      109 +                                                              
+      110 +0.6. Update tracks_handle_event callback                      
+      111 +     - Module procedure in ParticleTracksModule               
+      112 +     - Signature matches event_callback interface             
+      113 +     - Uses select type to extract ParticleTracksType from con
+          +text                                                          
+      114 +     - Implements existing handle_event logic                 
+      115 +                                                              
+      116  ### Task 1: New Event Types
+      117  
+      118  Files: src/Solution/ParticleTracker/Particle/Events/
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 19 lines, removed 8 lines                                     
+      195       - After models are allocated/read
+      196       - Before tracking begins
+      197  
+      198 -### Task 5: Make PrtPrtExchangeType an Event Consumer         
+      198 +### Task 5: Register PrtPrtExchange as Event Callback         
+      199  
+      200  Files: src/Exchange/exg-prtprt.f90
+      201  
+      202 -5.1. Extend ParticleEventConsumerType                         
+      203 -     - PrtPrtExchangeType extends ParticleEventConsumerType   
+      204 -     - Implement handle_event() method                        
+      202 +5.1. Create exchange_handle_event callback                    
+      203 +     - Module procedure in PrtPrtExchangeModule               
+      204 +     - Signature matches event_callback interface:            
+      205 +       ```fortran                                             
+      206 +       subroutine exchange_handle_event(context, particle, eve
+          +nt)                                                           
+      207 +         class(*), pointer :: context                         
+      208 +         type(ParticleType), intent(inout) :: particle        
+      209 +         class(ParticleEventType), intent(in) :: event        
+      210 +         type(PrtPrtExchangeType), pointer :: exchange        
+      211 +       ```                                                    
+      212  
+      206 -5.2. Implement handle_event()                                 
+      207 -     - Receive BOUNDARY_REACHED events                        
+      213 +5.2. Implement exchange_handle_event logic                    
+      214 +     - Use select type to extract PrtPrtExchangeType from cont
+          +ext                                                           
+      215 +     - Handle BOUNDARY_REACHED events                         
+      216       - Check if particle%icu is in nodem1 (model1 -> model2 tr
+           ansfer):
+      217         * Add particle to prtmodel2%exchange_prp%particles
+      218         * Set particle%iprp = 0 (exchange PRP)
+     ...
+      226         * Dispatch TERMINATE event
+      227  
+      228  5.3. Subscribe to model event dispatchers during exg_ar
+      221 -     - Subscribe to prtmodel1%events                          
+      222 -     - Subscribe to prtmodel2%events                          
+      229 +     - Register callback with both models:                    
+      230 +       ```fortran                                             
+      231 +       call this%prtmodel1%events%subscribe(exchange_handle_ev
+          +ent, this)                                                    
+      232 +       call this%prtmodel2%events%subscribe(exchange_handle_ev
+          +ent, this)                                                    
+      233 +       ```                                                    
+      234  
+      235  ### Task 6: Update PRT Model to Handle CLAIMED Events
+      236  
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 24 lines, removed 9 lines                                     
+      232         call this%prtmodel2%events%subscribe(exchange_handle_ev
+           ent, this)
+      233         ```
+      234  
+      235 -### Task 6: Update PRT Model to Handle CLAIMED Events         
+      235 +### Task 6: Register PRT Model as Event Callback for CLAIMED E
+          +vents                                                         
+      236  
+      237  Files: src/Model/ParticleTracking/prt.f90
+      238  
+      239 -6.1. Create model event consumer for CLAIMED events           
+      240 -     - New type: PrtModelEventConsumerType extends ParticleEve
+          -ntConsumerType                                                
+      241 -     - Implement handle_event() for CLAIMED events            
+      242 -     - Marks particle%istransferred = .true.                  
+      239 +6.1. Create model_handle_event callback                       
+      240 +     - Module procedure in PrtModule                          
+      241 +     - Signature matches event_callback interface:            
+      242 +       ```fortran                                             
+      243 +       subroutine model_handle_event(context, particle, event)
+      244 +         class(*), pointer :: context                         
+      245 +         type(ParticleType), intent(inout) :: particle        
+      246 +         class(ParticleEventType), intent(in) :: event        
+      247 +         type(PrtModelType), pointer :: model                 
+      248 +       ```                                                    
+      249  
+      244 -6.2. Subscribe model consumer to its own event dispatcher     
+      245 -     - During prt_ar(), after events dispatcher created       
+      250 +6.2. Implement model_handle_event logic                       
+      251 +     - Use select type to extract PrtModelType from context   
+      252 +     - Handle CLAIMED events                                  
+      253 +     - Mark particle%istransferred = .true.                   
+      254 +     - Model can access its own state for tracking which parti
+          +cles to skip                                                  
+      255 +                                                              
+      256 +6.3. Subscribe model to its own event dispatcher              
+      257 +     - During prt_ar(), after events dispatcher created:      
+      258 +       ```fortran                                             
+      259 +       call this%events%subscribe(model_handle_event, this)   
+      260 +       ```                                                    
+      261       - Self-subscription to handle CLAIMED events from exchang
+           es
+      262  
+      248 -6.3. Update prt_solve() tracking loop                         
+      263 +6.4. Update prt_solve() tracking loop                         
+      264       - Skip particles with istransferred = .true.
+      265       - Remove hardcoded outbox logic (lines 1122-1125, 1150-11
+           53)
+      266       - Remove inbox processing loop (lines 1137-1160)
+      267  
+      253 -6.4. Remove inbox/outbox from PrtModelType                    
+      268 +6.5. Remove inbox/outbox from PrtModelType                    
+      269       - Delete inbox, outbox pointers
+      270       - Delete ninbox, noutbox counters
+      271       - Clean up memory allocation in prt_ar()
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 8 lines, removed 2 lines                                      
+      350  
+      351  ## Implementation Order
+      352  
+      353 +Phase 0: Event System Refactoring (Task 0)                    
+      354 +- Replace consumer type hierarchy with procedure pointers     
+      355 +- Update ParticleEventDispatcherType to use callbacks with con
+          +text                                                          
+      356 +- Convert ParticleTracksType to use callback registration     
+      357 +- This is foundational - must happen first                    
+      358 +                                                              
+      359  Phase 1: Foundation (Tasks 1-2)
+      360  - Create new event types
+      361  - Implement exchange PRP package
+      362  - This provides the infrastructure for later tasks
+      363  
+      364  Phase 2: Event Mechanism (Tasks 5-7)
+      359 -- Make exchange an event consumer                             
+      360 -- Update model to handle CLAIMED events                       
+      365 +- Register exchange as event callback                         
+      366 +- Register model as event callback for CLAIMED events         
+      367  - Update tracking methods to dispatch BOUNDARY_REACHED
+      368  - This replaces hardcoded outbox logic
+      369  
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 17 lines, removed 1 line                                      
+      383  
+      384  ## Design Decisions and Trade-offs
+      385  
+      386 +### Why Procedure Pointers Over Consumer Type Hierarchy?      
+      387 +                                                              
+      388 +Pros:                                                         
+      389 +- No inheritance constraints - any object can register callbac
+          +ks                                                            
+      390 +- Avoids kludgy wrapper types with back-pointers              
+      391 +- Objects maintain all their state naturally                  
+      392 +- More flexible - matches original design vision from notes   
+      393 +- Cleaner conceptually                                        
+      394 +                                                              
+      395 +Cons:                                                         
+      396 +- Requires refactoring existing event system                  
+      397 +- Callbacks defined as module procedures (not type-bound)     
+      398 +- Context pointer requires select type cast in each callback  
+      399 +                                                              
+      400 +Decision: Use procedure pointers. We're already doing signific
+          +ant refactoring, and this avoids accumulating technical debt. 
+      401 +                                                              
+      402  ### Why Event-Based Over Bitmask?
+      403  
+      404  Pros:
+      405  - More flexible - exchanges can implement custom logic
+      406  - Cleaner separation - tracking methods don't need exchange kn
+           owledge
+      391 -- Extensible - easy to add new consumers later                
+      407 +- Extensible - easy to add new callbacks later                
+      408  
+      409  Cons:
+      410  - More complex event flow
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 2 lines                                                       
+      463  - src/Solution/ParticleTracker/Particle/Events/ClaimedEvent.f9
+           0
+      464  
+      465  Modified files:
+      466 +- src/Solution/ParticleTracker/Particle/Events/ParticleEvents.
+          +f90 (refactor to procedure pointers)                          
+      467 +- src/Solution/ParticleTracker/Particle/ParticleTracks.f90 (co
+          +nvert to callback registration)                               
+      468  - src/Exchange/BaseExchange.f90
+      469  - src/Exchange/exg-prtprt.f90
+      470  - src/Exchange/exg-gwfprt.f90
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 8 lines, removed 7 lines                                      
+      481  
+      482  ## Success Criteria
+      483  
+      484 -1. do_transfer() removed from BaseExchangeType                
+      485 -2. Connection linking implemented (gwfconn2prtconn, link_conne
+          -ctions)                                                       
+      486 -3. Particle boundary handling is event-based (no hardcoded out
+          -box logic)                                                    
+      487 -4. Exchange PRP (iprp=0) handles transferred particles        
+      488 -5. All existing PRT tests pass                                
+      489 -6. Multi-model PRT simulation works correctly                 
+      490 -7. No memory leaks introduced                                 
+      484 +1. Event system refactored to use procedure pointers (no Parti
+          +cleEventConsumerType)                                         
+      485 +2. do_transfer() removed from BaseExchangeType                
+      486 +3. Connection linking implemented (gwfconn2prtconn, link_conne
+          +ctions)                                                       
+      487 +4. Particle boundary handling is event-based (no hardcoded out
+          +box logic)                                                    
+      488 +5. Exchange PRP (iprp=0) handles transferred particles        
+      489 +6. All existing PRT tests pass                                
+      490 +7. Multi-model PRT simulation works correctly                 
+      491 +8. No memory leaks introduced                                 
+
+● Perfect! I've updated the plan to include:
+
+  1. New Task 0: Refactor event system to use procedure pointers with context
+    - Defines the event_callback interface
+    - Creates EventSubscription type
+    - Removes ParticleEventConsumerType
+    - Updates ParticleTracksType to register callbacks
+  2. Updated Tasks 5 & 6: Now show callback registration instead of type extension
+    - Exchange and model register module procedures as callbacks
+    - No wrapper types needed
+  3. New Phase 0: Event system refactoring happens first (foundational)
+  4. Design decisions section: Explains why procedure pointers over consumer hierarchy
+  5. Updated files and success criteria: Includes event system files
+
+  The plan is now comprehensive and consistent throughout. Ready to start implementing?
+
+> Excellent. Do you see any further points we need to clarify, or 
+inconsistencies we need to resolve? Read carefully. 
+
+● Let me read through the plan carefully to check for inconsistencies or unclear points.
+
+● Read(prt-exg-refactor-plan.txt)
+  ⎿  Read 60 lines
+
+● Read(prt-exg-refactor-plan.txt)
+  ⎿  Read 40 lines
+
+● I found several inconsistencies and points needing clarification:
+
+  1. do_transfer() contradiction:
+  - Task 3 says "Keep do_transfer() on PrtPrtExchangeType"
+  - Task 8.1 says "Remove current do_transfer() implementation - No longer needed"
+  - Which is it? If transfer happens via events during solve, do we still need do_transfer() at all?
+
+  2. Exchange PRP access:
+  - Task 5.2 says exchange adds particle to prtmodel2%exchange_prp%particles
+  - How does the exchange access exchange_prp? Does the model need a pointer to it? What's the data structure?
+
+  3. TERMINATE event dispatcher:
+  - Task 5.2 says "Dispatch TERMINATE event" when boundary is unclaimed
+  - But dispatch to which model's event dispatcher? The source model where the particle is?
+
+  4. Exchange PRP processing timing:
+  - Exchange adds particles to exchange_prp during solve (when handling BOUNDARY_REACHED)
+  - When/how does the destination model process these particles? Same iteration or next?
+  - The old inbox mechanism processed them in the same iteration - does exchange PRP work the same way?
+
+  5. Geometric selection scope:
+  - Task 8.2 mentions "Use particle (x, y, z) position and DisvGeom utilities"
+  - What about DIS (structured grids)? Does geometric selection work differently? Is it even needed for DIS?
+
+  6. Flow consolidation delivery mechanism:
+  - Task 8.4 says "Provide to PRT FMI for tracking"
+  - HOW is it provided? Pointer? Array? During which routine? This needs specifics.
+
+  7. Geometric selection location:
+  - Task 8 says to add geometric selection logic, but WHERE does it go? In exchange_handle_event when adding to exchange PRP? Or somewhere else?
+
+  Should I wait for answers before we proceed with implementation?
+
+> Re 1, I don't think we need `do_transfer` anymore, right?
+Re 2, the exchange has access to the model, which has a list of boundary 
+packages. Note how we loop over it in the PRT model and filter PRPs.
+Re 3, yes, dispatch to the source model.
+Re 4, the destination model processes arriving particles each new iteration 
+of the outer explicit solve loop we recently added. Will that work?
+Re 5, for DIS, yes we may need to do the same geometric selection. The 
+exchange boundary could be refined on one side whether the discretization is
+ structured or unstructured (vertex/DISV).
+Re 6, that's why we need the machinery to link connections and make sure PRT
+ FMI can see gwfsimvals. See if you can propose some specifics.
+Re 7, where do you think it should go> 
+
+● Good answers. Let me address each:
+
+  Re 1 (do_transfer): Agreed, we don't need it. I'll update the plan to remove it entirely.
+
+  Re 2 (Exchange PRP access): Got it. The exchange has prtmodel1 and prtmodel2 pointers. Each model has a package list. The exchange PRP would be in that list with iprp = 0. The exchange can iterate the package list to find it (or the model can expose it directly).
+
+  Re 4 (Processing timing): So particles added to exchange PRP during iteration N get tracked at the start of iteration N+1. That means exchange PRP particles need to be "ready to track" state (ACTIVE status, correct position/cell). This should work - same pattern as the old inbox.
+
+  Re 6 (Flow consolidation delivery): Here's my proposal:
+
+  Data structures:
+  - PrtPrtExchangeType has:
+    - gwfsimvals pointer (from linked GWF connection)
+    - consolidated_flows(:) array (real, indexed by cell number or connection?)
+    - Metadata mapping which cells have consolidated vs single connections
+
+  Setup (during exg_ar or link_connections):
+  - Exchange loops through connections, identifies cells with multiple connections
+  - Allocates consolidated_flows array
+  - Creates mapping: cell_id -> consolidated_flow_index
+
+  Runtime (each timestep before tracking):
+  - Exchange updates consolidated_flows by summing gwfsimvals for grouped connections
+  - PRT FMI queries exchange (or has pointer) to get flows for boundary cells
+
+  Question for you: Should consolidated flows be stored:
+  - A) In the exchange itself, with FMI querying the exchange?
+  - B) In PRT FMI, with exchange writing to it?
+  - C) Via pointer from FMI to exchange data?
+
+  I lean toward C (pointer from FMI to exchange consolidated_flows array).
+
+  Re 7 (Geometric selection location): It should go in exchange_handle_event. When a BOUNDARY_REACHED event comes in:
+  1. Check if particle%icu is in nodem1/nodem2 (claimed?)
+  2. Find all connections for that source cell
+  3. If multiple connections, call geometric selection to pick destination cell
+  4. Add particle to destination model's exchange PRP with the selected cell
+
+  This keeps the logic centralized in the exchange where it belongs.
+
+  Does this sound right?
+
+> Re 6, all sounds good, except do we really need metadata detailing which 
+cells have consolidated flows? The model the particle is leaving doesn't 
+need to know, right? And, I think we should store the flows on FMI, to be 
+loaded into the cell definition like any other flows. The particle tracking 
+method should just see flows, it doesn't care where they're from or how they
+ were calculated.
+
+Re 7, yes, that sounds great. 
+
+● Excellent point on #6! You're absolutely right. The tracking method should be agnostic to where flows come from. Exchange boundaries are just cells with flows like any other.
+
+  Revised approach for flow consolidation:
+
+  1. Exchange calculates consolidated flows (sums gwfsimvals for grouped connections)
+  2. Exchange provides flows to PRT FMI (via pointer or writes to FMI arrays)
+  3. PRT FMI loads them into cell definitions using existing mechanisms
+  4. Tracking method sees flows, tracks particle normally - no awareness of exchanges
+
+  No metadata needed about which cells are consolidated. The tracking method doesn't care and doesn't need to know.
+
+  Implementation detail: Do we need separate arrays in FMI for exchange boundary flows, or can they be merged with other flows (boundary packages, etc.)? I assume they're treated like any other boundary flows?
+
+  Let me update the plan to fix the inconsistencies we discussed. Should I do that now?
+
+> I think we can just merge them into the boundary flows. That's what they 
+are, after all. Yes, please update the plan regarding all these points. 
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 3 lines, removed 3 lines                                      
+      159       - Delete procedure declaration and implementation
+      160       - Remove from type-bound procedures
+      161  
+      162 -3.2. Keep do_transfer() on PrtPrtExchangeType                 
+      163 -     - Already implemented in exg-prtprt.f90                  
+      164 -     - Will be updated to work with exchange PRP (see Task 6) 
+      162 +3.2. Remove do_transfer() from PrtPrtExchangeType             
+      163 +     - No longer needed - transfer happens via event mechanism
+          + during solve                                                 
+      164 +     - Delete entire implementation from exg-prtprt.f90       
+      165  
+      166  3.3. Update ExplicitSolution.f90
+      167       - Remove loop calling do_transfer() on all exchanges
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 11 lines, removed 5 lines                                     
+      214       - Use select type to extract PrtPrtExchangeType from cont
+           ext
+      215       - Handle BOUNDARY_REACHED events
+      216       - Check if particle%icu is in nodem1 (model1 -> model2 tr
+           ansfer):
+      217 -       * Add particle to prtmodel2%exchange_prp%particles     
+      217 +       * Find all connections for particle%icu in nodem1      
+      218 +       * If multiple connections: call geometric selection to 
+          +pick destination cell                                         
+      219 +       * If single connection: use nodem2 directly            
+      220 +       * Add particle to prtmodel2%exchange_prp%particles with
+          + selected cell                                                
+      221         * Set particle%iprp = 0 (exchange PRP)
+      219 -       * Dispatch CLAIMED event to prtmodel1%events           
+      222 +       * Set particle%icu to destination cell                 
+      223 +       * Dispatch CLAIMED event to prtmodel1%events (source mo
+          +del)                                                          
+      224       - Check if particle%icu is in nodem2 (model2 -> model1 tr
+           ansfer):
+      225 +       * Same logic, reversed direction                       
+      226         * Add particle to prtmodel1%exchange_prp%particles
+      222 -       * Set particle%iprp = 0 (exchange PRP)                 
+      223 -       * Dispatch CLAIMED event to prtmodel2%events           
+      227 +       * Dispatch CLAIMED event to prtmodel2%events (source mo
+          +del)                                                          
+      228       - If neither match (not this exchange's boundary):
+      229         * Set particle%istatus = TERM_BOUNDARY
+      226 -       * Dispatch TERMINATE event                             
+      230 +       * Dispatch TERMINATE event to source model's events    
+      231  
+      232 +     Note: Exchange accesses exchange_prp via model's package 
+          +list (iprp = 0)                                               
+      233 +                                                              
+      234  5.3. Subscribe to model event dispatchers during exg_ar
+      235       - Register callback with both models:
+      236         ```fortran
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 26 lines, removed 18 lines                                    
+      295       - Particle should have (x, y, z) at boundary exit point
+      296       - Exchange needs accurate position for geometric selectio
+           n
+      297  
+      298 -### Task 8: Update do_transfer() for Refinement Support       
+      298 +### Task 8: Implement Flow Consolidation and Geometric Selecti
+          +on                                                            
+      299  
+      300 -Files: src/Exchange/exg-prtprt.f90                            
+      300 +Files: src/Exchange/exg-prtprt.f90, src/Exchange/exg-gwfprt.f9
+          +0                                                             
+      301  
+      302 -8.1. Remove current do_transfer() implementation              
+      303 -     - No longer needed - transfer happens via events during s
+          -olve                                                          
+      304 -     - OR: Keep for post-solve cleanup/validation?            
+      302 +8.1. Add consolidated flow storage to PrtPrtExchangeType      
+      303 +     - Array: consolidated_flows(:) for cells with multiple co
+          +nnections                                                     
+      304 +     - Allocated during link_connections based on connection p
+          +atterns                                                       
+      305  
+      306 -8.2. Add geometric selection for refined boundaries           
+      307 -     - When particle transferred from coarse -> refined cell  
+      308 -     - Multiple connections for same source cell              
+      309 -     - Use particle (x, y, z) position and DisvGeom utilities 
+      310 -     - Determine which refined cell contains exit point       
+      306 +8.2. Implement flow consolidation routine                     
+      307 +     - Called each timestep before tracking (in exg_rp or simi
+          +lar)                                                          
+      308 +     - Loop through connections, group by source cell         
+      309 +     - Sum gwfsimvals flows for each source cell              
+      310 +     - Write consolidated flows to PRT FMI boundary flow array
+          +s                                                             
+      311 +     - FMI loads into cell definitions using existing mechanis
+          +ms                                                            
+      312 +     - Tracking method sees flows without awareness of consoli
+          +dation                                                        
+      313  
+      312 -8.3. Add flow-weighted probabilistic fallback                 
+      313 -     - For cases where geometric analysis not feasible        
+      314 -     - Use gwfsimvals flows to weight probability             
+      315 -     - Randomly select destination cell                       
+      314 +8.3. Implement geometric selection helper                     
+      315 +     - Module procedure in PrtPrtExchangeModule               
+      316 +     - Signature: geometric_select(particle, connections, dest
+          +_cell)                                                        
+      317 +     - Works for both DIS and DISV grids (structured and unstr
+          +uctured)                                                      
+      318 +     - Use particle (x, y, z) position and discretization geom
+          +etry                                                          
+      319 +     - For DISV: use DisvGeom utilities (shared_edge, vertex c
+          +oordinates)                                                   
+      320 +     - For DIS: use cell geometry and face identification     
+      321 +     - Determine which refined cell contains particle exit poi
+          +nt                                                            
+      322 +     - Called from exchange_handle_event when multiple connect
+          +ions exist                                                    
+      323  
+      317 -8.4. Add consolidated flow calculation                        
+      318 -     - During exg_ar or beginning of timestep                 
+      319 -     - Group connections by coarse cell, sum flows            
+      320 -     - Provide to PRT FMI for tracking                        
+      324 +8.4. Implement flow-weighted probabilistic fallback           
+      325 +     - Called when geometric analysis fails or is not applicab
+          +le                                                            
+      326 +     - Use gwfsimvals flows to calculate probabilities        
+      327 +     - Randomly select destination cell weighted by flow magni
+          +tudes                                                         
+      328 +     - Handle mixed flow directions (warn if significant backf
+          +low)                                                          
+      329  
+      330  ### Task 9: Update has_pending() Logic
+      331  
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 6 lines, removed 4 lines                                      
+      333  
+      334  9.1. Review prt_has_pending() implementation
+      335       - Currently checks ninbox > 0
+      336 -     - Update to check if exchange PRP has particles          
+      337 -     - Return true if exchange_prp%particles%ncount > 0 (or si
+          -milar)                                                        
+      336 +     - Update to check if exchange PRP has particles ready to 
+          +track                                                         
+      337 +     - Return true if exchange_prp has particles (check partic
+          +le count > 0)                                                 
+      338 +     - Exchange PRP particles added during iteration N are tra
+          +cked in iteration N+1                                         
+      339  
+      340  9.2. Ensure ExplicitSolution uses has_pending correctly
+      340 -     - Check after all models solve                           
+      341 -     - Continue handoff loop while any model has_pending      
+      341 +     - After all models solve, check each model's has_pending 
+      342 +     - Continue outer explicit solve loop while any model has_
+          +pending                                                       
+      343 +     - This allows multi-hop particle transfers across multipl
+          +e exchanges                                                   
+      344  
+      345  ### Task 10: Clean Up and Testing
+      346  
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 14 lines, removed 9 lines                                     
+      345  ### Task 10: Clean Up and Testing
+      346  
+      347  10.1. Remove unused code
+      348 -      - Old inbox/outbox references                           
+      349 -      - BaseExchange do_transfer()                            
+      350 -      - Hardcoded boundary termination logic                  
+      348 +      - Old inbox/outbox references from PrtModelType         
+      349 +      - BaseExchange do_transfer() declaration and implementat
+          +ion                                                           
+      350 +      - PrtPrtExchangeType do_transfer() implementation       
+      351 +      - Hardcoded boundary termination logic in tracking metho
+          +ds                                                            
+      352 +      - ExplicitSolution do_transfer loop                     
+      353  
+      354  10.2. Update memory management
+      353 -      - Remove inbox/outbox memory allocations                
+      355 +      - Remove inbox/outbox memory allocations from prt_ar    
+      356        - Add exchange PRP memory paths
+      357 +      - Add consolidated_flows array allocation in exchange   
+      358        - Verify no memory leaks
+      359  
+      360  10.3. Test with existing PRT test cases
+      358 -      - Single model (no exchanges) should still work         
+      359 -      - Multi-model with 1-1 cell mapping                     
+      360 -      - Multi-model with refinement (if test cases exist)     
+      361 +      - Single model (no exchanges) - particles should termina
+          +te at boundaries normally                                     
+      362 +      - Multi-model with 1-1 cell mapping - particles should t
+          +ransfer between models                                        
+      363 +      - Multi-model with refinement (if test cases exist) - ge
+          +ometric selection                                             
+      364 +      - Verify exchange PRP processing timing (iteration N+1 p
+          +rocesses N's arrivals)                                        
+      365  
+      366  10.4. Update documentation
+      363 -      - Exchange input format documentation                   
+      367 +      - Exchange input format documentation (GWFMODELNAME1, GW
+          +FMODELNAME2)                                                  
+      368        - User guide for multi-model PRT
+      365 -      - Developer notes on event mechanism                    
+      369 +      - Developer notes on event mechanism with procedure poin
+          +ters                                                          
+      370 +      - Flow consolidation and geometric selection algorithms 
+      371  
+      372  ## Implementation Order
+      373  
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 4 lines, removed 4 lines                                      
+      467     - How to handle DIS vs DISV differences?
+      468     - What about DISU?
+      469  
+      470 -4. Flow consolidation timing                                  
+      471 -   - Pre-compute at start of timestep?                        
+      472 -   - On-demand during transfer?                               
+      473 -   - Store in exchange or FMI?                                
+      470 +4. Exchange PRP particle state                                
+      471 +   - What status should particles have in exchange PRP? ACTIVE
+          +?                                                             
+      472 +   - Are they immediately ready to track in next iteration?   
+      473 +   - Do they need any special initialization?                 
+      474  
+      475  5. Multiple exchanges per model
+      476     - We assume at most one PRT-PRT exchange between two models
+
+● Update(prt-exg-refactor-plan.txt)
+  ⎿  Added 3 lines, removed 2 lines                                      
+      474  
+      475  5. Multiple exchanges per model
+      476     - We assume at most one PRT-PRT exchange between two models
+      477 -   - But a model could have exchanges to multiple neighbors   
+      478 -   - How to handle boundary classification?                   
+      477 +   - But a model could have exchanges to multiple neighbors on
+          + different boundaries                                         
+      478 +   - Each exchange subscribes to events and checks if boundary
+          + is claimed                                                   
+      479 +   - First exchange to match claims the particle (should only 
+          +be one match)                                                 
+      480  
+      481  ## Files to Modify
+      482  
+
+● Perfect! I've updated the plan to address all the points we discussed:
+
+  1. do_transfer(): Completely removed from both BaseExchangeType and PrtPrtExchangeType
+  2. Exchange PRP access: Clarified exchange accesses it via model's package list (iprp = 0)
+  3. TERMINATE event: Clarified it dispatches to source model's events
+  4. Exchange PRP timing: Clarified particles added in iteration N are tracked in iteration N+1
+  5. Geometric selection scope: Now explicitly mentions both DIS and DISV
+  6. Flow consolidation: Exchange calculates, writes to PRT FMI boundary flow arrays, merged with other boundary flows, tracking method is agnostic
+  7. Geometric selection location: Happens in exchange_handle_event when handling BOUNDARY_REACHED events
+
+  The plan is now consistent and addresses all the inconsistencies. Ready to begin implementation?
+
+
+
