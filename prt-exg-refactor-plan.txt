@@ -1,0 +1,381 @@
+PRT Exchange Refactoring Plan
+==============================
+
+Date: 2026-03-16
+Branch: prt-claude-exg
+
+## Summary
+
+Refactor PRT exchange architecture to:
+1. Move do_transfer() from BaseExchangeType to PrtPrtExchangeType only
+2. Implement connection linking (gwfconn2prtconn, link_connections) for GWF-PRT exchange
+3. Replace hardcoded outbox logic with generic event-based mechanism
+4. Introduce exchange PRP package (index 0) to handle transferred particles
+5. Keep has_pending() on ExplicitModel
+
+## Background
+
+Current issues (from prt_exg_notes.txt):
+- do_transfer() shouldn't be on base exchange type (only needed for discrete object transfers)
+- Missing connection linking like GWF-GWT/GWF-GWE exchanges
+- Particle event mechanism is too specific (explicit consumer class instead of generic)
+- Outbox logic is hardcoded in prt_solve() (lines 1122-1125, 1150-1153)
+
+## Architecture Overview
+
+### Event-Based Boundary Handling
+
+When a particle reaches a model boundary:
+
+1. Tracking method dispatches BOUNDARY_REACHED event (where TERM_BOUNDARY is currently dispatched)
+2. PRT-PRT exchange (subscribed to both models' event dispatchers) receives event:
+   - Checks if particle%icu is in nodem1 or nodem2 (claimed boundary)
+   - If CLAIMED: Adds particle to destination model's exchange PRP, dispatches CLAIMED event
+   - If NOT CLAIMED: Sets status=TERM_BOUNDARY, dispatches TERMINATE event
+3. Source model (subscribed to CLAIMED events) marks particle as transferred/skip
+4. Output handler (ParticleTracksType, subscribed to TERMINATE) writes termination record
+5. After tracking loop completes, source model skips transferred particles in future iterations
+
+### Exchange PRP Package
+
+- Special PRP package with index 0 (iprp = 0)
+- Always exists on PRT models (created during model setup)
+- Empty/non-functional unless exchanges are configured
+- Receives particles transferred from neighboring models via exchanges
+- Processed uniformly in tracking loop alongside regular PRPs
+
+### Connection Linking
+
+Following GWF-GWT/GWF-GWE pattern:
+- PRT-PRT exchange has gwfmodelname1, gwfmodelname2 fields
+- gwfconn2prtconn() finds matching GWF-GWF ↔ PRT-PRT connection pairs
+- link_connections() establishes pointers to flow fields (simvals) for tracking
+- Supports flow consolidation for refined/coarse cell mappings
+
+## Implementation Tasks
+
+### Task 1: New Event Types
+
+Files: src/Solution/ParticleTracker/Particle/Events/
+
+1.1. Create BoundaryReachedEvent.f90
+     - Extends ParticleEventType
+     - get_code() returns new BOUNDARY_REACHED enum value
+     - get_verb() returns "BOUNDARY_REACHED"
+     - Contains particle state at boundary exit
+
+1.2. Create ClaimedEvent.f90
+     - Extends ParticleEventType
+     - get_code() returns new CLAIMED enum value
+     - get_verb() returns "CLAIMED"
+     - Contains particle state when claimed by exchange
+
+1.3. Update ParticleEvent.f90
+     - Add BOUNDARY_REACHED and CLAIMED to event code enumerations
+
+### Task 2: Exchange PRP Package
+
+Files: src/Model/ParticleTracking/prt.f90, src/Model/GroundWaterFlow/gwf3prp8.f90
+
+2.1. Update PRP package to support exchange PRP (iprp = 0)
+     - Modify prp_cr() to accept iprp = 0 as valid
+     - Exchange PRP has no release points, empty particle store initially
+     - Skip input reading for exchange PRP
+
+2.2. Create exchange PRP during prt_ar()
+     - Always create exchange PRP with iprp = 0
+     - Initialize with empty particle store
+     - Add to model's package list
+
+2.3. Add particle transfer flag to ParticleType
+     - New flag: istransferred (logical)
+     - Used to mark particles that have been claimed by exchanges
+     - Tracking loop skips particles with istransferred = .true.
+
+### Task 3: Remove do_transfer() from BaseExchangeType
+
+Files: src/Exchange/BaseExchange.f90, src/Exchange/exg-prtprt.f90
+
+3.1. Remove do_transfer() from BaseExchangeType
+     - Delete procedure declaration and implementation
+     - Remove from type-bound procedures
+
+3.2. Keep do_transfer() on PrtPrtExchangeType
+     - Already implemented in exg-prtprt.f90
+     - Will be updated to work with exchange PRP (see Task 6)
+
+3.3. Update ExplicitSolution.f90
+     - Remove loop calling do_transfer() on all exchanges
+     - Transfer now happens via event mechanism during solve
+
+### Task 4: Implement Connection Linking for GWF-PRT Exchange
+
+Files: src/Exchange/exg-gwfprt.f90
+
+4.1. Add fields to GwfPrtExchangeType
+     - gwfmodelname1, gwfmodelname2 (character)
+     - Pointers to matched connections/exchanges
+
+4.2. Implement gwfconn2prtconn()
+     - Pattern similar to exg-gwfgwt.f90:316-456
+     - Loop through baseconnectionlist
+     - Find PRT-PRT connections owned by PRT model
+     - Search for matching GWF-GWF connections:
+       * Model names match (gwfmodelname1, gwfmodelname2)
+       * Exchange data arrays identical (nodem1, nodem2, same order)
+     - Call link_connections() when match found
+     - Error if no match (PRT-PRT exchange requires corresponding GWF-GWF exchange)
+
+4.3. Implement link_connections()
+     - Pattern similar to exg-gwfgwt.f90:460-497
+     - Link flow values: prtExchange%gwfsimvals => gwfExchange%simvals
+     - Set flow sign if model2 is owner
+     - Mark exchange boundaries in PRT FMI (for tracking method to recognize)
+
+4.4. Call gwfconn2prtconn during exg_ar
+     - After models are allocated/read
+     - Before tracking begins
+
+### Task 5: Make PrtPrtExchangeType an Event Consumer
+
+Files: src/Exchange/exg-prtprt.f90
+
+5.1. Extend ParticleEventConsumerType
+     - PrtPrtExchangeType extends ParticleEventConsumerType
+     - Implement handle_event() method
+
+5.2. Implement handle_event()
+     - Receive BOUNDARY_REACHED events
+     - Check if particle%icu is in nodem1 (model1 -> model2 transfer):
+       * Add particle to prtmodel2%exchange_prp%particles
+       * Set particle%iprp = 0 (exchange PRP)
+       * Dispatch CLAIMED event to prtmodel1%events
+     - Check if particle%icu is in nodem2 (model2 -> model1 transfer):
+       * Add particle to prtmodel1%exchange_prp%particles
+       * Set particle%iprp = 0 (exchange PRP)
+       * Dispatch CLAIMED event to prtmodel2%events
+     - If neither match (not this exchange's boundary):
+       * Set particle%istatus = TERM_BOUNDARY
+       * Dispatch TERMINATE event
+
+5.3. Subscribe to model event dispatchers during exg_ar
+     - Subscribe to prtmodel1%events
+     - Subscribe to prtmodel2%events
+
+### Task 6: Update PRT Model to Handle CLAIMED Events
+
+Files: src/Model/ParticleTracking/prt.f90
+
+6.1. Create model event consumer for CLAIMED events
+     - New type: PrtModelEventConsumerType extends ParticleEventConsumerType
+     - Implement handle_event() for CLAIMED events
+     - Marks particle%istransferred = .true.
+
+6.2. Subscribe model consumer to its own event dispatcher
+     - During prt_ar(), after events dispatcher created
+     - Self-subscription to handle CLAIMED events from exchanges
+
+6.3. Update prt_solve() tracking loop
+     - Skip particles with istransferred = .true.
+     - Remove hardcoded outbox logic (lines 1122-1125, 1150-1153)
+     - Remove inbox processing loop (lines 1137-1160)
+
+6.4. Remove inbox/outbox from PrtModelType
+     - Delete inbox, outbox pointers
+     - Delete ninbox, noutbox counters
+     - Clean up memory allocation in prt_ar()
+
+### Task 7: Update Tracking Methods to Dispatch BOUNDARY_REACHED
+
+Files: src/Solution/ParticleTracker/Method/*.f90
+
+7.1. Find current TERM_BOUNDARY termination locations
+     - MethodDis.f90:289
+     - MethodDisv.f90:227
+     - MethodCell.f90:64
+     - Any other locations from grep results
+
+7.2. Replace termination with event dispatch
+     - Instead of: call this%terminate(particle, status=TERM_BOUNDARY)
+     - Do: Create BoundaryReachedEvent, call this%events%dispatch(particle, event)
+     - Remove status assignment (exchange will handle it)
+
+7.3. Ensure particle position is correct
+     - Particle should have (x, y, z) at boundary exit point
+     - Exchange needs accurate position for geometric selection
+
+### Task 8: Update do_transfer() for Refinement Support
+
+Files: src/Exchange/exg-prtprt.f90
+
+8.1. Remove current do_transfer() implementation
+     - No longer needed - transfer happens via events during solve
+     - OR: Keep for post-solve cleanup/validation?
+
+8.2. Add geometric selection for refined boundaries
+     - When particle transferred from coarse -> refined cell
+     - Multiple connections for same source cell
+     - Use particle (x, y, z) position and DisvGeom utilities
+     - Determine which refined cell contains exit point
+
+8.3. Add flow-weighted probabilistic fallback
+     - For cases where geometric analysis not feasible
+     - Use gwfsimvals flows to weight probability
+     - Randomly select destination cell
+
+8.4. Add consolidated flow calculation
+     - During exg_ar or beginning of timestep
+     - Group connections by coarse cell, sum flows
+     - Provide to PRT FMI for tracking
+
+### Task 9: Update has_pending() Logic
+
+Files: src/Model/ExplicitModel.f90, src/Model/ParticleTracking/prt.f90
+
+9.1. Review prt_has_pending() implementation
+     - Currently checks ninbox > 0
+     - Update to check if exchange PRP has particles
+     - Return true if exchange_prp%particles%ncount > 0 (or similar)
+
+9.2. Ensure ExplicitSolution uses has_pending correctly
+     - Check after all models solve
+     - Continue handoff loop while any model has_pending
+
+### Task 10: Clean Up and Testing
+
+10.1. Remove unused code
+      - Old inbox/outbox references
+      - BaseExchange do_transfer()
+      - Hardcoded boundary termination logic
+
+10.2. Update memory management
+      - Remove inbox/outbox memory allocations
+      - Add exchange PRP memory paths
+      - Verify no memory leaks
+
+10.3. Test with existing PRT test cases
+      - Single model (no exchanges) should still work
+      - Multi-model with 1-1 cell mapping
+      - Multi-model with refinement (if test cases exist)
+
+10.4. Update documentation
+      - Exchange input format documentation
+      - User guide for multi-model PRT
+      - Developer notes on event mechanism
+
+## Implementation Order
+
+Phase 1: Foundation (Tasks 1-2)
+- Create new event types
+- Implement exchange PRP package
+- This provides the infrastructure for later tasks
+
+Phase 2: Event Mechanism (Tasks 5-7)
+- Make exchange an event consumer
+- Update model to handle CLAIMED events
+- Update tracking methods to dispatch BOUNDARY_REACHED
+- This replaces hardcoded outbox logic
+
+Phase 3: Connection Linking (Task 4)
+- Implement gwfconn2prtconn and link_connections
+- Provides flow data for tracking and transfer
+
+Phase 4: Refinement Support (Task 8)
+- Geometric selection for refined boundaries
+- Flow consolidation
+- This extends to non-matching grids
+
+Phase 5: Cleanup (Tasks 3, 9, 10)
+- Remove do_transfer from base exchange
+- Update has_pending
+- Testing and documentation
+
+## Design Decisions and Trade-offs
+
+### Why Event-Based Over Bitmask?
+
+Pros:
+- More flexible - exchanges can implement custom logic
+- Cleaner separation - tracking methods don't need exchange knowledge
+- Extensible - easy to add new consumers later
+
+Cons:
+- More complex event flow
+- Performance overhead of event dispatch (likely negligible)
+
+### Why Exchange PRP Over Inbox?
+
+Pros:
+- Uniform treatment of all particles (regular + transferred)
+- Natural fit with PRP package architecture
+- Simpler - no special inbox processing loop
+
+Cons:
+- Requires special iprp = 0 handling
+- Always created even if unused
+
+### Why Keep has_pending on ExplicitModel?
+
+Pros:
+- Polymorphic - supports future discrete object models
+- Existing ExplicitSolution loop structure
+- Model encapsulates its own state
+
+Cons:
+- Somewhat PRT-specific despite being on base class
+
+## Open Questions
+
+1. Memory management for transferred particles
+   - When particle marked istransferred, when is memory freed?
+   - PRP store structure-of-arrays makes removal complex
+
+2. Exchange PRP capacity
+   - How to size exchange PRP particle store?
+   - Resize dynamically during transfer?
+
+3. Geometric selection implementation
+   - Which DisvGeom utilities to use?
+   - How to handle DIS vs DISV differences?
+   - What about DISU?
+
+4. Flow consolidation timing
+   - Pre-compute at start of timestep?
+   - On-demand during transfer?
+   - Store in exchange or FMI?
+
+5. Multiple exchanges per model
+   - We assume at most one PRT-PRT exchange between two models
+   - But a model could have exchanges to multiple neighbors
+   - How to handle boundary classification?
+
+## Files to Modify
+
+New files:
+- src/Solution/ParticleTracker/Particle/Events/BoundaryReachedEvent.f90
+- src/Solution/ParticleTracker/Particle/Events/ClaimedEvent.f90
+
+Modified files:
+- src/Exchange/BaseExchange.f90
+- src/Exchange/exg-prtprt.f90
+- src/Exchange/exg-gwfprt.f90
+- src/Model/ParticleTracking/prt.f90
+- src/Model/ExplicitModel.f90
+- src/Solution/ParticleTracker/Particle/Events/ParticleEvent.f90
+- src/Solution/ParticleTracker/Particle/Particle.f90
+- src/Solution/ParticleTracker/Method/Method.f90
+- src/Solution/ParticleTracker/Method/MethodDis.f90
+- src/Solution/ParticleTracker/Method/MethodDisv.f90
+- src/Solution/ParticleTracker/Method/MethodCell.f90
+- src/Solution/ExplicitSolution.f90
+- src/Model/GroundWaterFlow/gwf3prp8.f90 (if PRP needs exchange PRP support)
+
+## Success Criteria
+
+1. do_transfer() removed from BaseExchangeType
+2. Connection linking implemented (gwfconn2prtconn, link_connections)
+3. Particle boundary handling is event-based (no hardcoded outbox logic)
+4. Exchange PRP (iprp=0) handles transferred particles
+5. All existing PRT tests pass
+6. Multi-model PRT simulation works correctly
+7. No memory leaks introduced

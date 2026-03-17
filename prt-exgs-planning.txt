@@ -1,0 +1,453 @@
+
+╭─── Claude Code v2.0.76 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                  Welcome back wes!                 │ started                 │
+│                                                    │ Run /init to create a … │
+│                     * ▐▛███▜▌ *                    │ ─────────────────────── │
+│                    * ▝▜█████▛▘ *                   │ Recent activity         │
+│                     *  ▘▘ ▝▝  *                    │ No recent activity      │
+│                                                    │                         │
+│  Sonnet 4.5 · Claude Pro · wpbonelli@gmail.com's   │                         │
+│  Organization                                      │                         │
+│                   ~\dev\modflow6                   │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+> Have a look at `prt_exg_notes.txt`. These are some notes I took on this PR
+ branch. Do you understand the recommendations I'm making? Ask any questions
+ you need to. 
+
+● I'll read your notes to understand the recommendations you're making.
+
+● Read(prt_exg_notes.txt)
+  ⎿  Read 8 lines
+
+● I understand the general direction of your recommendations. Let me ask a few clarifying questions to make sure I fully grasp what you're proposing:
+
+  1. do_transfer() placement: You're suggesting this should either be:
+    - Moved exclusively to the PRT-PRT exchange type (not on the base exchange), OR
+    - We need a way to distinguish "discrete object transfer exchanges" from "equation-solving exchanges"
+
+  Do you have a preference between these two approaches? Are there other exchange types that might need discrete object transfer in the future?
+  2. Exchange/connection linking (gwfconn2prtconn): I assume this is similar to how GWF-GWT or GWF-GWE exchanges link connections between models. Are you saying the PRT-PRT exchange should follow the same pattern where:
+    - A GWF-GWF exchange defines the connections
+    - Then a PRT-PRT exchange links to those same connections via gwfconn2prtconn mapping?
+  3. Generic particle event mechanism: Currently there's an explicit consumer class for particle events. You want to replace this with procedure pointers so multiple consumers can handle events differently. Is the idea that:
+    - One consumer handles "normal" particle events
+    - Another consumer specifically handles the outbox placement vs termination decision for exchanged particles?
+  4. has_pending on explicit model: Where do you think this state should live instead? On the PRT model type? Or handled through the event mechanism you mentioned?
+
+> Re 1, yes either moved to the PRT-PRT type, or to a discrete object 
+transfer exchange type, separate from the equation-solving exchange type
+Re 2, yes, that's right.
+Re 3, yes, as you say, except where you say "normal", consider it rather an 
+output handler. One consumer for writing events to output files, one for 
+doing the exchange-related tasks (outbox/termination).
+Re 4, I'm open to any suggestions you deem appropriate.
+
+Look at the code closely to get a feel for the architecture. Ask more 
+questions if you need to. See if you can see clearly how to proceed with 
+each of these items. 
+
+● I'll explore the codebase to understand the architecture and see how to proceed with each recommendation.
+
+● Explore(Explore exchange architecture)
+  ⎿  Done (39 tool uses · 73.1k tokens · 4m 39s)                           
+
+● Excellent! Now I have a clear picture. Let me read a few more specific files to understand the implementation details, then I'll outline how to proceed.
+
+● Read(src\Model\ParticleTracking\prt.f90)
+  ⎿  Read 50 lines
+
+● Search(pattern: "outbox", path: "src\Model\ParticleTracking")
+  ⎿  Found 1 file (ctrl+o to expand)
+
+● Search(pattern: "TERM_BOUNDARY", path: "src", glob: "*.f90", output_mode:
+        "content", head_limit: 20)
+  ⎿  Found 16 lines (ctrl+o to expand)
+
+● Search(pattern: "noutbox\s*=", path: "src\Model\ParticleTracking\prt.f90",
+        output_mode: "content")
+  ⎿  Found 35 lines (ctrl+o to expand)
+
+● Read(src\Model\ParticleTracking\prt.f90)
+  ⎿  Read 80 lines
+
+● Search(pattern: "ParticleEventConsumer", path: "src")
+  ⎿  Found 3 files (ctrl+o to expand)
+
+● Search(pattern: "subscribe|dispatch", path:
+        "src\Model\ParticleTracking\prt.f90", output_mode: "content")
+  ⎿  Found 17 lines (ctrl+o to expand)
+
+● Read(src\Solution\ParticleTracker\Particle\ParticleTracks.f90)
+  ⎿  Read 100 lines
+
+● Search(pattern: "call.*events%dispatch", path: "src\Solution\ParticleTracker",
+         output_mode: "content", head_limit: 15)
+  ⎿  Found 8 lines (ctrl+o to expand)
+
+● Read(src\Exchange\exg-gwfgwt.f90)
+  ⎿  Read 80 lines
+
+● Read(src\Exchange\exg-gwfprt.f90)
+  ⎿  Read 100 lines
+
+● Read(src\Exchange\exg-prtprt.f90)
+  ⎿  Read 120 lines
+
+● Search(pattern: "gwfmodelname", path: "src\Exchange", output_mode: "content",
+        head_limit: 30)
+  ⎿  Found 30 lines (ctrl+o to expand)
+
+● Perfect! Now I have a clear understanding of the architecture. Let me summarize what I've learned and outline how to proceed with each recommendation:
+
+  Current Architecture Understanding
+
+  Event System:
+  - ParticleEventDispatcherType dispatches events to subscribed consumers
+  - ParticleTracksType is currently the only consumer - handles output/logging
+  - Events are dispatched from tracking methods (Method.f90) when particles reach significant states
+
+  Outbox Population:
+  - Currently hardcoded in prt_solve() at lines 1122-1125 and 1150-1153
+  - When particle%istatus == TERM_BOUNDARY, directly increments noutbox and adds to outbox
+  - This tight coupling is the problem
+
+  Exchange Linking Pattern (GWT/GWE):
+  - GWT-GWT and GWE-GWE exchanges have gwfmodelname1/gwfmodelname2 fields
+  - gwfconn2gwtconn() searches connections to find matching GWF-GWF ↔ GWT-GWT pairs
+  - Matching criteria: model name correspondence + identical nodem1/nodem2 arrays
+  - link_connections() establishes pointers to share data between matched connections
+
+  ---
+  Implementation Questions
+
+  1. do_transfer() placement:
+  I see two reasonable approaches:
+  - Option A: Remove from BaseExchangeType, add only to PrtPrtExchangeType
+  - Option B: Create intermediate DiscreteObjectExchangeType that has do_transfer(), with PrtPrtExchangeType extending it
+
+  Option A is simpler. Option B adds flexibility if future discrete object models are planned. Which do you prefer?
+
+  2. Connection linking for PRT-PRT:
+  Following the GWT pattern, I would:
+  - Add gwfmodelname1 and gwfmodelname2 to PrtPrtExchangeType
+  - Implement gwfconn2prtconn() in exg-gwfprt.f90 (similar to gwfconn2gwtconn)
+  - Implement link_connections() to establish pointers
+
+  Question: What data should link_connections() link between GWF-GWF and PRT-PRT connections? The GWT version links simvals (flow rates) and mover budgets. For PRT, is it just establishing the topology relationship, or are there flow fields that need linking too?
+
+  3. Generic particle event mechanism:
+  I would:
+  - Create a new ParticleExchangeConsumerType that extends ParticleEventConsumerType
+  - In its handle_event(), check if event is a termination with TERM_BOUNDARY status
+  - If so, determine whether to place in outbox or permanently terminate
+  - Subscribe this consumer alongside ParticleTracksType in prt_ar()
+  - Remove the outbox logic from prt_solve() (lines 1122-1125, 1150-1153)
+
+  Question: What determines whether a TERM_BOUNDARY particle goes to outbox vs permanent termination? Is it based on whether the boundary face is connected to another model via a PRT-PRT exchange? If so, the consumer would need access to exchange information.
+
+  4. has_pending() placement:
+  Options I see:
+  - Option A: Keep on ExplicitModel (status quo) - provides polymorphism for future discrete object models
+  - Option B: Remove from ExplicitModel, check outbox directly in ExplicitSolution
+  - Option C: Move the check to the exchange level - exchanges track pending state
+
+  Which approach do you prefer? I lean toward Option A (keep it) if we're going with a discrete object exchange hierarchy, or Option B if we're keeping it PRT-specific.
+
+  Let me know your preferences and I can proceed with a detailed implementation plan!
+
+> 1: just move it to the PRT PRT exchange
+2: we need to link flow fields too
+3: why not make the PRT PRT exchange itself the consumer?
+4: I'm liking option C, if possible
+
+don't make a detailed plan just yet, let's finish talking it out first 
+
+● Good, this is getting clearer. Let me ask a few follow-up questions:
+
+  For #2 (flow field linking):
+  What specific flow fields need to be linked between GWF-GWF and PRT-PRT connections? I see that GWT links simvals (intercell flows) and mover budgets. For particles, do we need the actual flow rates across the boundary, or are there other fields? Is this for determining particle movement across the exchange boundary?
+
+  For #3 (exchange as consumer):
+  I need to understand the mechanics of how this works:
+  - When a particle hits TERM_BOUNDARY, how do we identify which boundary face/cell it exited from?
+  - The exchange has nodem1/nodem2 arrays - are these the cells on the boundary?
+  - Does the particle carry its exit cell index (icu) that we can match against the exchange data?
+  - If there are multiple PRT-PRT exchanges connected to the same model, each exchange would subscribe to that model's events and check "is this my boundary?" - correct?
+
+  For #4 (exchange tracking pending):
+  - Should has_pending() be added to BaseExchangeType with a default false implementation (like do_transfer()), then overridden in PrtPrtExchangeType?
+  - Or keep it polymorphic another way?
+  - In ExplicitSolution, we'd loop through exchanges instead of models to check for pending work?
+
+> 2: yes, exactly.
+3: read exg-connections.txt, it might answer some of your questions
+4: ok, I'm convinced that pending stuff can stay on the explicit model 
+
+● Read(exg-connections.txt)
+  ⎿  Read 653 lines
+
+● Good, this previous conversation is very helpful context! I can see the inbox/outbox mechanism is already in place and do_transfer() already handles the basic transfer.
+
+  Now I better understand the architecture. A few more questions about making the PRT-PRT exchange the event consumer:
+
+  For #3 (exchange as event consumer):
+
+  Looking at the current code in prt_solve() (lines 1122-1125), when a particle gets TERM_BOUNDARY status, it's immediately placed in the outbox. If we move this to the exchange as an event consumer:
+
+  1. Event data: When a particle terminates with TERM_BOUNDARY, does the event or particle carry information about which cell it exited from? Looking at the ParticleType, it has icu (current cell). Is that sufficient for the exchange to check "is this cell in my boundary list (nodem1 or nodem2)?"
+  2. Multiple exchanges: If a model has multiple PRT-PRT exchanges (connecting to different neighbor models on different boundaries), each exchange would subscribe to events and check "is this my boundary cell?" Whichever exchange claims it would handle the outbox placement. If no exchange claims it (e.g., external boundary), it truly terminates. Is that the pattern?
+  3. Outbox ownership: Currently outbox lives on the PRT model. If the exchange is determining what goes in it, should outbox move to the exchange itself? Or does each exchange add particles to the model's shared outbox, and then in do_transfer() each exchange only processes the particles relevant to its boundaries?
+  4. Geometric/probabilistic selection: From the previous conversation, this logic belongs in do_transfer() when mapping cells across refinement. That stays the same, right?
+
+> Re 1, yes, icu should be sufficient. To answer your first question, the 
+event and the particle both carry some info, there's some redundancy.
+Re 2, let's assume there will be at most a single PRT PRT exchange between 
+any two neighboring models
+Re 3, I think these mailboxes should move to the PRT PRT exchange, as should
+ the transfer routine
+Re 4, yes, if the design makes sense, let's use it 
+
+● Good, that clarifies a lot. A few more questions to understand the full architecture:
+
+  Inbox/Outbox ownership:
+
+  If inbox/outbox move to the PRT-PRT exchange, I'm thinking:
+  - Each exchange has outbox/inbox for both directions (e.g., outbox_m1to2, inbox_m1to2, outbox_m2to1, inbox_m2to1)
+  - Or maybe simpler: outbox1, outbox2, inbox1, inbox2 corresponding to model1 and model2
+
+  But then:
+  1. How does the model consume inbox particles? Currently prt_solve() has a loop processing this%inbox (lines 1137-1160). If inbox moves to the exchange, does the model need to query its connected exchanges for inbox particles? Or does do_transfer() push particles back into model-level storage?
+  2. Event consumer logic: When the exchange (as consumer) receives a TERM_BOUNDARY event:
+    - Check if particle%icu is in nodem1 (particle in model1 exiting to model2) → add to outbox1
+    - Check if particle%icu is in nodem2 (particle in model2 exiting to model1) → add to outbox2
+    - If no match, ignore the event (not this exchange's boundary - could be external boundary or another exchange)
+
+  Is that right?
+  3. Unclaimed TERM_BOUNDARY particles: If a particle gets TERM_BOUNDARY but no exchange claims it (external domain boundary), should it stay TERM_BOUNDARY in the PRP store (permanent termination), or do we need explicit handling to convert TERM_BOUNDARY → some final terminated status?
+  4. has_pending(): If we keep it on the explicit model (#4 from earlier), does the model query its connected exchanges to see if they have pending inbox particles for it?
+
+> You're right, the mailboxes should stay on the models.\
+
+Correct re: event consumer logic.
+
+We really shouldn't assign the TERM_BOUNDARY status until it's confirmed 
+that there is no exchange through which to pass the particle. 
+
+● Ah, that's an important point. So we need to determine whether a boundary is an exchange boundary BEFORE assigning the status.
+
+  How should this work? I see a few options:
+
+  Option A: Mark exchange boundaries in advance
+  - During exchange setup, mark which cells/connections are exchange boundaries (in FMI or some data structure accessible to the tracking method)
+  - When particle exits a cell, tracking method checks: "is this an exchange boundary?"
+    - Yes → assign TERM_BOUNDARY, dispatch event, exchange consumer adds to outbox
+    - No → assign different permanent termination status (what status? TERM_EXTERNAL?)
+
+  Option B: Query via event response
+  - Tracking method detects boundary exit but doesn't terminate yet (sets a pending state?)
+  - Dispatch a "boundary check" event
+  - Exchange consumer responds if it claims the boundary
+  - Based on response, assign TERM_BOUNDARY or permanent termination
+
+  Option C: Check in model solve loop
+  - Tracking method marks particle as "exited boundary" without termination status
+  - Model checks against its connected exchanges: "do any exchanges claim this cell?"
+  - If yes → set TERM_BOUNDARY and add to exchange's outbox
+  - If no → set permanent termination status
+
+  Which pattern aligns better with the existing architecture? Option A seems cleanest if we can mark exchange boundaries during setup.
+
+  Also: what should the permanent termination status be for particles that truly exit the domain (non-exchange boundaries)?
+
+> Option A is reasonable, but where would we store this exchange boundary 
+knowledge? Note that we store info about assigned boundary faces in FMI with
+ an integer bitmask. Could we do something similar?
+
+I"m also intrigued by option B. Could we introduce this new intermediate 
+event type, raised when a particle reaches a boundary, and it's yet unkown 
+whether it should terminate or be transferred through an exchange, and the 
+exchange consumer could dispatch a claimed event which the model could 
+subscribe to, to remove the particle from its internal storage, or a 
+termination event, for the output consumer to process as usual. Basically 
+leveraging the event system for the event response. Would something like 
+that work? 
+
+● Option B is intriguing! Let me think through how the event response would work:
+
+  Option B Flow (as I understand it):
+
+  1. Particle reaches boundary during tracking
+  2. Dispatch BOUNDARY_REACHED event (or similar - new event type)
+  3. Exchange consumer receives it, checks if particle%icu is in nodem1/nodem2
+    - If claimed: Adds to outbox, dispatches CLAIMED event (or TERM_BOUNDARY event for the exchange)
+    - If not claimed: Does nothing
+  4. Some consumer (model? output handler?) receives the response and handles accordingly
+
+  Questions about the mechanics:
+
+  1. Who dispatches the response event? The exchange would need access to an event dispatcher. Would it use the model's dispatcher? Or would exchanges have their own dispatchers?
+  2. What sets particle status?
+    - Does the exchange set particle%istatus = TERM_BOUNDARY when it claims it?
+    - Or does status remain ACTIVE and the exchange just adds to outbox?
+    - For unclaimed boundaries, what status gets set (TERM_EXTERNAL or something)?
+  3. How does the model know if claimed?
+    - Does the model subscribe to CLAIMED events to know "don't permanently terminate this one"?
+    - Or after dispatching BOUNDARY_REACHED, does the model check the particle's status to see if it changed?
+
+  For Option A (bitmask):
+  Could we add an exchange boundary bitmask to FMI (alongside existing boundary masks)? During exchange setup, we'd mark which connections/faces are exchange boundaries. Then the tracking method checks the mask when a particle exits and knows whether to set TERM_BOUNDARY vs permanent termination.
+
+  Which approach do you think fits better with the event system architecture?
+
+> You've got it, except if not claimed, the exchange can raise a termination
+ event. And the exchange itself can be dispatcher, right? The exchange can 
+manage particle state. TERM_BOUNDARY is when the exchange raises the 
+termination event. The claimed event is separate and the particle status 
+remains active in that case. The model doesn't need to terminate the 
+particles, but yes it does subscribe to claimed events so it knows which 
+particles to remove from its internal storage.
+
+I'm liking this. I don't love the idea of the methods needing to know a 
+bunch of ad hoc info about certain faces, although I guess we already have 
+the precedent. 
+
+● Excellent! This is elegant. Let me make sure I have the flow right:
+
+  Event Flow:
+
+  1. Tracking method detects boundary exit → dispatches BOUNDARY_REACHED event
+  2. Exchange (subscribed to events) receives it, checks if claimed:
+    - Claimed: Adds particle to outbox (status stays ACTIVE), dispatches CLAIMED event
+    - Not claimed: Sets status to TERM_BOUNDARY, dispatches TERMINATE event
+  3. Model (subscribed to CLAIMED events) receives CLAIMED → removes particle from internal storage
+  4. Output handler (subscribed to TERMINATE events) receives TERMINATE → writes termination record
+
+  Architecture questions:
+
+  1. Event dispatcher topology: Does the exchange need its own dispatcher, or does everything go through the model's event dispatcher (this%events)?
+    - Option A: Model's dispatcher is central hub. Exchange subscribes to it, receives BOUNDARY_REACHED, then dispatches CLAIMED/TERMINATE back to same dispatcher
+    - Option B: Exchange has its own dispatcher. Model and output handler subscribe to both model's dispatcher AND exchange's dispatcher
+  2. Multiple exchanges: If a model has multiple PRT-PRT exchanges, all would be subscribed. When BOUNDARY_REACHED is dispatched, each checks if it claims the particle. Only one should claim it (or none). Is there any concern about race conditions or need for ordering?
+  3. New event types: We'd need to add:
+    - BOUNDARY_REACHED (or similar name)
+    - CLAIMED (or similar name)
+    - Keep existing TERMINATE event type?
+
+  Does Option A (central dispatcher on model) make sense, or do you prefer separate dispatchers?
+
+> Yes, you've got the idea. One note, I think in step 3 the model should 
+just mark the particle for removal at first, since the event will be handled
+ during the tracking loop. Then after the inner explicit solve is done, 
+remove any marked particles from the model's storage. Make sense?
+
+I think everything can go through the model's dispatcher, do you agree?
+
+We can assume at most one PRT PRT exchange between two given models.
+
+Yes, exactly re: event types. 
+
+● Yes, that makes sense. You can't remove particles from storage while iterating through it. Mark them, then clean up afterward.
+
+  And yes, everything through the model's dispatcher keeps it simple.
+
+  So the complete flow would be:
+
+  1. During tracking: Particle reaches boundary → dispatch BOUNDARY_REACHED
+  2. Exchange consumer: Receives event, checks if claimed:
+    - Claimed: add to outbox (status=ACTIVE), dispatch CLAIMED
+    - Not claimed: set status=TERM_BOUNDARY, dispatch TERMINATE
+  3. Model consumer: Receives CLAIMED → marks particle for removal
+  4. Output consumer: Receives TERMINATE → writes termination record
+  5. After tracking loop: Model removes marked particles from internal storage
+
+  Implementation questions:
+
+  1. Where does BOUNDARY_REACHED get dispatched? In the tracking methods (MethodDis, MethodDisv, etc.) when they detect boundary exit? Or in the model's tracking loop when it detects the particle has exited?
+  2. Which model's dispatcher? If a particle is in model1 and exits toward model2, it dispatches to model1's dispatcher, and the exchange is subscribed to both model1's and model2's dispatchers?
+  3. Particle removal: Currently particles are stored in PRP package particles stores. When marked for removal, do we:
+    - Actually remove from the store?
+    - Or just set a flag and skip them in future iterations?
+
+  Should I start outlining the implementation steps, or do we need to clarify more?
+
+> Re 1, dispatch the boundary reached event exactly where the termination at
+ boundary event is dispatched now
+Re 2, yes, I think that'll work?
+Re 3, I think we should actually remove them, although that'd get a bit 
+messy given how they're stored in a structure of arrays. I guess we can just
+ mark the indices for skipping, maybe? Or yeah, add a flag saying a particle
+ has "flown the nest", so to speak? 
+
+● Got it. So for particles that have been claimed by an exchange:
+  - Add a flag to ParticleType (or track indices separately in the model) to mark "transferred to exchange"
+  - In future iterations, skip these marked particles
+  - They stay in the PRP store but are inactive
+
+  That avoids the complexity of restructuring the arrays.
+
+  Let me summarize the architecture we've settled on:
+
+  Architecture Summary
+
+  1. do_transfer() placement:
+  - Remove from BaseExchangeType
+  - Keep only on PrtPrtExchangeType
+
+  2. GWF-PRT exchange linking:
+  - Implement gwfconn2prtconn() to find matching GWF-GWF connections
+  - Implement link_connections() to link flow fields (simvals)
+  - These provide flow data for tracking to boundary
+
+  3. Event-based boundary handling:
+  - New event type: BOUNDARY_REACHED (dispatched where TERM_BOUNDARY currently is in Methods)
+  - PRT-PRT exchange subscribes to both models' event dispatchers
+  - Exchange checks if boundary is claimed:
+    - Claimed: Add to outbox (status=ACTIVE), dispatch CLAIMED event
+    - Not claimed: Set status=TERM_BOUNDARY, dispatch TERMINATE event
+  - Model subscribes to CLAIMED events, marks particles for skipping
+  - Output handler subscribes to TERMINATE events
+
+  4. has_pending() and mailboxes:
+  - has_pending() stays on explicit model
+  - inbox/outbox stay on models
+
+  Does this capture everything correctly? Ready to start planning implementation?
+
+> Excellent. I think we're ready. Regarding your last point about 
+inbox/outbox on models, I think eventually we'll only need an inbox. The 
+final step after what we've described above is an "exchange PRP", a special 
+PRP package that "adopts" particles coming in from other models. This is 
+natural because the PRP maintains the particle store at the moment. This 
+exchange PRP could have index 0, and always exist, regardless if any 
+exchanges are setup, it'd just be empty and non-functional usually. Make 
+sense? 
+
+● Yes, that makes perfect sense! The exchange PRP is a cleaner abstraction:
+
+  - Regular PRP packages (index 1, 2, 3...) handle user-defined particle releases
+  - Exchange PRP (index 0) handles particles transferred from neighboring models via exchanges
+  - The tracking loop processes all PRPs uniformly, including the exchange PRP
+  - Exchanges populate the exchange PRP's particle store directly when transferring
+
+  This eliminates the need for the outbox entirely:
+  - Particle reaches boundary → BOUNDARY_REACHED event
+  - Exchange claims it → adds directly to the exchange PRP in the destination model
+  - Model marks source particle as transferred/skip
+  - Next iteration: exchange PRP particles get tracked normally
+
+  Question: Should we implement the exchange PRP as part of this refactoring, or keep inbox/outbox for now and make the exchange PRP a follow-up step? The exchange PRP seems like it would simplify things, but I want to make sure we're not biting off too much at once.
+
+  Also, when you say "the final step after what we've described" - does that mean:
+  1. First refactor: event-based boundary handling with inbox/outbox
+  2. Second refactor: replace inbox with exchange PRP
+
+  Or should we go straight to the exchange PRP design?
+
+> Yes, let's implement the exchange PRP here. Let's go for it all. I think 
+we're ready to make a planning doc 
+  ⎿  Interrupted · What should Claude do instead?
+
+
+
