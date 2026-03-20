@@ -537,7 +537,6 @@ jobs:
           chmod +x "${{ github.workspace }}/bin/zbud6"
     
       - name: Install dependencies for building models
-        if: inputs.releasemode == true
         working-directory: modflow6-examples/etc
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -547,12 +546,72 @@ jobs:
           pixi run --manifest-path ../../modflow6/pixi.toml get-modflow "${{ github.workspace }}/bin" --subset mf2005,triangle,gridgen
 
       - name: Build example models
-        if: inputs.releasemode == true
         working-directory: modflow6-examples/autotest
         run: |
           models="gwf,gwt,gwe,prt"
           pixi run --manifest-path ../../modflow6/pixi.toml pytest -v -n auto test_scripts.py --init -k "${models//,/ or }"
-      
+
+      - name: Generate models registry
+        working-directory: modflow6-examples
+        run: |
+          # Create .registry directory
+          mkdir -p .registry
+
+          # Determine release tag based on release mode
+          if [[ "${{ inputs.releasemode }}" == "true" ]]; then
+            release_tag="current"
+          else
+            release_tag="nightly"
+          fi
+
+          # Generate registry using modflow-devtools
+          pixi run --manifest-path ../modflow6/pixi.toml python -m modflow_devtools.models.make_registry \
+            --repo MODFLOW-ORG/modflow6-examples \
+            --ref "${release_tag}" \
+            --asset-file mf6examples.zip \
+            --name "mf6/example" \
+            --path examples \
+            --output .registry
+
+      - name: Package example models
+        working-directory: modflow6-examples
+        run: |
+          # Create zip file from examples directory
+          cd examples
+          zip -r ../mf6examples.zip . -x '*.DS_Store' -x '*/__pycache__/*'
+          cd ..
+
+          echo "Created mf6examples.zip:"
+          ls -lh mf6examples.zip
+
+      - name: Publish to modflow6-examples repository
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # Determine release tag and title based on release mode
+          if [[ "${{ inputs.releasemode }}" == "true" ]]; then
+            release_tag="current"
+            release_title="Latest"
+            release_notes="Example models for MODFLOW 6 version ${{ needs.build.outputs.version }}"
+          else
+            release_tag="nightly"
+            release_title="Latest Nightly Examples"
+            release_notes="Latest nightly build of MODFLOW 6 examples (build version ${{ needs.build.outputs.version }})"
+          fi
+
+          # Delete existing release if it exists
+          gh release delete "${release_tag}" \
+            --repo MODFLOW-ORG/modflow6-examples \
+            --yes || true
+
+          # Create new release with examples
+          gh release create "${release_tag}" \
+            modflow6-examples/mf6examples.zip \
+            modflow6-examples/.registry/models.toml \
+            --repo MODFLOW-ORG/modflow6-examples \
+            --title "${release_title}" \
+            --notes "${release_notes}"
+
       - name: Collect deprecations
         working-directory: modflow6/doc/mf6io/mf6ivar
         run: |
