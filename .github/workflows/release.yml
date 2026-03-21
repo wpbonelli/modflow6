@@ -586,7 +586,7 @@ jobs:
 
       - name: Publish to modflow6-examples repository
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ secrets.EXAMPLES_RELEASE_TOKEN }}
         run: |
           # Determine release tag and title based on release mode
           if [[ "${{ inputs.releasemode }}" == "true" ]]; then
