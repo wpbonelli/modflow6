@@ -81,6 +81,7 @@ contains
     event%imdl = particle%imdl
     event%iprp = particle%iprp
     event%irpt = particle%irpt
+    event%imid = particle%itrdomain(1)
     event%ilay = particle%ilay
     event%icu = particle%icu
     event%izone = particle%izone
@@ -94,15 +95,16 @@ contains
 
   !> @brief Dispatch an event for handling. The first
   !! subscriber to handle the event stops propagation.
-  subroutine dispatch(this, particle, event)
+  function dispatch(this, particle, event) result(handled)
     class(ParticleEventDispatcherType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     class(ParticleEventType), pointer, intent(in) :: event
-    ! local
     logical(LGP) :: handled
+    ! local
     integer(I4B) :: i
     class(*), pointer :: p
 
+    handled = .false.
     call this%prep_event(particle, event)
 
     do i = 1, this%subscriptions%Count()
@@ -116,7 +118,7 @@ contains
         if (handled) exit
       end select
     end do
-  end subroutine dispatch
+  end function dispatch
 
   !> @brief Broadcast an event to all subscribers so
   !! all receive the event and a chance to handle it.

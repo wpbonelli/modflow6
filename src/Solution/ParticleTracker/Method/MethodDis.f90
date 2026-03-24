@@ -167,14 +167,16 @@ contains
         call this%method_cell_ptb%init( &
           fmi=this%fmi, &
           cell=this%cell, &
-          events=this%events, &
+          observers=this%observers, &
+          handlers=this%handlers, &
           tracktimes=this%tracktimes)
         submethod => this%method_cell_ptb
       else
         call this%method_cell_plck%init( &
           fmi=this%fmi, &
           cell=this%cell, &
-          events=this%events, &
+          observers=this%observers, &
+          handlers=this%handlers, &
           tracktimes=this%tracktimes)
         submethod => this%method_cell_plck
       end if
@@ -184,7 +186,6 @@ contains
   !> @brief Load cell properties into the particle, including
   ! the z coordinate, entry face, and node and layer numbers.
   subroutine load_particle(this, cell, particle)
-    use ParticleModule, only: TERM_BOUNDARY
     use ParticleEventModule, only: TERMINATE
     ! dummy
     class(MethodDisType), intent(inout) :: this
@@ -283,7 +284,6 @@ contains
 
   !> @brief Pass a particle to the next cell, if there is one
   subroutine pass_dis(this, particle)
-    use ParticleModule, only: TERM_BOUNDARY
     use ParticleEventModule, only: TERMINATE
     ! dummy
     class(MethodDisType), intent(inout) :: this
@@ -299,9 +299,8 @@ contains
       iface = particle%iboundary(LEVEL_FEATURE)
       no_neighbors = cell%defn%facenbr(iface) == 0
 
-      ! todo AMP: reconsider when multiple models supported
       if (no_neighbors) then
-        call this%terminate(particle, status=TERM_BOUNDARY)
+        call this%modelexit(particle)
         return
       end if
 
