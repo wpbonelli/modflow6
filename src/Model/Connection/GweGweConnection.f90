@@ -4,10 +4,10 @@ module GweGweConnectionModule
   use CsrUtilsModule, only: getCSRIndex
   use SimModule, only: ustop
   use MemoryManagerModule, only: mem_allocate, mem_deallocate, mem_checkin
-  use SpatialModelConnectionModule
+  use InterfaceModelExchangeModule
   use NumericalModelModule
   use GweModule
-  use DisConnExchangeModule
+  use GeometricConnectionExchangeModule
   use GweGweExchangeModule
   use GweInterfaceModelModule
   use SparseModule, only: sparsematrix
@@ -27,7 +27,7 @@ module GweGweConnectionModule
   !! from NumericalExchangeType so the solution can use it to
   !! fetch the coefficients for this connection.
   !<
-  type, public, extends(SpatialModelConnectionType) :: GweGweConnectionType
+  type, public, extends(InterfaceModelExchangeType) :: GweGweConnectionType
 
     class(GweModelType), pointer :: gweModel => null() !< the model for which this connection exists
     class(GweExchangeType), pointer :: gweExchange => null() !< the primary exchange, cast to GWE-GWE
@@ -68,8 +68,8 @@ module GweGweConnectionModule
     procedure :: validateConnection
 
     ! local stuff
-    procedure, private :: allocate_scalars
-    procedure, private :: allocate_arrays
+    procedure :: allocate_scalars
+    procedure :: allocate_arrays
     procedure, private :: cfg_dist_vars
     procedure, private :: setGridExtent
     procedure, private :: validateGweExchange
@@ -88,7 +88,7 @@ contains
     class(GweGweConnectionType) :: this !< the connection
     class(NumericalModelType), pointer :: model !< the model owning this connection,
                                                 !! this must be a GweModelType
-    class(DisConnExchangeType), pointer :: gweEx !< the GWE-GWE exchange the interface model is created for
+    class(GeometricConnectionExchangeType), pointer :: gweEx !< the GWE-GWE exchange the interface model is created for
     ! local
     character(len=LINELENGTH) :: fname
     character(len=LENCOMPONENTNAME) :: name
@@ -122,9 +122,9 @@ contains
     end if
 
     ! first call base constructor
-    call this%SpatialModelConnectionType%spatialConnection_ctor(model, &
-                                                                gweEx, &
-                                                                name)
+    call this%InterfaceModelExchangeType%interfaceModelExchange_ctor(model, &
+                                                                     gweEx, &
+                                                                     name)
 
     call this%allocate_scalars()
     this%typename = 'GWE-GWE'
@@ -173,7 +173,7 @@ contains
     call this%setGridExtent()
 
     ! now set up the GridConnection
-    call this%spatialcon_df()
+    call this%exg_df()
 
     ! we have to 'catch up' and create the interface model
     !    here, then the remainder of this routine will be define
@@ -196,14 +196,14 @@ contains
     call this%gweInterfaceModel%allocate_fmi()
 
     ! connect X, RHS, IBOUND, and flowja
-    call this%spatialcon_setmodelptrs()
+    call this%setmodelptrs()
 
     ! connect pointers (used by BUY)
     this%conc => this%gweInterfaceModel%x
     this%icbound => this%gweInterfaceModel%ibound
 
     ! add connections from the interface model to solution matrix
-    call this%spatialcon_connect()
+    call this%connect()
 
   end subroutine gwegwecon_df
 
@@ -296,7 +296,7 @@ contains
     call this%validateConnection()
 
     ! allocate and read base
-    call this%spatialcon_ar()
+    call this%exg_ar()
 
     ! ... and now the interface model
     call this%gweInterfaceModel%model_ar()
@@ -334,7 +334,7 @@ contains
     class(GweGweConnectionType) :: this !< this connection
 
     ! base validation, the spatial/geometry part
-    call this%SpatialModelConnectionType%validateConnection()
+    call this%InterfaceModelExchangeType%validateConnection()
 
     ! we cannot validate this (yet) in parallel mode
     if (.not. this%gweExchange%v_model1%is_local) return
@@ -406,7 +406,7 @@ contains
     real(DP), dimension(:), intent(inout) :: rhs_sln !< global right-hand-side
     integer(I4B), optional, intent(in) :: inwtflag !< newton-raphson flag
 
-    call this%SpatialModelConnectionType%spatialcon_fc( &
+    call this%InterfaceModelExchangeType%exg_fc( &
       kiter, matrix_sln, rhs_sln, inwtflag)
 
     ! _fc the movers through the exchange
@@ -585,7 +585,7 @@ contains
     deallocate (this%gweInterfaceModel)
 
     ! dealloc base
-    call this%spatialcon_da()
+    call this%InterfaceModelExchangeType%exg_da()
 
     inquire (this%iout, opened=isOpen)
     if (isOpen) then

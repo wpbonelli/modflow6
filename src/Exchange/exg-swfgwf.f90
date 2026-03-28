@@ -44,7 +44,6 @@ module SwfGwfExchangeModule
 
     integer(I4B), pointer :: ifixedcond => null() !< conductance is fixed as product of bedleak and cfact
 
-    integer(I4B), pointer :: nexg => null() !< number of exchanges
     integer(I4B), dimension(:), pointer, contiguous :: nodeswf => null() !< node numbers in swf model
     integer(I4B), dimension(:), pointer, contiguous :: nodegwf => null() !< node numbers in gwf model
     real(DP), dimension(:), pointer, contiguous :: bedleak => null() !< bed leakance, size: nexg

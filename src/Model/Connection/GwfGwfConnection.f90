@@ -6,11 +6,11 @@ module GwfGwfConnectionModule
   use SparseModule, only: sparsematrix
   use MemoryManagerModule, only: mem_allocate, mem_deallocate
   use SimModule, only: ustop
-  use SpatialModelConnectionModule
+  use InterfaceModelExchangeModule
   use GwfInterfaceModelModule
   use NumericalModelModule
   use GwfModule, only: GwfModelType, CastAsGwfModel
-  use DisConnExchangeModule
+  use GeometricConnectionExchangeModule
   use GwfGwfExchangeModule, only: GwfExchangeType, GetGwfExchangeFromList, &
                                   CastAsGwfExchange
   use GwfNpfModule, only: GwfNpfType
@@ -35,7 +35,7 @@ module GwfGwfConnectionModule
   !! one to manage the coefficients in the matrix rows for model1, and
   !! the other to do the same for model2.
   !<
-  type, public, extends(SpatialModelConnectionType) :: GwfGwfConnectionType
+  type, public, extends(InterfaceModelExchangeType) :: GwfGwfConnectionType
 
     class(GwfModelType), pointer :: gwfModel => null() !< the model for which this connection exists
     class(GwfExchangeType), pointer :: gwfExchange => null() !< the primary exchange, cast to its concrete type
@@ -84,7 +84,7 @@ contains
     class(GwfGwfConnectionType) :: this !< the connection
     class(NumericalModelType), pointer :: model !< the model owning this connection,
                                                 !! this must of course be a GwfModelType
-    class(DisConnExchangeType), pointer :: gwfEx !< the exchange the interface model is created for
+    class(GeometricConnectionExchangeType), pointer :: gwfEx !< the exchange the interface model is created for
     ! local
     character(len=LINELENGTH) :: fname
     character(len=LENCOMPONENTNAME) :: name
@@ -118,9 +118,9 @@ contains
     end if
 
     ! first call base constructor
-    call this%SpatialModelConnectionType%spatialConnection_ctor(model, &
-                                                                gwfEx, &
-                                                                name)
+    call this%InterfaceModelExchangeType%interfaceModelExchange_ctor(model, &
+                                                                     gwfEx, &
+                                                                     name)
 
     call this%allocateScalars()
 
@@ -146,7 +146,7 @@ contains
     integer(I4B) :: i
 
     ! this sets up the GridConnection
-    call this%spatialcon_df()
+    call this%exg_df()
 
     ! Now grid conn is defined, we create the interface model
     ! here, and the remainder of this routine is define.
@@ -191,10 +191,10 @@ contains
     end do
 
     ! point X, RHS, IBOUND to connection
-    call this%spatialcon_setmodelptrs()
+    call this%setmodelptrs()
 
     ! connect interface model to spatial connection
-    call this%spatialcon_connect()
+    call this%connect()
 
   end subroutine gwfgwfcon_df
 
@@ -273,7 +273,7 @@ contains
     call this%validateConnection()
 
     ! allocate and read base
-    call this%spatialcon_ar()
+    call this%exg_ar()
 
     ! ... and now the interface model
     call this%gwfInterfaceModel%model_ar()
@@ -319,7 +319,7 @@ contains
     class(GwfGwfConnectionType) :: this !< this connection
     integer(I4B), intent(in) :: kiter !< the iteration counter
 
-    call this%SpatialModelConnectionType%spatialcon_cf(kiter)
+    call this%InterfaceModelExchangeType%exg_cf(kiter)
 
     ! CF the movers through the exchange
     if (this%owns_exchange) then
@@ -340,7 +340,7 @@ contains
     integer(I4B), optional, intent(in) :: inwtflag !< newton-raphson flag
     ! local
 
-    call this%SpatialModelConnectionType%spatialcon_fc( &
+    call this%InterfaceModelExchangeType%exg_fc( &
       kiter, matrix_sln, rhs_sln, inwtflag)
 
     ! FC the movers through the exchange; we cannot call
@@ -364,7 +364,7 @@ contains
     ! local
 
     ! base validation (geometry/spatial)
-    call this%SpatialModelConnectionType%validateConnection()
+    call this%InterfaceModelExchangeType%validateConnection()
     call this%validateGwfExchange()
 
     ! abort on errors
@@ -477,7 +477,7 @@ contains
     call this%gwfInterfaceModel%model_da()
     deallocate (this%gwfInterfaceModel)
 
-    call this%spatialcon_da()
+    call this%InterfaceModelExchangeType%exg_da()
 
     inquire (this%iout, opened=isOpen)
     if (isOpen) then

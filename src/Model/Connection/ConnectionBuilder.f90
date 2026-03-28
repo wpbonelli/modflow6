@@ -7,13 +7,15 @@ module ConnectionBuilderModule
   use BaseSolutionModule, only: BaseSolutionType
   use NumericalSolutionModule, only: NumericalSolutionType
   use BaseExchangeModule, only: BaseExchangeType, GetBaseExchangeFromList
-  use DisConnExchangeModule, only: DisConnExchangeType, &
-                                   GetDisConnExchangeFromList
+  use GeometricConnectionExchangeModule, only: &
+    GeometricConnectionExchangeType, &
+    GetGeometricConnectionExchangeFromList
   use NumericalModelModule, only: NumericalModelType
-  use SpatialModelConnectionModule, only: SpatialModelConnectionType, &
-                                          cast_as_smc, &
-                                          get_smc_from_list, &
-                                          add_smc_to_list
+  use InterfaceModelExchangeModule, only: &
+    InterfaceModelExchangeType, &
+    CastAsInterfaceModelExchange, &
+    GetInterfaceModelExchangeFromList, &
+    AddInterfaceModelExchangeToList
 
   implicit none
   private
@@ -84,16 +86,16 @@ contains
     type(ListType), pointer, intent(in) :: exchanges !< the list of exchanges to process
     type(ListType), intent(inout) :: newConnections !< the newly created connections
     ! local
-    class(DisConnExchangeType), pointer :: conEx
+    class(GeometricConnectionExchangeType), pointer :: conEx
     class(BaseExchangeType), pointer :: baseEx
     integer(I4B) :: iex, ibasex
-    class(SpatialModelConnectionType), pointer :: modelConnection
+    class(InterfaceModelExchangeType), pointer :: modelConnection
     logical(LGP) :: isPeriodic
 
     do iex = 1, exchanges%Count()
-      conEx => GetDisConnExchangeFromList(exchanges, iex)
+      conEx => GetGeometricConnectionExchangeFromList(exchanges, iex)
       if (.not. associated(conEx)) then
-        ! if it is not DisConnExchangeType, we can skip it
+        ! if it is not GeometricConnectionExchangeType, we can skip it
         cycle
       end if
 
@@ -113,15 +115,19 @@ contains
         if (conEx%v_model1%is_local) then
           ! create model connection for model 1
           modelConnection => createModelConnection(conEx%model1, conEx)
-          call add_smc_to_list(baseconnectionlist, modelConnection)
-          call add_smc_to_list(newConnections, modelConnection)
+          call AddInterfaceModelExchangeToList( &
+            baseconnectionlist, modelConnection)
+          call AddInterfaceModelExchangeToList( &
+            newConnections, modelConnection)
         end if
 
         ! and for model 2
         if (conEx%v_model2%is_local) then
           modelConnection => createModelConnection(conEx%model2, conEx)
-          call add_smc_to_list(baseconnectionlist, modelConnection)
-          call add_smc_to_list(newConnections, modelConnection)
+          call AddInterfaceModelExchangeToList( &
+            baseconnectionlist, modelConnection)
+          call AddInterfaceModelExchangeToList( &
+            newConnections, modelConnection)
         end if
 
         ! remove this exchange from the base list, ownership
@@ -151,8 +157,8 @@ contains
     use GwfModule, only: GwfModelType
 
     class(NumericalModelType), pointer, intent(in) :: model !< the model for which the connection will be created
-    class(DisConnExchangeType), pointer, intent(in) :: exchange !< the type of connection
-    class(SpatialModelConnectionType), pointer :: connection !< the created connection
+    class(GeometricConnectionExchangeType), pointer, intent(in) :: exchange !< the type of connection
+    class(InterfaceModelExchangeType), pointer :: connection !< the created connection
 
     ! different concrete connection types:
     class(GwfGwfConnectionType), pointer :: flowConnection => null()
@@ -198,7 +204,7 @@ contains
     ! local
     type(ListType) :: keepList
     class(*), pointer :: exPtr, exPtr2, connPtr
-    class(SpatialModelConnectionType), pointer :: conn
+    class(InterfaceModelExchangeType), pointer :: conn
     integer(I4B) :: iex, iconn
     logical(LGP) :: keepExchange
 
@@ -208,7 +214,7 @@ contains
       ! will this exchange be replaced by a connection?
       keepExchange = .true.
       do iconn = 1, connections%Count()
-        conn => get_smc_from_list(connections, iconn)
+        conn => GetInterfaceModelExchangeFromList(connections, iconn)
         exPtr2 => conn%prim_exchange
         if (associated(exPtr2, exPtr)) then
           ! if so, don't add it to the list
@@ -251,11 +257,11 @@ contains
     type(ListType), intent(inout) :: connections !< all connections that are created for this solution
     ! local
     integer(I4B) :: iconn
-    class(SpatialModelConnectionType), pointer :: modelConn
+    class(InterfaceModelExchangeType), pointer :: modelConn
 
     ! create halo for the model connections
     do iconn = 1, connections%Count()
-      modelConn => get_smc_from_list(connections, iconn)
+      modelConn => GetInterfaceModelExchangeFromList(connections, iconn)
       call modelConn%createModelHalo()
     end do
 

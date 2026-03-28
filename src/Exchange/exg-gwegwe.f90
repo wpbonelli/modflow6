@@ -21,7 +21,7 @@ module GweGweExchangeModule
   use ListModule, only: ListType
   use ListsModule, only: basemodellist
   use VirtualModelModule, only: get_virtual_model
-  use DisConnExchangeModule, only: DisConnExchangeType
+  use GeometricConnectionExchangeModule, only: GeometricConnectionExchangeType
   use GweModule, only: GweModelType
   use TspMvtModule, only: TspMvtType
   use VirtualModelModule, only: VirtualModelType
@@ -45,7 +45,7 @@ module GweGweExchangeModule
   !! connecting two GWT models.
   !!
   !<
-  type, extends(DisConnExchangeType) :: GweExchangeType
+  type, extends(GeometricConnectionExchangeType) :: GweExchangeType
     !
     ! -- names of the GWF models that are connected by this exchange
     character(len=LENMODELNAME) :: gwfmodelname1 = '' !< name of gwfmodel that corresponds to gwtmodel1
@@ -79,15 +79,15 @@ module GweGweExchangeModule
 
   contains
 
-    procedure :: exg_df => gwe_gwe_df
-    procedure :: exg_ar => gwe_gwe_ar
-    procedure :: exg_rp => gwe_gwe_rp
-    procedure :: exg_ad => gwe_gwe_ad
-    procedure :: exg_fc => gwe_gwe_fc
-    procedure :: exg_bd => gwe_gwe_bd
-    procedure :: exg_ot => gwe_gwe_ot
-    procedure :: exg_da => gwe_gwe_da
-    procedure :: exg_fp => gwe_gwe_fp
+    procedure :: exg_df
+    procedure :: exg_ar
+    procedure :: exg_rp
+    procedure :: exg_ad
+    procedure :: exg_fc
+    procedure :: exg_bd
+    procedure :: exg_ot
+    procedure :: exg_da
+    procedure :: exg_fp
     procedure :: connects_model => gwe_gwe_connects_model
     procedure :: use_interface_model
     procedure :: allocate_scalars
@@ -193,7 +193,7 @@ contains
   !!
   !! Define GWE to GWE exchange object.
   !<
-  subroutine gwe_gwe_df(this)
+  subroutine exg_df(this)
     ! -- modules
     use SimVariablesModule, only: iout
     use InputOutputModule, only: getunit, openfile
@@ -242,7 +242,7 @@ contains
     !
     ! -- validate
     call this%validate_exchange()
-  end subroutine gwe_gwe_df
+  end subroutine exg_df
 
   !> @brief validate exchange data after reading
   !<
@@ -306,7 +306,7 @@ contains
   !!
   !! Allocated and read and calculate saturated conductance
   !<
-  subroutine gwe_gwe_ar(this)
+  subroutine exg_ar(this)
     ! -- dummy
     class(GweExchangeType) :: this !<  GwtExchangeType
     !
@@ -315,13 +315,13 @@ contains
     !
     ! -- Observation AR
     call this%obs%obs_ar()
-  end subroutine gwe_gwe_ar
+  end subroutine exg_ar
 
   !> @ brief Read and prepare
   !!
   !! Read new data for mover and obs
   !<
-  subroutine gwe_gwe_rp(this)
+  subroutine exg_rp(this)
     ! -- modules
     use TdisModule, only: readnewdata
     ! -- dummy
@@ -335,13 +335,13 @@ contains
     !
     ! -- Read and prepare for observations
     call this%gwe_gwe_rp_obs()
-  end subroutine gwe_gwe_rp
+  end subroutine exg_rp
 
   !> @ brief Advance
   !!
   !! Advance mover and obs
   !<
-  subroutine gwe_gwe_ad(this)
+  subroutine exg_ad(this)
     ! -- dummy
     class(GweExchangeType) :: this !<  GweExchangeType
     !
@@ -350,13 +350,13 @@ contains
     !
     ! -- Push simulated values to preceding time step
     call this%obs%obs_ad()
-  end subroutine gwe_gwe_ad
+  end subroutine exg_ad
 
   !> @ brief Fill coefficients
   !!
   !! Calculate conductance and fill coefficient matrix
   !<
-  subroutine gwe_gwe_fc(this, kiter, matrix_sln, rhs_sln, inwtflag)
+  subroutine exg_fc(this, kiter, matrix_sln, rhs_sln, inwtflag)
     ! -- dummy
     class(GweExchangeType) :: this !<  GwtExchangeType
     integer(I4B), intent(in) :: kiter
@@ -366,13 +366,13 @@ contains
     !
     ! -- Call mvt fc routine
     if (this%inmvt > 0) call this%mvt%mvt_fc(this%gwemodel1%x, this%gwemodel2%x)
-  end subroutine gwe_gwe_fc
+  end subroutine exg_fc
 
   !> @ brief Budget
   !!
   !! Accumulate budget terms
   !<
-  subroutine gwe_gwe_bd(this, icnvg, isuppress_output, isolnid)
+  subroutine exg_bd(this, icnvg, isuppress_output, isolnid)
     ! -- modules
     use ConstantsModule, only: DZERO, LENBUDTXT, LENPACKAGENAME
     use BudgetModule, only: rate_accumulator
@@ -408,7 +408,7 @@ contains
     !
     ! -- Call mvt bd routine
     if (this%inmvt > 0) call this%mvt%mvt_bd(this%gwemodel1%x, this%gwemodel2%x)
-  end subroutine gwe_gwe_bd
+  end subroutine exg_bd
 
   !> @ brief Budget save
   !!
@@ -616,7 +616,7 @@ contains
   !!
   !! Write output
   !<
-  subroutine gwe_gwe_ot(this)
+  subroutine exg_ot(this)
     ! -- modules
     use SimVariablesModule, only: iout
     use ConstantsModule, only: DZERO
@@ -664,7 +664,7 @@ contains
     !
     ! -- OBS output
     call this%obs%obs_ot()
-  end subroutine gwe_gwe_ot
+  end subroutine exg_ot
 
   !> @ brief Source options
   !!
@@ -702,7 +702,7 @@ contains
     write (iout, '(1x,a)') 'PROCESSING GWE-GWE EXCHANGE OPTIONS'
     !
     ! -- source base class options
-    call this%DisConnExchangeType%source_options(iout)
+    call this%GeometricConnectionExchangeType%source_options(iout)
     !
     if (found%gwfmodelname1) then
       write (iout, '(4x,a,a)') &
@@ -791,7 +791,7 @@ contains
     ! -- dummy
     class(GweExchangeType) :: this !<  GwtExchangeType
     !
-    call this%DisConnExchangeType%allocate_scalars()
+    call this%GeometricConnectionExchangeType%allocate_scalars()
     !
     call mem_allocate(this%inewton, 'INEWTON', this%memoryPath)
     call mem_allocate(this%inobs, 'INOBS', this%memoryPath)
@@ -808,7 +808,7 @@ contains
   !!
   !! Deallocate memory associated with this object
   !<
-  subroutine gwe_gwe_da(this)
+  subroutine exg_da(this)
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
     ! -- dummy
@@ -847,8 +847,8 @@ contains
     call mem_deallocate(this%inmvt)
     !
     ! -- deallocate base
-    call this%DisConnExchangeType%disconnex_da()
-  end subroutine gwe_gwe_da
+    call this%GeometricConnectionExchangeType%exg_da()
+  end subroutine exg_da
 
   !> @ brief Allocate arrays
   !!
@@ -863,7 +863,7 @@ contains
     character(len=LINELENGTH) :: text
     integer(I4B) :: ntabcol, i
     !
-    call this%DisConnExchangeType%allocate_arrays()
+    call this%GeometricConnectionExchangeType%allocate_arrays()
     !
     call mem_allocate(this%cond, this%nexg, 'COND', this%memoryPath)
     call mem_allocate(this%simvals, this%nexg, 'SIMVALS', this%memoryPath)
@@ -1009,10 +1009,10 @@ contains
   !!
   !! Conduct any final processing
   !<
-  subroutine gwe_gwe_fp(this)
+  subroutine exg_fp(this)
     ! -- dummy
     class(GweExchangeType) :: this !<  GwtExchangeType
-  end subroutine gwe_gwe_fp
+  end subroutine exg_fp
 
   !> @brief Return true when this exchange provides matrix coefficients for
   !! solving @param model

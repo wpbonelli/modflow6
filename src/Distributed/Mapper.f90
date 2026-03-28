@@ -43,18 +43,18 @@ contains
   subroutine add_exchange_vars(this)
     use SimStagesModule
     use ListsModule, only: baseconnectionlist
-    use SpatialModelConnectionModule, only: SpatialModelConnectionType, &
-                                            get_smc_from_list
+    use InterfaceModelExchangeModule, only: InterfaceModelExchangeType, &
+                                            GetInterfaceModelExchangeFromList
     use VirtualExchangeModule, only: VirtualExchangeType, get_virtual_exchange
     class(MapperType) :: this
     ! local
     integer(I4B) :: iconn
-    class(SpatialModelConnectionType), pointer :: conn
+    class(InterfaceModelExchangeType), pointer :: conn
     class(VirtualExchangeType), pointer :: virt_exg
     character(len=LENMEMPATH) :: virt_mem_path, local_mem_path
 
     do iconn = 1, baseconnectionlist%Count()
-      conn => get_smc_from_list(baseconnectionlist, iconn)
+      conn => GetInterfaceModelExchangeFromList(baseconnectionlist, iconn)
       virt_exg => get_virtual_exchange(conn%prim_exchange%id)
       if (.not. virt_exg%v_model1%is_local) then
         virt_mem_path = virt_exg%get_vrt_mem_path('NODEM1', '')
@@ -108,15 +108,15 @@ contains
   !<
   subroutine add_interface_vars(this)
     use ListsModule, only: baseconnectionlist
-    use SpatialModelConnectionModule, only: SpatialModelConnectionType, &
-                                            get_smc_from_list
+    use InterfaceModelExchangeModule, only: InterfaceModelExchangeType, &
+                                            GetInterfaceModelExchangeFromList
     class(MapperType) :: this
     ! local
     integer(I4B) :: iconn
-    class(SpatialModelConnectionType), pointer :: conn
+    class(InterfaceModelExchangeType), pointer :: conn
 
     do iconn = 1, baseconnectionlist%Count()
-      conn => get_smc_from_list(baseconnectionlist, iconn)
+      conn => GetInterfaceModelExchangeFromList(baseconnectionlist, iconn)
       ! add the variables for this interface model to our mapper
       call this%add_dist_vars(conn%owner%idsoln, &
                               conn%iface_dist_vars, &

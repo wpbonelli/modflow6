@@ -112,7 +112,9 @@
 		<File RelativePath="..\src\Distributed\VirtualSolution.f90"/></Filter>
 		<Filter Name="Exchange">
 		<File RelativePath="..\src\Exchange\BaseExchange.f90"/>
-		<File RelativePath="..\src\Exchange\DisConnExchange.f90"/>
+		<File RelativePath="..\src\Exchange\CellConnectionExchange.f90"/>
+		<File RelativePath="..\src\Exchange\NumericalExchange.f90"/>
+		<File RelativePath="..\src\Exchange\GeometricConnectionExchange.f90"/>
 		<File RelativePath="..\src\Exchange\exg-chfgwf.f90"/>
 		<File RelativePath="..\src\Exchange\exg-gwegwe.f90"/>
 		<File RelativePath="..\src\Exchange\exg-gwfgwe.f90"/>
@@ -123,8 +125,7 @@
 		<File RelativePath="..\src\Exchange\exg-olfgwf.f90"/>
 		<File RelativePath="..\src\Exchange\exg-swfgwf.f90"/>
 		<File RelativePath="..\src\Exchange\GhostNode.f90"/>
-		<File RelativePath="..\src\Exchange\GwfExchangeMover.f90"/>
-		<File RelativePath="..\src\Exchange\NumericalExchange.f90"/></Filter>
+		<File RelativePath="..\src\Exchange\GwfExchangeMover.f90"/></Filter>
 		<Filter Name="Idm">
 		<Filter Name="selector">
 		<File RelativePath="..\src\Idm\selector\IdmChfDfnSelector.f90"/>
@@ -270,7 +271,7 @@
 		<File RelativePath="..\src\Model\Connection\GwtGwtConnection.f90"/>
 		<File RelativePath="..\src\Model\Connection\GwtInterfaceModel.f90"/>
 		<File RelativePath="..\src\Model\Connection\qsort_inline.inc"/>
-		<File RelativePath="..\src\Model\Connection\SpatialModelConnection.f90"/></Filter>
+		<File RelativePath="..\src\Model\Connection\InterfaceModelExchange.f90"/></Filter>
 		<Filter Name="Discretization">
 		<File RelativePath="..\src\Model\Discretization\Dis.f90"/>
 		<File RelativePath="..\src\Model\Discretization\Dis2d.f90"/>

@@ -6,8 +6,8 @@ module GwfGwtExchangeModule
   use SimModule, only: store_error
   use SimVariablesModule, only: errmsg
   use BaseExchangeModule, only: BaseExchangeType, AddBaseExchangeToList
-  use SpatialModelConnectionModule, only: SpatialModelConnectionType, &
-                                          get_smc_from_list
+  use InterfaceModelExchangeModule, only: InterfaceModelExchangeType, &
+                                          GetInterfaceModelExchangeFromList
   use GwtGwtConnectionModule, only: GwtGwtConnectionType, CastAsGwtGwtConnection
   use GwfGwfConnectionModule, only: GwfGwfConnectionType, CastAsGwfGwfConnection
   use GwfGwfExchangeModule, only: GwfExchangeType, &
@@ -323,7 +323,7 @@ contains
     type(GwfModelType), pointer :: gwfModel !< the flow model
     type(GwtModelType), pointer :: gwtModel !< the transport model
     ! -- local
-    class(SpatialModelConnectionType), pointer :: conn => null()
+    class(InterfaceModelExchangeType), pointer :: conn => null()
     class(*), pointer :: objPtr => null()
     class(GwtGwtConnectionType), pointer :: gwtConn => null()
     class(GwfGwfConnectionType), pointer :: gwfConn => null()
@@ -336,7 +336,7 @@ contains
     ! loop over all connections
     gwtloop: do ic1 = 1, baseconnectionlist%Count()
       !
-      conn => get_smc_from_list(baseconnectionlist, ic1)
+      conn => GetInterfaceModelExchangeFromList(baseconnectionlist, ic1)
       if (.not. associated(conn%owner, gwtModel)) cycle gwtloop
       !
       ! start with a GWT conn.
@@ -348,7 +348,7 @@ contains
       !
       ! find matching GWF conn. in same list
       gwfloop: do ic2 = 1, baseconnectionlist%Count()
-        conn => get_smc_from_list(baseconnectionlist, ic2)
+        conn => GetInterfaceModelExchangeFromList(baseconnectionlist, ic2)
         !
         if (associated(conn%owner, gwfModel)) then
           !

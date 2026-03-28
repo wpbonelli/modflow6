@@ -12,8 +12,8 @@ module Mf6CoreModule
                          baseconnectionlist
   use BaseModelModule, only: BaseModelType, GetBaseModelFromList
   use BaseExchangeModule, only: BaseExchangeType, GetBaseExchangeFromList
-  use SpatialModelConnectionModule, only: SpatialModelConnectionType, &
-                                          get_smc_from_list
+  use InterfaceModelExchangeModule, only: InterfaceModelExchangeType, &
+                                          GetInterfaceModelExchangeFromList
   use BaseSolutionModule, only: BaseSolutionType, GetBaseSolutionFromList
   use SolutionGroupModule, only: SolutionGroupType, GetSolutionGroupFromList
   use RunControlModule, only: RunControlType
@@ -160,7 +160,7 @@ contains
     class(BaseSolutionType), pointer :: sp => null()
     class(BaseModelType), pointer :: mp => null()
     class(BaseExchangeType), pointer :: ep => null()
-    class(SpatialModelConnectionType), pointer :: mc => null()
+    class(InterfaceModelExchangeType), pointer :: mc => null()
     integer(I4B) :: tmr_dealloc
 
     ! start timer
@@ -211,7 +211,7 @@ contains
     !
     ! -- Deallocate for each connection
     do ic = 1, baseconnectionlist%Count()
-      mc => get_smc_from_list(baseconnectionlist, ic)
+      mc => GetInterfaceModelExchangeFromList(baseconnectionlist, ic)
       call mc%exg_da()
       deallocate (mc)
     end do
@@ -334,7 +334,7 @@ contains
     class(BaseSolutionType), pointer :: sp => null()
     class(BaseModelType), pointer :: mp => null()
     class(BaseExchangeType), pointer :: ep => null()
-    class(SpatialModelConnectionType), pointer :: mc => null()
+    class(InterfaceModelExchangeType), pointer :: mc => null()
 
     ! -- define input
     call idm_df()
@@ -372,7 +372,7 @@ contains
     !
     ! -- Define each connection
     do ic = 1, baseconnectionlist%Count()
-      mc => get_smc_from_list(baseconnectionlist, ic)
+      mc => GetInterfaceModelExchangeFromList(baseconnectionlist, ic)
       call mc%exg_df()
     end do
     !
@@ -405,7 +405,7 @@ contains
     class(BaseSolutionType), pointer :: sp => null()
     class(BaseModelType), pointer :: mp => null()
     class(BaseExchangeType), pointer :: ep => null()
-    class(SpatialModelConnectionType), pointer :: mc => null()
+    class(InterfaceModelExchangeType), pointer :: mc => null()
 
     ! -- Allocate and read each model
     do im = 1, basemodellist%Count()
@@ -424,7 +424,7 @@ contains
     !
     ! -- Allocate and read all model connections
     do ic = 1, baseconnectionlist%Count()
-      mc => get_smc_from_list(baseconnectionlist, ic)
+      mc => GetInterfaceModelExchangeFromList(baseconnectionlist, ic)
       call mc%exg_ar()
     end do
     !
@@ -513,7 +513,7 @@ contains
     ! -- local variables
     class(BaseModelType), pointer :: mp => null()
     class(BaseExchangeType), pointer :: ep => null()
-    class(SpatialModelConnectionType), pointer :: mc => null()
+    class(InterfaceModelExchangeType), pointer :: mc => null()
     class(BaseSolutionType), pointer :: sp => null()
     character(len=LINELENGTH) :: line
     character(len=LINELENGTH) :: fmt
@@ -565,7 +565,7 @@ contains
     !
     ! -- Read and prepare each connection
     do ic = 1, baseconnectionlist%Count()
-      mc => get_smc_from_list(baseconnectionlist, ic)
+      mc => GetInterfaceModelExchangeFromList(baseconnectionlist, ic)
       call mc%exg_rp()
     end do
     !
@@ -589,7 +589,7 @@ contains
     !
     ! -- time update for each connection
     do ic = 1, baseconnectionlist%Count()
-      mc => get_smc_from_list(baseconnectionlist, ic)
+      mc => GetInterfaceModelExchangeFromList(baseconnectionlist, ic)
       call mc%exg_dt()
     end do
     !
@@ -728,7 +728,7 @@ contains
     class(BaseSolutionType), pointer :: sp => null()
     class(BaseModelType), pointer :: mp => null()
     class(BaseExchangeType), pointer :: ep => null()
-    class(SpatialModelConnectionType), pointer :: mc => null()
+    class(InterfaceModelExchangeType), pointer :: mc => null()
     character(len=LINELENGTH) :: line
     character(len=LINELENGTH) :: fmt
     integer(I4B) :: im
@@ -772,7 +772,7 @@ contains
       !
       ! -- Write output for each connection
       do ic = 1, baseconnectionlist%Count()
-        mc => get_smc_from_list(baseconnectionlist, ic)
+        mc => GetInterfaceModelExchangeFromList(baseconnectionlist, ic)
         call mc%exg_ot()
       end do
       !

@@ -20,7 +20,7 @@ module GwfGwfExchangeModule
                              TABCENTER, TABLEFT, LENAUXNAME, DNODATA
   use ListModule, only: ListType
   use ListsModule, only: basemodellist
-  use DisConnExchangeModule, only: DisConnExchangeType
+  use GeometricConnectionExchangeModule, only: GeometricConnectionExchangeType
   use GwfModule, only: GwfModelType
   use VirtualModelModule, only: VirtualModelType
   use GhostNodeModule, only: GhostNodeType
@@ -44,7 +44,7 @@ module GwfGwfExchangeModule
   !! This derived type contains information and methods for
   !! connecting two GWF models.
   !<
-  type, extends(DisConnExchangeType) :: GwfExchangeType
+  type, extends(GeometricConnectionExchangeType) :: GwfExchangeType
     class(GwfModelType), pointer :: gwfmodel1 => null() !< pointer to GWF Model 1
     class(GwfModelType), pointer :: gwfmodel2 => null() !< pointer to GWF Model 2
     !
@@ -74,20 +74,20 @@ module GwfGwfExchangeModule
 
   contains
 
-    procedure :: exg_df => gwf_gwf_df
-    procedure :: exg_ac => gwf_gwf_ac
-    procedure :: exg_mc => gwf_gwf_mc
-    procedure :: exg_ar => gwf_gwf_ar
-    procedure :: exg_rp => gwf_gwf_rp
-    procedure :: exg_ad => gwf_gwf_ad
-    procedure :: exg_cf => gwf_gwf_cf
-    procedure :: exg_fc => gwf_gwf_fc
-    procedure :: exg_fn => gwf_gwf_fn
-    procedure :: exg_cq => gwf_gwf_cq
-    procedure :: exg_bd => gwf_gwf_bd
-    procedure :: exg_ot => gwf_gwf_ot
-    procedure :: exg_da => gwf_gwf_da
-    procedure :: exg_fp => gwf_gwf_fp
+    procedure :: exg_df
+    procedure :: exg_ac
+    procedure :: exg_mc
+    procedure :: exg_ar
+    procedure :: exg_rp
+    procedure :: exg_ad
+    procedure :: exg_cf
+    procedure :: exg_fc
+    procedure :: exg_fn
+    procedure :: exg_cq
+    procedure :: exg_bd
+    procedure :: exg_ot
+    procedure :: exg_da
+    procedure :: exg_fp
     procedure :: get_iasym => gwf_gwf_get_iasym
     procedure :: connects_model => gwf_gwf_connects_model
     procedure :: use_interface_model
@@ -203,7 +203,7 @@ contains
   !!
   !! Define GWF to GWF exchange object.
   !<
-  subroutine gwf_gwf_df(this)
+  subroutine exg_df(this)
     ! -- modules
     use SimVariablesModule, only: iout
     use InputOutputModule, only: getunit, openfile
@@ -266,7 +266,7 @@ contains
     !
     ! -- validate
     call this%validate_exchange()
-  end subroutine gwf_gwf_df
+  end subroutine exg_df
 
   !> @brief validate exchange data after reading
   !<
@@ -360,7 +360,7 @@ contains
   !!
   !! Override parent exg_ac so that gnc can add connections here.
   !<
-  subroutine gwf_gwf_ac(this, sparse)
+  subroutine exg_ac(this, sparse)
     ! -- modules
     use SparseModule, only: sparsematrix
     ! -- dummy
@@ -381,13 +381,13 @@ contains
     if (this%ingnc > 0) then
       call this%gnc%gnc_ac(sparse)
     end if
-  end subroutine gwf_gwf_ac
+  end subroutine exg_ac
 
   !> @ brief Map connections
   !!
   !! Map the connections in the global matrix
   !<
-  subroutine gwf_gwf_mc(this, matrix_sln)
+  subroutine exg_mc(this, matrix_sln)
     ! -- modules
     use SparseModule, only: sparsematrix
     ! -- dummy
@@ -408,13 +408,13 @@ contains
     if (this%ingnc > 0) then
       call this%gnc%gnc_mc(matrix_sln)
     end if
-  end subroutine gwf_gwf_mc
+  end subroutine exg_mc
 
   !> @ brief Allocate and read
   !!
   !! Allocated and read and calculate saturated conductance
   !<
-  subroutine gwf_gwf_ar(this)
+  subroutine exg_ar(this)
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
     !
@@ -426,13 +426,13 @@ contains
     !
     ! -- Observation AR
     call this%obs%obs_ar()
-  end subroutine gwf_gwf_ar
+  end subroutine exg_ar
 
   !> @ brief Read and prepare
   !!
   !! Read new data for mover and obs
   !<
-  subroutine gwf_gwf_rp(this)
+  subroutine exg_rp(this)
     ! -- modules
     use TdisModule, only: readnewdata
     ! -- dummy
@@ -446,13 +446,13 @@ contains
     !
     ! -- Read and prepare for observations
     call this%gwf_gwf_rp_obs()
-  end subroutine gwf_gwf_rp
+  end subroutine exg_rp
 
   !> @ brief Advance
   !!
   !! Advance mover and obs
   !<
-  subroutine gwf_gwf_ad(this)
+  subroutine exg_ad(this)
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
     !
@@ -461,13 +461,13 @@ contains
     !
     ! -- Push simulated values to preceding time step
     call this%obs%obs_ad()
-  end subroutine gwf_gwf_ad
+  end subroutine exg_ad
 
   !> @ brief Calculate coefficients
   !!
   !! Rewet as necessary
   !<
-  subroutine gwf_gwf_cf(this, kiter)
+  subroutine exg_cf(this, kiter)
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
     integer(I4B), intent(in) :: kiter
@@ -479,13 +479,13 @@ contains
     ! -- Rewet cells across models using the wetdry parameters in each model's
     !    npf package, and the head in the connected model.
     call this%rewet(kiter)
-  end subroutine gwf_gwf_cf
+  end subroutine exg_cf
 
   !> @ brief Fill coefficients
   !!
   !! Calculate conductance and fill coefficient matrix
   !<
-  subroutine gwf_gwf_fc(this, kiter, matrix_sln, rhs_sln, inwtflag)
+  subroutine exg_fc(this, kiter, matrix_sln, rhs_sln, inwtflag)
     ! -- modules
     use ConstantsModule, only: DHALF
     use GwfConductanceUtilsModule, only: hcond, vcond
@@ -547,13 +547,13 @@ contains
                              ictm2_opt=this%gwfmodel2%npf%icelltype)
       end if
     end if
-  end subroutine gwf_gwf_fc
+  end subroutine exg_fc
 
   !> @ brief Fill Newton
   !!
   !! Fill amatsln with Newton terms
   !<
-  subroutine gwf_gwf_fn(this, kiter, matrix_sln)
+  subroutine exg_fn(this, kiter, matrix_sln)
     ! -- modules
     use SmoothingModule, only: sQuadraticSaturationDerivative
     ! -- dummy
@@ -653,14 +653,14 @@ contains
         end if
       end if
     end do
-  end subroutine gwf_gwf_fn
+  end subroutine exg_fn
 
   !> @ brief Calculate flow
   !!
   !! Calculate flow between two cells and store in simvals, also set
   !! information needed for specific discharge calculation
   !<
-  subroutine gwf_gwf_cq(this, icnvg, isuppress_output, isolnid)
+  subroutine exg_cq(this, icnvg, isuppress_output, isolnid)
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
     integer(I4B), intent(inout) :: icnvg
@@ -675,7 +675,7 @@ contains
     !
     ! -- add exchange flows to model's flowja diagonal
     call this%gwf_gwf_add_to_flowja()
-  end subroutine gwf_gwf_cq
+  end subroutine exg_cq
 
   !> @brief Calculate flow rates for the exchanges and store them in a member
   !! array
@@ -855,7 +855,7 @@ contains
   !!
   !! Accumulate budget terms
   !<
-  subroutine gwf_gwf_bd(this, icnvg, isuppress_output, isolnid)
+  subroutine exg_bd(this, icnvg, isuppress_output, isolnid)
     ! -- modules
     use ConstantsModule, only: DZERO, LENBUDTXT, LENPACKAGENAME
     use BudgetModule, only: rate_accumulator
@@ -895,7 +895,7 @@ contains
     !
     ! -- Call mvr bd routine
     if (this%inmvr > 0) call this%mvr%mvr_bd()
-  end subroutine gwf_gwf_bd
+  end subroutine exg_bd
 
   !> @ brief gwf-gwf-chd-bd
   !!
@@ -1156,7 +1156,7 @@ contains
   !!
   !! Write output
   !<
-  subroutine gwf_gwf_ot(this)
+  subroutine exg_ot(this)
     ! -- modules
     use SimVariablesModule, only: iout
     use ConstantsModule, only: DZERO
@@ -1221,7 +1221,7 @@ contains
     !
     ! -- OBS output
     call this%obs%obs_ot()
-  end subroutine gwf_gwf_ot
+  end subroutine exg_ot
 
   !> @ brief Source options
   !!
@@ -1257,7 +1257,7 @@ contains
     write (iout, '(1x,a)') 'PROCESSING GWF-GWF EXCHANGE OPTIONS'
     !
     ! -- source base class options
-    call this%DisConnExchangeType%source_options(iout)
+    call this%GeometricConnectionExchangeType%source_options(iout)
     !
     if (found%cell_averaging) then
       if (this%icellavg == 0) then
@@ -1653,7 +1653,7 @@ contains
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
     !
-    call this%DisConnExchangeType%allocate_scalars()
+    call this%GeometricConnectionExchangeType%allocate_scalars()
     !
     call mem_allocate(this%icellavg, 'ICELLAVG', this%memoryPath)
     call mem_allocate(this%ivarcv, 'IVARCV', this%memoryPath)
@@ -1677,7 +1677,7 @@ contains
   !!
   !! Deallocate memory associated with this object
   !<
-  subroutine gwf_gwf_da(this)
+  subroutine exg_da(this)
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
     ! -- dummy
@@ -1727,8 +1727,8 @@ contains
     call mem_deallocate(this%satomega)
     !
     ! -- deallocate base
-    call this%DisConnExchangeType%disconnex_da()
-  end subroutine gwf_gwf_da
+    call this%GeometricConnectionExchangeType%exg_da()
+  end subroutine exg_da
 
   !> @ brief Allocate arrays
   !!
@@ -1743,7 +1743,7 @@ contains
     character(len=LINELENGTH) :: text
     integer(I4B) :: ntabcol, i
     !
-    call this%DisConnExchangeType%allocate_arrays()
+    call this%GeometricConnectionExchangeType%allocate_arrays()
     !
     call mem_allocate(this%cond, this%nexg, 'COND', this%memoryPath)
     call mem_allocate(this%idxglo, this%nexg, 'IDXGLO', this%memoryPath)
@@ -1892,10 +1892,10 @@ contains
   !!
   !! Conduct any final processing
   !<
-  subroutine gwf_gwf_fp(this)
+  subroutine exg_fp(this)
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
-  end subroutine gwf_gwf_fp
+  end subroutine exg_fp
 
   !> @ brief Calculate flow
   !!
@@ -1972,7 +1972,7 @@ contains
     ! -- local
     integer(I4B) :: inbuy_m1
 
-    use_im = this%DisConnExchangeType%use_interface_model()
+    use_im = this%GeometricConnectionExchangeType%use_interface_model()
     use_im = use_im .or. (this%ixt3d > 0)
 
     inbuy_m1 = 0

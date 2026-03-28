@@ -1,4 +1,4 @@
-module SpatialModelConnectionModule
+module InterfaceModelExchangeModule
   use KindModule, only: I4B, DP, LGP
   use ConstantsModule, only: LINELENGTH, DZERO
   use SparseModule, only: sparsematrix
@@ -7,7 +7,7 @@ module SpatialModelConnectionModule
   use SimModule, only: ustop, count_errors, store_error
   use NumericalModelModule, only: NumericalModelType
   use NumericalExchangeModule, only: NumericalExchangeType
-  use DisConnExchangeModule, only: DisConnExchangeType
+  use GeometricConnectionExchangeModule, only: GeometricConnectionExchangeType
   use MemoryManagerModule, only: mem_allocate, mem_deallocate, mem_checkin
   use MemoryHelperModule, only: create_mem_path
   use GridConnectionModule, only: GridConnectionType
@@ -24,24 +24,31 @@ module SpatialModelConnectionModule
 
   implicit none
   private
-  public :: cast_as_smc
-  public :: add_smc_to_list
-  public :: get_smc_from_list
+  public :: CastAsInterfaceModelExchange
+  public :: AddInterfaceModelExchangeToList
+  public :: GetInterfaceModelExchangeFromList
 
-  !> Class to manage spatial connection of a model to one
-  !! or more models of the same type. Spatial connection here
-  !! means that the model domains (spatial discretization) are
-  !! adjacent and connected via DisConnExchangeType object(s).
-  !! The connection itself is a Numerical Exchange as well,
-  !! and part of a Numerical Solution providing the amat and rhs
-  !< values for the exchange.
-  type, public, extends(NumericalExchangeType) :: SpatialModelConnectionType
+  !> @brief InterfaceModelExchangeType
+  !!
+  !! An exchange type that wraps a GeometricConnectionExchangeType and creates
+  !! an interface model to handle the numerical coupling between two models of
+  !! the same type (e.g., GWF-GWF, GWT-GWT, GWE-GWE). This exchange type:
+  !!   - Creates an interface model that includes cells from both models near
+  !!     the connection, plus a computational stencil/halo around those cells
+  !!   - Assembles matrix coefficients and RHS terms for the interface
+  !!   - Provides these coefficients to the numerical solution
+  !!
+  !! This approach provides a more accurate and robust coupling than simple
+  !! cell-to-cell connections, especially for complex discretizations, higher
+  !! order schemes (e.g., XT3D), and transport with sharp gradients.
+  !<
+  type, public, extends(NumericalExchangeType) :: InterfaceModelExchangeType
 
     class(NumericalModelType), pointer :: owner => null() !< the model whose connection this is
     class(NumericalModelType), pointer :: interface_model => null() !< the interface model
     integer(I4B), pointer :: nr_connections => null() !< total nr. of connected cells (primary)
 
-    class(DisConnExchangeType), pointer :: prim_exchange => null() !< the exchange for which the interface model is created
+    class(GeometricConnectionExchangeType), pointer :: prim_exchange => null() !< the primary exchange for which the interface model is created
     logical(LGP) :: owns_exchange !< there are two connections (in serial) for an exchange,
                                   !! one of them needs to manage/own the exchange (e.g. clean up)
     type(STLVecInt), pointer :: halo_models !< models that are potentially in the halo of this interface
@@ -67,41 +74,37 @@ module SpatialModelConnectionModule
   contains
 
     ! public
-    procedure, pass(this) :: spatialConnection_ctor
-    generic :: construct => spatialConnection_ctor
+    procedure, pass(this) :: interfaceModelExchange_ctor
+    generic :: construct => interfaceModelExchange_ctor
 
-    ! partly overriding NumericalExchangeType:
-    procedure :: exg_df => spatialcon_df
-    procedure :: exg_ar => spatialcon_ar
-    procedure :: exg_ac => spatialcon_ac
-    procedure :: exg_mc => spatialcon_mc
-    procedure :: exg_cf => spatialcon_cf
-    procedure :: exg_fc => spatialcon_fc
-    procedure :: exg_da => spatialcon_da
+    ! overriding NumericalExchangeType:
+    procedure :: exg_df
+    procedure :: exg_ar
+    procedure :: exg_ac
+    procedure :: exg_mc
+    procedure :: exg_cf
+    procedure :: exg_fc
+    procedure :: exg_da
 
     ! protected
-    procedure, pass(this) :: spatialcon_df
-    procedure, pass(this) :: spatialcon_ar
-    procedure, pass(this) :: spatialcon_ac
-    procedure, pass(this) :: spatialcon_cf
-    procedure, pass(this) :: spatialcon_fc
-    procedure, pass(this) :: spatialcon_da
-    procedure, pass(this) :: spatialcon_setmodelptrs
-    procedure, pass(this) :: spatialcon_connect
+    procedure, pass(this) :: setmodelptrs
+    procedure, pass(this) :: connect
     procedure, pass(this) :: validateConnection
     procedure, pass(this) :: cfg_dv
     procedure, pass(this) :: createModelHalo
 
+    ! overriding allocation methods
+    procedure :: allocate_scalars
+    procedure :: allocate_arrays
+
     ! private
     procedure, private, pass(this) :: setupGridConnection
     procedure, private, pass(this) :: getNrOfConnections
-    procedure, private, pass(this) :: allocateScalars
-    procedure, private, pass(this) :: allocateArrays
     procedure, private, pass(this) :: createCoefficientMatrix
     procedure, private, pass(this) :: maskOwnerConnections
     procedure, private, pass(this) :: addModelNeighbors
 
-  end type SpatialModelConnectionType
+  end type InterfaceModelExchangeType
 
 contains ! module procedures
 
@@ -109,10 +112,10 @@ contains ! module procedures
   !!
   !! This constructor is typically called from a derived class.
   !<
-  subroutine spatialConnection_ctor(this, model, exchange, name)
-    class(SpatialModelConnectionType) :: this !< the connection
+  subroutine interfaceModelExchange_ctor(this, model, exchange, name)
+    class(InterfaceModelExchangeType) :: this !< the connection
     class(NumericalModelType), intent(in), pointer :: model !< the model that owns the connection
-    class(DisConnExchangeType), intent(in), pointer :: exchange !< the primary exchange from which
+    class(GeometricConnectionExchangeType), intent(in), pointer :: exchange !< the primary exchange from which
                                                                 !! the connection is created
     character(len=*), intent(in) :: name !< the connection name (for memory management mostly)
 
@@ -126,7 +129,7 @@ contains ! module procedures
     allocate (this%halo_models)
     allocate (this%halo_exchanges)
     allocate (this%matrix)
-    call this%allocateScalars()
+    call this%allocate_scalars()
 
     this%int_stencil_depth = 1
     this%exg_stencil_depth = 1
@@ -135,12 +138,12 @@ contains ! module procedures
     ! this should be set in derived ctor
     this%interface_model => null()
 
-  end subroutine spatialConnection_ctor
+  end subroutine interfaceModelExchange_ctor
 
   !> @brief Find all models that might participate in this interface
   !<
   subroutine createModelHalo(this)
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
 
     call this%halo_models%init()
     call this%halo_exchanges%init()
@@ -156,7 +159,7 @@ contains ! module procedures
                                          virtual_exchanges, &
                                          depth, is_root, mask)
     use VirtualExchangeModule, only: get_virtual_exchange
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
     integer(I4B) :: model_id !< the model (id) to add neighbors for
     type(ListType) :: virtual_exchanges !< list with all virtual exchanges
     integer(I4B), value :: depth !< the maximal number of exchanges between
@@ -237,8 +240,8 @@ contains ! module procedures
   !> @brief Define this connection, this is where the
   !! discretization (DISU) for the interface model is
   !< created!
-  subroutine spatialcon_df(this)
-    class(SpatialModelConnectionType) :: this !< this connection
+  subroutine exg_df(this)
+    class(InterfaceModelExchangeType) :: this !< this connection
     ! local
     integer(I4B) :: i
     class(VirtualModelType), pointer :: v_model
@@ -258,14 +261,14 @@ contains ! module procedures
     call this%setupGridConnection()
 
     this%neq = this%ig_builder%nrOfCells
-    call this%allocateArrays()
+    call this%allocate_arrays()
 
-  end subroutine spatialcon_df
+  end subroutine exg_df
 
   !> @brief Allocate the connection,
   !<
-  subroutine spatialcon_ar(this)
-    class(SpatialModelConnectionType) :: this !< this connection
+  subroutine exg_ar(this)
+    class(InterfaceModelExchangeType) :: this !< this connection
     ! local
     integer(I4B) :: iface_idx, glob_idx
     class(GridConnectionType), pointer :: gc
@@ -279,12 +282,12 @@ contains ! module procedures
       gc%idxToGlobalIdx(iface_idx) = glob_idx
     end do
 
-  end subroutine spatialcon_ar
+  end subroutine exg_ar
 
   !> @brief set model pointers to connection
   !<
-  subroutine spatialcon_setmodelptrs(this)
-    class(SpatialModelConnectionType) :: this !< this connection
+  subroutine setmodelptrs(this)
+    class(InterfaceModelExchangeType) :: this !< this connection
 
     ! point x, ibound, and rhs to connection
     this%interface_model%x => this%x
@@ -300,12 +303,12 @@ contains ! module procedures
                      this%interface_model%memoryPath, 'IBOUND', &
                      this%memoryPath)
 
-  end subroutine spatialcon_setmodelptrs
+  end subroutine setmodelptrs
 
   !> @brief map interface model connections to our sparse matrix,
   !< analogously to what happens in sln_connect.
-  subroutine spatialcon_connect(this)
-    class(SpatialModelConnectionType) :: this !< this connection
+  subroutine connect(this)
+    class(InterfaceModelExchangeType) :: this !< this connection
     ! local
     type(sparsematrix) :: sparse
     class(MatrixBaseType), pointer :: matrix_base
@@ -322,7 +325,7 @@ contains ! module procedures
     call this%interface_model%model_mc(matrix_base)
     call this%maskOwnerConnections()
 
-  end subroutine spatialcon_connect
+  end subroutine connect
 
   !> @brief Mask the owner's connections
   !!
@@ -331,7 +334,7 @@ contains ! module procedures
   !< set their mask to zero for the owning model.
   subroutine maskOwnerConnections(this)
     use CsrUtilsModule, only: getCSRIndex
-    class(SpatialModelConnectionType) :: this !< the connection
+    class(InterfaceModelExchangeType) :: this !< the connection
     ! local
     integer(I4B) :: ipos, n, m, nloc, mloc, csr_idx
     type(ConnectionsType), pointer :: conn
@@ -381,8 +384,8 @@ contains ! module procedures
 
   !> @brief Add connections, handled by the interface model,
   !< to the global system's sparse
-  subroutine spatialcon_ac(this, sparse)
-    class(SpatialModelConnectionType) :: this !< this connection
+  subroutine exg_ac(this, sparse)
+    class(InterfaceModelExchangeType) :: this !< this connection
     type(sparsematrix), intent(inout) :: sparse !< sparse matrix to store the connections
     ! local
     integer(I4B) :: n, m, ipos
@@ -410,13 +413,13 @@ contains ! module procedures
 
     end do
 
-  end subroutine spatialcon_ac
+  end subroutine exg_ac
 
   !> @brief Creates the mapping from the local system
   !< matrix to the global one
-  subroutine spatialcon_mc(this, matrix_sln)
+  subroutine exg_mc(this, matrix_sln)
     use SimModule, only: ustop
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
     class(MatrixBaseType), pointer :: matrix_sln !< global matrix
     ! local
     integer(I4B) :: i, m, n, mglo, nglo, ipos, ipos_sln
@@ -449,13 +452,13 @@ contains ! module procedures
       end do
     end do
 
-  end subroutine spatialcon_mc
+  end subroutine exg_mc
 
   !> @brief Calculate (or adjust) matrix coefficients,
   !! in this case those which are determined or affected
   !< by the connection of a GWF model with its neighbors
-  subroutine spatialcon_cf(this, kiter)
-    class(SpatialModelConnectionType) :: this !< this connection
+  subroutine exg_cf(this, kiter)
+    class(InterfaceModelExchangeType) :: this !< this connection
     integer(I4B), intent(in) :: kiter !< the iteration counter
     ! local
     integer(I4B) :: i
@@ -469,12 +472,12 @@ contains ! module procedures
     ! calculate the interface model
     call this%interface_model%model_cf(kiter)
 
-  end subroutine spatialcon_cf
+  end subroutine exg_cf
 
   !> @brief Formulate coefficients from interface model
   !<
-  subroutine spatialcon_fc(this, kiter, matrix_sln, rhs_sln, inwtflag)
-    class(SpatialModelConnectionType) :: this !< this connection
+  subroutine exg_fc(this, kiter, matrix_sln, rhs_sln, inwtflag)
+    class(InterfaceModelExchangeType) :: this !< this connection
     integer(I4B), intent(in) :: kiter !< the iteration counter
     class(MatrixBaseType), pointer :: matrix_sln !< the system matrix
     real(DP), dimension(:), intent(inout) :: rhs_sln !< global right-hand-side
@@ -508,12 +511,12 @@ contains ! module procedures
       end do
     end do
 
-  end subroutine spatialcon_fc
+  end subroutine exg_fc
 
   !> @brief Deallocation
   !<
-  subroutine spatialcon_da(this)
-    class(SpatialModelConnectionType) :: this !< this connection
+  subroutine exg_da(this)
+    class(InterfaceModelExchangeType) :: this !< this connection
 
     call mem_deallocate(this%neq)
     call mem_deallocate(this%int_stencil_depth)
@@ -537,7 +540,11 @@ contains ! module procedures
     deallocate (this%interface_map)
     deallocate (this%ipos_to_sln)
 
-  end subroutine spatialcon_da
+    ! Note: InterfaceModelExchangeType doesn't allocate the base connection arrays
+    ! (nexg, nodem1, nodem2, ihc) so we don't call parent exg_da to avoid
+    ! trying to deallocate memory we never allocated.
+
+  end subroutine exg_da
 
   !> @brief Creates the connection structure for the
   !! interface grid, starting from primary exchanges,
@@ -545,7 +552,7 @@ contains ! module procedures
   !! model boundaries.
   !<
   subroutine setupGridConnection(this)
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
     ! local
 
     ! connect cells from primary exchange
@@ -562,24 +569,32 @@ contains ! module procedures
 
   !> @brief Allocation of scalars
   !<
-  subroutine allocateScalars(this)
+  subroutine allocate_scalars(this)
     use MemoryManagerModule, only: mem_allocate
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
+
+    ! Note: InterfaceModelExchangeType doesn't use the base connection arrays
+    ! (nexg, nodem1, nodem2, ihc) - it uses prim_exchange for that data.
+    ! So we don't call parent allocate_scalars here.
 
     call mem_allocate(this%neq, 'NEQ', this%memoryPath)
     call mem_allocate(this%int_stencil_depth, 'INTSTDEPTH', this%memoryPath)
     call mem_allocate(this%exg_stencil_depth, 'EXGSTDEPTH', this%memoryPath)
     call mem_allocate(this%nr_connections, 'NROFCONNS', this%memoryPath)
 
-  end subroutine allocateScalars
+  end subroutine allocate_scalars
 
   !> @brief Allocation of arrays
   !<
-  subroutine allocateArrays(this)
+  subroutine allocate_arrays(this)
     use MemoryManagerModule, only: mem_allocate
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
     ! local
     integer(I4B) :: i
+
+    ! Note: InterfaceModelExchangeType doesn't use the base connection arrays
+    ! (nexg, nodem1, nodem2, ihc) - it uses prim_exchange for that data.
+    ! So we don't call parent allocate_arrays here.
 
     call mem_allocate(this%x, this%neq, 'X', this%memoryPath)
     call mem_allocate(this%rhs, this%neq, 'RHS', this%memoryPath)
@@ -592,12 +607,12 @@ contains ! module procedures
       this%rhs(i) = DZERO
     end do
 
-  end subroutine allocateArrays
+  end subroutine allocate_arrays
 
   !> @brief Returns total nr. of primary connections
   !<
   function getNrOfConnections(this) result(nrConns)
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
     integer(I4B) :: nrConns
     !local
 
@@ -609,7 +624,7 @@ contains ! module procedures
   !<
   subroutine createCoefficientMatrix(this, sparse)
     use SimModule, only: ustop
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
     type(sparsematrix), intent(inout) :: sparse !< the sparse matrix with the cell connections
 
     call sparse%sort()
@@ -620,9 +635,9 @@ contains ! module procedures
   !> @brief Validate this connection
   !<
   subroutine validateConnection(this)
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
     ! local
-    class(DisConnExchangeType), pointer :: conEx => null()
+    class(GeometricConnectionExchangeType), pointer :: conEx => null()
     character(len=LINELENGTH) :: errmsg
 
     conEx => this%prim_exchange
@@ -654,7 +669,7 @@ contains ! module procedures
   !< of this interface.
   subroutine cfg_dv(this, var_name, subcomp_name, map_type, &
                     sync_stages, exg_var_name)
-    class(SpatialModelConnectionType) :: this !< this connection
+    class(InterfaceModelExchangeType) :: this !< this connection
     character(len=*) :: var_name !< name of variable, e.g. "K11"
     character(len=*) :: subcomp_name !< subcomponent, e.g. "NPF"
     integer(I4B) :: map_type !< type of variable map
@@ -679,47 +694,47 @@ contains ! module procedures
 
   end subroutine cfg_dv
 
-  !> @brief Cast to SpatialModelConnectionType
+  !> @brief Cast to InterfaceModelExchangeType
   !<
-  function cast_as_smc(obj) result(res)
+  function CastAsInterfaceModelExchange(obj) result(res)
     implicit none
     class(*), pointer, intent(inout) :: obj !< object to be cast
-    class(SpatialModelConnectionType), pointer :: res !< the instance of SpatialModelConnectionType
+    class(InterfaceModelExchangeType), pointer :: res !< the instance of InterfaceModelExchangeType
     !
     res => null()
     if (.not. associated(obj)) return
     !
     select type (obj)
-    class is (SpatialModelConnectionType)
+    class is (InterfaceModelExchangeType)
       res => obj
     end select
-  end function cast_as_smc
+  end function CastAsInterfaceModelExchange
 
   !> @brief Add connection to a list
   !<
-  subroutine add_smc_to_list(list, conn)
+  subroutine AddInterfaceModelExchangeToList(list, conn)
     implicit none
     ! -- dummy
     type(ListType), intent(inout) :: list !< the list
-    class(SpatialModelConnectionType), pointer, intent(in) :: conn !< the connection
+    class(InterfaceModelExchangeType), pointer, intent(in) :: conn !< the connection
     ! -- local
     class(*), pointer :: obj
     !
     obj => conn
     call list%Add(obj)
-  end subroutine add_smc_to_list
+  end subroutine AddInterfaceModelExchangeToList
 
   !> @brief Get the connection from a list
   !<
-  function get_smc_from_list(list, idx) result(res)
+  function GetInterfaceModelExchangeFromList(list, idx) result(res)
     type(ListType), intent(inout) :: list !< the list
     integer(I4B), intent(in) :: idx !< the index of the connection
-    class(SpatialModelConnectionType), pointer :: res !< the returned connection
+    class(InterfaceModelExchangeType), pointer :: res !< the returned connection
 
     ! local
     class(*), pointer :: obj
     obj => list%GetItem(idx)
-    res => cast_as_smc(obj)
-  end function get_smc_from_list
+    res => CastAsInterfaceModelExchange(obj)
+  end function GetInterfaceModelExchangeFromList
 
-end module SpatialModelConnectionModule
+end module InterfaceModelExchangeModule

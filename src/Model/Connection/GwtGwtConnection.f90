@@ -4,10 +4,10 @@ module GwtGwtConnectionModule
   use CsrUtilsModule, only: getCSRIndex
   use SimModule, only: ustop
   use MemoryManagerModule, only: mem_allocate, mem_deallocate, mem_checkin
-  use SpatialModelConnectionModule
+  use InterfaceModelExchangeModule
   use NumericalModelModule
   use GwtModule
-  use DisConnExchangeModule
+  use GeometricConnectionExchangeModule
   use GwtGwtExchangeModule
   use GwtInterfaceModelModule
   use SparseModule, only: sparsematrix
@@ -27,7 +27,7 @@ module GwtGwtConnectionModule
   !! from NumericalExchangeType so the solution can use it to
   !! fetch the coefficients for this connection.
   !<
-  type, public, extends(SpatialModelConnectionType) :: GwtGwtConnectionType
+  type, public, extends(InterfaceModelExchangeType) :: GwtGwtConnectionType
 
     class(GwtModelType), pointer :: gwtModel => null() !< the model for which this connection exists
     class(GwtExchangeType), pointer :: gwtExchange => null() !< the primary exchange, cast to GWT-GWT
@@ -68,8 +68,8 @@ module GwtGwtConnectionModule
     procedure :: validateConnection
 
     ! local stuff
-    procedure, private :: allocate_scalars
-    procedure, private :: allocate_arrays
+    procedure :: allocate_scalars
+    procedure :: allocate_arrays
     procedure, private :: cfg_dist_vars
     procedure, private :: setGridExtent
     procedure, private :: setFlowToExchange
@@ -85,7 +85,7 @@ contains
     class(GwtGwtConnectionType) :: this !< the connection
     class(NumericalModelType), pointer :: model !< the model owning this connection,
                                                 !! this must be a GwtModelType
-    class(DisConnExchangeType), pointer :: gwtEx !< the GWT-GWT exchange the interface model is created for
+    class(GeometricConnectionExchangeType), pointer :: gwtEx !< the GWT-GWT exchange the interface model is created for
     ! local
     character(len=LINELENGTH) :: fname
     character(len=LENCOMPONENTNAME) :: name
@@ -119,9 +119,9 @@ contains
     end if
 
     ! first call base constructor
-    call this%SpatialModelConnectionType%spatialConnection_ctor(model, &
-                                                                gwtEx, &
-                                                                name)
+    call this%InterfaceModelExchangeType%interfaceModelExchange_ctor(model, &
+                                                                     gwtEx, &
+                                                                     name)
 
     call this%allocate_scalars()
     this%typename = 'GWT-GWT'
@@ -168,7 +168,7 @@ contains
     call this%setGridExtent()
 
     ! now set up the GridConnection
-    call this%spatialcon_df()
+    call this%exg_df()
 
     ! we have to 'catch up' and create the interface model
     ! here, then the remainder of this routine will be define
@@ -191,14 +191,14 @@ contains
     call this%gwtInterfaceModel%allocate_fmi()
 
     ! connect X, RHS, IBOUND, and flowja
-    call this%spatialcon_setmodelptrs()
+    call this%setmodelptrs()
 
     ! connect pointers (used by BUY)
     this%conc => this%gwtInterfaceModel%x
     this%icbound => this%gwtInterfaceModel%ibound
 
     ! add connections from the interface model to solution matrix
-    call this%spatialcon_connect()
+    call this%connect()
 
   end subroutine gwtgwtcon_df
 
@@ -289,7 +289,7 @@ contains
     call this%validateConnection()
 
     ! allocate and read base
-    call this%spatialcon_ar()
+    call this%exg_ar()
 
     ! ... and now the interface model
     call this%gwtInterfaceModel%model_ar()
@@ -315,7 +315,7 @@ contains
     class(GwtGwtConnectionType) :: this !< this connection
 
     ! base validation, the spatial/geometry part
-    call this%SpatialModelConnectionType%validateConnection()
+    call this%InterfaceModelExchangeType%validateConnection()
 
     ! we cannot validate this (yet) in parallel mode
     if (.not. this%gwtExchange%v_model1%is_local) return
@@ -382,7 +382,7 @@ contains
     integer(I4B), optional, intent(in) :: inwtflag !< newton-raphson flag
     !
 
-    call this%SpatialModelConnectionType%spatialcon_fc( &
+    call this%InterfaceModelExchangeType%exg_fc( &
       kiter, matrix_sln, rhs_sln, inwtflag)
     !
     ! FC the movers through the exchange
@@ -475,7 +475,7 @@ contains
     deallocate (this%gwtInterfaceModel)
 
     ! dealloc base
-    call this%spatialcon_da()
+    call this%InterfaceModelExchangeType%exg_da()
 
     inquire (this%iout, opened=isOpen)
     if (isOpen) then

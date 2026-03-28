@@ -13,7 +13,7 @@ module GridConnectionModule
   use ListModule, only: ListType, isEqualIface
   use NumericalModelModule
   use DisuModule
-  use DisConnExchangeModule
+  use GeometricConnectionExchangeModule
   use VirtualModelModule, only: VirtualModelType, get_virtual_model, &
                                 get_virtual_model_from_list
   use VirtualExchangeModule, only: VirtualExchangeType, get_virtual_exchange
@@ -62,7 +62,7 @@ module GridConnectionModule
     integer(I4B) :: icondir !< icondir as defined in DIS, but reduced over all models in the interface
 
     class(NumericalModelType), pointer :: model => null() !< the model for which this grid connection exists
-    class(DisConnExchangeType), pointer :: primaryExchange => null() !< pointer to the primary exchange for this interface
+    class(GeometricConnectionExchangeType), pointer :: primaryExchange => null() !< pointer to the primary exchange for this interface
 
     integer(I4B), pointer :: nrOfBoundaryCells => null() !< nr of boundary cells with connection to another model
     type(CellWithNbrsType), dimension(:), pointer :: boundaryCells => null() !< cells on our side of the primary connections
@@ -160,7 +160,7 @@ contains
   !<
   subroutine connectPrimaryExchange(this, primEx)
     class(GridConnectionType) :: this !< this grid connection
-    class(DisConnExchangeType), pointer :: primEx !< the primary exchange for this connection
+    class(GeometricConnectionExchangeType), pointer :: primEx !< the primary exchange for this connection
     ! local
     integer(I4B) :: iconn
 

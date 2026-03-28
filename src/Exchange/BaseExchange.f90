@@ -13,6 +13,7 @@ module BaseExchangeModule
 
   type, abstract :: BaseExchangeType
     character(len=LENEXCHANGENAME) :: name !< the name of this exchange
+    character(len=7) :: typename !< the type of exchange (e.g., 'GWF-GWF', 'PRT-PRT')
     character(len=LENMEMPATH) :: memoryPath !< the location in the memory manager where the variables are stored
     character(len=LENMEMPATH) :: input_mempath
     integer(I4B) :: id

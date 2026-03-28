@@ -17,10 +17,12 @@ module VirtualDataManagerModule
   use NumericalModelModule, only: NumericalModelType, GetNumericalModelFromList
   use NumericalExchangeModule, only: NumericalExchangeType, &
                                      GetNumericalExchangeFromList
-  use DisConnExchangeModule, only: DisConnExchangeType, &
-                                   GetDisConnExchangeFromList
-  use SpatialModelConnectionModule, only: SpatialModelConnectionType, &
-                                          get_smc_from_list
+  use GeometricConnectionExchangeModule, only: &
+    GeometricConnectionExchangeType, &
+    GetGeometricConnectionExchangeFromList
+  use InterfaceModelExchangeModule, only: &
+    InterfaceModelExchangeType, &
+    GetInterfaceModelExchangeFromList
   implicit none
   private
 
@@ -89,8 +91,8 @@ contains
     integer(I4B) :: i, im, ix, ihm, ihx
     type(VirtualSolutionType), pointer :: virt_sol
     class(NumericalModelType), pointer :: num_mod
-    class(DisConnExchangeType), pointer :: exg
-    class(SpatialModelConnectionType), pointer :: conn
+    class(GeometricConnectionExchangeType), pointer :: exg
+    class(InterfaceModelExchangeType), pointer :: conn
     integer(I4B) :: model_id, exg_id
     type(STLVecInt) :: model_ids, exchange_ids
     class(VirtualDataContainerType), pointer :: vdc
@@ -125,7 +127,7 @@ contains
 
     ! 2) adding all local exchanges with a virtual exchange counterpart
     do ix = 1, num_sol%exchangelist%Count()
-      exg => GetDisConnExchangeFromList(num_sol%exchangelist, ix)
+      exg => GetGeometricConnectionExchangeFromList(num_sol%exchangelist, ix)
       if (.not. associated(exg)) cycle ! interface model is handled separately
       found = .false.
       do i = 1, virtual_exchange_list%Count()
@@ -140,7 +142,7 @@ contains
 
     ! 3) add halo models and exchanges from interface models
     do ix = 1, num_sol%exchangelist%Count()
-      conn => get_smc_from_list(num_sol%exchangelist, ix)
+      conn => GetInterfaceModelExchangeFromList(num_sol%exchangelist, ix)
       if (.not. associated(conn)) cycle
 
       ! it's an interface model based exchanged, get
@@ -185,13 +187,13 @@ contains
     type(STLVecInt) :: halo_model_ids
     class(VirtualModelType), pointer :: vm
     class(VirtualExchangeType), pointer :: ve
-    class(SpatialModelConnectionType), pointer :: conn
+    class(InterfaceModelExchangeType), pointer :: conn
 
     call halo_model_ids%init()
 
     ! add halo models to list with ids (unique)
     do ic = 1, baseconnectionlist%Count()
-      conn => get_smc_from_list(baseconnectionlist, ic)
+      conn => GetInterfaceModelExchangeFromList(baseconnectionlist, ic)
       do im = 1, conn%halo_models%size
         call halo_model_ids%push_back_unique(conn%halo_models%at(im))
       end do
@@ -240,7 +242,7 @@ contains
     character(len=128) :: monitor_file
     type(VirtualSolutionType), pointer :: virt_sol
     class(NumericalSolutionType), pointer :: num_sol
-    class(SpatialModelConnectionType), pointer :: conn
+    class(InterfaceModelExchangeType), pointer :: conn
     class(VirtualDataContainerType), pointer :: vdc
     type(IndexMapType), pointer :: nmap, cmap
 
@@ -249,7 +251,7 @@ contains
       virt_sol => this%virtual_solutions(isol)
       num_sol => CastAsNumericalSolutionClass(virt_sol%numerical_solution)
       do iexg = 1, num_sol%exchangelist%Count()
-        conn => get_smc_from_list(num_sol%exchangelist, iexg)
+        conn => GetInterfaceModelExchangeFromList(num_sol%exchangelist, iexg)
         if (.not. associated(conn)) cycle
         ! these are interface models, now merge their
         ! interface maps

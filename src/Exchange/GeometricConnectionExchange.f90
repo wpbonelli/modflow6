@@ -1,4 +1,4 @@
-module DisConnExchangeModule
+module GeometricConnectionExchangeModule
   use KindModule, only: I4B, DP, LGP
   use SimVariablesModule, only: errmsg
   use ConstantsModule, only: LENAUXNAME, LENBOUNDNAME, LINELENGTH
@@ -12,15 +12,25 @@ module DisConnExchangeModule
   implicit none
 
   private
-  public :: DisConnExchangeType
-  public :: CastAsDisConnExchangeClass, AddDisConnExchangeToList, &
-            GetDisConnExchangeFromList
+  public :: GeometricConnectionExchangeType
+  public :: CastAsGeometricConnectionExchangeClass, &
+            AddGeometricConnectionExchangeToList, &
+            GetGeometricConnectionExchangeFromList
 
-  !> Exchange based on connection between discretizations of DisBaseType.
-  !! The data specifies the connections, similar to the information stored
-  !! in the connections object: DisBaseType%con
+  !> @brief GeometricConnectionExchangeType
+  !!
+  !! Exchange type that extends CellConnectionExchangeType to add geometric
+  !! information for connections between two numerical models. In addition to
+  !! the topological connection data (nexg, nodem1, nodem2, ihc), this type
+  !! stores geometric properties needed for flow calculations:
+  !!   - cl1, cl2: connection lengths from cell centers to the shared face
+  !!   - hwva: horizontal connection widths or vertical flow areas
+  !!   - auxvar: auxiliary variables (e.g., ANGLDEGX for anisotropy, CDIST)
+  !!
+  !! This is the base type for model-specific exchanges (GWF-GWF, GWT-GWT,
+  !! GWE-GWE) that couple models of the same type in a numerical solution.
   !<
-  type, extends(NumericalExchangeType) :: DisConnExchangeType
+  type, extends(NumericalExchangeType) :: GeometricConnectionExchangeType
     character(len=LINELENGTH), pointer :: filename => null() !< name of the input file
 
     class(NumericalModelType), pointer :: model1 => null() !< model 1
@@ -30,10 +40,6 @@ module DisConnExchangeModule
     logical(LGP) :: is_datacopy !< when true, this exchange is just a data copy on another process and
                                 !! not responsible for controlling movers, observations, ...
 
-    integer(I4B), pointer :: nexg => null() !< number of exchanges
-    integer(I4B), dimension(:), pointer, contiguous :: nodem1 => null() !< node numbers in model 1
-    integer(I4B), dimension(:), pointer, contiguous :: nodem2 => null() !< node numbers in model 2
-    integer(I4B), dimension(:), pointer, contiguous :: ihc => null() !< horizontal connection indicator array, size: nexg
     real(DP), dimension(:), pointer, contiguous :: cl1 => null() !< connection length 1, size: nexg
     real(DP), dimension(:), pointer, contiguous :: cl2 => null() !< connection length 2, size: nexg
     real(DP), dimension(:), pointer, contiguous :: hwva => null() !< horizontal widths, vertical flow areas, size: nexg
@@ -60,7 +66,7 @@ module DisConnExchangeModule
 
     procedure :: allocate_scalars
     procedure :: allocate_arrays
-    procedure :: disconnex_da
+    procedure :: exg_da
     procedure :: use_interface_model
 
     ! protected
@@ -70,14 +76,14 @@ module DisConnExchangeModule
     procedure, pass(this) :: noder
     procedure, pass(this) :: cellstr
 
-  end type DisConnExchangeType
+  end type GeometricConnectionExchangeType
 
-  !> @ brief DisConnExchangeFoundType
+  !> @ brief GeometricConnectionExchangeFoundType
   !!
   !!  This type is used to simplify the tracking of common parameters
   !!  that are sourced from the input context.
   !<
-  type DisConnExchangeFoundType
+  type GeometricConnectionExchangeFoundType
     logical :: naux = .false.
     logical :: ipakcb = .false.
     logical :: iprpak = .false.
@@ -86,7 +92,7 @@ module DisConnExchangeModule
     logical :: auxiliary = .false.
     logical :: dev_ifmod_on = .false.
     logical :: nexg = .false.
-  end type DisConnExchangeFoundType
+  end type GeometricConnectionExchangeFoundType
 
 contains
 
@@ -97,10 +103,10 @@ contains
     use MemoryManagerExtModule, only: mem_set_value
     use ArrayHandlersModule, only: ifind
     ! -- dummy
-    class(DisConnExchangeType) :: this !< instance of exchange object
+    class(GeometricConnectionExchangeType) :: this !< instance of exchange object
     integer(I4B), intent(in) :: iout !< for logging
     ! -- local
-    type(DisConnExchangeFoundType) :: found
+    type(GeometricConnectionExchangeFoundType) :: found
     integer(I4B) :: ival, n
     !
     ! -- update defaults with idm sourced values
@@ -171,10 +177,10 @@ contains
     ! -- modules
     use MemoryManagerExtModule, only: mem_set_value
     ! -- dummy
-    class(DisConnExchangeType) :: this !< instance of exchange object
+    class(GeometricConnectionExchangeType) :: this !< instance of exchange object
     integer(I4B), intent(in) :: iout !< for logging
     ! -- local
-    type(DisConnExchangeFoundType) :: found
+    type(GeometricConnectionExchangeFoundType) :: found
     !
     ! -- update defaults with idm sourced values
     call mem_set_value(this%nexg, 'NEXG', this%input_mempath, found%nexg)
@@ -194,7 +200,7 @@ contains
     ! -- modules
     use GeomUtilModule, only: get_node
     ! -- dummy
-    class(DisConnExchangeType) :: this !< instance of exchange object
+    class(GeometricConnectionExchangeType) :: this !< instance of exchange object
     class(NumericalModelType), pointer, intent(in) :: model
     integer(I4B), dimension(:), intent(in) :: cellid
     integer(I4B), intent(in) :: iout !< the output file unit
@@ -220,7 +226,7 @@ contains
   function cellstr(this, ndim, cellid, iout)
     ! -- modules
     ! -- dummy
-    class(DisConnExchangeType) :: this !< instance of exchange object
+    class(GeometricConnectionExchangeType) :: this !< instance of exchange object
     integer(I4B) :: ndim !< model DIS dimension
     integer(I4B), dimension(:), intent(in) :: cellid
     integer(I4B), intent(in) :: iout !< the output file unit
@@ -251,7 +257,7 @@ contains
     ! -- modules
     use MemoryManagerModule, only: mem_setptr
     ! -- dummy
-    class(DisConnExchangeType) :: this !< instance of exchange object
+    class(GeometricConnectionExchangeType) :: this !< instance of exchange object
     integer(I4B), intent(in) :: iout !< the output file unit
     ! -- local
     integer(I4B), dimension(:, :), contiguous, pointer :: cellidm1
@@ -395,13 +401,16 @@ contains
   subroutine allocate_scalars(this)
     ! -- modules
     use MemoryManagerModule, only: mem_allocate
+    use CellConnectionExchangeModule, only: CellConnectionExchangeType
     ! -- dummy
-    class(DisConnExchangeType) :: this !< instance of exchange object
+    class(GeometricConnectionExchangeType) :: this !< instance of exchange object
+    !
+    ! -- allocate scalars in CellConnectionExchange
+    call this%CellConnectionExchangeType%allocate_scalars()
     !
     allocate (this%filename)
     this%filename = ''
     !
-    call mem_allocate(this%nexg, 'NEXG', this%memoryPath)
     call mem_allocate(this%naux, 'NAUX', this%memoryPath)
     call mem_allocate(this%ianglex, 'IANGLEX', this%memoryPath)
     call mem_allocate(this%icdist, 'ICDIST', this%memoryPath)
@@ -417,7 +426,6 @@ contains
     call mem_allocate(this%auxname_cst, LENAUXNAME, 0, &
                       'AUXNAME_CST', this%memoryPath)
     !
-    this%nexg = 0
     this%naux = 0
     this%ianglex = 0
     this%icdist = 0
@@ -434,12 +442,14 @@ contains
   !! connected nodes @param nexg
   !<
   subroutine allocate_arrays(this)
+    ! -- modules
+    use CellConnectionExchangeModule, only: CellConnectionExchangeType
     ! -- dummy
-    class(DisConnExchangeType) :: this !< instance of exchange object
+    class(GeometricConnectionExchangeType) :: this !< instance of exchange object
     !
-    call mem_allocate(this%nodem1, this%nexg, 'NODEM1', this%memoryPath)
-    call mem_allocate(this%nodem2, this%nexg, 'NODEM2', this%memoryPath)
-    call mem_allocate(this%ihc, this%nexg, 'IHC', this%memoryPath)
+    ! -- allocate arrays in CellConnectionExchange
+    call this%CellConnectionExchangeType%allocate_arrays()
+    !
     call mem_allocate(this%cl1, this%nexg, 'CL1', this%memoryPath)
     call mem_allocate(this%cl2, this%nexg, 'CL2', this%memoryPath)
     call mem_allocate(this%hwva, this%nexg, 'HWVA', this%memoryPath)
@@ -461,7 +471,7 @@ contains
   !<
   function use_interface_model(this) result(use_im)
     ! -- dummy
-    class(DisConnExchangeType) :: this !< instance of exchange object
+    class(GeometricConnectionExchangeType) :: this !< instance of exchange object
     ! -- return
     logical(LGP) :: use_im !< flag whether interface model should be used
                           !! for this exchange instead
@@ -472,16 +482,14 @@ contains
 
   !> @brief Clean up all scalars and arrays
   !<
-  subroutine disconnex_da(this)
+  subroutine exg_da(this)
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
+    use CellConnectionExchangeModule, only: CellConnectionExchangeType
     ! -- dummy
-    class(DisConnExchangeType) :: this !< instance of exchange object
+    class(GeometricConnectionExchangeType) :: this !< instance of exchange object
     !
-    ! arrays
-    call mem_deallocate(this%nodem1)
-    call mem_deallocate(this%nodem2)
-    call mem_deallocate(this%ihc)
+    ! arrays defined in GeometricConnectionExchange
     call mem_deallocate(this%cl1)
     call mem_deallocate(this%cl2)
     call mem_deallocate(this%hwva)
@@ -489,8 +497,7 @@ contains
     !
     deallocate (this%boundname)
     !
-    ! scalars
-    call mem_deallocate(this%nexg)
+    ! scalars defined in GeometricConnectionExchange
     call mem_deallocate(this%naux)
     call mem_deallocate(this%auxname, 'AUXNAME', this%memoryPath)
     call mem_deallocate(this%auxname_cst, 'AUXNAME_CST', this%memoryPath)
@@ -502,48 +509,51 @@ contains
     call mem_deallocate(this%ipakcb)
     call mem_deallocate(this%inamedbound)
     call mem_deallocate(this%dev_ifmod_on)
-  end subroutine disconnex_da
+    !
+    ! -- deallocate scalars and arrays in CellConnectionExchange
+    call this%CellConnectionExchangeType%exg_da()
+  end subroutine exg_da
 
-  function CastAsDisConnExchangeClass(obj) result(res)
+  function CastAsGeometricConnectionExchangeClass(obj) result(res)
     implicit none
     ! -- dummy
     class(*), pointer, intent(inout) :: obj
     ! -- return
-    class(DisConnExchangeType), pointer :: res
+    class(GeometricConnectionExchangeType), pointer :: res
     !
     res => null()
     if (.not. associated(obj)) return
     !
     select type (obj)
-    class is (DisConnExchangeType)
+    class is (GeometricConnectionExchangeType)
       res => obj
     end select
-  end function CastAsDisConnExchangeClass
+  end function CastAsGeometricConnectionExchangeClass
 
-  subroutine AddDisConnExchangeToList(list, exchange)
+  subroutine AddGeometricConnectionExchangeToList(list, exchange)
     implicit none
     ! -- dummy
     type(ListType), intent(inout) :: list
-    class(DisConnExchangeType), pointer, intent(in) :: exchange
+    class(GeometricConnectionExchangeType), pointer, intent(in) :: exchange
     ! -- local
     class(*), pointer :: obj
     !
     obj => exchange
     call list%Add(obj)
-  end subroutine AddDisConnExchangeToList
+  end subroutine AddGeometricConnectionExchangeToList
 
-  function GetDisConnExchangeFromList(list, idx) result(res)
+  function GetGeometricConnectionExchangeFromList(list, idx) result(res)
     implicit none
     ! -- dummy
     type(ListType), intent(inout) :: list
     integer(I4B), intent(in) :: idx
     ! -- return
-    class(DisConnExchangeType), pointer :: res
+    class(GeometricConnectionExchangeType), pointer :: res
     ! -- local
     class(*), pointer :: obj
     !
     obj => list%GetItem(idx)
-    res => CastAsDisConnExchangeClass(obj)
-  end function GetDisConnExchangeFromList
+    res => CastAsGeometricConnectionExchangeClass(obj)
+  end function GetGeometricConnectionExchangeFromList
 
-end module DisConnExchangeModule
+end module GeometricConnectionExchangeModule

@@ -21,7 +21,7 @@ module GwtGwtExchangeModule
   use ListModule, only: ListType
   use ListsModule, only: basemodellist
   use VirtualModelModule, only: get_virtual_model
-  use DisConnExchangeModule, only: DisConnExchangeType
+  use GeometricConnectionExchangeModule, only: GeometricConnectionExchangeType
   use GwtModule, only: GwtModelType
   use TspMvtModule, only: TspMvtType
   use VirtualModelModule, only: VirtualModelType
@@ -43,7 +43,7 @@ module GwtGwtExchangeModule
   !! This derived type contains information and methods for
   !! connecting two GWT models.
   !<
-  type, extends(DisConnExchangeType) :: GwtExchangeType
+  type, extends(GeometricConnectionExchangeType) :: GwtExchangeType
     !
     ! -- names of the GWF models that are connected by this exchange
     character(len=LENMODELNAME) :: gwfmodelname1 = '' !< name of gwfmodel that corresponds to gwtmodel1
@@ -77,15 +77,15 @@ module GwtGwtExchangeModule
 
   contains
 
-    procedure :: exg_df => gwt_gwt_df
-    procedure :: exg_ar => gwt_gwt_ar
-    procedure :: exg_rp => gwt_gwt_rp
-    procedure :: exg_ad => gwt_gwt_ad
-    procedure :: exg_fc => gwt_gwt_fc
-    procedure :: exg_bd => gwt_gwt_bd
-    procedure :: exg_ot => gwt_gwt_ot
-    procedure :: exg_da => gwt_gwt_da
-    procedure :: exg_fp => gwt_gwt_fp
+    procedure :: exg_df
+    procedure :: exg_ar
+    procedure :: exg_rp
+    procedure :: exg_ad
+    procedure :: exg_fc
+    procedure :: exg_bd
+    procedure :: exg_ot
+    procedure :: exg_da
+    procedure :: exg_fp
     procedure :: connects_model => gwt_gwt_connects_model
     procedure :: use_interface_model
     procedure :: allocate_scalars
@@ -191,7 +191,7 @@ contains
   !!
   !! Define GWT to GWT exchange object.
   !<
-  subroutine gwt_gwt_df(this)
+  subroutine exg_df(this)
     ! -- modules
     use SimVariablesModule, only: iout
     use InputOutputModule, only: getunit, openfile
@@ -239,7 +239,7 @@ contains
     !
     ! -- validate
     call this%validate_exchange()
-  end subroutine gwt_gwt_df
+  end subroutine exg_df
 
   !> @brief validate exchange data after reading
   !<
@@ -302,7 +302,7 @@ contains
   !!
   !! Allocated and read and calculate saturated conductance
   !<
-  subroutine gwt_gwt_ar(this)
+  subroutine exg_ar(this)
     ! -- dummy
     class(GwtExchangeType) :: this !<  GwtExchangeType
     !
@@ -311,13 +311,13 @@ contains
     !
     ! -- Observation AR
     call this%obs%obs_ar()
-  end subroutine gwt_gwt_ar
+  end subroutine exg_ar
 
   !> @ brief Read and prepare
   !!
   !! Read new data for mover and obs
   !<
-  subroutine gwt_gwt_rp(this)
+  subroutine exg_rp(this)
     ! -- modules
     use TdisModule, only: readnewdata
     ! -- dummy
@@ -331,13 +331,13 @@ contains
     !
     ! -- Read and prepare for observations
     call this%gwt_gwt_rp_obs()
-  end subroutine gwt_gwt_rp
+  end subroutine exg_rp
 
   !> @ brief Advance
   !!
   !! Advance mover and obs
   !<
-  subroutine gwt_gwt_ad(this)
+  subroutine exg_ad(this)
     ! -- dummy
     class(GwtExchangeType) :: this !<  GwtExchangeType
     !
@@ -346,13 +346,13 @@ contains
     !
     ! -- Push simulated values to preceding time step
     call this%obs%obs_ad()
-  end subroutine gwt_gwt_ad
+  end subroutine exg_ad
 
   !> @ brief Fill coefficients
   !!
   !! Calculate conductance and fill coefficient matrix
   !<
-  subroutine gwt_gwt_fc(this, kiter, matrix_sln, rhs_sln, inwtflag)
+  subroutine exg_fc(this, kiter, matrix_sln, rhs_sln, inwtflag)
     ! -- dummy
     class(GwtExchangeType) :: this !<  GwtExchangeType
     integer(I4B), intent(in) :: kiter
@@ -362,13 +362,13 @@ contains
     !
     ! -- Call mvt fc routine
     if (this%inmvt > 0) call this%mvt%mvt_fc(this%gwtmodel1%x, this%gwtmodel2%x)
-  end subroutine gwt_gwt_fc
+  end subroutine exg_fc
 
   !> @ brief Budget
   !!
   !! Accumulate budget terms
   !<
-  subroutine gwt_gwt_bd(this, icnvg, isuppress_output, isolnid)
+  subroutine exg_bd(this, icnvg, isuppress_output, isolnid)
     ! -- modules
     use ConstantsModule, only: DZERO, LENBUDTXT, LENPACKAGENAME
     use BudgetModule, only: rate_accumulator
@@ -404,7 +404,7 @@ contains
     !
     ! -- Call mvt bd routine
     if (this%inmvt > 0) call this%mvt%mvt_bd(this%gwtmodel1%x, this%gwtmodel2%x)
-  end subroutine gwt_gwt_bd
+  end subroutine exg_bd
 
   !> @ brief Budget save
   !!
@@ -612,7 +612,7 @@ contains
   !!
   !! Write output
   !<
-  subroutine gwt_gwt_ot(this)
+  subroutine exg_ot(this)
     ! -- modules
     use SimVariablesModule, only: iout
     use ConstantsModule, only: DZERO
@@ -660,7 +660,7 @@ contains
     !
     ! -- OBS output
     call this%obs%obs_ot()
-  end subroutine gwt_gwt_ot
+  end subroutine exg_ot
 
   !> @ brief Source options
   !!
@@ -698,7 +698,7 @@ contains
     write (iout, '(1x,a)') 'PROCESSING GWT-GWT EXCHANGE OPTIONS'
     !
     ! -- source base class options
-    call this%DisConnExchangeType%source_options(iout)
+    call this%GeometricConnectionExchangeType%source_options(iout)
     !
     if (found%gwfmodelname1) then
       write (iout, '(4x,a,a)') &
@@ -787,7 +787,7 @@ contains
     ! -- dummy
     class(GwtExchangeType) :: this !<  GwtExchangeType
     !
-    call this%DisConnExchangeType%allocate_scalars()
+    call this%GeometricConnectionExchangeType%allocate_scalars()
     !
     call mem_allocate(this%inewton, 'INEWTON', this%memoryPath)
     call mem_allocate(this%inobs, 'INOBS', this%memoryPath)
@@ -804,7 +804,7 @@ contains
   !!
   !! Deallocate memory associated with this object
   !<
-  subroutine gwt_gwt_da(this)
+  subroutine exg_da(this)
     ! -- modules
     use MemoryManagerModule, only: mem_deallocate
     ! -- dummy
@@ -843,8 +843,8 @@ contains
     call mem_deallocate(this%inmvt)
     !
     ! -- deallocate base
-    call this%DisConnExchangeType%disconnex_da()
-  end subroutine gwt_gwt_da
+    call this%GeometricConnectionExchangeType%exg_da()
+  end subroutine exg_da
 
   !> @ brief Allocate arrays
   !!
@@ -859,7 +859,7 @@ contains
     character(len=LINELENGTH) :: text
     integer(I4B) :: ntabcol, i
     !
-    call this%DisConnExchangeType%allocate_arrays()
+    call this%GeometricConnectionExchangeType%allocate_arrays()
     !
     call mem_allocate(this%cond, this%nexg, 'COND', this%memoryPath)
     call mem_allocate(this%simvals, this%nexg, 'SIMVALS', this%memoryPath)
@@ -1005,10 +1005,10 @@ contains
   !!
   !! Conduct any final processing
   !<
-  subroutine gwt_gwt_fp(this)
+  subroutine exg_fp(this)
     ! -- dummy
     class(GwtExchangeType) :: this !<  GwtExchangeType
-  end subroutine gwt_gwt_fp
+  end subroutine exg_fp
 
   !> @brief Return true when this exchange provides matrix coefficients for
   !! solving @param model

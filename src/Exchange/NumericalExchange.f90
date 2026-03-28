@@ -3,6 +3,7 @@ module NumericalExchangeModule
   use KindModule, only: DP, I4B
   use BaseModelModule, only: BaseModelType
   use BaseExchangeModule, only: BaseExchangeType, AddBaseExchangeToList
+  use CellConnectionExchangeModule, only: CellConnectionExchangeType
   use NumericalModelModule, only: NumericalModelType
   use ListModule, only: ListType
   use MatrixBaseModule
@@ -13,8 +14,14 @@ module NumericalExchangeModule
   public :: NumericalExchangeType, &
             AddNumericalExchangeToList, GetNumericalExchangeFromList
 
-  type, extends(BaseExchangeType) :: NumericalExchangeType
-    character(len=7) :: typename !< name of the type (e.g., 'GWF-GWF')
+  !> @brief NumericalExchangeType
+  !!
+  !! An exchange type that provides matrix assembly methods for numerical
+  !! exchanges between models that participate in a numerical solution.
+  !! Extends CellConnectionExchangeType to add numerical coupling capabilities
+  !! including matrix coefficient assembly for direct cell-to-cell connections.
+  !<
+  type, extends(CellConnectionExchangeType) :: NumericalExchangeType
 
   contains
 
@@ -148,6 +155,9 @@ contains
     use MemoryManagerModule, only: mem_deallocate
     ! -- dummy
     class(NumericalExchangeType) :: this
+    !
+    ! -- deallocate parent
+    call this%CellConnectionExchangeType%exg_da()
   end subroutine exg_da
 
   function get_iasym(this) result(iasym)
