@@ -3,7 +3,8 @@ module PrtPrtExchangeModule
 
   use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: LENPACKAGENAME, LINELENGTH, LENMEMPATH, &
-                             LENMODELNAME, LENBOUNDNAME, LENAUXNAME
+                             LENMODELNAME, LENBOUNDNAME, LENAUXNAME, &
+                             DZERO, DONE
   use ListsModule, only: basemodellist, baseexchangelist
   use SimModule, only: store_error, store_error_filename, count_errors
   use SimVariablesModule, only: errmsg
@@ -19,9 +20,11 @@ module PrtPrtExchangeModule
   use CharacterStringModule
   use ExplicitModelModule, only: ExplicitModelType
   use MemoryManagerModule, only: mem_allocate, mem_reallocate, mem_deallocate
+  use BaseDisModule, only: DisBaseType
   use DisModule, only: DisType
   use DisvModule, only: DisvType
-  use GeomUtilModule, only: get_ijk
+  use GeomUtilModule, only: get_ijk, point_in_polygon
+  use PrtFmiModule, only: IFLOWFACE_TOP
 
   implicit none
   private
@@ -73,6 +76,7 @@ module PrtPrtExchangeModule
     procedure, private :: source_data
     procedure, private :: noder
     procedure, private :: get_exchange_faces
+    procedure, private :: transform_particle_coords
   end type PrtPrtExchangeType
 
 contains
@@ -216,8 +220,12 @@ contains
       ic2 = this%nodem2(iexg)
       q = abs(this%gwfsimvals(iexg))
       call this%get_exchange_faces(iexg, if1, if2)
-      call this%prtmodel1%fmi%add_boundary_flow(ic1, if1, -q)
-      call this%prtmodel2%fmi%add_boundary_flow(ic2, if2, q)
+      ! print *, 'Adding boundary flow ', -q, ' to model ', this%prtmodel1%id, &
+      !          ' cell ', ic1, ' face ', if1
+      ! call this%prtmodel1%fmi%add_boundary_flow(ic1, if1, -q)
+      ! print *, 'Adding boundary flow ', q, ' to model ', this%prtmodel2%id, &
+      !          ' cell ', ic2, ' face ', if2
+      ! call this%prtmodel2%fmi%add_boundary_flow(ic2, if2, q)
     end do
   end subroutine
 
@@ -508,8 +516,11 @@ contains
         type is (ExgPrtPrpType)
           exgprp => exgprp_obj
           particle%itrdomain(1) = exg%prtmodel2%id
-          particle%icu = dest_cell
-          ! TODO: update particle coordinates
+          ! Transform particle coordinates before updating icu
+          call exg%transform_particle_coords(particle, particle%icu, &
+                                              nint(exg%auxvar(exg%iflowface1, i)), &
+                                              from_m1=.true.)
+          ! Note: transform_particle_coords updates particle%icu and particle%x/y/z
           exgprp%has_pending = .true.
           exgprp%nparticles = exgprp%nparticles + 1
           call exgprp%particles%resize(exgprp%nparticles, exgprp%memoryPath)
@@ -536,8 +547,12 @@ contains
         type is (ExgPrtPrpType)
           exgprp => exgprp_obj
           particle%itrdomain(1) = exg%prtmodel1%id
-          particle%icu = dest_cell
-          ! TODO: update particle coordinates
+          ! Transform particle coordinates before updating icu
+          ! Note: for model2->model1, we use iflowface2 as source
+          call exg%transform_particle_coords(particle, particle%icu, &
+                                              nint(exg%auxvar(exg%iflowface2, i)), &
+                                              from_m1=.false.)
+          ! Note: transform updates particle%icu and particle%x/y/z
           exgprp%has_pending = .true.
           exgprp%nparticles = exgprp%nparticles + 1
           call exgprp%particles%resize(exgprp%nparticles, exgprp%memoryPath)
@@ -576,5 +591,470 @@ contains
       res => obj
     end select
   end function CastAsPrtPrtExchange
+
+  !> @brief Transform particle coordinates from source to destination model
+  !! @param from_m1 If true, transfer is from model1 to model2; otherwise model2 to model1
+  subroutine transform_particle_coords(this, particle, n_src, f_src, from_m1)
+    class(PrtPrtExchangeType) :: this
+    type(ParticleType), pointer :: particle
+    integer(I4B), intent(in) :: n_src ! source cell
+    integer(I4B), intent(in) :: f_src ! source face (IFLOWFACE numbering)
+    logical(LGP), intent(in) :: from_m1 ! true = m1->m2, false = m2->m1
+
+    ! Local variables
+    integer(I4B), allocatable :: iexg_candidates(:)
+    integer(I4B) :: n_candidates
+    integer(I4B) :: n_dst, f_dst, iexg, i
+    integer(I4B) :: iflowface_src, iflowface_dst
+    real(DP) :: x1min, x1max, y1min, y1max, z1min, z1max
+    real(DP) :: x2min, x2max, y2min, y2max, z2min, z2max
+    real(DP) :: xt, yt, zt ! transformed coordinates
+    real(DP) :: tx, ty, tz ! normalized parameters [0,1]
+    real(DP) :: dx1, dy1, dz1, dx2, dy2, dz2
+    logical :: found
+    class(DisBaseType), pointer :: dis_src, dis_dst
+
+    ! Set up source/destination based on direction
+    if (from_m1) then
+      dis_src => this%prtmodel1%dis
+      dis_dst => this%prtmodel2%dis
+      iflowface_src = this%iflowface1
+      iflowface_dst = this%iflowface2
+    else
+      dis_src => this%prtmodel2%dis
+      dis_dst => this%prtmodel1%dis
+      iflowface_src = this%iflowface2
+      iflowface_dst = this%iflowface1
+    end if
+
+    ! 1. Find all candidate destination connections
+    call find_candidate_connections(this, n_src, f_src, iexg_candidates, &
+                                     n_candidates, from_m1)
+
+    ! 2. Get source face bounds
+    call get_face_bounds(dis_src, n_src, f_src, &
+                         x1min, x1max, y1min, y1max, z1min, z1max)
+
+    ! 3. Get consolidated destination face bounds
+    call get_consolidated_bounds(this, iexg_candidates, n_candidates, &
+                                  x2min, x2max, y2min, y2max, z2min, z2max, &
+                                  dis_dst, iflowface_dst)
+
+    ! 4. Normalize particle position in source face [0,1]
+    dx1 = x1max - x1min
+    dy1 = y1max - y1min
+    dz1 = z1max - z1min
+
+    if (dx1 > DZERO) then
+      tx = (particle%x - x1min) / dx1
+    else
+      tx = DZERO ! dimension constant on this face
+    end if
+
+    if (dy1 > DZERO) then
+      ty = (particle%y - y1min) / dy1
+    else
+      ty = DZERO
+    end if
+
+    if (dz1 > DZERO) then
+      tz = (particle%z - z1min) / dz1
+    else
+      tz = DZERO
+    end if
+
+    ! 5. Map to destination face space
+    dx2 = x2max - x2min
+    dy2 = y2max - y2min
+    dz2 = z2max - z2min
+
+    if (dx2 > DZERO) then
+      xt = x2min + tx * dx2
+    else
+      xt = x2min
+    end if
+
+    if (dy2 > DZERO) then
+      yt = y2min + ty * dy2
+    else
+      yt = y2min
+    end if
+
+    if (dz2 > DZERO) then
+      zt = z2min + tz * dz2
+    else
+      zt = z2min
+    end if
+
+    ! 6. Find which destination cell contains this position
+    found = .false.
+    do i = 1, n_candidates
+      iexg = iexg_candidates(i)
+      if (from_m1) then
+        n_dst = this%nodem2(iexg)
+        f_dst = nint(this%auxvar(iflowface_dst, iexg))
+      else
+        n_dst = this%nodem1(iexg)
+        f_dst = nint(this%auxvar(iflowface_dst, iexg))
+      end if
+
+      if (point_in_face_bounds(dis_dst, n_dst, f_dst, xt, yt, zt)) then
+        ! Found the destination!
+        particle%x = xt
+        particle%y = yt
+        particle%z = zt
+        particle%icu = n_dst
+        found = .true.
+        exit
+      end if
+    end do
+
+    if (from_m1) then
+      print *, 'Particle entered model ', this%prtmodel2%id, &
+                ' cell ', particle%icu
+    else
+      print *, 'Particle entered model ', this%prtmodel1%id, &
+                ' cell ', particle%icu
+    end if
+
+    if (.not. found) then
+      write (errmsg, '(a,i0,a,i0,a,3g15.6,a)') &
+        'Particle transferring from cell ', n_src, ' face ', f_src, &
+        ' at position (', xt, yt, zt, &
+        ') not found in any destination face'
+      call store_error(errmsg, terminate=.TRUE.)
+    end if
+
+    deallocate (iexg_candidates)
+  end subroutine transform_particle_coords
+
+  !> @brief Find all exchange connections with the same source cell and face
+  subroutine find_candidate_connections(this, n_src, f_src, iexg_list, n_found, from_m1)
+    class(PrtPrtExchangeType) :: this
+    integer(I4B), intent(in) :: n_src, f_src
+    integer(I4B), allocatable, intent(out) :: iexg_list(:)
+    integer(I4B), intent(out) :: n_found
+    logical(LGP), intent(in) :: from_m1
+    integer(I4B) :: iexg, f_test, iflowface_src
+    integer(I4B), allocatable :: temp_list(:)
+
+    ! Set up source flowface index based on direction
+    if (from_m1) then
+      iflowface_src = this%iflowface1
+    else
+      iflowface_src = this%iflowface2
+    end if
+
+    ! Allocate temporary array (max size = all connections)
+    allocate (temp_list(this%nexg))
+    n_found = 0
+
+    do iexg = 1, this%nexg
+      if (from_m1) then
+        if (this%nodem1(iexg) == n_src) then
+          f_test = nint(this%auxvar(iflowface_src, iexg))
+          if (f_test == f_src) then
+            n_found = n_found + 1
+            temp_list(n_found) = iexg
+          end if
+        end if
+      else
+        if (this%nodem2(iexg) == n_src) then
+          f_test = nint(this%auxvar(iflowface_src, iexg))
+          if (f_test == f_src) then
+            n_found = n_found + 1
+            temp_list(n_found) = iexg
+          end if
+        end if
+      end if
+    end do
+
+    ! Copy to right-sized output array
+    allocate (iexg_list(n_found))
+    iexg_list(1:n_found) = temp_list(1:n_found)
+    deallocate (temp_list)
+  end subroutine find_candidate_connections
+
+  !> @brief Get consolidated bounds across multiple destination faces
+  subroutine get_consolidated_bounds(this, iexg_list, n, &
+                                      xmin, xmax, ymin, ymax, zmin, zmax, &
+                                      dis_dst, iflowface_dst)
+    class(PrtPrtExchangeType) :: this
+    integer(I4B), intent(in) :: iexg_list(:), n
+    real(DP), intent(out) :: xmin, xmax, ymin, ymax, zmin, zmax
+    class(DisBaseType), pointer :: dis_dst
+    integer(I4B), intent(in) :: iflowface_dst
+    integer(I4B) :: i, iexg, n_dst, f_dst
+    real(DP) :: x0, x1, y0, y1, z0, z1
+
+    ! Initialize with extreme values
+    xmin = HUGE(DONE)
+    xmax = -HUGE(DONE)
+    ymin = HUGE(DONE)
+    ymax = -HUGE(DONE)
+    zmin = HUGE(DONE)
+    zmax = -HUGE(DONE)
+
+    ! Find min/max across all destination faces
+    do i = 1, n
+      iexg = iexg_list(i)
+      ! Destination depends on which list is being used
+      ! The iexg_list comes from find_candidate_connections which already
+      ! filters by source, so all entries have the same source.
+      ! We need to get the destination cell/face from the opposite side.
+      if (iflowface_dst == this%iflowface2) then
+        n_dst = this%nodem2(iexg)
+      else
+        n_dst = this%nodem1(iexg)
+      end if
+      f_dst = nint(this%auxvar(iflowface_dst, iexg))
+
+      call get_face_bounds(dis_dst, n_dst, f_dst, x0, x1, y0, y1, z0, z1)
+
+      xmin = min(xmin, x0)
+      xmax = max(xmax, x1)
+      ymin = min(ymin, y0)
+      ymax = max(ymax, y1)
+      zmin = min(zmin, z0)
+      zmax = max(zmax, z1)
+    end do
+  end subroutine get_consolidated_bounds
+
+  !> @brief Check if point is within face bounds (polymorphic wrapper)
+  function point_in_face_bounds(dis, icell, iface, x, y, z) result(inside)
+    class(DisBaseType), pointer :: dis
+    integer(I4B), intent(in) :: icell, iface
+    real(DP), intent(in) :: x, y, z
+    logical(LGP) :: inside
+
+    select type (dis)
+    type is (DisType)
+      inside = point_in_face_bounds_dis(dis, icell, iface, x, y, z)
+    type is (DisvType)
+      inside = point_in_face_bounds_disv(dis, icell, iface, x, y, z)
+    class default
+      inside = .false.
+    end select
+  end function point_in_face_bounds
+
+  !> @brief Check if point is within DIS face bounds
+  function point_in_face_bounds_dis(dis, icell, iface, x, y, z) result(inside)
+    type(DisType), pointer, intent(in) :: dis
+    integer(I4B), intent(in) :: icell, iface
+    real(DP), intent(in) :: x, y, z
+    logical(LGP) :: inside
+    real(DP) :: xmin, xmax, ymin, ymax, zmin, zmax
+    real(DP), parameter :: TOL = 1.0d-9
+
+    call get_face_bounds_dis(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+
+    inside = (x >= xmin - TOL .and. x <= xmax + TOL .and. &
+              y >= ymin - TOL .and. y <= ymax + TOL .and. &
+              z >= zmin - TOL .and. z <= zmax + TOL)
+  end function point_in_face_bounds_dis
+
+  !> @brief Check if point is within DISV face bounds
+  function point_in_face_bounds_disv(dis, icell, iface, x, y, z) result(inside)
+    type(DisvType), pointer, intent(in) :: dis
+    integer(I4B), intent(in) :: icell, iface
+    real(DP), intent(in) :: x, y, z
+    logical(LGP) :: inside
+    integer(I4B) :: k, n2d, m, iv, nvert_cell, iv1, iv2
+    real(DP) :: ztop, zbot, x1, y1, x2, y2
+    real(DP), allocatable :: poly(:, :)
+    real(DP), parameter :: TOL = 1.0d-9
+
+    n2d = mod(icell - 1, dis%ncpl) + 1
+    k = (icell - 1) / dis%ncpl + 1
+
+    if (k == 1) then
+      ztop = dis%top1d(n2d)
+    else
+      ztop = dis%bot2d(n2d, k - 1)
+    end if
+    zbot = dis%bot2d(n2d, k)
+
+    inside = .false.
+
+    if (iface == -1 .or. iface == -2) then
+      ! Top or bottom face - use 2D polygon containment
+      if ((iface == -1 .and. abs(z - ztop) < TOL) .or. &
+          (iface == -2 .and. abs(z - zbot) < TOL)) then
+        ! Build polygon from vertices
+        nvert_cell = dis%iavert(n2d + 1) - dis%iavert(n2d)
+        allocate (poly(2, nvert_cell))
+        do m = 1, nvert_cell
+          iv = dis%javert(dis%iavert(n2d) + m - 1)
+          poly(1, m) = dis%vertices(iv, 1)
+          poly(2, m) = dis%vertices(iv, 2)
+        end do
+        inside = point_in_polygon(x, y, poly)
+        deallocate (poly)
+      end if
+
+    else
+      ! Lateral face - check z bounds and point on edge
+      if (z < zbot - TOL .or. z > ztop + TOL) return
+
+      ! Check if (x,y) is on the edge
+      nvert_cell = dis%iavert(n2d + 1) - dis%iavert(n2d)
+      iv1 = dis%javert(dis%iavert(n2d) + iface - 1)
+      iv2 = dis%javert(dis%iavert(n2d) + mod(iface, nvert_cell))
+
+      x1 = dis%vertices(iv1, 1)
+      y1 = dis%vertices(iv1, 2)
+      x2 = dis%vertices(iv2, 1)
+      y2 = dis%vertices(iv2, 2)
+
+      inside = point_on_line_segment(x, y, x1, y1, x2, y2, TOL)
+    end if
+  end function point_in_face_bounds_disv
+
+  !> @brief Get face bounds (polymorphic wrapper)
+  subroutine get_face_bounds(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+    class(DisBaseType), pointer :: dis
+    integer(I4B), intent(in) :: icell, iface
+    real(DP), intent(out) :: xmin, xmax, ymin, ymax, zmin, zmax
+
+    select type (dis)
+    type is (DisType)
+      call get_face_bounds_dis(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+    type is (DisvType)
+      call get_face_bounds_disv(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+    class default
+      call store_error('Unsupported discretization type for PRT-PRT exchange')
+      call store_error_filename('')
+    end select
+  end subroutine get_face_bounds
+
+  !> @brief Get face bounds for DISV (vertex) grid
+  subroutine get_face_bounds_disv(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+    type(DisvType), pointer, intent(in) :: dis
+    integer(I4B), intent(in) :: icell, iface
+    real(DP), intent(out) :: xmin, xmax, ymin, ymax, zmin, zmax
+    integer(I4B) :: k, n2d, m, iv, nvert_cell, iv1, iv2
+    real(DP) :: ztop, zbot
+
+    ! Get layer and 2D cell index
+    n2d = mod(icell - 1, dis%ncpl) + 1
+    k = (icell - 1) / dis%ncpl + 1
+
+    ! Z bounds
+    if (k == 1) then
+      ztop = dis%top1d(n2d)
+    else
+      ztop = dis%bot2d(n2d, k - 1)
+    end if
+    zbot = dis%bot2d(n2d, k)
+
+    if (iface == -1 .or. iface == -2) then
+      ! Top or bottom face - horizontal polygon
+      ! Get bounding box of polygon vertices
+      xmin = HUGE(DONE)
+      xmax = -HUGE(DONE)
+      ymin = HUGE(DONE)
+      ymax = -HUGE(DONE)
+
+      do m = dis%iavert(n2d), dis%iavert(n2d + 1) - 1
+        iv = dis%javert(m)
+        xmin = min(xmin, dis%vertices(iv, 1))
+        xmax = max(xmax, dis%vertices(iv, 1))
+        ymin = min(ymin, dis%vertices(iv, 2))
+        ymax = max(ymax, dis%vertices(iv, 2))
+      end do
+
+      if (iface == -1) then
+        zmin = ztop
+        zmax = ztop
+      else
+        zmin = zbot
+        zmax = zbot
+      end if
+
+    else
+      ! Lateral face - vertical rectangle along an edge
+      nvert_cell = dis%iavert(n2d + 1) - dis%iavert(n2d)
+      iv1 = dis%javert(dis%iavert(n2d) + iface - 1)
+      iv2 = dis%javert(dis%iavert(n2d) + mod(iface, nvert_cell))
+
+      xmin = min(dis%vertices(iv1, 1), dis%vertices(iv2, 1))
+      xmax = max(dis%vertices(iv1, 1), dis%vertices(iv2, 1))
+      ymin = min(dis%vertices(iv1, 2), dis%vertices(iv2, 2))
+      ymax = max(dis%vertices(iv1, 2), dis%vertices(iv2, 2))
+      zmin = zbot
+      zmax = ztop
+    end if
+  end subroutine get_face_bounds_disv
+
+  !> @brief Get face bounds for DIS (structured) grid
+  subroutine get_face_bounds_dis(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+    type(DisType), pointer, intent(in) :: dis
+    integer(I4B), intent(in) :: icell, iface
+    real(DP), intent(out) :: xmin, xmax, ymin, ymax, zmin, zmax
+    integer(I4B) :: k, i, j
+    real(DP) :: ztop, zbot
+
+    call get_ijk(icell, dis%nrow, dis%ncol, dis%nlay, i, j, k)
+
+    ! X bounds
+    xmin = dis%xorigin
+    if (j > 1) xmin = xmin + sum(dis%delr(1:j - 1))
+    xmax = xmin + dis%delr(j)
+
+    ! Y bounds (rows numbered north to south)
+    ymax = dis%yorigin + sum(dis%delc)
+    if (i > 1) ymax = ymax - sum(dis%delc(1:i - 1))
+    ymin = ymax - dis%delc(i)
+
+    ! Z bounds
+    if (k == 1) then
+      ztop = dis%top2d(j, i)
+    else
+      ztop = dis%bot3d(j, i, k - 1)
+    end if
+    zbot = dis%bot3d(j, i, k)
+    zmin = zbot
+    zmax = ztop
+
+    ! Constrain to face (set min=max for constant dimension)
+    select case (iface)
+    case (1) ! West face
+      xmax = xmin
+    case (2) ! East face
+      xmin = xmax
+    case (3) ! South face
+      ymax = ymin
+    case (4) ! North face
+      ymin = ymax
+    case (-2) ! Bottom face
+      zmax = zbot
+    case (-1) ! Top face
+      zmin = ztop
+    end select
+  end subroutine get_face_bounds_dis
+
+  !> @brief Check if a point lies on a line segment
+  function point_on_line_segment(x, y, x1, y1, x2, y2, tol) result(on_seg)
+    real(DP), intent(in) :: x, y, x1, y1, x2, y2, tol
+    logical(LGP) :: on_seg
+    real(DP) :: dx, dy, dx_seg, dy_seg, cross, dot, len_sq
+
+    dx = x - x1
+    dy = y - y1
+    dx_seg = x2 - x1
+    dy_seg = y2 - y1
+
+    ! Cross product (zero if collinear)
+    cross = abs(dx * dy_seg - dy * dx_seg)
+
+    ! Dot product and length check (within segment)
+    dot = dx * dx_seg + dy * dy_seg
+    len_sq = dx_seg**2 + dy_seg**2
+
+    on_seg = .false.
+    if (cross < tol .and. dot >= -tol .and. dot <= len_sq + tol) then
+      on_seg = .true.
+    end if
+  end function point_on_line_segment
 
 end module PrtPrtExchangeModule

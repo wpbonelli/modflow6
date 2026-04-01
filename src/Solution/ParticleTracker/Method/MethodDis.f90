@@ -145,6 +145,14 @@ contains
       cell%vy1 = cell%defn%faceflow(4) * term
       cell%vy2 = -cell%defn%faceflow(2) * term
 
+      print *, 'Face flows: ', &
+        'vx1: ', cell%vx1, &
+        'vx2: ', cell%vx2, &
+        'vy1: ', cell%vy1, &
+        'vy2: ', cell%vy2, &
+        'vz1: ', cell%vz1, &
+        'vz2: ', cell%vz2
+
     end select
   end subroutine load_cell
 

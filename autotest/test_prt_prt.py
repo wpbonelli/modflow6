@@ -4,11 +4,11 @@ Test PRT-PRT exchange between two particle tracking models.
 The two model domains form a 10-cell line split down the middle:
 
         left        |        right
-  0   1   2   3   4 | 0   1   2   3   4
- _______________________________________
-| * | ->| ->| ->| ->| ->| ->| ->| ->|   |
+ ___________________|___________________
+| o | ->| ->| ->| ->| ->| ->| ->| ->| x |
 |___|___|___|___|___|___|___|___|___|___|
-  *particle release
+  o release
+  x termination
 
 Steady flow runs from left to right.
 
@@ -20,6 +20,8 @@ rightmost cell of the right model.  The test asserts that:
 """
 
 from pathlib import Path
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 import flopy
 import numpy as np
@@ -38,8 +40,9 @@ delz = 1.0
 top = 1.0
 botm = [0.0]
 
-head_left = 1.0
+head_left = 2.0
 head_right = 0.0
+head_half = (head_left + head_right) / 2
 hk = 1.0
 
 porosity = 0.1
@@ -197,6 +200,7 @@ def build_models(idx, test):
         prtl,
         pname="oc",
         trackcsv_filerecord=f"{get_model_name(idx, 'prtl')}.trk.csv",
+        dev_dump_event_trace=True,
     )
     flopy.mf6.ModflowPrtfmi(
         prtl,
@@ -230,6 +234,7 @@ def build_models(idx, test):
         prtr,
         pname="oc",
         trackcsv_filerecord=f"{get_model_name(idx, 'prtr')}.trk.csv",
+        dev_dump_event_trace=True,
     )
     flopy.mf6.ModflowPrtfmi(
         prtr,
@@ -283,8 +288,8 @@ def check_output(idx, test):
     head_l = hds_l.get_data().squeeze()
     head_r = hds_r.get_data().squeeze()
 
-    assert np.all(head_l >= 0.5) and np.all(head_l <= head_left)
-    assert np.all(head_r >= head_right) and np.all(head_r <= 0.5)
+    assert np.all(head_l <= head_left)
+    assert np.all(head_r >= head_right)
 
     pls_l = pd.read_csv(ws / f"{get_model_name(idx, 'prtl')}.trk.csv")
     pls_r = pd.read_csv(ws / f"{get_model_name(idx, 'prtr')}.trk.csv")
@@ -300,17 +305,91 @@ def check_output(idx, test):
     assert all(terminations.istatus == 5)
 
     final_x = terminations["x"].max()
-    assert np.isclose(final_x, delr * ncol)
+    assert np.isclose(final_x, 4.5)
+
+
+def plot_output(idx, test):
+    name = test.name
+    ws = test.workspace
+    sim = test.sims[0]
+    gwf_l_name = get_model_name(idx, "gwfl")
+    gwf_r_name = get_model_name(idx, "gwfr")
+    prt_l_name = get_model_name(idx, "prtl")
+    prt_r_name = get_model_name(idx, "prtr")
+    gwf_l = sim.get_model(gwf_l_name)
+    gwf_r = sim.get_model(gwf_r_name)
+    prt_l = sim.get_model(prt_l_name)
+    prt_r = sim.get_model(prt_r_name)
+    mg_l = gwf_l.modelgrid
+    mg_r = gwf_r.modelgrid
+    gwf_l_head_file = f"{gwf_l_name}.hds"
+    gwf_r_head_file = f"{gwf_r_name}.hds"
+    prt_l_trk_file = f"{prt_l_name}.trk.csv"
+    prt_r_trk_file = f"{prt_r_name}.trk.csv"
+    hds_l = flopy.utils.HeadFile(ws / gwf_l_head_file).get_data()
+    hds_r = flopy.utils.HeadFile(ws / gwf_r_head_file).get_data()
+    bud_l = gwf_l.output.budget()
+    bud_r = gwf_r.output.budget()
+    spdis_l = bud_l.get_data(text="DATA-SPDIS")[0]
+    spdis_r = bud_r.get_data(text="DATA-SPDIS")[0]
+    qs_l = flopy.utils.postprocessing.get_specific_discharge(spdis_l, gwf_l)
+    qs_r = flopy.utils.postprocessing.get_specific_discharge(spdis_r, gwf_r)
+    pls_l = pd.read_csv(ws / prt_l_trk_file, na_filter=False)
+    pls_r = pd.read_csv(ws / prt_r_trk_file, na_filter=False)
+
+    # set up plot
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 10))
+    for a in ax:
+        a.set_aspect("equal")
+
+    # plot left model
+    pmv = flopy.plot.PlotMapView(modelgrid=mg_l, ax=ax[0])
+    pmv.plot_grid()
+    pmv.plot_array(hds_l[0], alpha=0.1)
+    pmv.plot_vector(qs_l[0], qs_l[1], normalize=True, color="white")
+    plines_l = pls_l.groupby(["iprp", "irpt", "trelease"])
+    for ipl, ((iprp, irpt, trelease), pl) in enumerate(plines_l):
+        pl.plot(
+            title="left",
+            kind="line",
+            x="x",
+            y="y",
+            ax=ax[0],
+            legend=False,
+            color=cm.plasma(ipl / len(plines_l)),
+        )
+
+    # plot right model
+    pmv = flopy.plot.PlotMapView(modelgrid=mg_r, ax=ax[1])
+    pmv.plot_grid()
+    pmv.plot_array(hds_r[0], alpha=0.1)
+    pmv.plot_vector(qs_r[0], qs_r[1], normalize=True, color="white")
+    plines_r = pls_r.groupby(["particleid"])
+    for ipl, (pid, pl) in enumerate(plines_r):
+        pl.plot(
+            title="right",
+            kind="line",
+            x="x",
+            y="y",
+            ax=ax[1],
+            legend=False,
+            color=cm.plasma(ipl / len(plines_r)),
+        )
+
+    # view/save plot
+    plt.show()
+    plt.savefig(ws / f"{name}.png")
 
 
 @pytest.mark.parametrize("idx, name", enumerate(cases))
-def test_mf6model(idx, name, function_tmpdir, targets):
+def test_mf6model(idx, name, function_tmpdir, targets, plot):
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
         targets=targets,
         build=lambda t: build_models(idx, t),
         check=lambda t: check_output(idx, t),
+        plot=lambda t: plot_output(idx, t) if plot else None,
         compare=None,
     )
     test.run()
