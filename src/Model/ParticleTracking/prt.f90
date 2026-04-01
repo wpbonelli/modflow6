@@ -1075,6 +1075,15 @@ contains
           end if
           ! Apply the tracking method until the maximum time.
           call this%method%apply(particle, tmax)
+          ! On the final time step, if extend is on and the particle is
+          ! still active, continue tracking to the particle stop time
+          ! using the last available flow field.
+          if (endofsimulation .and. particle%extend .and. &
+              particle%istatus <= ACTIVE) then
+            tmax = particle%tstop
+            particle%advancing = .true.
+            call this%method%apply(particle, tmax)
+          end if
           ! If the particle timed out, terminate it.
           ! "Timed out" means it's still active but
           !   - it reached its stop time, or

@@ -61,6 +61,7 @@ module PrtPrpModule
     ! members
     type(PrtFmiType), pointer :: fmi => null() !< flow model interface
     type(ParticleStoreType), pointer :: particles => null() !< particle store
+    type(ParticleStoreType), pointer :: particles_old => null() !< old particle state (for ATS)
     type(ParticleReleaseScheduleType), pointer :: schedule => null() !< particle release schedule
     integer(I4B), pointer :: nreleasepoints => null() !< number of release points
     integer(I4B), pointer :: nreleasetimes => null() !< number of user-specified particle release times
@@ -233,8 +234,10 @@ contains
 
     ! Deallocate objects
     call this%particles%destroy(this%memoryPath)
+    call this%particles_old%destroy(trim(this%memoryPath)//'-OLD')
     call this%schedule%destroy()
     deallocate (this%particles)
+    deallocate (this%particles_old)
     deallocate (this%schedule)
   end subroutine prp_da
 
@@ -265,6 +268,12 @@ contains
       this%particles, &
       this%nreleasepoints, &
       this%memoryPath)
+
+    ! Allocate old particle store for ATS backup/restore
+    call create_particle_store( &
+      this%particles_old, &
+      this%nreleasepoints, &
+      trim(this%memoryPath)//'-OLD')
 
     ! Allocate arrays
     call mem_allocate(this%rptx, this%nreleasepoints, 'RPTX', this%memoryPath)
@@ -417,6 +426,7 @@ contains
   !> @brief Advance a time step and release particles if scheduled.
   subroutine prp_ad(this)
     use TdisModule, only: totalsimtime, kstp, kper
+    use SimVariablesModule, only: iFailedStepRetry
     class(PrtPrpType) :: this
     integer(I4B) :: ip, it
     real(DP) :: t
@@ -429,6 +439,24 @@ contains
     ! of particles, but only one at any time.
     ! Coincident release times are merged to
     ! a single time by the release scheduler.
+
+    ! Update or restore particle state (following GWF/LAK/UZF pattern).
+    ! This is only needed when PRT runs in the same simulation as GWF via
+    ! exchange: GWF can fail to converge and ATS may retry the time step,
+    ! requiring particle state to be restored to the start of the failed step.
+    if (.not. this%fmi%flows_from_file) then
+      if (iFailedStepRetry == 0) then
+        ! Save current state as old
+        if (this%particles%num_stored() > 0) then
+          call this%particles_old%copy_from(this%particles)
+        end if
+      else
+        ! Restore state from old (retry)
+        if (this%particles_old%num_stored() > 0) then
+          call this%particles%copy_from(this%particles_old)
+        end if
+      end if
+    end if
 
     ! Reset mass accumulators for this time step.
     do ip = 1, this%nreleasepoints
@@ -461,6 +489,11 @@ contains
       this%particles%num_stored() + &
       (this%nreleasepoints * this%schedule%count()), &
       this%memoryPath)
+
+    ! Resize old particle store to match
+    call this%particles_old%resize( &
+      this%particles%num_stored(), &
+      trim(this%memoryPath)//'-OLD')
 
     ! Release a particle from each point for
     ! each release time in the current step.

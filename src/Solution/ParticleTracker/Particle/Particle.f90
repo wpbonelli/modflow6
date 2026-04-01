@@ -2,10 +2,12 @@ module ParticleModule
 
   use KindModule, only: DP, I4B, LGP
   use ListModule, only: ListType
+  use SimVariablesModule, only: errmsg
   use ConstantsModule, only: DZERO, DONE, LENMEMPATH, LENBOUNDNAME, &
                              LINELENGTH
   use MemoryManagerModule, only: mem_allocate, mem_deallocate, &
                                  mem_reallocate
+  use ErrorUtilModule, only: pstop
   implicit none
   public
 
@@ -141,6 +143,7 @@ module ParticleModule
     procedure, public :: resize
     procedure, public :: get
     procedure, public :: put
+    procedure, public :: copy_from
   end type ParticleStoreType
 
 contains
@@ -338,6 +341,45 @@ contains
     this%extend(ip) = particle%extend
     this%icycwin(ip) = particle%icycwin
   end subroutine put
+
+  !> @brief Copy mutable particle state to this store from another one.
+  !!
+  !! Copies all mutable state arrays from source to this store. Copying
+  !! only mutable state (positions, status, tracking time, etc) without
+  !! immutable state (identity, options) saves space and time, but note
+  !! that it assumes this store already has all the immutable state; if
+  !! this routine is ever used beyond the context of ATS compatibility,
+  !! it will probably need modifying to copy immutable state as well.
+  !!
+  !! This routine assumes both stores are the same size.
+  !<
+  subroutine copy_from(this, source)
+    ! dummy
+    class(ParticleStoreType), intent(inout) :: this
+    class(ParticleStoreType), intent(in) :: source
+    ! local
+    integer(I4B) :: np
+
+    np = source%num_stored()
+
+    if (this%num_stored() /= np) then
+      write (errmsg, '(a,i0,a,i0)') &
+        'Cannot copy particle store, size mismatch (source=', np, &
+        ', dest=', this%num_stored(), ')'
+      call pstop(1, errmsg)
+    end if
+
+    this%itrdomain(:, :) = source%itrdomain(:, :)
+    this%iboundary(:, :) = source%iboundary(:, :)
+    this%icu(:) = source%icu(:)
+    this%ilay(:) = source%ilay(:)
+    this%izone(:) = source%izone(:)
+    this%istatus(:) = source%istatus(:)
+    this%x(:) = source%x(:)
+    this%y(:) = source%y(:)
+    this%z(:) = source%z(:)
+    this%ttrack(:) = source%ttrack(:)
+  end subroutine copy_from
 
   !> @brief Transform particle coordinates.
   !!
