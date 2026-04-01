@@ -220,12 +220,8 @@ contains
       ic2 = this%nodem2(iexg)
       q = abs(this%gwfsimvals(iexg))
       call this%get_exchange_faces(iexg, if1, if2)
-      ! print *, 'Adding boundary flow ', -q, ' to model ', this%prtmodel1%id, &
-      !          ' cell ', ic1, ' face ', if1
-      ! call this%prtmodel1%fmi%add_boundary_flow(ic1, if1, -q)
-      ! print *, 'Adding boundary flow ', q, ' to model ', this%prtmodel2%id, &
-      !          ' cell ', ic2, ' face ', if2
-      ! call this%prtmodel2%fmi%add_boundary_flow(ic2, if2, q)
+      call this%prtmodel1%fmi%add_boundary_flow(ic1, if1, -q)
+      call this%prtmodel2%fmi%add_boundary_flow(ic2, if2, q)
     end do
   end subroutine
 
@@ -708,14 +704,6 @@ contains
         exit
       end if
     end do
-
-    if (from_m1) then
-      print *, 'Particle entered model ', this%prtmodel2%id, &
-                ' cell ', particle%icu
-    else
-      print *, 'Particle entered model ', this%prtmodel1%id, &
-                ' cell ', particle%icu
-    end if
 
     if (.not. found) then
       write (errmsg, '(a,i0,a,i0,a,3g15.6,a)') &

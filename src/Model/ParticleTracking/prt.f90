@@ -1052,8 +1052,9 @@ contains
           ! Get the particle from the store. Make sure
           ! to preserve the original model ID and PRP ID.
           call packobj%particles%get(particle, np)
-          ! If the particle was transferred to another model, skip it.
-          if (particle%imdl == this%id .and. particle%transferred) cycle
+          ! If the particle was transferred to another model, skip
+          if (particle%imdl == this%id .and. particle%transferred) &
+            cycle
           ! If particle is permanently unreleased, cycle.
           ! Raise a termination event if we haven't yet.
           ! TODO: when we have generic dynamic vectors,

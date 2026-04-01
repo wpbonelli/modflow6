@@ -42,7 +42,7 @@ botm = [0.0]
 
 head_left = 2.0
 head_right = 0.0
-head_half = (head_left + head_right) / 2
+
 hk = 1.0
 
 porosity = 0.1
@@ -282,6 +282,22 @@ def build_models(idx, test):
 
 def check_output(idx, test):
     ws = Path(test.workspace)
+    sim = test.sims[0]
+
+    gwf_l_name = get_model_name(idx, "gwfl")
+    gwf_r_name = get_model_name(idx, "gwfr")
+    prt_l_name = get_model_name(idx, "prtl")
+    prt_r_name = get_model_name(idx, "prtr")
+    gwf_l = sim.get_model(gwf_l_name)
+    gwf_r = sim.get_model(gwf_r_name)
+
+    bud_l = gwf_l.output.budget()
+    bud_r = gwf_r.output.budget()
+    spdis_l = bud_l.get_data(text="DATA-SPDIS")[0]
+    spdis_r = bud_r.get_data(text="DATA-SPDIS")[0]
+    qs_l = flopy.utils.postprocessing.get_specific_discharge(spdis_l, gwf_l)
+    qs_r = flopy.utils.postprocessing.get_specific_discharge(spdis_r, gwf_r)
+    flowja = bud_l.get_data(text="FLOW-JA-FACE")
 
     hds_l = flopy.utils.HeadFile(ws / f"{get_model_name(idx, 'gwfl')}.hds")
     hds_r = flopy.utils.HeadFile(ws / f"{get_model_name(idx, 'gwfr')}.hds")
@@ -336,6 +352,7 @@ def plot_output(idx, test):
     qs_r = flopy.utils.postprocessing.get_specific_discharge(spdis_r, gwf_r)
     pls_l = pd.read_csv(ws / prt_l_trk_file, na_filter=False)
     pls_r = pd.read_csv(ws / prt_r_trk_file, na_filter=False)
+    flowja = bud_l.get_data(text="FLOW-JA-FACE")
 
     # set up plot
     fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 10))
@@ -347,8 +364,8 @@ def plot_output(idx, test):
     pmv.plot_grid()
     pmv.plot_array(hds_l[0], alpha=0.1)
     pmv.plot_vector(qs_l[0], qs_l[1], normalize=True, color="white")
-    plines_l = pls_l.groupby(["iprp", "irpt", "trelease"])
-    for ipl, ((iprp, irpt, trelease), pl) in enumerate(plines_l):
+    plines_l = pls_l.groupby(["irpt"])
+    for ipl, (irpt, pl) in enumerate(plines_l):
         pl.plot(
             title="left",
             kind="line",
@@ -364,8 +381,8 @@ def plot_output(idx, test):
     pmv.plot_grid()
     pmv.plot_array(hds_r[0], alpha=0.1)
     pmv.plot_vector(qs_r[0], qs_r[1], normalize=True, color="white")
-    plines_r = pls_r.groupby(["particleid"])
-    for ipl, (pid, pl) in enumerate(plines_r):
+    plines_r = pls_r.groupby(["irpt"])
+    for ipl, (irpt, pl) in enumerate(plines_r):
         pl.plot(
             title="right",
             kind="line",

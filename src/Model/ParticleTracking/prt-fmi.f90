@@ -314,8 +314,6 @@ contains
 
     call this%mark_boundary_face(ic, icellface)
     this%BoundaryFlows(ic, icellface) = this%BoundaryFlows(ic, icellface) + q
-
-    print *, 'Boundary flow: ', this%BoundaryFlows(ic, :)
   end subroutine add_boundary_flow
 
 end module PrtFmiModule

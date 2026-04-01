@@ -720,6 +720,8 @@ contains
     particle%extend = this%extend
     particle%icycwin = this%icycwin
     particle%extol = this%extol
+    particle%transferred = .false.
+
   end subroutine initialize_particle
 
   !> @ brief Read and prepare period data for particle input
