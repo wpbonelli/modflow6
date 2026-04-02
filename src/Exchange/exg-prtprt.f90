@@ -595,7 +595,6 @@ contains
   end function CastAsPrtPrtExchange
 
   !> @brief Transform particle coordinates from source to destination model
-  !! @param from_m1 If true, transfer is from model1 to model2; otherwise model2 to model1
   subroutine transform_particle(this, particle, n_src, f_src, from_m1)
     class(PrtPrtExchangeType) :: this
     type(ParticleType), pointer :: particle
@@ -669,6 +668,14 @@ contains
     dx2 = x2max - x2min
     dy2 = y2max - y2min
     dz2 = z2max - z2min
+
+    print *, 'dx1: ', dx1
+    print *, 'dy1: ', dy1
+    print *, 'dz1: ', dz1
+
+    print *, 'dx2: ', dx2
+    print *, 'dy2: ', dy2
+    print *, 'dz2: ', dz2
 
     if (dx2 > DZERO) then
       xt = x2min + tx * dx2
@@ -1020,17 +1027,18 @@ contains
     select case (iface)
     case (1) ! West face
       xmax = xmin
-    case (2) ! East face
+    case (3) ! East face
       xmin = xmax
-    case (3) ! South face
+    case (4) ! South face
       ymax = ymin
-    case (4) ! North face
+    case (2) ! North face
       ymin = ymax
     case (-2) ! Bottom face
       zmax = zbot
     case (-1) ! Top face
       zmin = ztop
     end select
+
   end subroutine get_face_bounds_dis
 
   !> @brief Check if a point lies on a line segment
