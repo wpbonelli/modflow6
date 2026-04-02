@@ -5,14 +5,13 @@ Each model domain has 2 cells, together forming a 4-cell line.
 Steady flow is configured from left to right with CHD packages
 in the left-most and right-most cells.
 
-PRT models are connected by an exchange at (0, 0, 1) <-> (0, 0, 0).
-
+The flow and tracking models are connected on their shared face.
 IFLOWFACE is configured in the CHD cells and in the exchange cells,
-on the formers' outer faces and the inner shared face for the latter.
+on the outer faces of the CHD cells and on the shared exchange face.
 
 Particles are released from the left-most cell (0, 0, 0) in the left
 model. They should reach and cross the exchange and terminate at the
-rightmost edge of the right model. 
+rightmost edge of the right model.
 
    left | right
 ________|________
@@ -27,14 +26,14 @@ equivalent DISV grid.
 """
 
 from pathlib import Path
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 
 import flopy
-from flopy.utils.gridutil import get_disv_kwargs
+import matplotlib.cm as cm
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
+from flopy.utils.gridutil import get_disv_kwargs
 from framework import TestFramework
 
 nlay = 1
@@ -117,9 +116,11 @@ def build_models(idx, test):
     )
     flopy.mf6.ModflowGwfchd(
         gwfl,
-        stress_period_data=[[(0, 0), head_left, 4]] if "disv" in name else [[(0, 0, 0), head_left, 1]],
+        stress_period_data=[[(0, 0), head_left, 4]]
+        if "disv" in name
+        else [[(0, 0, 0), head_left, 1]],
         pname="chd_left",
-        auxiliary=["IFLOWFACE"]
+        auxiliary=["IFLOWFACE"],
     )
     flopy.mf6.ModflowGwfoc(
         gwfl,
@@ -134,7 +135,9 @@ def build_models(idx, test):
         save_flows=True,
     )
     if "disv" in name:
-        flopy.mf6.ModflowGwfdisv(gwfr, **get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm))
+        flopy.mf6.ModflowGwfdisv(
+            gwfr, **get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm)
+        )
     else:
         flopy.mf6.ModflowGwfdis(
             gwfr,
@@ -153,12 +156,13 @@ def build_models(idx, test):
         icelltype=0,
         k=hk,
     )
-    # CHD on right face
     flopy.mf6.ModflowGwfchd(
         gwfr,
-        stress_period_data=[[(0, 1), head_right, 2]] if "disv" in name else [[(0, 0, 1), head_right, 3]],
+        stress_period_data=[[(0, 1), head_right, 2]]
+        if "disv" in name
+        else [[(0, 0, 1), head_right, 3]],
         pname="chd_right",
-        auxiliary=["IFLOWFACE"]
+        auxiliary=["IFLOWFACE"],
     )
     flopy.mf6.ModflowGwfoc(
         gwfr,
@@ -206,7 +210,9 @@ def build_models(idx, test):
 
     prtl = flopy.mf6.ModflowPrt(sim, modelname=get_model_name(idx, "prtl"))
     if "disv" in name:
-        flopy.mf6.ModflowPrtdisv(prtl, **get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm))
+        flopy.mf6.ModflowPrtdisv(
+            prtl, **get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm)
+        )
         releasepts = [(0, (0, 0), 0.5, 0.5, 0.5)]
     else:
         flopy.mf6.ModflowPrtdis(
@@ -229,7 +235,7 @@ def build_models(idx, test):
         packagedata=releasepts,
         perioddata={0: ["FIRST"]},
         extend_tracking=True,
-        stoptime=0.4
+        stoptime=0.4,
     )
     flopy.mf6.ModflowPrtoc(
         prtl,
@@ -247,7 +253,9 @@ def build_models(idx, test):
 
     prtr = flopy.mf6.ModflowPrt(sim, modelname=get_model_name(idx, "prtr"))
     if "disv" in name:
-        flopy.mf6.ModflowPrtdisv(prtr, **get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm))
+        flopy.mf6.ModflowPrtdisv(
+            prtr, **get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm)
+        )
     else:
         flopy.mf6.ModflowPrtdis(
             prtr,
@@ -312,28 +320,10 @@ def build_models(idx, test):
 
 def check_output(idx, test):
     ws = Path(test.workspace)
-    sim = test.sims[0]
-
-    gwf_l_name = get_model_name(idx, "gwfl")
-    gwf_r_name = get_model_name(idx, "gwfr")
-    prt_l_name = get_model_name(idx, "prtl")
-    prt_r_name = get_model_name(idx, "prtr")
-    gwf_l = sim.get_model(gwf_l_name)
-    gwf_r = sim.get_model(gwf_r_name)
-
-    bud_l = gwf_l.output.budget()
-    bud_r = gwf_r.output.budget()
-    spdis_l = bud_l.get_data(text="DATA-SPDIS")[0]
-    spdis_r = bud_r.get_data(text="DATA-SPDIS")[0]
-    qs_l = flopy.utils.postprocessing.get_specific_discharge(spdis_l, gwf_l)
-    qs_r = flopy.utils.postprocessing.get_specific_discharge(spdis_r, gwf_r)
-    flowja = bud_l.get_data(text="FLOW-JA-FACE")
-
     hds_l = flopy.utils.HeadFile(ws / f"{get_model_name(idx, 'gwfl')}.hds")
     hds_r = flopy.utils.HeadFile(ws / f"{get_model_name(idx, 'gwfr')}.hds")
     head_l = hds_l.get_data().squeeze()
     head_r = hds_r.get_data().squeeze()
-
     assert np.all(head_l <= head_left)
     assert np.all(head_r >= head_right)
 
@@ -368,8 +358,6 @@ def plot_output(idx, test):
     prt_r_name = get_model_name(idx, "prtr")
     gwf_l = sim.get_model(gwf_l_name)
     gwf_r = sim.get_model(gwf_r_name)
-    prt_l = sim.get_model(prt_l_name)
-    prt_r = sim.get_model(prt_r_name)
     mg_l = gwf_l.modelgrid
     mg_r = gwf_r.modelgrid
     gwf_l_head_file = f"{gwf_l_name}.hds"
@@ -386,14 +374,13 @@ def plot_output(idx, test):
     qs_r = flopy.utils.postprocessing.get_specific_discharge(spdis_r, gwf_r)
     pls_l = pd.read_csv(ws / prt_l_trk_file, na_filter=False)
     pls_r = pd.read_csv(ws / prt_r_trk_file, na_filter=False)
-    flowja = bud_l.get_data(text="FLOW-JA-FACE")
 
     # set up plot
     fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(10, 10))
     for a in ax:
         a.set_aspect("equal")
 
-    # plot left model
+    # left model
     pmv = flopy.plot.PlotMapView(modelgrid=mg_l, ax=ax[0])
     pmv.plot_grid()
     pmv.plot_array(hds_l[0], alpha=0.1)
@@ -410,7 +397,7 @@ def plot_output(idx, test):
             color=cm.plasma(ipl / len(plines_l)),
         )
 
-    # plot right model
+    # right model
     pmv = flopy.plot.PlotMapView(modelgrid=mg_r, ax=ax[1])
     pmv.plot_grid()
     pmv.plot_array(hds_r[0], alpha=0.1)
