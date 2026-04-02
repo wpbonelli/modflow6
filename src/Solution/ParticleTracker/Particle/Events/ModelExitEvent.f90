@@ -11,8 +11,6 @@ module ModelExitEventModule
   public :: ModelExitEventType
 
   type, extends(FeatureExitEventType) :: ModelExitEventType
-    integer(I4B) :: model_id
-    integer(I4B) :: exg_name
   contains
     procedure :: get_code
     procedure :: get_verb
@@ -30,7 +28,7 @@ contains
   function get_verb(this) result(verb)
     class(ModelExitEventType), intent(in) :: this
     character(len=:), allocatable :: verb
-    verb = 'exited model '
+    verb = 'exited model'
   end function get_verb
 
   function get_text(this) result(text)
@@ -43,12 +41,11 @@ contains
       ', package ', this%iprp, &
       ', point ', this%irpt, &
       ', time ', this%trelease, &
-      ' '//this%get_verb(), this%model_id, &
+      ' '//this%get_verb(), &
       ' in model ', this%imid, &
       ', layer ', this%ilay, &
       ', cell ', this%icu, &
       ', zone ', this%izone, &
-      ' through exchange ', this%exg_name, &
       ' at x ', this%x, &
       ', y ', this%y, &
       ', z ', this%z, &

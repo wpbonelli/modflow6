@@ -59,8 +59,9 @@ contains
 
     ! assigned boundary face with net outflow?
     ic = particle%itrdomain(LEVEL_FEATURE)
-    if (this%fmi%is_net_out_boundary_face(ic, icellface)) &
+    if (this%fmi%is_net_out_boundary_face(ic, icellface)) then
       call this%modelexit(particle)
+    end if
 
   end subroutine try_pass
 

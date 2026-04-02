@@ -518,6 +518,7 @@ contains
                        this%fmi%BoundaryFlows(defn%icell, this%fmi%max_faces - 1)
     defn%faceflow(7) = defn%faceflow(7) + &
                        this%fmi%BoundaryFlows(defn%icell, this%fmi%max_faces)
+
   end subroutine load_cell_boundary_flows
 
 end module MethodDisModule

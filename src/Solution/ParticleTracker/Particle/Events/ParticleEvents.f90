@@ -91,6 +91,7 @@ contains
     event%y = y
     event%z = z
     event%istatus = particle%istatus
+
   end subroutine prep_event
 
   !> @brief Dispatch an event for handling. The first

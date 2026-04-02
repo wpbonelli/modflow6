@@ -1,22 +1,26 @@
 """
 Test PRT-PRT exchange between two particle tracking models.
 
-The two model domains form a 10-cell line split down the middle:
+Each model domain has 2 cells, together forming a 4-cell line.
+Steady flow is configured from left to right with CHD packages
+in the left-most and right-most cells.
 
-        left        |        right
- ___________________|___________________
-| o | ->| ->| ->| ->| ->| ->| ->| ->| x |
-|___|___|___|___|___|___|___|___|___|___|
+PRT models are connected by an exchange at (0, 0, 1) <-> (0, 0, 0).
+
+IFLOWFACE is configured in the CHD cells and in the exchange cells,
+on the formers' outer faces and the inner shared face for the latter.
+
+Particles are released from the left-most cell (0, 0, 0) in the left
+model. They should reach and cross the exchange and terminate at the
+rightmost edge of the right model. 
+
+   left | right
+________|________
+| o-|---|---|-->x
+|___|___|___|___|
   o release
   x termination
 
-Steady flow runs from left to right.
-
-PRT models are connected by an exchange at (0, 0, 4) <-> (0, 0, 0).
-
-Particles are released from the left-most cell (0, 0, 0) in the left
-model. They should reach and cross the exchange and terminate in the
-rightmost cell of the right model.  The test asserts that:
 """
 
 from pathlib import Path
@@ -31,8 +35,7 @@ from framework import TestFramework
 
 nlay = 1
 nrow = 1
-ncol_half = 5
-ncol = ncol_half * 2
+ncol = 2
 
 delr = 1.0
 delc = 1.0
@@ -41,7 +44,7 @@ top = 1.0
 botm = [0.0]
 
 head_left = 2.0
-head_right = 0.0
+head_right = -1.0
 
 hk = 1.0
 
@@ -92,7 +95,7 @@ def build_models(idx, test):
         gwfl,
         nlay=nlay,
         nrow=nrow,
-        ncol=ncol_half,
+        ncol=ncol,
         delr=delr,
         delc=delc,
         top=top,
@@ -107,8 +110,9 @@ def build_models(idx, test):
     )
     flopy.mf6.ModflowGwfchd(
         gwfl,
-        stress_period_data=[[(0, 0, 0), head_left]],
+        stress_period_data=[[(0, 0, 0), head_left, 1]],
         pname="chd_left",
+        auxiliary=["IFLOWFACE"]
     )
     flopy.mf6.ModflowGwfoc(
         gwfl,
@@ -126,7 +130,7 @@ def build_models(idx, test):
         gwfr,
         nlay=nlay,
         nrow=nrow,
-        ncol=ncol_half,
+        ncol=ncol,
         delr=delr,
         delc=delc,
         top=top,
@@ -142,8 +146,9 @@ def build_models(idx, test):
     # CHD on right face
     flopy.mf6.ModflowGwfchd(
         gwfr,
-        stress_period_data=[[(0, 0, ncol_half - 1), head_right]],
+        stress_period_data=[[(0, 0, 1), head_right, 3]],
         pname="chd_right",
+        auxiliary=["IFLOWFACE"]
     )
     flopy.mf6.ModflowGwfoc(
         gwfr,
@@ -154,7 +159,7 @@ def build_models(idx, test):
 
     gwfgwf_data = [
         (
-            (0, 0, ncol_half - 1),
+            (0, 0, ncol - 1),
             (0, 0, 0),
             1,
             delr / 2.0,
@@ -180,7 +185,7 @@ def build_models(idx, test):
         prtl,
         nlay=nlay,
         nrow=nrow,
-        ncol=ncol_half,
+        ncol=ncol,
         delr=delr,
         delc=delc,
         top=top,
@@ -195,19 +200,13 @@ def build_models(idx, test):
         packagedata=releasepts,
         perioddata={0: ["FIRST"]},
         extend_tracking=True,
+        stoptime=0.4
     )
     flopy.mf6.ModflowPrtoc(
         prtl,
         pname="oc",
         trackcsv_filerecord=f"{get_model_name(idx, 'prtl')}.trk.csv",
         dev_dump_event_trace=True,
-    )
-    flopy.mf6.ModflowPrtfmi(
-        prtl,
-        packagedata=[
-            ("GWFHEAD", f"{get_model_name(idx, 'gwfl')}.hds"),
-            ("GWFBUDGET", f"{get_model_name(idx, 'gwfl')}.cbc"),
-        ],
     )
     flopy.mf6.ModflowGwfprt(
         sim,
@@ -222,7 +221,7 @@ def build_models(idx, test):
         prtr,
         nlay=nlay,
         nrow=nrow,
-        ncol=ncol_half,
+        ncol=ncol,
         delr=delr,
         delc=delc,
         top=top,
@@ -236,13 +235,6 @@ def build_models(idx, test):
         trackcsv_filerecord=f"{get_model_name(idx, 'prtr')}.trk.csv",
         dev_dump_event_trace=True,
     )
-    flopy.mf6.ModflowPrtfmi(
-        prtr,
-        packagedata=[
-            ("GWFHEAD", f"{get_model_name(idx, 'gwfr')}.hds"),
-            ("GWFBUDGET", f"{get_model_name(idx, 'gwfr')}.cbc"),
-        ],
-    )
     flopy.mf6.ModflowGwfprt(
         sim,
         exgtype="GWF6-PRT6",
@@ -253,7 +245,7 @@ def build_models(idx, test):
 
     prtprt_data = [
         # nodem1, nodem2, ihc, iflowface1, iflowface2
-        ((0, 0, ncol_half - 1), (0, 0, 0), 1, 3, 1),
+        ((0, 0, ncol - 1), (0, 0, 0), 1, 3, 1)
     ]
     flopy.mf6.ModflowPrtprt(
         sim,
@@ -318,10 +310,14 @@ def check_output(idx, test):
 
     terminations = pls_r[pls_r.ireason == 3]
     assert len(terminations) == len(irpts_l)
-    assert all(terminations.istatus == 5)
+    assert all(terminations.istatus == 2)
 
-    final_x = terminations["x"].max()
-    assert np.isclose(final_x, 4.5)
+    final_x = terminations["x"].item()
+    final_y = terminations["y"].item()
+    final_z = terminations["z"].item()
+    assert np.isclose(final_x, 2.0)
+    assert np.isclose(final_y, 0.5)
+    assert np.isclose(final_z, 0.5)
 
 
 def plot_output(idx, test):

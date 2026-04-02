@@ -25,7 +25,7 @@ module PrtModule
                                   write_particle_event
   use SimModule, only: count_errors, store_error, store_error_filename
   use MemoryManagerModule, only: mem_allocate
-  use MethodModule, only: MethodType, LEVEL_FEATURE
+  use MethodModule, only: MethodType, LEVEL_MODEL, LEVEL_FEATURE
   use MethodDisModule, only: MethodDisType, create_method_dis
   use MethodDisvModule, only: MethodDisvType, create_method_disv
   use HashTableModule, only: HashTableType, hash_table_cr, hash_table_da
@@ -1063,6 +1063,7 @@ contains
           ! indicates the permanently unreleased event
           ! is not yet recorded, status 8 it has been.
           if (particle%istatus == (-1 * TERM_UNRELEASED)) then
+            particle%itrdomain(LEVEL_MODEL) = this%id
             particle%imdl = this%id
             particle%iprp = iprp
             call this%method%terminate(particle, status=TERM_UNRELEASED)
@@ -1071,7 +1072,9 @@ contains
           if (particle%istatus > ACTIVE) cycle ! Skip terminated particles
           particle%istatus = ACTIVE ! Set active status in case of release
           ! If the particle was released this time step, emit a release event
-          if (particle%trelease >= totimc) then
+          if ((particle%ttrack <= particle%trelease) .and. &
+              (particle%trelease >= totimc)) then
+            particle%itrdomain(LEVEL_MODEL) = this%id
             particle%imdl = this%id
             particle%iprp = iprp
             call this%method%release(particle)

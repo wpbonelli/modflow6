@@ -12,7 +12,7 @@ module PrtPrtExchangeModule
   use BaseModelModule, only: BaseModelType, GetBaseModelFromList
   use PrtModule, only: PrtModelType
   use ParticleModule, only: ParticleType, create_particle, &
-                            create_particle_store, TERM_BOUNDARY
+                            create_particle_store
   use ParticleEventModule, only: ParticleEventType
   use MemoryHelperModule, only: create_mem_path
   use ExgPrtprtInputModule, only: ExgPrtprtParamFoundType
@@ -76,7 +76,7 @@ module PrtPrtExchangeModule
     procedure, private :: source_data
     procedure, private :: noder
     procedure, private :: get_exchange_faces
-    procedure, private :: transform_particle_coords
+    procedure, private :: transform_particle
   end type PrtPrtExchangeType
 
 contains
@@ -419,7 +419,7 @@ contains
     ! -- local
     integer(I4B), dimension(:, :), contiguous, pointer :: cellidm1 => null()
     integer(I4B), dimension(:, :), contiguous, pointer :: cellidm2 => null()
-    integer(I4B) :: iexg, node1, node2, iaux
+    integer(I4B) :: iexg, iaux
     integer(I4B), dimension(:), contiguous, pointer :: ihc
     real(DP), dimension(:, :), contiguous, pointer :: auxvar
     type(CharacterStringType), dimension(:), contiguous, pointer :: boundname
@@ -472,6 +472,7 @@ contains
   function try_particle_transfer(context, particle, event) result(transferred)
     use ModelExitEventModule, only: ModelExitEventType
     use PrtPrpModule, only: PrtPrpType, ExgPrtPrpType
+    use MethodModule, only: LEVEL_MODEL, LEVEL_FEATURE
     ! dummy
     class(*), pointer :: context
     type(ParticleType), pointer, intent(inout) :: particle
@@ -498,7 +499,8 @@ contains
       ! model1 -> model2
       found = .false.
       do i = 1, exg%nexg
-        if (particle%icu == exg%nodem1(i)) then
+        if ((particle%itrdomain(LEVEL_MODEL) == exg%prtmodel1%id) .and. &
+            (particle%icu == exg%nodem1(i))) then
           dest_cell = exg%nodem2(i)
           found = .true.
           exit
@@ -511,16 +513,18 @@ contains
         select type (exgprp_obj)
         type is (ExgPrtPrpType)
           exgprp => exgprp_obj
-          particle%itrdomain(1) = exg%prtmodel2%id
-          ! Transform particle coordinates before updating icu
-          call exg%transform_particle_coords(particle, particle%icu, &
-                                              nint(exg%auxvar(exg%iflowface1, i)), &
-                                              from_m1=.true.)
-          ! Note: transform_particle_coords updates particle%icu and particle%x/y/z
+          particle%advancing = .true.
+          particle%itrdomain(LEVEL_MODEL) = exg%prtmodel2%id
+          call exg%transform_particle(particle, particle%icu, &
+                                      nint(exg%auxvar(exg%iflowface1, i)), &
+                                      from_m1=.true.)
+          particle%itrdomain(LEVEL_FEATURE) = particle%icu
           exgprp%has_pending = .true.
           exgprp%nparticles = exgprp%nparticles + 1
           call exgprp%particles%resize(exgprp%nparticles, exgprp%memoryPath)
           call exgprp%particles%put(particle, exgprp%nparticles)
+          particle%itrdomain(1) = exg%prtmodel1%id
+          particle%advancing = .false.
           transferred = .true.
           return
         end select
@@ -529,7 +533,8 @@ contains
       ! model2 -> model1
       found = .false.
       do i = 1, exg%nexg
-        if (particle%icu == exg%nodem2(i)) then
+        if ((particle%itrdomain(LEVEL_MODEL) == exg%prtmodel2%id) .and. &
+            (particle%icu == exg%nodem2(i))) then
           dest_cell = exg%nodem1(i)
           found = .true.
           exit
@@ -542,17 +547,18 @@ contains
         select type (exgprp_obj)
         type is (ExgPrtPrpType)
           exgprp => exgprp_obj
-          particle%itrdomain(1) = exg%prtmodel1%id
-          ! Transform particle coordinates before updating icu
-          ! Note: for model2->model1, we use iflowface2 as source
-          call exg%transform_particle_coords(particle, particle%icu, &
-                                              nint(exg%auxvar(exg%iflowface2, i)), &
-                                              from_m1=.false.)
-          ! Note: transform updates particle%icu and particle%x/y/z
+          particle%advancing = .true.
+          particle%itrdomain(LEVEL_MODEL) = exg%prtmodel1%id
+          call exg%transform_particle(particle, particle%icu, &
+                                      nint(exg%auxvar(exg%iflowface2, i)), &
+                                      from_m1=.false.)
+          particle%itrdomain(LEVEL_FEATURE) = particle%icu
           exgprp%has_pending = .true.
           exgprp%nparticles = exgprp%nparticles + 1
           call exgprp%particles%resize(exgprp%nparticles, exgprp%memoryPath)
           call exgprp%particles%put(particle, exgprp%nparticles)
+          particle%itrdomain(1) = exg%prtmodel2%id
+          particle%advancing = .false.
           transferred = .true.
           return
         end select
@@ -590,7 +596,7 @@ contains
 
   !> @brief Transform particle coordinates from source to destination model
   !! @param from_m1 If true, transfer is from model1 to model2; otherwise model2 to model1
-  subroutine transform_particle_coords(this, particle, n_src, f_src, from_m1)
+  subroutine transform_particle(this, particle, n_src, f_src, from_m1)
     class(PrtPrtExchangeType) :: this
     type(ParticleType), pointer :: particle
     integer(I4B), intent(in) :: n_src ! source cell
@@ -624,8 +630,8 @@ contains
     end if
 
     ! 1. Find all candidate destination connections
-    call find_candidate_connections(this, n_src, f_src, iexg_candidates, &
-                                     n_candidates, from_m1)
+    call get_connections(this, n_src, f_src, iexg_candidates, &
+                         n_candidates, from_m1)
 
     ! 2. Get source face bounds
     call get_face_bounds(dis_src, n_src, f_src, &
@@ -633,8 +639,8 @@ contains
 
     ! 3. Get consolidated destination face bounds
     call get_consolidated_bounds(this, iexg_candidates, n_candidates, &
-                                  x2min, x2max, y2min, y2max, z2min, z2max, &
-                                  dis_dst, iflowface_dst)
+                                 x2min, x2max, y2min, y2max, z2min, z2max, &
+                                 dis_dst, iflowface_dst)
 
     ! 4. Normalize particle position in source face [0,1]
     dx1 = x1max - x1min
@@ -714,10 +720,10 @@ contains
     end if
 
     deallocate (iexg_candidates)
-  end subroutine transform_particle_coords
+  end subroutine transform_particle
 
   !> @brief Find all exchange connections with the same source cell and face
-  subroutine find_candidate_connections(this, n_src, f_src, iexg_list, n_found, from_m1)
+  subroutine get_connections(this, n_src, f_src, iexg_list, n_found, from_m1)
     class(PrtPrtExchangeType) :: this
     integer(I4B), intent(in) :: n_src, f_src
     integer(I4B), allocatable, intent(out) :: iexg_list(:)
@@ -761,12 +767,12 @@ contains
     allocate (iexg_list(n_found))
     iexg_list(1:n_found) = temp_list(1:n_found)
     deallocate (temp_list)
-  end subroutine find_candidate_connections
+  end subroutine get_connections
 
   !> @brief Get consolidated bounds across multiple destination faces
   subroutine get_consolidated_bounds(this, iexg_list, n, &
-                                      xmin, xmax, ymin, ymax, zmin, zmax, &
-                                      dis_dst, iflowface_dst)
+                                     xmin, xmax, ymin, ymax, zmin, zmax, &
+                                     dis_dst, iflowface_dst)
     class(PrtPrtExchangeType) :: this
     integer(I4B), intent(in) :: iexg_list(:), n
     real(DP), intent(out) :: xmin, xmax, ymin, ymax, zmin, zmax
@@ -787,7 +793,7 @@ contains
     do i = 1, n
       iexg = iexg_list(i)
       ! Destination depends on which list is being used
-      ! The iexg_list comes from find_candidate_connections which already
+      ! The iexg_list comes from get_connections which already
       ! filters by source, so all entries have the same source.
       ! We need to get the destination cell/face from the opposite side.
       if (iflowface_dst == this%iflowface2) then
@@ -834,7 +840,8 @@ contains
     real(DP) :: xmin, xmax, ymin, ymax, zmin, zmax
     real(DP), parameter :: TOL = 1.0d-9
 
-    call get_face_bounds_dis(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+    call get_face_bounds_dis(dis, icell, iface, &
+                             xmin, xmax, ymin, ymax, zmin, zmax)
 
     inside = (x >= xmin - TOL .and. x <= xmax + TOL .and. &
               y >= ymin - TOL .and. y <= ymax + TOL .and. &
@@ -899,16 +906,19 @@ contains
   end function point_in_face_bounds_disv
 
   !> @brief Get face bounds (polymorphic wrapper)
-  subroutine get_face_bounds(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+  subroutine get_face_bounds(dis, icell, iface, xmin, xmax, ymin, ymax, &
+                             zmin, zmax)
     class(DisBaseType), pointer :: dis
     integer(I4B), intent(in) :: icell, iface
     real(DP), intent(out) :: xmin, xmax, ymin, ymax, zmin, zmax
 
     select type (dis)
     type is (DisType)
-      call get_face_bounds_dis(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+      call get_face_bounds_dis(dis, icell, iface, xmin, xmax, &
+                               ymin, ymax, zmin, zmax)
     type is (DisvType)
-      call get_face_bounds_disv(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+      call get_face_bounds_disv(dis, icell, iface, xmin, xmax, &
+                                ymin, ymax, zmin, zmax)
     class default
       call store_error('Unsupported discretization type for PRT-PRT exchange')
       call store_error_filename('')
@@ -916,7 +926,8 @@ contains
   end subroutine get_face_bounds
 
   !> @brief Get face bounds for DISV (vertex) grid
-  subroutine get_face_bounds_disv(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+  subroutine get_face_bounds_disv(dis, icell, iface, xmin, xmax, ymin, ymax, &
+                                  zmin, zmax)
     type(DisvType), pointer, intent(in) :: dis
     integer(I4B), intent(in) :: icell, iface
     real(DP), intent(out) :: xmin, xmax, ymin, ymax, zmin, zmax
@@ -975,7 +986,8 @@ contains
   end subroutine get_face_bounds_disv
 
   !> @brief Get face bounds for DIS (structured) grid
-  subroutine get_face_bounds_dis(dis, icell, iface, xmin, xmax, ymin, ymax, zmin, zmax)
+  subroutine get_face_bounds_dis(dis, icell, iface, xmin, xmax, ymin, ymax, &
+                                 zmin, zmax)
     type(DisType), pointer, intent(in) :: dis
     integer(I4B), intent(in) :: icell, iface
     real(DP), intent(out) :: xmin, xmax, ymin, ymax, zmin, zmax

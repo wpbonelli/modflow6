@@ -304,10 +304,6 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     class(ParticleEventType), pointer :: event
     allocate (ModelExitEventType :: event)
-    select type (event)
-    type is (ModelExitEventType)
-      event%model_id = particle%itrdomain(1)
-    end select
 
     ! First: let observers see the event (always broadcast to all)
     call this%observers%broadcast(particle, event)
