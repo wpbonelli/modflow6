@@ -370,7 +370,6 @@ contains
   subroutine exg_prp_allocate_scalars(this)
     use MemoryManagerModule, only: mem_allocate
     class(ExgPrtPrpType) :: this
-    integer(I4B), pointer :: iper, ionper
 
     this%input_mempath = trim(this%memoryPath)//'-INPUT'
 
