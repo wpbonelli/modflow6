@@ -21,6 +21,9 @@ ________|________
   o release
   x termination
 
+There are two test cases, one using a DIS grid, another with an
+equivalent DISV grid.
+
 """
 
 from pathlib import Path
@@ -28,6 +31,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
 import flopy
+from flopy.utils.gridutil import get_disv_kwargs
 import numpy as np
 import pandas as pd
 import pytest
@@ -53,9 +57,8 @@ nper = 1
 perlen = 10.0
 nstp = 10
 
-releasepts = [(0, (0, 0, 0), 0.5, 0.5, 0.5)]
-
-cases = ["prtprtexg"]
+simname = "prtprt"
+cases = [f"{simname}dis", f"{simname}disv"]
 
 
 def get_model_name(idx, mdl):
@@ -91,16 +94,20 @@ def build_models(idx, test):
         modelname=get_model_name(idx, "gwfl"),
         save_flows=True,
     )
-    flopy.mf6.ModflowGwfdis(
-        gwfl,
-        nlay=nlay,
-        nrow=nrow,
-        ncol=ncol,
-        delr=delr,
-        delc=delc,
-        top=top,
-        botm=botm,
-    )
+    if "disv" in name:
+        kwargs = get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm)
+        flopy.mf6.ModflowGwfdisv(gwfl, **kwargs)
+    else:
+        flopy.mf6.ModflowGwfdis(
+            gwfl,
+            nlay=nlay,
+            nrow=nrow,
+            ncol=ncol,
+            delr=delr,
+            delc=delc,
+            top=top,
+            botm=botm,
+        )
     flopy.mf6.ModflowGwfic(gwfl, strt=head_left)
     flopy.mf6.ModflowGwfnpf(
         gwfl,
@@ -110,7 +117,7 @@ def build_models(idx, test):
     )
     flopy.mf6.ModflowGwfchd(
         gwfl,
-        stress_period_data=[[(0, 0, 0), head_left, 1]],
+        stress_period_data=[[(0, 0), head_left, 4]] if "disv" in name else [[(0, 0, 0), head_left, 1]],
         pname="chd_left",
         auxiliary=["IFLOWFACE"]
     )
@@ -126,16 +133,19 @@ def build_models(idx, test):
         modelname=get_model_name(idx, "gwfr"),
         save_flows=True,
     )
-    flopy.mf6.ModflowGwfdis(
-        gwfr,
-        nlay=nlay,
-        nrow=nrow,
-        ncol=ncol,
-        delr=delr,
-        delc=delc,
-        top=top,
-        botm=botm,
-    )
+    if "disv" in name:
+        flopy.mf6.ModflowGwfdisv(gwfr, **get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm))
+    else:
+        flopy.mf6.ModflowGwfdis(
+            gwfr,
+            nlay=nlay,
+            nrow=nrow,
+            ncol=ncol,
+            delr=delr,
+            delc=delc,
+            top=top,
+            botm=botm,
+        )
     flopy.mf6.ModflowGwfic(gwfr, strt=head_right)
     flopy.mf6.ModflowGwfnpf(
         gwfr,
@@ -146,7 +156,7 @@ def build_models(idx, test):
     # CHD on right face
     flopy.mf6.ModflowGwfchd(
         gwfr,
-        stress_period_data=[[(0, 0, 1), head_right, 3]],
+        stress_period_data=[[(0, 1), head_right, 2]] if "disv" in name else [[(0, 0, 1), head_right, 3]],
         pname="chd_right",
         auxiliary=["IFLOWFACE"]
     )
@@ -157,18 +167,32 @@ def build_models(idx, test):
         saverecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
     )
 
-    gwfgwf_data = [
-        (
-            (0, 0, ncol - 1),
-            (0, 0, 0),
-            1,
-            delr / 2.0,
-            delr / 2.0,
-            delc,
-            0.0,
-            delr,
-        )
-    ]
+    if "disv" in name:
+        gwfgwf_data = [
+            (
+                (0, ncol - 1),
+                (0, 0),
+                1,
+                delr / 2.0,
+                delr / 2.0,
+                delc,
+                0.0,
+                delr,
+            )
+        ]
+    else:
+        gwfgwf_data = [
+            (
+                (0, 0, ncol - 1),
+                (0, 0, 0),
+                1,
+                delr / 2.0,
+                delr / 2.0,
+                delc,
+                0.0,
+                delr,
+            )
+        ]
     flopy.mf6.ModflowGwfgwf(
         sim,
         exgtype="GWF6-GWF6",
@@ -181,16 +205,21 @@ def build_models(idx, test):
     )
 
     prtl = flopy.mf6.ModflowPrt(sim, modelname=get_model_name(idx, "prtl"))
-    flopy.mf6.ModflowPrtdis(
-        prtl,
-        nlay=nlay,
-        nrow=nrow,
-        ncol=ncol,
-        delr=delr,
-        delc=delc,
-        top=top,
-        botm=botm,
-    )
+    if "disv" in name:
+        flopy.mf6.ModflowPrtdisv(prtl, **get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm))
+        releasepts = [(0, (0, 0), 0.5, 0.5, 0.5)]
+    else:
+        flopy.mf6.ModflowPrtdis(
+            prtl,
+            nlay=nlay,
+            nrow=nrow,
+            ncol=ncol,
+            delr=delr,
+            delc=delc,
+            top=top,
+            botm=botm,
+        )
+        releasepts = [(0, (0, 0, 0), 0.5, 0.5, 0.5)]
     flopy.mf6.ModflowPrtmip(prtl, pname="mip", porosity=porosity)
     flopy.mf6.ModflowPrtprp(
         prtl,
@@ -217,16 +246,19 @@ def build_models(idx, test):
     )
 
     prtr = flopy.mf6.ModflowPrt(sim, modelname=get_model_name(idx, "prtr"))
-    flopy.mf6.ModflowPrtdis(
-        prtr,
-        nlay=nlay,
-        nrow=nrow,
-        ncol=ncol,
-        delr=delr,
-        delc=delc,
-        top=top,
-        botm=botm,
-    )
+    if "disv" in name:
+        flopy.mf6.ModflowPrtdisv(prtr, **get_disv_kwargs(nlay, nrow, ncol, delr, delc, top, botm))
+    else:
+        flopy.mf6.ModflowPrtdis(
+            prtr,
+            nlay=nlay,
+            nrow=nrow,
+            ncol=ncol,
+            delr=delr,
+            delc=delc,
+            top=top,
+            botm=botm,
+        )
     flopy.mf6.ModflowPrtmip(prtr, pname="mip", porosity=porosity)
     # right model has no PRP, it just receives particles from left
     flopy.mf6.ModflowPrtoc(
@@ -243,10 +275,16 @@ def build_models(idx, test):
         filename=f"{get_model_name(idx, 'gwfr')}.gwfprt",
     )
 
-    prtprt_data = [
-        # nodem1, nodem2, ihc, iflowface1, iflowface2
-        ((0, 0, ncol - 1), (0, 0, 0), 1, 3, 1)
-    ]
+    if "disv" in name:
+        prtprt_data = [
+            # nodem1, nodem2, ihc, iflowface1, iflowface2
+            ((0, ncol - 1), (0, 0), 1, 2, 4)
+        ]
+    else:
+        prtprt_data = [
+            # nodem1, nodem2, ihc, iflowface1, iflowface2
+            ((0, 0, ncol - 1), (0, 0, 0), 1, 3, 1)
+        ]
     flopy.mf6.ModflowPrtprt(
         sim,
         exgtype="PRT6-PRT6",

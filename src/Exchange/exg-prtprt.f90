@@ -25,6 +25,7 @@ module PrtPrtExchangeModule
   use DisvModule, only: DisvType
   use GeomUtilModule, only: get_ijk, point_in_polygon
   use PrtFmiModule, only: IFLOWFACE_TOP
+  use MethodModule, only: LEVEL_MODEL, LEVEL_FEATURE
 
   implicit none
   private
@@ -472,7 +473,6 @@ contains
   function try_particle_transfer(context, particle, event) result(transferred)
     use ModelExitEventModule, only: ModelExitEventType
     use PrtPrpModule, only: PrtPrpType, ExgPrtPrpType
-    use MethodModule, only: LEVEL_MODEL, LEVEL_FEATURE
     ! dummy
     class(*), pointer :: context
     type(ParticleType), pointer, intent(inout) :: particle
@@ -513,12 +513,9 @@ contains
         select type (exgprp_obj)
         type is (ExgPrtPrpType)
           exgprp => exgprp_obj
-          particle%advancing = .true.
-          particle%itrdomain(LEVEL_MODEL) = exg%prtmodel2%id
           call exg%transform_particle(particle, particle%icu, &
                                       nint(exg%auxvar(exg%iflowface1, i)), &
                                       from_m1=.true.)
-          particle%itrdomain(LEVEL_FEATURE) = particle%icu
           exgprp%has_pending = .true.
           exgprp%nparticles = exgprp%nparticles + 1
           call exgprp%particles%resize(exgprp%nparticles, exgprp%memoryPath)
@@ -547,12 +544,9 @@ contains
         select type (exgprp_obj)
         type is (ExgPrtPrpType)
           exgprp => exgprp_obj
-          particle%advancing = .true.
-          particle%itrdomain(LEVEL_MODEL) = exg%prtmodel1%id
           call exg%transform_particle(particle, particle%icu, &
                                       nint(exg%auxvar(exg%iflowface2, i)), &
                                       from_m1=.false.)
-          particle%itrdomain(LEVEL_FEATURE) = particle%icu
           exgprp%has_pending = .true.
           exgprp%nparticles = exgprp%nparticles + 1
           call exgprp%particles%resize(exgprp%nparticles, exgprp%memoryPath)
@@ -613,17 +607,17 @@ contains
     real(DP) :: tx, ty, tz ! normalized parameters [0,1]
     real(DP) :: dx1, dy1, dz1, dx2, dy2, dz2
     logical :: found
-    class(DisBaseType), pointer :: dis_src, dis_dst
+    class(PrtModelType), pointer :: prt_src, prt_dst
 
     ! Set up source/destination based on direction
     if (from_m1) then
-      dis_src => this%prtmodel1%dis
-      dis_dst => this%prtmodel2%dis
+      prt_src => this%prtmodel1
+      prt_dst => this%prtmodel2
       iflowface_src = this%iflowface1
       iflowface_dst = this%iflowface2
     else
-      dis_src => this%prtmodel2%dis
-      dis_dst => this%prtmodel1%dis
+      prt_src => this%prtmodel2
+      prt_dst => this%prtmodel1
       iflowface_src = this%iflowface2
       iflowface_dst = this%iflowface1
     end if
@@ -633,13 +627,13 @@ contains
                          n_candidates, from_m1)
 
     ! 2. Get source face bounds
-    call get_face_bounds(dis_src, n_src, f_src, &
+    call get_face_bounds(prt_src%dis, n_src, f_src, &
                          x1min, x1max, y1min, y1max, z1min, z1max)
 
     ! 3. Get consolidated destination face bounds
     call get_consolidated_bounds(this, iexg_candidates, n_candidates, &
                                  x2min, x2max, y2min, y2max, z2min, z2max, &
-                                 dis_dst, iflowface_dst)
+                                 prt_dst%dis, iflowface_dst)
 
     ! 4. Normalize particle position in source face [0,1]
     dx1 = x1max - x1min
@@ -668,14 +662,6 @@ contains
     dx2 = x2max - x2min
     dy2 = y2max - y2min
     dz2 = z2max - z2min
-
-    print *, 'dx1: ', dx1
-    print *, 'dy1: ', dy1
-    print *, 'dz1: ', dz1
-
-    print *, 'dx2: ', dx2
-    print *, 'dy2: ', dy2
-    print *, 'dz2: ', dz2
 
     if (dx2 > DZERO) then
       xt = x2min + tx * dx2
@@ -707,12 +693,16 @@ contains
         f_dst = nint(this%auxvar(iflowface_dst, iexg))
       end if
 
-      if (point_in_face_bounds(dis_dst, n_dst, f_dst, xt, yt, zt)) then
+      if (point_in_face_bounds(prt_dst%dis, n_dst, f_dst, xt, yt, zt)) then
         ! Found the destination!
         particle%x = xt
         particle%y = yt
         particle%z = zt
         particle%icu = n_dst
+        particle%advancing = .true.
+        particle%itrdomain(LEVEL_MODEL) = prt_dst%id
+        particle%itrdomain(LEVEL_FEATURE) = &
+          prt_dst%dis%get_nodenumber(particle%icu, 1)
         found = .true.
         exit
       end if
@@ -887,8 +877,8 @@ contains
         allocate (poly(2, nvert_cell))
         do m = 1, nvert_cell
           iv = dis%javert(dis%iavert(n2d) + m - 1)
-          poly(1, m) = dis%vertices(iv, 1)
-          poly(2, m) = dis%vertices(iv, 2)
+          poly(1, m) = dis%vertices(1, iv)
+          poly(2, m) = dis%vertices(2, iv)
         end do
         inside = point_in_polygon(x, y, poly)
         deallocate (poly)
@@ -903,10 +893,10 @@ contains
       iv1 = dis%javert(dis%iavert(n2d) + iface - 1)
       iv2 = dis%javert(dis%iavert(n2d) + mod(iface, nvert_cell))
 
-      x1 = dis%vertices(iv1, 1)
-      y1 = dis%vertices(iv1, 2)
-      x2 = dis%vertices(iv2, 1)
-      y2 = dis%vertices(iv2, 2)
+      x1 = dis%vertices(1, iv1)
+      y1 = dis%vertices(2, iv1)
+      x2 = dis%vertices(1, iv2)
+      y2 = dis%vertices(2, iv2)
 
       inside = point_on_line_segment(x, y, x1, y1, x2, y2, TOL)
     end if
@@ -963,10 +953,10 @@ contains
 
       do m = dis%iavert(n2d), dis%iavert(n2d + 1) - 1
         iv = dis%javert(m)
-        xmin = min(xmin, dis%vertices(iv, 1))
-        xmax = max(xmax, dis%vertices(iv, 1))
-        ymin = min(ymin, dis%vertices(iv, 2))
-        ymax = max(ymax, dis%vertices(iv, 2))
+        xmin = min(xmin, dis%vertices(1, iv))
+        xmax = max(xmax, dis%vertices(1, iv))
+        ymin = min(ymin, dis%vertices(2, iv))
+        ymax = max(ymax, dis%vertices(2, iv))
       end do
 
       if (iface == -1) then
@@ -983,10 +973,10 @@ contains
       iv1 = dis%javert(dis%iavert(n2d) + iface - 1)
       iv2 = dis%javert(dis%iavert(n2d) + mod(iface, nvert_cell))
 
-      xmin = min(dis%vertices(iv1, 1), dis%vertices(iv2, 1))
-      xmax = max(dis%vertices(iv1, 1), dis%vertices(iv2, 1))
-      ymin = min(dis%vertices(iv1, 2), dis%vertices(iv2, 2))
-      ymax = max(dis%vertices(iv1, 2), dis%vertices(iv2, 2))
+      xmin = min(dis%vertices(1, iv1), dis%vertices(1, iv2))
+      xmax = max(dis%vertices(1, iv1), dis%vertices(1, iv2))
+      ymin = min(dis%vertices(2, iv1), dis%vertices(2, iv2))
+      ymax = max(dis%vertices(2, iv1), dis%vertices(2, iv2))
       zmin = zbot
       zmax = ztop
     end if
