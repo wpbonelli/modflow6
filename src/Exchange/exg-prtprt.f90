@@ -5,6 +5,7 @@ module PrtPrtExchangeModule
   use ConstantsModule, only: LENPACKAGENAME, LINELENGTH, LENMEMPATH, &
                              LENMODELNAME, LENBOUNDNAME, LENAUXNAME, &
                              DZERO, DONE
+  use ErrorUtilModule, only: pstop
   use ListsModule, only: basemodellist, baseexchangelist
   use SimModule, only: store_error, store_error_filename, count_errors
   use SimVariablesModule, only: errmsg
@@ -31,7 +32,7 @@ module PrtPrtExchangeModule
   private
 
   public :: PrtPrtExchangeType
-  public :: prtprt_cr, try_particle_transfer
+  public :: prtprt_cr, try_transfer_particle
   public :: GetPrtPrtExchangeFromList
 
   !> @brief Exchange that transfers particles between two PRT models.
@@ -78,6 +79,7 @@ module PrtPrtExchangeModule
     procedure, private :: noder
     procedure, private :: get_exchange_faces
     procedure, private :: transform_particle
+    procedure, private :: transfer_particle
   end type PrtPrtExchangeType
 
 contains
@@ -162,8 +164,8 @@ contains
     end if
     !
     p => this%self ! self-pointer. can't point directly to `this`
-    call this%prtmodel1%handlers%subscribe(try_particle_transfer, p)
-    call this%prtmodel2%handlers%subscribe(try_particle_transfer, p)
+    call this%prtmodel1%handlers%subscribe(try_transfer_particle, p)
+    call this%prtmodel2%handlers%subscribe(try_transfer_particle, p)
   end subroutine exg_df
 
   !> @brief Allocate and read: load the connected-cell list from IDM.
@@ -470,7 +472,10 @@ contains
     noder = model%dis%get_nodenumber(node, 0)
   end function noder
 
-  function try_particle_transfer(context, particle, event) result(transferred)
+  !> @brief Event handler for particle transfers. Checks whether the particle
+  !! should be transferred in either direction through any exchange connection
+  !! and, if so, conducts the transfer and return signals that it has occurred.
+  function try_transfer_particle(context, particle, event) result(transferred)
     use ModelExitEventModule, only: ModelExitEventType
     use PrtPrpModule, only: PrtPrpType, ExgPrtPrpType
     ! dummy
@@ -480,10 +485,8 @@ contains
     logical(LGP) :: transferred
     ! local
     type(PrtPrtExchangeType), pointer :: exg
-    class(BndType), pointer :: exgprp_obj
-    type(ExgPrtPrpType), pointer :: exgprp
-    integer(I4B) :: i, dest_cell
-    logical(LGP) :: found
+    logical(LGP) :: should
+    integer(I4B) :: iexg
 
     transferred = .false.
 
@@ -496,110 +499,105 @@ contains
 
     select type (event)
     type is (ModelExitEventType)
-      ! model1 -> model2
-      found = .false.
-      do i = 1, exg%nexg
+      ! model1->model2
+      should = .false.
+      do iexg = 1, exg%nexg
         if ((particle%itrdomain(LEVEL_MODEL) == exg%prtmodel1%id) .and. &
-            (particle%icu == exg%nodem1(i))) then
-          dest_cell = exg%nodem2(i)
-          found = .true.
+            (particle%icu == exg%nodem1(iexg))) then
+          should = .true.
           exit
         end if
       end do
-      if (found) then
-        exgprp_obj => GetBndFromList( &
-                      exg%prtmodel2%bndlist, &
-                      exg%prtmodel2%bndlist%Count())
-        select type (exgprp_obj)
-        type is (ExgPrtPrpType)
-          exgprp => exgprp_obj
-          call exg%transform_particle(particle, particle%icu, &
-                                      nint(exg%auxvar(exg%iflowface1, i)), &
-                                      from_m1=.true.)
-          exgprp%has_pending = .true.
-          exgprp%nparticles = exgprp%nparticles + 1
-          call exgprp%particles%resize(exgprp%nparticles, exgprp%memoryPath)
-          call exgprp%particles%put(particle, exgprp%nparticles)
-          particle%itrdomain(1) = exg%prtmodel1%id
-          particle%advancing = .false.
-          transferred = .true.
-          return
-        end select
+      if (should) then
+        call exg%transfer_particle(particle, iexg=iexg, from_m1=.true.)
+        return
       end if
 
-      ! model2 -> model1
-      found = .false.
-      do i = 1, exg%nexg
+      ! model2->model1
+      should = .false.
+      do iexg = 1, exg%nexg
         if ((particle%itrdomain(LEVEL_MODEL) == exg%prtmodel2%id) .and. &
-            (particle%icu == exg%nodem2(i))) then
-          dest_cell = exg%nodem1(i)
-          found = .true.
+            (particle%icu == exg%nodem2(iexg))) then
+          should = .true.
           exit
         end if
       end do
-      if (found) then
-        exgprp_obj => GetBndFromList( &
-                      exg%prtmodel1%bndlist, &
-                      exg%prtmodel1%bndlist%Count())
-        select type (exgprp_obj)
-        type is (ExgPrtPrpType)
-          exgprp => exgprp_obj
-          call exg%transform_particle(particle, particle%icu, &
-                                      nint(exg%auxvar(exg%iflowface2, i)), &
-                                      from_m1=.false.)
-          exgprp%has_pending = .true.
-          exgprp%nparticles = exgprp%nparticles + 1
-          call exgprp%particles%resize(exgprp%nparticles, exgprp%memoryPath)
-          call exgprp%particles%put(particle, exgprp%nparticles)
-          particle%itrdomain(1) = exg%prtmodel2%id
-          particle%advancing = .false.
-          transferred = .true.
-          return
-        end select
+      if (should) then
+        call exg%transfer_particle(particle, iexg=iexg, from_m1=.false.)
+        return
       end if
     end select
-  end function try_particle_transfer
+  end function try_transfer_particle
 
-  !> @brief Get PRT-PRT exchange from list
-  function GetPrtPrtExchangeFromList(list, idx) result(res)
-    use ListModule, only: ListType
-    implicit none
-    type(ListType), intent(inout) :: list
-    integer(I4B), intent(in) :: idx
-    class(PrtPrtExchangeType), pointer :: res
-    class(*), pointer :: obj
+  !> @brief Transfer the particle from one model to the other through
+  !! the given exchange connection.
+  subroutine transfer_particle(this, particle, iexg, from_m1)
+    use PrtPrpModule, only: PrtPrpType, ExgPrtPrpType
+    class(PrtPrtExchangeType), intent(inout) :: this
+    type(ParticleType), intent(inout), pointer :: particle
+    integer(I4B), intent(in) :: iexg
+    logical(LGP), intent(in) :: from_m1
+    ! local
+    type(PrtModelType), pointer :: prt_dst
+    type(ExgPrtPrpType), pointer :: exgprp
+    class(BndType), pointer :: exgprp_obj
+    integer(I4B) :: icu_dst
 
-    obj => list%GetItem(idx)
-    res => CastAsPrtPrtExchange(obj)
-  end function GetPrtPrtExchangeFromList
+    if (from_m1) then
+      prt_dst => this%prtmodel2
+    else
+      prt_dst => this%prtmodel1
+    end if
 
-  !> @brief Cast object as PRT-PRT exchange
-  function CastAsPrtPrtExchange(obj) result(res)
-    implicit none
-    class(*), pointer, intent(inout) :: obj
-    class(PrtPrtExchangeType), pointer :: res
+    exgprp_obj => GetBndFromList( &
+                  prt_dst%bndlist, &
+                  prt_dst%bndlist%Count())
 
-    res => null()
-    if (.not. associated(obj)) return
+    select type (exgprp_obj)
+    type is (ExgPrtPrpType)
+      call this%transform_particle(particle, particle%icu, icu_dst, &
+                                   nint(this%auxvar(this%iflowface1, iexg)), &
+                                   from_m1=from_m1)
 
-    select type (obj)
-    class is (PrtPrtExchangeType)
-      res => obj
+      particle%icu = icu_dst
+      particle%advancing = .true.
+      particle%itrdomain(LEVEL_MODEL) = prt_dst%id
+      particle%itrdomain(LEVEL_FEATURE) = &
+        prt_dst%dis%get_nodenumber(particle%icu, 1)
+
+      exgprp => exgprp_obj
+      exgprp%has_pending = .true.
+      exgprp%nparticles = exgprp%nparticles + 1
+      call exgprp%particles%resize(exgprp%nparticles, exgprp%memoryPath)
+      call exgprp%particles%put(particle, exgprp%nparticles)
     end select
-  end function CastAsPrtPrtExchange
+  end subroutine transfer_particle
 
-  !> @brief Transform particle coordinates from source to destination model
-  subroutine transform_particle(this, particle, n_src, f_src, from_m1)
+  !> @brief Transform particle coordinates from source to destination cell,
+  !! by way of intermediate transformations via cell-normalized coordinates.
+  !!
+  !! Transforms particle from the source model's coordinate system to coords
+  !! local to the source cell, then to coords local to the destination cell,
+  !! and finally to the destination model's coordinate system.
+  !!
+  !! If the source cell connects to multiple cells in the destination model,
+  !! the destination cells' connecting faces are together assumed to coincide
+  !! with the source cell's connecting face. Coordinates are then computed by
+  !! reference to the extent of the cell in the 2 dimensions parallel to the
+  !! connected faces, and used to determine which among potential destination
+  !! cells the particle should enter.
+  !<
+  subroutine transform_particle(this, particle, n_src, n_dst, f_src, from_m1)
     class(PrtPrtExchangeType) :: this
     type(ParticleType), pointer :: particle
     integer(I4B), intent(in) :: n_src ! source cell
+    integer(I4B), intent(out) :: n_dst ! destination cell
     integer(I4B), intent(in) :: f_src ! source face (IFLOWFACE numbering)
     logical(LGP), intent(in) :: from_m1 ! true = m1->m2, false = m2->m1
-
-    ! Local variables
+    ! local
     integer(I4B), allocatable :: iexg_candidates(:)
     integer(I4B) :: n_candidates
-    integer(I4B) :: n_dst, f_dst, iexg, i
+    integer(I4B) :: f_dst, iexg, i
     integer(I4B) :: iflowface_src, iflowface_dst
     real(DP) :: x1min, x1max, y1min, y1max, z1min, z1max
     real(DP) :: x2min, x2max, y2min, y2max, z2min, z2max
@@ -609,7 +607,7 @@ contains
     logical :: found
     class(PrtModelType), pointer :: prt_src, prt_dst
 
-    ! Set up source/destination based on direction
+    ! set source/destination model
     if (from_m1) then
       prt_src => this%prtmodel1
       prt_dst => this%prtmodel2
@@ -622,66 +620,60 @@ contains
       iflowface_dst = this%iflowface1
     end if
 
-    ! 1. Find all candidate destination connections
+    ! find candidate connections
     call get_connections(this, n_src, f_src, iexg_candidates, &
                          n_candidates, from_m1)
 
-    ! 2. Get source face bounds
+    ! compute source face bounds
     call get_face_bounds(prt_src%dis, n_src, f_src, &
                          x1min, x1max, y1min, y1max, z1min, z1max)
 
-    ! 3. Get consolidated destination face bounds
+    ! compute destination face bounds
     call get_consolidated_bounds(this, iexg_candidates, n_candidates, &
                                  x2min, x2max, y2min, y2max, z2min, z2max, &
                                  prt_dst%dis, iflowface_dst)
 
-    ! 4. Normalize particle position in source face [0,1]
+    ! map to cell-local coords
     dx1 = x1max - x1min
     dy1 = y1max - y1min
     dz1 = z1max - z1min
-
     if (dx1 > DZERO) then
       tx = (particle%x - x1min) / dx1
     else
-      tx = DZERO ! dimension constant on this face
+      tx = DZERO ! constant dimension
     end if
-
     if (dy1 > DZERO) then
       ty = (particle%y - y1min) / dy1
     else
       ty = DZERO
     end if
-
     if (dz1 > DZERO) then
       tz = (particle%z - z1min) / dz1
     else
       tz = DZERO
     end if
 
-    ! 5. Map to destination face space
+    ! map to destination model coords
     dx2 = x2max - x2min
     dy2 = y2max - y2min
     dz2 = z2max - z2min
-
     if (dx2 > DZERO) then
       xt = x2min + tx * dx2
     else
       xt = x2min
     end if
-
     if (dy2 > DZERO) then
       yt = y2min + ty * dy2
     else
       yt = y2min
     end if
-
     if (dz2 > DZERO) then
       zt = z2min + tz * dz2
     else
       zt = z2min
     end if
 
-    ! 6. Find which destination cell contains this position
+    ! which cell is the particle in?
     found = .false.
     do i = 1, n_candidates
       iexg = iexg_candidates(i)
@@ -692,28 +684,20 @@ contains
         n_dst = this%nodem1(iexg)
         f_dst = nint(this%auxvar(iflowface_dst, iexg))
       end if
-
       if (point_in_face_bounds(prt_dst%dis, n_dst, f_dst, xt, yt, zt)) then
-        ! Found the destination!
         particle%x = xt
         particle%y = yt
         particle%z = zt
-        particle%icu = n_dst
-        particle%advancing = .true.
-        particle%itrdomain(LEVEL_MODEL) = prt_dst%id
-        particle%itrdomain(LEVEL_FEATURE) = &
-          prt_dst%dis%get_nodenumber(particle%icu, 1)
         found = .true.
         exit
       end if
     end do
-
     if (.not. found) then
       write (errmsg, '(a,i0,a,i0,a,3g15.6,a)') &
         'Particle transferring from cell ', n_src, ' face ', f_src, &
         ' at position (', xt, yt, zt, &
-        ') not found in any destination face'
-      call store_error(errmsg, terminate=.TRUE.)
+        ') not found in any destination cell'
+      call pstop(1, errmsg)
     end if
 
     deallocate (iexg_candidates)
@@ -1054,5 +1038,33 @@ contains
       on_seg = .true.
     end if
   end function point_on_line_segment
+
+  !> @brief Get PRT-PRT exchange from list
+  function GetPrtPrtExchangeFromList(list, idx) result(res)
+    use ListModule, only: ListType
+    implicit none
+    type(ListType), intent(inout) :: list
+    integer(I4B), intent(in) :: idx
+    class(PrtPrtExchangeType), pointer :: res
+    class(*), pointer :: obj
+
+    obj => list%GetItem(idx)
+    res => CastAsPrtPrtExchange(obj)
+  end function GetPrtPrtExchangeFromList
+
+  !> @brief Cast object as PRT-PRT exchange
+  function CastAsPrtPrtExchange(obj) result(res)
+    implicit none
+    class(*), pointer, intent(inout) :: obj
+    class(PrtPrtExchangeType), pointer :: res
+
+    res => null()
+    if (.not. associated(obj)) return
+
+    select type (obj)
+    class is (PrtPrtExchangeType)
+      res => obj
+    end select
+  end function CastAsPrtPrtExchange
 
 end module PrtPrtExchangeModule
