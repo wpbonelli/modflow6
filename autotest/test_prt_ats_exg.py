@@ -2,7 +2,6 @@
 Test a PRT model exchange-coupled to an ATS-enabled GWF model.
 """
 
-
 import flopy
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
