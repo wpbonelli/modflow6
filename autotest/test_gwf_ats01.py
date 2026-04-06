@@ -111,7 +111,7 @@ def build_gwf_sim(name, ws, mf6):
     ic = flopy.mf6.ModflowGwfic(gwf, strt=strt)
 
     # node property flow
-    npf = flopy.mf6.ModflowGwfnpf(gwf, save_flows=True, icelltype=laytyp, k=hk)
+    npf = flopy.mf6.ModflowGwfnpf(gwf, save_flows=True, save_saturation=True, save_specific_discharge=True, icelltype=laytyp, k=hk)
     # storage
     sto = flopy.mf6.ModflowGwfsto(
         gwf,

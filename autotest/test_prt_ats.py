@@ -12,15 +12,8 @@ from framework import TestFramework
 from prt_test_utils import get_model_name
 from test_gwf_ats01 import build_gwf_sim
 
-simname = "prt_ats"
+simname = "prtatsexg"
 cases = [simname]
-
-# ATS parameters
-dt0 = 0.5
-dtmin = 1.0e-3
-dtmax = 1.0
-dtadj = 2.0
-dtfailadj = 5.0
 
 
 def build_mf6_sim(name, ws, mf6):
