@@ -1081,9 +1081,11 @@ contains
           if (endofsimulation .and. particle%extend .and. &
               particle%istatus <= ACTIVE) then
             tmax = particle%tstop
-            particle%advancing = .true.
-            call this%method%apply(particle, tmax)
+          else
+            tmax = min(totimc + delt, particle%tstop)
           end if
+          ! Apply the tracking method until the maximum time.
+          call this%method%apply(particle, tmax)
           ! If the particle timed out, terminate it.
           ! "Timed out" means it's still active but
           !   - it reached its stop time, or
