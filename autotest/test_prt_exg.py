@@ -34,14 +34,11 @@ from prt_test_utils import (
     FlopyReadmeCase,
     check_budget_data,
     check_track_data,
+    get_model_name,
 )
 
 simname = "prtexg01"
 cases = [simname, f"{simname}bnms", f"{simname}idmu", f"{simname}idmn"]
-
-
-def get_model_name(name, mdl):
-    return f"{name}_{mdl}"
 
 
 def build_mf6_sim(name, ws, mf6):

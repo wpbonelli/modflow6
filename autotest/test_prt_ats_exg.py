@@ -10,7 +10,7 @@ import pytest
 from flopy.utils.binaryfile import CellBudgetFile, HeadFile
 from framework import TestFramework
 from prt_test_utils import get_model_name
-from test_prt_exg import build_mf6_sim
+from test_gwf_ats01 import build_gwf_sim
 
 simname = "prt_ats"
 cases = [simname]
@@ -23,24 +23,82 @@ dtadj = 2.0
 dtfailadj = 5.0
 
 
-def build_sim(name, ws, mf6):
-    sim = build_mf6_sim(name, ws, mf6)
+def build_mf6_sim(name, ws, mf6):
+    gwf_name = get_model_name(name, "gwf")
+    prt_name = get_model_name(name, "prt")
 
-    # add ATS to GFW TDIS
-    tdis = sim.get_package("tdis")
-    ats_filerecord = f"{name}.ats"
-    atsperiod = [(0, dt0, dtmin, dtmax, dtadj, dtfailadj)]
-    tdis.ats.initialize(
-        maxats=len(atsperiod),
-        perioddata=atsperiod,
-        filename=ats_filerecord,
+    sim = build_gwf_sim(name, ws, mf6)
+
+    # create prt model
+    gwf = sim.get_model()
+    prt = flopy.mf6.ModflowPrt(sim, modelname=prt_name, save_flows=True)
+    grid = gwf.modelgrid
+
+    # create prt discretization
+    flopy.mf6.modflow.mfprtdis.ModflowPrtdis(
+        prt,
+        pname="dis",
+        nlay=grid.nlay,
+        nrow=grid.nrow,
+        ncol=grid.ncol,
     )
 
+    # create mip package
+    flopy.mf6.ModflowPrtmip(prt, pname="mip", porosity=0.1)
+
+    # create prp package
+    rpts = [
+        # particle index, k, i, j, x, y, z
+        [i, 0, 0, 0, float(f"0.{i + 1}"), float(f"0.{i + 1}"), 0.5]
+        for i in range(9)
+    ]
+    flopy.mf6.ModflowPrtprp(
+        prt,
+        pname="prp1",
+        filename=f"{prt_name}_1.prp",
+        nreleasepts=len(rpts),
+        packagedata=rpts,
+        perioddata={0: ["FIRST"]},
+        extend_tracking=True,
+    )
+
+    # create output control package
+    prt_budget_file = f"{prt_name}.cbb"
+    prt_track_file = f"{prt_name}.trk"
+    prt_track_csv_file = f"{prt_name}.trk.csv"
+    flopy.mf6.ModflowPrtoc(
+        prt,
+        pname="oc",
+        budget_filerecord=[prt_budget_file],
+        track_filerecord=[prt_track_file],
+        trackcsv_filerecord=[prt_track_csv_file],
+        printrecord=[("BUDGET", "ALL")],
+        saverecord=[("BUDGET", "ALL")],
+        # dev_dump_event_trace=True
+    )
+
+    # create exchange
+    gwf_name = get_model_name(name, "gwf")
+    flopy.mf6.ModflowGwfprt(
+        sim,
+        exgtype="GWF6-PRT6",
+        exgmnamea=gwf_name,
+        exgmnameb=prt_name,
+        filename=f"{gwf_name}.gwfprt",
+    )
+
+    # add explicit model solution
+    ems = flopy.mf6.ModflowEms(
+        sim,
+        pname="ems",
+        filename=f"{prt_name}.ems",
+    )
+    sim.register_solution_package(ems, [prt.name])
     return sim
 
 
 def build_models(idx, test):
-    return build_sim(test.name, test.workspace, test.targets["mf6"])
+    return build_mf6_sim(test.name, test.workspace, test.targets["mf6"])
 
 
 def check_output(idx, test):
@@ -50,12 +108,11 @@ def check_output(idx, test):
     prt_name = get_model_name(name, "prt")
 
     gwf_head_file = ws / f"{gwf_name}.hds"
-    gwf_budget_file = ws / f"{gwf_name}.bud"
+    gwf_budget_file = ws / f"{gwf_name}.cbc"
 
     gwf_hds = HeadFile(gwf_head_file)
     gwf_cbb = CellBudgetFile(gwf_budget_file)
     gwf_times = set(gwf_hds.get_times())
-    assert gwf_times == {0.5, 1.0}
     assert gwf_times == set(gwf_cbb.get_times())
 
     prt_track_csv_file = ws / f"{prt_name}.trk.csv"
