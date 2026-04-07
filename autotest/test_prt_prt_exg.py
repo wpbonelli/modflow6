@@ -7,10 +7,11 @@ in the left-most and right-most cells.
 
 The flow and tracking models are connected on their shared face.
 IFLOWFACE is configured in the CHD cells and in the exchange cells,
-on the outer faces of the CHD cells and on the shared exchange face.
+on the outer faces of the CHD cells and on the shared exchange face
+at the exchange boundary.
 
-Particles are released from the left-most cell (0, 0, 0) in the left
-model. They should reach and cross the exchange and terminate at the
+A single particle is released from the left-most cell in the left
+model. It should reach and cross the exchange and terminate at the
 rightmost edge of the right model.
 
    left | right
