@@ -300,6 +300,10 @@ def build_models(idx, test):
 
 
 def compare_output(name, mf6_pls, mp7_pls, mp7_eps):
+    # drop last timestep event, in extended mode mp7 doesn't
+    # report a pathline point when the final time step ends.
+    mf6_pls = mf6_pls.drop(mf6_pls[mf6_pls.ireason == 2].index[-(len(releasepts_mp7) * 2):])
+
     mf6_eps = mf6_pls[mf6_pls.ireason == 3]  # get prt endpoints
     mp7_eps = to_mp7_pathlines(mp7_eps)  # convert mp7 pathlines to mp7 format
     mf6_pls = to_mp7_pathlines(mf6_pls)  # convert mf6 pathlines to mp7 format

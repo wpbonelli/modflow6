@@ -242,6 +242,10 @@ def check_output(idx, test):
     # load mf6 pathline results
     mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file)
 
+    # drop last timestep event, in extended mode mp7 doesn't
+    # report a pathline point when the final time step ends.
+    mf6_pls = mf6_pls.drop(mf6_pls[mf6_pls.ireason == 2].index[-mf6_pls.irpt.unique().size:])
+
     # load mp7 pathline results
     plf = PathlineFile(mp7_ws / mp7_pathline_file)
     mp7_pls = pd.DataFrame(

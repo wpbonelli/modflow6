@@ -92,6 +92,7 @@ contains
   subroutine track_subcell(this, subcell, particle, tmax)
     use ParticleModule, only: ACTIVE, TERM_NO_EXITS_SUB
     use ParticleEventModule, only: FEATEXIT, TERMINATE, TIMESTEP, USERTIME
+    use TdisModule, only: endofsimulation
     ! dummy
     class(MethodSubcellTernaryType), intent(inout) :: this
     class(SubcellTriType), intent(in) :: subcell

@@ -1077,17 +1077,20 @@ contains
               end do
             end if
           end if
-          ! Maximum time is the end of the time step or the particle
-          ! stop time, whichever comes first, unless it's the final
-          ! time step and the extend option is on, in which case
-          ! it's just the particle stop time.
-          if (endofsimulation .and. particle%extend) then
-            tmax = particle%tstop
-          else
-            tmax = min(totimc + delt, particle%tstop)
-          end if
-          ! Apply the tracking method until the maximum time.
+          ! Track to the end of the time step (or particle stop time,
+          ! whichever comes first). This always emits a timestep event,
+          ! including on the final time step.
+          tmax = min(totimc + delt, particle%tstop)
           call this%method%apply(particle, tmax)
+          ! On the final time step, if extend is on and the particle is
+          ! still active, continue tracking to the particle stop time
+          ! using the last available flow field.
+          if (endofsimulation .and. particle%extend .and. &
+              particle%istatus <= ACTIVE) then
+            tmax = particle%tstop
+            particle%advancing = .true.
+            call this%method%apply(particle, tmax)
+          end if
           ! If the particle timed out, terminate it.
           ! "Timed out" means it's still active but
           !   - it reached its stop time, or

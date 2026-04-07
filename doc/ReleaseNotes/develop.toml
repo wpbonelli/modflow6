@@ -38,3 +38,8 @@ description = "The Flow Model Interface (FMI) package for transport and tracking
 section = "fixes"
 subsection = "model"
 description = "Fixed an issue with PRT which could cause double-reporting of user-defined tracking time events."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "The PRT model previously failed to report time step events for the final time step of a simulation with extended tracking enabled. This issue has been resolved and time step events are now reported for the final time step of a simulation with extended tracking enabled."

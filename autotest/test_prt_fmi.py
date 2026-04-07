@@ -248,6 +248,10 @@ def check_output(idx, test):
     # load mf6 pathline results
     mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
+    # drop last timestep event, in extended mode mp7 doesn't
+    # report a pathline point when the final time step ends.
+    mf6_pls = mf6_pls.drop(mf6_pls[mf6_pls.ireason == 2].index[-mf6_pls.irpt.unique().size:])
+
     prt_budget_file = prt_ws / f"{prt_name}.bud"
     prt_bud = flopy.utils.CellBudgetFile(prt_budget_file, precision="double")
     prt_bud_data = prt_bud.get_data(kstpkper=(0, 0))

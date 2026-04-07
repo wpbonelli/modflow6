@@ -424,6 +424,10 @@ def check_output(test, snapshot):
     # load mf6 pathline results
     mf6_pls = pd.read_csv(prt_ws / prt_track_csv_file, na_filter=False)
 
+    # drop last timestep event, in extended mode mp7 doesn't
+    # report a pathline point when the final time step ends.
+    mf6_pls = mf6_pls.drop(mf6_pls[mf6_pls.ireason == 2].index[-mf6_pls.irpt.unique().size:])
+
     # check output files exist
     assert (ws / gwf_budget_file).is_file()
     assert (ws / gwf_head_file).is_file()
@@ -481,10 +485,6 @@ def check_output(test, snapshot):
     # compare pathlines with snapshot
     actual_data = mf6_pls.drop("name", axis=1).round(3)
     actual_records = actual_data.to_records(index=False)
-
-    # Show detailed comparison before asserting (for debugging)
-    snapshot_dir = Path(__file__).parent / "__snapshots__" / "test_prt_release_timing"
-    compare_snapshots(name, actual_data, snapshot_dir, prt_ws)
 
     # Assert against snapshot
     assert snapshot == actual_records
@@ -565,14 +565,14 @@ def check_output(test, snapshot):
         pass
     elif "dbl" in name or "open" in name or "both" in name:
         # 2 release times, expect double mp7's data size
-        assert len(mf6_pls) == 2 * len(mp7_pls)
+        assert len(mf6_pls) == 2 * len(mp7_pls) + 9
     elif "freq" in name:
         # the "freq" case uses both time step frequency
         # in the period block and RELEASE_TIME_FREQUENCY
         # in the options block, setting the former to 1
         # and the latter to 0.2, so we expect 5 times as
         # many particles (first time t=0 is deduplicated)
-        assert len(mf6_pls) == 5 * len(mp7_pls)
+        assert len(mf6_pls) == 5 * len(mp7_pls) + (4 * 9)
     elif "fill" in name or "multi" in name:
         # MP7 has duplicate records for particles released
         # at t = 1.0. these particles stop without moving,
@@ -581,7 +581,10 @@ def check_output(test, snapshot):
         # end of kper = 1 as per our philosophy that they
         # have been tracked under the prior period's flow
         # system, the next shouldn't "get credit" for it.
-        assert len(mf6_pls) == len(mp7_pls) - 9
+        # but the difference is balanced by the fact that
+        # PRT reports a timestep event when the last time
+        # step ends in extended mode, which MP7 doesn't.
+        assert len(mf6_pls) == len(mp7_pls) - 18
     else:
         # the rest of the cases should match mp7 results,
         # with duplicate times debounced in "dupe"/"tol".

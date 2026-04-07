@@ -243,6 +243,10 @@ def check_output(idx, test):
         r"^\s*$", np.nan, regex=True
     )
 
+    # drop last timestep event, in extended mode mp7 doesn't
+    # report a pathline point when the final time step ends.
+    mf6_pls = mf6_pls.drop(mf6_pls[mf6_pls.ireason == 2].index[-mf6_pls.irpt.unique().size:])
+
     # make sure pathline dataframe has "name" column
     assert "name" in mf6_pls
 
