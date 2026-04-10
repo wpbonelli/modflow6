@@ -304,6 +304,8 @@ contains
     checked_conns = .false.
     do n = 1, this%nexg
       if (checked_conns(n)) cycle
+      ! Skip connections with unresolved nodes (model on remote process)
+      if (this%nodem1(n) == -1 .or. this%nodem2(n) == -1) cycle
       ncount = 0
       do m = 1, this%nexg
         if (this%nodem1(m) == this%nodem1(n) .and. &
