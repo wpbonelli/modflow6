@@ -252,6 +252,9 @@ contains
     ! -- local
     integer(I4B) :: n, m, ncount
     logical(LGP), dimension(:), allocatable :: checked_conns
+    !
+    ! In parallel, only validate on the owning process
+    if (this%is_datacopy) return
 
     ! Ensure gwfmodel names were entered
     if (this%gwfmodelname1 == '') then
@@ -299,7 +302,7 @@ contains
       call store_error(errmsg)
     end if
     !
-    ! At most one horizontal connection is allowed between any two cells.
+    ! At most one connection is allowed between any two cells.
     allocate (checked_conns(this%nexg))
     checked_conns = .false.
     do n = 1, this%nexg

@@ -279,6 +279,9 @@ contains
     integer(I4B) :: n, m, ncount
     logical(LGP), dimension(:), allocatable :: checked_conns
     !
+    ! In parallel, only validate on the owning process
+    if (this%is_datacopy) return
+    !
     ! Periodic boundary condition in exchange don't allow XT3D (=interface model)
     if (this%v_model1 == this%v_model2) then
       if (this%ixt3d > 0) then
@@ -358,7 +361,7 @@ contains
       call store_error(errmsg, terminate=.TRUE.)
     end if
     !
-    ! At most one horizontal connection is allowed between any two cells.
+    ! At most one connection is allowed between any two cells.
     allocate (checked_conns(this%nexg))
     checked_conns = .false.
     do n = 1, this%nexg
