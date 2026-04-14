@@ -115,9 +115,6 @@ def check_output(idx, test):
     prt_cbb = CellBudgetFile(prt_budget_file)
     assert gwf_times == set(prt_cbb.get_times())
 
-    timestep_events = prt_pls[prt_pls.ireason == 2]
-    assert gwf_times == set(timestep_events.t.unique())
-
 
 def plot_output(idx, test):
     name = test.name

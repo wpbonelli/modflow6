@@ -75,6 +75,8 @@ module PrtPrpModule
     character(len=LENBOUNDNAME), pointer, contiguous :: rptname(:) => null() !< release point names
     character(len=LINELENGTH), allocatable :: period_block_lines(:) !< last period block configuration for fill-forward
     integer(I4B) :: applied_kper !< period for which configuration was last applied
+    integer(I4B) :: release_kstp !< time step for which particles were last released
+    integer(I4B) :: release_kper !< stress period for which particles were last released
   contains
     procedure :: prp_allocate_arrays
     procedure :: prp_allocate_scalars
@@ -262,17 +264,12 @@ contains
 
     call this%BndExtType%allocate_arrays()
 
-    ! Allocate particle store, starting with the number
-    ! of release points (arrays resized if/when needed)
+    ! Allocate particle stores
     call create_particle_store( &
-      this%particles, &
-      this%nreleasepoints, &
+      this%particles, 0, &
       this%memoryPath)
-
-    ! Allocate old particle store for ATS backup/restore
     call create_particle_store( &
-      this%particles_old, &
-      this%nreleasepoints, &
+      this%particles_old, 0, &
       trim(this%memoryPath)//'-OLD')
 
     ! Allocate arrays
@@ -349,6 +346,8 @@ contains
     this%rttol = DSAME * DEP9
     this%rtfreq = DZERO
     this%applied_kper = 0
+    this%release_kstp = 0
+    this%release_kper = 0
 
   end subroutine prp_allocate_scalars
 
@@ -440,33 +439,43 @@ contains
     ! Coincident release times are merged to
     ! a single time by the release scheduler.
 
+    ! Guard against double-advance. When PRT shares a solution group with GWF
+    ! and the group uses mxiter > 1, sgp_ca calls sln_ca twice per converged
+    ! time step: once during the Picard loop and once as an output re-run.
+    ! Both passes call prepareSolve -> model_ad -> prp_ad with iFailedStepRetry
+    ! == 0, so without this guard particles would be released twice and the
+    ! retry snapshot would capture an already-released state. On ATS retries
+    ! (iFailedStepRetry > 0) we always proceed so state is restored and
+    ! particles re-released for the new attempt.
+    if (iFailedStepRetry == 0 .and. &
+        this%release_kstp == kstp .and. &
+        this%release_kper == kper) return
+
     ! Update or restore particle state (following GWF/LAK/UZF pattern).
     ! This is only needed when PRT runs in the same simulation as GWF via
     ! exchange: GWF can fail to converge and ATS may retry the time step,
     ! requiring particle state to be restored to the start of the failed step.
     if (.not. this%fmi%flows_from_file) then
       if (iFailedStepRetry == 0) then
-        ! Save current state as old
-        if (this%particles%num_stored() > 0) then
-          ! Resize old particle store to match
-          call this%particles_old%resize( &
-            this%particles%num_stored(), &
-            trim(this%memoryPath)//'-OLD')
-          call this%particles_old%copy_from(this%particles)
-          print *, 'Saved ', this%particles_old%num_stored(), ' particles for retry'
-        end if
+        ! Save particle state as the retry snapshot for this time step.
+        ! Always save unconditionally, even if the store is empty, so that
+        ! a failed first time step can be correctly restored to empty state.
+        call this%particles_old%resize( &
+          this%particles%num_stored(), &
+          trim(this%memoryPath)//'-OLD')
+        call this%particles_old%copy_from(this%particles)
       else
-        ! Restore state from old (retry)
-        if (this%particles_old%num_stored() > 0) then
-          print *, 'Restoring particle state from previous attempt...'
-          ! Resize particles back to the size at the start of the failed time step
-          ! before restoring, in case particles were released during the failed attempt
-          call this%particles%resize( &
-            this%particles_old%num_stored(), &
-            this%memoryPath)
-          call this%particles%copy_from(this%particles_old)
-          print *, 'Restored ', this%particles%num_stored(), ' particles.'
-        end if
+        ! Restore particle state to the start of the failed time step.
+        ! Resizing to particles_old's count trims any particles that were
+        ! released during the failed attempt (including on the first step).
+        call this%particles%resize( &
+          this%particles_old%num_stored(), &
+          this%memoryPath)
+        call this%particles%copy_from(this%particles_old)
+        ! Reset the release counter to match the restored store size.
+        ! Without this, release() would compute out-of-bounds slot indices
+        ! on re-release (np = nparticles+1 would exceed the store size).
+        this%nparticles = this%particles_old%num_stored()
       end if
     end if
 
@@ -489,6 +498,10 @@ contains
       call this%schedule%advance()
     end if
 
+    ! Record that releases have been processed for this time step.
+    this%release_kstp = kstp
+    this%release_kper = kper
+
     ! Check if any releases will be made this time step.
     if (.not. this%schedule%any()) return
 
@@ -501,11 +514,6 @@ contains
       this%particles%num_stored() + &
       (this%nreleasepoints * this%schedule%count()), &
       this%memoryPath)
-
-    ! ! Resize old particle store to match
-    ! call this%particles_old%resize( &
-    !   this%particles%num_stored(), &
-    !   trim(this%memoryPath)//'-OLD')
 
     ! Release a particle from each point for
     ! each release time in the current step.
