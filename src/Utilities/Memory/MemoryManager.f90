@@ -1223,8 +1223,8 @@ contains
         call allocate_error(name, mem_path, istat, isize)
       end if
       !
-      ! -- copy existing values
-      do n = 1, nrow_old
+      ! -- copy existing values (only up to the new size to handle shrinking)
+      do n = 1, min(nrow_old, nrow)
         astrtemp(n) = astr(n)
       end do
       !
@@ -1310,9 +1310,14 @@ contains
         call allocate_error(name, mem_path, istat, isize)
       end if
       !
-      ! -- copy existing values
-      do n = 1, nrow_old
+      ! -- copy existing values (only up to the new size to handle shrinking)
+      do n = 1, min(nrow_old, nrow)
         astrtemp(n) = acharstr1d(n)
+        call acharstr1d(n)%destroy()
+      end do
+      !
+      ! -- destroy remaining elements if shrinking
+      do n = nrow + 1, nrow_old
         call acharstr1d(n)%destroy()
       end do
       !
@@ -1469,8 +1474,9 @@ contains
     if (istat /= 0) then
       call allocate_error(name, mem_path, istat, isize)
     end if
-    do i = 1, ishape(2)
-      do j = 1, ishape(1)
+    ! Copy only what fits in the new array to handle shrinking
+    do i = 1, min(ishape(2), nrow)
+      do j = 1, min(ishape(1), ncol)
         aint(j, i) = mt%aint2d(j, i)
       end do
     end do
@@ -1559,8 +1565,9 @@ contains
     if (istat /= 0) then
       call allocate_error(name, mem_path, istat, isize)
     end if
-    do i = 1, ishape(2)
-      do j = 1, ishape(1)
+    ! Copy only what fits in the new array to handle shrinking
+    do i = 1, min(ishape(2), nrow)
+      do j = 1, min(ishape(1), ncol)
         adbl(j, i) = mt%adbl2d(j, i)
       end do
     end do

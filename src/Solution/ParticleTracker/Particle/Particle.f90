@@ -233,29 +233,53 @@ contains
     character(*), intent(in) :: mempath !< path to memory
 
     ! resize arrays
+    ! print *, 'reallocating imdl to size ', np
     call mem_reallocate(this%imdl, np, 'PLIMDL', mempath)
+    ! print *, 'reallocating iprp to size ', np
     call mem_reallocate(this%iprp, np, 'PLIPRP', mempath)
+    ! print *, 'reallocating irpt to size ', np
     call mem_reallocate(this%irpt, np, 'PLIRPT', mempath)
+    ! print *, 'reallocating name to size ', np
     call mem_reallocate(this%name, LENBOUNDNAME, np, 'PLNAME', mempath)
+    ! print *, 'reallocating icu to size ', np
     call mem_reallocate(this%icu, np, 'PLICU', mempath)
+    ! print *, 'reallocating ilay to size ', np
     call mem_reallocate(this%ilay, np, 'PLILAY', mempath)
+    ! print *, 'reallocating izone to size ', np
     call mem_reallocate(this%izone, np, 'PLIZONE', mempath)
+    ! print *, 'reallocating istatus to size ', np
     call mem_reallocate(this%istatus, np, 'PLISTATUS', mempath)
+    ! print *, 'reallocating x to size ', np
     call mem_reallocate(this%x, np, 'PLX', mempath)
+    ! print *, 'reallocating y to size ', np
     call mem_reallocate(this%y, np, 'PLY', mempath)
+    ! print *, 'reallocating z to size ', np
     call mem_reallocate(this%z, np, 'PLZ', mempath)
+    ! print *, 'reallocating trelease to size ', np
     call mem_reallocate(this%trelease, np, 'PLTRELEASE', mempath)
+    ! print *, 'reallocating tstop to size ', np
     call mem_reallocate(this%tstop, np, 'PLTSTOP', mempath)
+    ! print *, 'reallocating ttrack to size ', np
     call mem_reallocate(this%ttrack, np, 'PLTTRACK', mempath)
+    ! print *, 'reallocating istopweaksink to size ', np
     call mem_reallocate(this%istopweaksink, np, 'PLISTOPWEAKSINK', mempath)
+    ! print *, 'reallocating istopzone to size ', np
     call mem_reallocate(this%istopzone, np, 'PLISTOPZONE', mempath)
+    ! print *, 'reallocating idrymeth to size ', np
     call mem_reallocate(this%idrymeth, np, 'PLIDRYMETH', mempath)
+    ! print *, 'reallocating frctrn to size ', np
     call mem_reallocate(this%frctrn, np, 'PLFRCTRN', mempath)
+    ! print *, 'reallocating iexmeth to size ', np
     call mem_reallocate(this%iexmeth, np, 'PLIEXMETH', mempath)
+    ! print *, 'reallocating extol to size ', np
     call mem_reallocate(this%extol, np, 'PLEXTOL', mempath)
+    ! print *, 'reallocating extend to size ', np
     call mem_reallocate(this%extend, np, 'PLEXTEND', mempath)
+    ! print *, 'reallocating icycwin to size ', np
     call mem_reallocate(this%icycwin, np, 'PLICYCWIN', mempath)
+    ! print *, 'reallocating itrdomain to size ', np
     call mem_reallocate(this%itrdomain, np, MAX_LEVEL, 'PLIDOMAIN', mempath)
+    ! print *, 'reallocating iboundary to size ', np
     call mem_reallocate(this%iboundary, np, MAX_LEVEL, 'PLIBOUNDARY', mempath)
   end subroutine resize
 
@@ -363,7 +387,7 @@ contains
     np = source%num_stored()
 
     if (this%num_stored() /= np) then
-      write (errmsg, '(a,i0,a,i0)') &
+      write (errmsg, '(a,i0,a,i0,a)') &
         'Cannot copy particle store, size mismatch (source=', np, &
         ', dest=', this%num_stored(), ')'
       call pstop(1, errmsg)

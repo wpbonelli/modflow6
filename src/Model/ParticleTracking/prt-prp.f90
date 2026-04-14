@@ -448,12 +448,24 @@ contains
       if (iFailedStepRetry == 0) then
         ! Save current state as old
         if (this%particles%num_stored() > 0) then
+          ! Resize old particle store to match
+          call this%particles_old%resize( &
+            this%particles%num_stored(), &
+            trim(this%memoryPath)//'-OLD')
           call this%particles_old%copy_from(this%particles)
+          print *, 'Saved ', this%particles_old%num_stored(), ' particles for retry'
         end if
       else
         ! Restore state from old (retry)
         if (this%particles_old%num_stored() > 0) then
+          print *, 'Restoring particle state from previous attempt...'
+          ! Resize particles back to the size at the start of the failed time step
+          ! before restoring, in case particles were released during the failed attempt
+          call this%particles%resize( &
+            this%particles_old%num_stored(), &
+            this%memoryPath)
           call this%particles%copy_from(this%particles_old)
+          print *, 'Restored ', this%particles%num_stored(), ' particles.'
         end if
       end if
     end if
@@ -490,10 +502,10 @@ contains
       (this%nreleasepoints * this%schedule%count()), &
       this%memoryPath)
 
-    ! Resize old particle store to match
-    call this%particles_old%resize( &
-      this%particles%num_stored(), &
-      trim(this%memoryPath)//'-OLD')
+    ! ! Resize old particle store to match
+    ! call this%particles_old%resize( &
+    !   this%particles%num_stored(), &
+    !   trim(this%memoryPath)//'-OLD')
 
     ! Release a particle from each point for
     ! each release time in the current step.
