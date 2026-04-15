@@ -439,29 +439,37 @@ contains
     ! Coincident release times are merged to
     ! a single time by the release scheduler.
 
-    ! Guard against double-advance. When PRT shares a solution group with GWF
-    ! and the group uses mxiter > 1, sgp_ca calls sln_ca twice per converged
-    ! time step: once during the Picard loop and once as an output re-run.
-    ! Both passes call prepareSolve -> model_ad -> prp_ad with iFailedStepRetry
-    ! == 0, so without this guard particles would be released twice and the
-    ! retry snapshot would capture an already-released state
+    ! Guard against multiple advances per time step. When PRT runs in the same
+    ! simulation as GWF and the solution group is configured with mxiter > 1
+    ! (Picard iteration between coupled solutions), sgp_ca (SolutionGroup.f90)
+    ! calls sln_ca once per Picard iteration until convergence, then calls it
+    ! once more to re-run with output enabled. Every sln_ca call goes through
+    ! prepareSolve -> model_ad -> prp_ad. So prp_ad is called (actual Picard
+    ! iterations + 1) times per converged time step. Without this guard,
+    ! particles would be released on every pass.
+    !
+    ! Note: the solution group mxiter defaults to 1 (SolutionGroup.f90), so
+    ! this guard is a no-op for typical GWF-PRT simulations. ATS retries are
+    ! handled by the save/restore block below; on those retries iFailedStepRetry
+    ! > 0 so the guard is always bypassed.
     if (iFailedStepRetry == 0 .and. &
         this%release_kstp == kstp .and. &
         this%release_kper == kper) return
 
-    ! Update or restore particle state
+    ! Save or restore particle state for ATS
     if (.not. this%fmi%flows_from_file) then
       if (iFailedStepRetry == 0) then
+        ! save
         call this%particles_old%resize( &
           this%particles%num_stored(), &
           trim(this%memoryPath)//'-OLD')
         call this%particles_old%copy_from(this%particles)
       else
+        ! restore
         call this%particles%resize( &
           this%particles_old%num_stored(), &
           this%memoryPath)
         call this%particles%copy_from(this%particles_old)
-        ! Reset counter to match the restored store size
         this%nparticles = this%particles_old%num_stored()
       end if
     end if
