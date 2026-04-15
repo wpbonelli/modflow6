@@ -230,20 +230,36 @@ contains
 
   !> @brief Seek each open track file back to its saved position and
   !! truncate, discarding events written during a failed ATS attempt.
+  !! After endfile, gfortran marks the unit AFTER_ENDFILE and rejects
+  !! subsequent writes. Closing and reopening the unit resets that state
+  !! while keeping the truncation that endfile wrote to disk.
   subroutine rollback_positions(this)
     class(ParticleTracksType) :: this
     integer(I4B) :: i
+    character(len=512) :: fname
     do i = 1, this%ntrackfiles
       if (this%files(i)%iun > 0 .and. &
           this%files(i)%saved_pos > 0_I8B) then
+        inquire (unit=this%files(i)%iun, name=fname)
+        ! Position to saved offset and truncate there.
         if (this%files(i)%csv) then
-          ! formatted STREAM: empty format positions without writing
           write (this%files(i)%iun, '()', pos=this%files(i)%saved_pos)
         else
-          ! unformatted STREAM: no fmt, no io-list — just positions
           write (this%files(i)%iun, pos=this%files(i)%saved_pos)
         end if
         endfile (this%files(i)%iun)
+        ! Close to flush the truncation and clear the AFTER_ENDFILE
+        ! state, then reopen positioned at the new end-of-file.
+        close (this%files(i)%iun)
+        if (this%files(i)%csv) then
+          open (unit=this%files(i)%iun, file=trim(fname), &
+                form='FORMATTED', access='STREAM', status='OLD', &
+                action='READWRITE', position='APPEND')
+        else
+          open (unit=this%files(i)%iun, file=trim(fname), &
+                form='UNFORMATTED', access='STREAM', status='OLD', &
+                action='READWRITE', position='APPEND')
+        end if
       end if
     end do
   end subroutine rollback_positions
