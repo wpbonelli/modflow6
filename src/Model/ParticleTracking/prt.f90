@@ -69,6 +69,9 @@ module PrtModule
     real(DP), dimension(:), pointer, contiguous :: masstrm => null() !< particle mass terminating in cells, new value
     real(DP), dimension(:), pointer, contiguous :: ratetrm => null() !< particle mass termination rate in cells
     type(HashTableType), pointer :: trm_ids => null() !< terminated particle ids
+    integer(I4B) :: trk_save_kstp = 0 !< kstp for which track file positions were last saved
+    integer(I4B) :: trk_save_kper = 0 !< kper for which track file positions were last saved
+    integer(I4B) :: trk_last_retry = -1 !< iFailedStepRetry at last track file rollback
   contains
     ! Override BaseModelType procs
     procedure :: model_df => prt_df
@@ -361,12 +364,29 @@ contains
   subroutine prt_ad(this)
     ! modules
     use SimVariablesModule, only: isimcheck, iFailedStepRetry
+    use TdisModule, only: kstp, kper
     ! dummy
     class(PrtModelType) :: this
     class(BndType), pointer :: packobj
     ! local
     integer(I4B) :: irestore
     integer(I4B) :: ip, n, i
+
+    ! Save track file positions at the start of each new time step so that a
+    ! failed ATS attempt can be rolled back. On the first call for a new retry
+    ! attempt, roll back all track files to those saved positions, discarding
+    ! events written during the failed attempt.
+    if (iFailedStepRetry == 0) then
+      if (kstp /= this%trk_save_kstp .or. kper /= this%trk_save_kper) then
+        call this%tracks%save_positions()
+        this%trk_save_kstp = kstp
+        this%trk_save_kper = kper
+        this%trk_last_retry = -1
+      end if
+    else if (iFailedStepRetry /= this%trk_last_retry) then
+      call this%tracks%rollback_positions()
+      this%trk_last_retry = iFailedStepRetry
+    end if
 
     ! Reset state variable
     irestore = 0

@@ -77,6 +77,7 @@ module PrtPrpModule
     integer(I4B) :: applied_kper !< period for which configuration was last applied
     integer(I4B) :: release_kstp !< time step for which particles were last released
     integer(I4B) :: release_kper !< stress period for which particles were last released
+    integer(I4B) :: release_retry !< iFailedStepRetry value for which particles were last released
   contains
     procedure :: prp_allocate_arrays
     procedure :: prp_allocate_scalars
@@ -348,6 +349,7 @@ contains
     this%applied_kper = 0
     this%release_kstp = 0
     this%release_kper = 0
+    this%release_retry = -1
 
   end subroutine prp_allocate_scalars
 
@@ -439,22 +441,14 @@ contains
     ! Coincident release times are merged to
     ! a single time by the release scheduler.
 
-    ! Guard against multiple advances per time step. When PRT runs in the same
-    ! simulation as GWF and the solution group is configured with mxiter > 1
-    ! (Picard iteration between coupled solutions), sgp_ca (SolutionGroup.f90)
-    ! calls sln_ca once per Picard iteration until convergence, then calls it
-    ! once more to re-run with output enabled. Every sln_ca call goes through
-    ! prepareSolve -> model_ad -> prp_ad. So prp_ad is called (actual Picard
-    ! iterations + 1) times per converged time step. Without this guard,
-    ! particles would be released on every pass.
-    !
-    ! Note: the solution group mxiter defaults to 1 (SolutionGroup.f90), so
-    ! this guard is a no-op for typical GWF-PRT simulations. ATS retries are
-    ! handled by the save/restore block below; on those retries iFailedStepRetry
-    ! > 0 so the guard is always bypassed.
-    if (iFailedStepRetry == 0 .and. &
-        this%release_kstp == kstp .and. &
-        this%release_kper == kper) return
+    ! Stamping (kstp, kper, iFailedStepRetry) and returning early on a match
+    ! guards against multiple advances per unique combination of step/retry,
+    ! which can happen due to failed time steps or picard loop output reruns.
+    ! PRT is unlike the other models in that PRT advance/solve routines are
+    ! in general stateful, not idempotent, and should not run more than once.
+    if (this%release_kstp == kstp .and. &
+        this%release_kper == kper .and. &
+        this%release_retry == iFailedStepRetry) return
 
     ! Save or restore particle state for ATS
     if (.not. this%fmi%flows_from_file) then
@@ -493,9 +487,10 @@ contains
       call this%schedule%advance()
     end if
 
-    ! Record that releases have been processed for this time step.
+    ! Record that releases have been processed for this (step, retry attempt).
     this%release_kstp = kstp
     this%release_kper = kper
+    this%release_retry = iFailedStepRetry
 
     ! Check if any releases will be made this time step.
     if (.not. this%schedule%any()) return
@@ -1015,8 +1010,8 @@ contains
     if (found%trackcsvfile) then
       this%itrkcsv = getunit()
       call openfile(this%itrkcsv, this%iout, trackcsvfile, 'CSV', &
-                    filstat_opt='REPLACE')
-      write (this%itrkcsv, '(a)') TRACKHEADER
+                    accarg_opt='STREAM', filstat_opt='REPLACE')
+      write (this%itrkcsv, '(a)') TRACKHEADER//new_line('A')
     end if
 
     ! terminate if any errors were detected

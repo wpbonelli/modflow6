@@ -13,10 +13,16 @@ from prt_test_utils import get_model_name
 from test_gwf_ats01 import build_gwf_sim
 
 simname = "prtatsexg"
-cases = [simname]
+
+# Two cases: default mxiter=1 (tests ATS retry), and mxiter=2 (exercises the
+# Picard output re-run guard in prp_ad). Both should produce identical output.
+cases = [
+    (simname, 1),
+    (simname + "pic", 2),
+]
 
 
-def build_mf6_sim(name, ws, mf6):
+def build_mf6_sim(name, ws, mf6, mxiter=1):
     gwf_name = get_model_name(name, "gwf")
     prt_name = get_model_name(name, "prt")
 
@@ -67,7 +73,6 @@ def build_mf6_sim(name, ws, mf6):
         trackcsv_filerecord=[prt_track_csv_file],
         printrecord=[("BUDGET", "ALL")],
         saverecord=[("BUDGET", "ALL")],
-        # dev_dump_event_trace=True
     )
 
     # create exchange
@@ -87,11 +92,19 @@ def build_mf6_sim(name, ws, mf6):
         filename=f"{prt_name}.ems",
     )
     sim.register_solution_package(ems, [prt.name])
+
+    # Set solution group mxiter. With mxiter > 1, sgp_ca runs each solution
+    # once per Picard iteration then once more as an output re-run, which
+    # exercises the double-advance guard in prp_ad.
+    if mxiter > 1:
+        sim.name_file.mxiter.set_data(mxiter, key=0)
+
     return sim
 
 
 def build_models(idx, test):
-    return build_mf6_sim(test.name, test.workspace, test.targets["mf6"])
+    _, mxiter = cases[idx]
+    return build_mf6_sim(test.name, test.workspace, test.targets["mf6"], mxiter=mxiter)
 
 
 def check_output(idx, test):
@@ -114,6 +127,7 @@ def check_output(idx, test):
     prt_pls = pd.read_csv(prt_track_csv_file)
     prt_cbb = CellBudgetFile(prt_budget_file)
     assert gwf_times == set(prt_cbb.get_times())
+    assert (prt_pls["ireason"] == 0).sum() == 9
 
 
 def plot_output(idx, test):
@@ -165,8 +179,9 @@ def plot_output(idx, test):
     plt.savefig(ws / f"{name}.png")
 
 
-@pytest.mark.parametrize("idx, name", enumerate(cases))
-def test_mf6model(idx, name, function_tmpdir, targets, plot):
+@pytest.mark.parametrize("idx, case", enumerate(cases))
+def test_mf6model(idx, case, function_tmpdir, targets, plot):
+    name, _ = case
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,

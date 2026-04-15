@@ -16,7 +16,7 @@
 !<
 module ParticleTracksModule
 
-  use KindModule, only: DP, I4B, LGP
+  use KindModule, only: DP, I4B, I8B, LGP
   use ErrorUtilModule, only: pstop
   use ConstantsModule, only: DZERO, DONE, DPIO180
   use ParticleModule, only: ParticleType, ACTIVE
@@ -58,6 +58,7 @@ module ParticleTracksModule
     integer(I4B), public :: iun = 0 !< file unit number
     logical(LGP), public :: csv = .false. !< whether the file is binary or CSV
     integer(I4B), public :: iprp = -1 !< -1 is model-level file, 0 is exchange PRP
+    integer(I8B), public :: saved_pos = 0_I8B !< file position saved at start of time step (for ATS rollback)
   end type ParticleTrackFileType
 
   !> @brief Selection of particle events.
@@ -88,6 +89,8 @@ module ParticleTracksModule
     procedure, public :: init_file
     procedure, public :: is_selected
     procedure, public :: select_events
+    procedure, public :: save_positions
+    procedure, public :: rollback_positions
     procedure, public :: destroy
     procedure :: expand_files
     procedure :: should_save
@@ -213,6 +216,38 @@ contains
 
   end function is_selected
 
+  !> @brief Save the current file position of each open track file.
+  !! Called at the start of each new time step so that a failed ATS
+  !! attempt can be rolled back before retrying.
+  subroutine save_positions(this)
+    class(ParticleTracksType) :: this
+    integer(I4B) :: i
+    do i = 1, this%ntrackfiles
+      if (this%files(i)%iun > 0) &
+        inquire (unit=this%files(i)%iun, pos=this%files(i)%saved_pos)
+    end do
+  end subroutine save_positions
+
+  !> @brief Seek each open track file back to its saved position and
+  !! truncate, discarding events written during a failed ATS attempt.
+  subroutine rollback_positions(this)
+    class(ParticleTracksType) :: this
+    integer(I4B) :: i
+    do i = 1, this%ntrackfiles
+      if (this%files(i)%iun > 0 .and. &
+          this%files(i)%saved_pos > 0_I8B) then
+        if (this%files(i)%csv) then
+          ! formatted STREAM: empty format positions without writing
+          write (this%files(i)%iun, '()', pos=this%files(i)%saved_pos)
+        else
+          ! unformatted STREAM: no fmt, no io-list — just positions
+          write (this%files(i)%iun, pos=this%files(i)%saved_pos)
+        end if
+        endfile (this%files(i)%iun)
+      end if
+    end do
+  end subroutine rollback_positions
+
   !> @brief Check whether a particle belongs in a given file i.e.
   !! if the file is enabled and its group matches the particle's.
   logical function should_save(this, particle, file) result(save)
@@ -232,6 +267,8 @@ contains
     logical(LGP), intent(in) :: csv
 
     if (csv) then
+      ! CSV files are opened with access='STREAM', so no implicit record
+      ! terminator is added by the runtime. The newline must be explicit.
       write (iun, '(*(G0,:,","))') &
         event%kper, &
         event%kstp, &
@@ -248,7 +285,7 @@ contains
         event%x, &
         event%y, &
         event%z, &
-        trim(adjustl(particle%name))
+        trim(adjustl(particle%name))//new_line('A')
     else
       write (iun) &
         event%kper, &
