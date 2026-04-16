@@ -69,9 +69,7 @@ module PrtModule
     real(DP), dimension(:), pointer, contiguous :: masstrm => null() !< particle mass terminating in cells, new value
     real(DP), dimension(:), pointer, contiguous :: ratetrm => null() !< particle mass termination rate in cells
     type(HashTableType), pointer :: trm_ids => null() !< terminated particle ids
-    integer(I4B) :: trk_save_kstp = 0 !< kstp for which track file positions were last saved
-    integer(I4B) :: trk_save_kper = 0 !< kper for which track file positions were last saved
-    integer(I4B) :: trk_last_retry = -1 !< iFailedStepRetry at last track file rollback
+    integer(I4B) :: trk_last_retry = -1 !< iFailedStepRetry at last buffer discard
   contains
     ! Override BaseModelType procs
     procedure :: model_df => prt_df
@@ -364,7 +362,6 @@ contains
   subroutine prt_ad(this)
     ! modules
     use SimVariablesModule, only: isimcheck, iFailedStepRetry
-    use TdisModule, only: kstp, kper
     ! dummy
     class(PrtModelType) :: this
     class(BndType), pointer :: packobj
@@ -372,19 +369,13 @@ contains
     integer(I4B) :: irestore
     integer(I4B) :: ip, n, i
 
-    ! Save track file positions at the start of each new time step so that a
-    ! failed ATS attempt can be rolled back. On the first call for a new retry
-    ! attempt, roll back all track files to those saved positions, discarding
-    ! events written during the failed attempt.
-    if (iFailedStepRetry == 0) then
-      if (kstp /= this%trk_save_kstp .or. kper /= this%trk_save_kper) then
-        call this%tracks%save_positions()
-        this%trk_save_kstp = kstp
-        this%trk_save_kper = kper
-        this%trk_last_retry = -1
-      end if
-    else if (iFailedStepRetry /= this%trk_last_retry) then
-      call this%tracks%rollback_positions()
+    ! Discard buffered track events at the start of each new ATS retry
+    ! attempt so that events from failed attempts are never written to disk.
+    ! The guard on trk_last_retry prevents discarding twice when prt_ad is
+    ! called more than once within the same retry (Picard re-runs).
+    if (iFailedStepRetry > 0 .and. &
+        iFailedStepRetry /= this%trk_last_retry) then
+      call this%tracks%discard_buffer()
       this%trk_last_retry = iFailedStepRetry
     end if
 
@@ -593,7 +584,8 @@ contains
     integer(I4B) :: ibudfl
     integer(I4B) :: ipflag
 
-    ! Note: particle tracking output is handled elsewhere
+    ! Flush buffered track events to disk now that the time step has converged.
+    call this%tracks%flush_buffer()
 
     ! Set write and print flags
     idvsave = 0

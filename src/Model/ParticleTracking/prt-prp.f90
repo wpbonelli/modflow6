@@ -1010,8 +1010,8 @@ contains
     if (found%trackcsvfile) then
       this%itrkcsv = getunit()
       call openfile(this%itrkcsv, this%iout, trackcsvfile, 'CSV', &
-                    accarg_opt='STREAM', filstat_opt='REPLACE')
-      write (this%itrkcsv, '(a)') TRACKHEADER//new_line('A')
+                    filstat_opt='REPLACE')
+      write (this%itrkcsv, '(a)') TRACKHEADER
     end if
 
     ! terminate if any errors were detected

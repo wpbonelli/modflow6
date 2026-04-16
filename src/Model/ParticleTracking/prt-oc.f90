@@ -297,9 +297,9 @@ contains
     if (found%trackcsvfile) then
       this%itrkcsv = getunit()
       call openfile(this%itrkcsv, this%iout, trackcsv, 'CSV', &
-                    accarg_opt='STREAM', filstat_opt='REPLACE')
+                    filstat_opt='REPLACE')
       write (this%iout, fmttrkcsv) trim(adjustl(trackcsv)), this%itrkcsv
-      write (this%itrkcsv, '(a)') TRACKHEADER//new_line('A')
+      write (this%itrkcsv, '(a)') TRACKHEADER
     end if
 
     write (this%iout, '(1x,a)') 'END OF OC OPTIONS'

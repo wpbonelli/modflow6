@@ -16,7 +16,7 @@
 !<
 module ParticleTracksModule
 
-  use KindModule, only: DP, I4B, I8B, LGP
+  use KindModule, only: DP, I4B, LGP
   use ErrorUtilModule, only: pstop
   use ConstantsModule, only: DZERO, DONE, DPIO180
   use ParticleModule, only: ParticleType, ACTIVE
@@ -37,8 +37,9 @@ module ParticleTracksModule
   public :: ParticleTrackFileType, &
             ParticleTracksType, &
             ParticleTrackEventSelectionType, &
+            PendingTrackEventType, &
             write_particle_event
-  private :: save_event
+  private :: save_event, write_pending_event
 
   character(len=*), parameter, public :: TRACKHEADER = &
     'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,&
@@ -47,6 +48,17 @@ module ParticleTracksModule
   character(len=*), parameter, public :: TRACKDTYPES = &
     '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
     &<i4,<i4,<f8,<f8,<f8,<f8,<f8,|S40'
+
+  !> @brief Flat record of a single particle track event, used for
+  !! in-memory buffering during a time step. Stored in the pending(:)
+  !! array and flushed to disk only when the step converges.
+  !<
+  type :: PendingTrackEventType
+    integer(I4B) :: kper, kstp, imdl, iprp, irpt, ilay, icu, izone
+    integer(I4B) :: istatus, ireason
+    real(DP)     :: trelease, ttrack, x, y, z
+    character(len=40) :: name
+  end type PendingTrackEventType
 
   !> @brief Output file containing all or some particle pathlines.
   !!
@@ -58,7 +70,6 @@ module ParticleTracksModule
     integer(I4B), public :: iun = 0 !< file unit number
     logical(LGP), public :: csv = .false. !< whether the file is binary or CSV
     integer(I4B), public :: iprp = -1 !< -1 is model-level file, 0 is exchange PRP
-    integer(I8B), public :: saved_pos = 0_I8B !< file position saved at start of time step (for ATS rollback)
   end type ParticleTrackFileType
 
   !> @brief Selection of particle events.
@@ -85,12 +96,15 @@ module ParticleTracksModule
     integer(I4B), public :: ntrackfiles !< number of track files
     type(ParticleTrackFileType), public, allocatable :: files(:) !< track files
     type(ParticleTrackEventSelectionType), public :: selected !< event selection
+    integer(I4B), public :: npending = 0 !< number of buffered events
+    type(PendingTrackEventType), public, allocatable :: pending(:) !< buffered events
   contains
     procedure, public :: init_file
     procedure, public :: is_selected
     procedure, public :: select_events
-    procedure, public :: save_positions
-    procedure, public :: rollback_positions
+    procedure, public :: buffer_event
+    procedure, public :: flush_buffer
+    procedure, public :: discard_buffer
     procedure, public :: destroy
     procedure :: expand_files
     procedure :: should_save
@@ -127,6 +141,7 @@ contains
   subroutine destroy(this)
     class(ParticleTracksType) :: this
     if (allocated(this%files)) deallocate (this%files)
+    if (allocated(this%pending)) deallocate (this%pending)
   end subroutine destroy
 
   !> @brief Grow the array of track files.
@@ -216,53 +231,94 @@ contains
 
   end function is_selected
 
-  !> @brief Save the current file position of each open track file.
-  !! Called at the start of each new time step so that a failed ATS
-  !! attempt can be rolled back before retrying.
-  subroutine save_positions(this)
+  !> @brief Buffer a particle event for deferred write.
+  !! Called from write_particle_event instead of writing directly to disk.
+  !! The buffer is flushed to disk by flush_buffer when the time step
+  !! converges, or discarded by discard_buffer on a failed ATS retry.
+  subroutine buffer_event(this, particle, event)
+    ! dummy
     class(ParticleTracksType) :: this
-    integer(I4B) :: i
-    do i = 1, this%ntrackfiles
-      if (this%files(i)%iun > 0) &
-        inquire (unit=this%files(i)%iun, pos=this%files(i)%saved_pos)
-    end do
-  end subroutine save_positions
+    type(ParticleType), pointer, intent(in) :: particle
+    class(ParticleEventType), pointer, intent(in) :: event
+    ! local
+    type(PendingTrackEventType) :: rec
+    type(PendingTrackEventType), allocatable :: tmp(:)
 
-  !> @brief Seek each open track file back to its saved position and
-  !! truncate, discarding events written during a failed ATS attempt.
-  !! After endfile, gfortran marks the unit AFTER_ENDFILE and rejects
-  !! subsequent writes. Closing and reopening the unit resets that state
-  !! while keeping the truncation that endfile wrote to disk.
-  subroutine rollback_positions(this)
+    rec%kper     = event%kper;     rec%kstp    = event%kstp
+    rec%imdl     = event%imdl;     rec%iprp    = event%iprp
+    rec%irpt     = event%irpt;     rec%ilay    = event%ilay
+    rec%icu      = event%icu;      rec%izone   = event%izone
+    rec%istatus  = event%istatus;  rec%ireason = event%get_code()
+    rec%trelease = event%trelease; rec%ttrack  = event%ttrack
+    rec%x = event%x; rec%y = event%y; rec%z = event%z
+    rec%name = trim(adjustl(particle%name))
+
+    if (.not. allocated(this%pending)) then
+      allocate (this%pending(64))
+    else if (this%npending == size(this%pending)) then
+      allocate (tmp(size(this%pending) * 2))
+      tmp(1:this%npending) = this%pending
+      call move_alloc(tmp, this%pending)
+    end if
+
+    this%npending = this%npending + 1
+    this%pending(this%npending) = rec
+  end subroutine buffer_event
+
+  !> @brief Flush buffered events to disk.
+  !! Called from prt_ot after a time step converges. Writes each pending
+  !! record to all files for which the event's PRP matches, then resets
+  !! the count.
+  subroutine flush_buffer(this)
+    ! dummy
     class(ParticleTracksType) :: this
-    integer(I4B) :: i
-    character(len=512) :: fname
-    do i = 1, this%ntrackfiles
-      if (this%files(i)%iun > 0 .and. &
-          this%files(i)%saved_pos > 0_I8B) then
-        inquire (unit=this%files(i)%iun, name=fname)
-        ! Position to saved offset and truncate there.
-        if (this%files(i)%csv) then
-          write (this%files(i)%iun, '()', pos=this%files(i)%saved_pos)
-        else
-          write (this%files(i)%iun, pos=this%files(i)%saved_pos)
-        end if
-        endfile (this%files(i)%iun)
-        ! Close to flush the truncation and clear the AFTER_ENDFILE
-        ! state, then reopen positioned at the new end-of-file.
-        close (this%files(i)%iun)
-        if (this%files(i)%csv) then
-          open (unit=this%files(i)%iun, file=trim(fname), &
-                form='FORMATTED', access='STREAM', status='OLD', &
-                action='READWRITE', position='APPEND')
-        else
-          open (unit=this%files(i)%iun, file=trim(fname), &
-                form='UNFORMATTED', access='STREAM', status='OLD', &
-                action='READWRITE', position='APPEND')
-        end if
-      end if
+    ! local
+    integer(I4B) :: n, i
+    type(PendingTrackEventType) :: rec
+    type(ParticleTrackFileType) :: file
+
+    do n = 1, this%npending
+      rec = this%pending(n)
+      do i = 1, this%ntrackfiles
+        file = this%files(i)
+        if (file%iun > 0 .and. &
+            (file%iprp == -1 .or. file%iprp == rec%iprp)) &
+          call write_pending_event(file%iun, rec, file%csv)
+      end do
     end do
-  end subroutine rollback_positions
+    this%npending = 0
+  end subroutine flush_buffer
+
+  !> @brief Discard buffered events without writing.
+  !! Called from prt_ad at the start of each new ATS retry attempt,
+  !! so that events from failed attempts are never written to disk.
+  !! Resets the count without deallocating, so the allocation is reused.
+  subroutine discard_buffer(this)
+    class(ParticleTracksType) :: this
+    this%npending = 0
+  end subroutine discard_buffer
+
+  !> @brief Write a single pending (buffered) event record to a file.
+  !! Mirrors save_event but reads from a flat PendingTrackEventType
+  !! record rather than a live polymorphic event + particle pair.
+  subroutine write_pending_event(iun, rec, csv)
+    ! dummy
+    integer(I4B), intent(in) :: iun
+    type(PendingTrackEventType), intent(in) :: rec
+    logical(LGP), intent(in) :: csv
+
+    if (csv) then
+      write (iun, '(*(G0,:,","))') &
+        rec%kper, rec%kstp, rec%imdl, rec%iprp, rec%irpt, &
+        rec%ilay, rec%icu, rec%izone, rec%istatus, rec%ireason, &
+        rec%trelease, rec%ttrack, rec%x, rec%y, rec%z, trim(rec%name)
+    else
+      write (iun) &
+        rec%kper, rec%kstp, rec%imdl, rec%iprp, rec%irpt, &
+        rec%ilay, rec%icu, rec%izone, rec%istatus, rec%ireason, &
+        rec%trelease, rec%ttrack, rec%x, rec%y, rec%z, rec%name
+    end if
+  end subroutine write_pending_event
 
   !> @brief Check whether a particle belongs in a given file i.e.
   !! if the file is enabled and its group matches the particle's.
@@ -283,8 +339,6 @@ contains
     logical(LGP), intent(in) :: csv
 
     if (csv) then
-      ! CSV files are opened with access='STREAM', so no implicit record
-      ! terminator is added by the runtime. The newline must be explicit.
       write (iun, '(*(G0,:,","))') &
         event%kper, &
         event%kstp, &
@@ -301,7 +355,7 @@ contains
         event%x, &
         event%y, &
         event%z, &
-        trim(adjustl(particle%name))//new_line('A')
+        trim(adjustl(particle%name))
     else
       write (iun) &
         event%kper, &
@@ -339,21 +393,13 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     class(ParticleEventType), pointer, intent(in) :: event
     logical(LGP) :: handled
-    ! local
-    integer(I4B) :: i
-    type(ParticleTrackFileType) :: file
 
     select type (context)
     type is (ParticleTracksType)
       if (context%should_print()) &
         call event%log(context%iout)
-      if (context%is_selected(event)) then
-        do i = 1, context%ntrackfiles
-          file = context%files(i)
-          if (context%should_save(particle, file)) &
-            call save_event(file%iun, particle, event, csv=file%csv)
-        end do
-      end if
+      if (context%is_selected(event)) &
+        call context%buffer_event(particle, event)
       handled = .true.
     end select
   end function write_particle_event
