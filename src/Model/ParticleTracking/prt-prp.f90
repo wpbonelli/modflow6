@@ -441,11 +441,12 @@ contains
     ! Coincident release times are merged to
     ! a single time by the release scheduler.
 
-    ! Stamping (kstp, kper, iFailedStepRetry) and returning early on a match
-    ! guards against multiple advances per unique combination of step/retry,
-    ! which can happen due to failed time steps or picard loop output reruns.
-    ! PRT is unlike the other models in that PRT advance/solve routines are
+    ! We might be here due to time step convergence failure (ATS) or picard
+    ! loop reruns, whether for output writing (always occurs) or mxiter > 1.
+    ! PRT is unlike the other models in that PRT's advance/solve routines are
     ! in general stateful, not idempotent, and should not run more than once.
+    ! Stamping (kstp, kper, iFailedStepRetry) and returning early on a match
+    ! guards against multiple advances per unique combination of step/retry.
     if (this%release_kstp == kstp .and. &
         this%release_kper == kper .and. &
         this%release_retry == iFailedStepRetry) return

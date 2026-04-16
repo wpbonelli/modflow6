@@ -37,7 +37,6 @@ module ParticleTracksModule
   public :: ParticleTrackFileType, &
             ParticleTracksType, &
             ParticleTrackEventSelectionType, &
-            PendingTrackEventType, &
             write_particle_event
   private :: write_pending_event
 
@@ -49,9 +48,8 @@ module ParticleTracksModule
     '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
     &<i4,<i4,<f8,<f8,<f8,<f8,<f8,|S40'
 
-  !> @brief Flat record of a single particle track event, used for
-  !! in-memory buffering during a time step. Stored in the pending(:)
-  !! array and flushed to disk only when the step converges.
+  !> @brief Flat record of a single particle track event.
+
   !<
   type :: PendingTrackEventType
     integer(I4B) :: kper, kstp, imdl, iprp, irpt, ilay, icu, izone
@@ -89,6 +87,9 @@ module ParticleTracksModule
   !! can be configured for writing, with each file optionally associated with
   !! a PRP package or with the full model. Events can be filtered by type, so
   !! that only certain event types are printed or written to files.
+  !!
+  !! Records are buffered in-memory during a time step, stored in pending(:),
+  !! and should be flushed to disk only when the step converges.
   !<
   type :: ParticleTracksType
     private
@@ -96,8 +97,8 @@ module ParticleTracksModule
     integer(I4B), public :: ntrackfiles !< number of track files
     type(ParticleTrackFileType), public, allocatable :: files(:) !< track files
     type(ParticleTrackEventSelectionType), public :: selected !< event selection
-    integer(I4B), public :: npending = 0 !< number of buffered events
     type(PendingTrackEventType), public, allocatable :: pending(:) !< buffered events
+    integer(I4B), public :: npending = 0 !< number of buffered events
   contains
     procedure, public :: init_file
     procedure, public :: is_selected
@@ -140,6 +141,9 @@ contains
   !> @brief Destroy the particle track manager.
   subroutine destroy(this)
     class(ParticleTracksType) :: this
+    if (this%npending > 0) &
+      call pstop(1, 'ParticleTracksType destroyed with unflushed track &
+                    &events; flush_buffer must be called before destroy.')
     if (allocated(this%files)) deallocate (this%files)
     if (allocated(this%pending)) deallocate (this%pending)
   end subroutine destroy
@@ -232,9 +236,9 @@ contains
   end function is_selected
 
   !> @brief Buffer a particle event for deferred write.
-  !! Called from write_particle_event instead of writing directly to disk.
-  !! The buffer is flushed to disk by flush_buffer when the time step
-  !! converges, or discarded by discard_buffer on a failed ATS retry.
+  !! The buffer can be flushed to disk by flush_buffer,
+  !! or discarded by discard_buffer (e.g., on a failed
+  !! ATS retry). The buffer starts at 64 events, then
   subroutine buffer_event(this, particle, event)
     ! dummy
     class(ParticleTracksType) :: this

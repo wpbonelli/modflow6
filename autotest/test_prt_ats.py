@@ -14,11 +14,9 @@ from test_gwf_ats01 import build_gwf_sim
 
 simname = "prtatsexg"
 
-# Two cases: default mxiter=1 (tests ATS retry), and mxiter=2 (exercises the
-# Picard output re-run guard in prp_ad). Both should produce identical output.
 cases = [
-    (simname, 1),
-    (simname + "pic", 2),
+    (simname, 1),          # mxiter=1 (ATS retry)
+    (simname + "pic", 2),  # mxiter=2 (picard rerun)
 ]
 
 
@@ -93,9 +91,6 @@ def build_mf6_sim(name, ws, mf6, mxiter=1):
     )
     sim.register_solution_package(ems, [prt.name])
 
-    # Set solution group mxiter. With mxiter > 1, sgp_ca runs each solution
-    # once per Picard iteration then once more as an output re-run, which
-    # exercises the double-advance guard in prp_ad.
     if mxiter > 1:
         sim.name_file.mxiter.set_data(mxiter, key=0)
 

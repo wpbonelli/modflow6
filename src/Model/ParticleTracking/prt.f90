@@ -371,10 +371,13 @@ contains
 
     ! Discard buffered track events at the start of each new ATS retry
     ! attempt so that events from failed attempts are never written to disk.
-    ! The guard on trk_last_retry prevents discarding twice when prt_ad is
-    ! called more than once within the same retry (Picard re-runs).
-    if (iFailedStepRetry > 0 .and. &
-        iFailedStepRetry /= this%trk_last_retry) then
+    ! trk_last_retry is reset to -1 on clean invocations so that a retry
+    ! count equal to a previous step's final retry count does not falsely
+    ! block the discard. The /= guard prevents discarding twice when prt_ad
+    ! is called more than once within the same retry (Picard re-runs).
+    if (iFailedStepRetry == 0) then
+      this%trk_last_retry = -1
+    else if (iFailedStepRetry /= this%trk_last_retry) then
       call this%tracks%discard_buffer()
       this%trk_last_retry = iFailedStepRetry
     end if
@@ -584,7 +587,9 @@ contains
     integer(I4B) :: ibudfl
     integer(I4B) :: ipflag
 
-    ! Flush buffered track events to disk now that the time step has converged.
+    ! Flush buffered track events to disk. prt_ot is called once per
+    ! converged time step from Mf6FinalizeTimestep, outside the ATS
+    ! retry loop, so the buffer holds only events from the successful attempt.
     call this%tracks%flush_buffer()
 
     ! Set write and print flags
