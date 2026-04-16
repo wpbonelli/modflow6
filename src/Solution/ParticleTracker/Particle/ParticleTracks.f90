@@ -39,7 +39,7 @@ module ParticleTracksModule
             ParticleTrackEventSelectionType, &
             PendingTrackEventType, &
             write_particle_event
-  private :: save_event, write_pending_event
+  private :: write_pending_event
 
   character(len=*), parameter, public :: TRACKHEADER = &
     'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,&
@@ -56,7 +56,7 @@ module ParticleTracksModule
   type :: PendingTrackEventType
     integer(I4B) :: kper, kstp, imdl, iprp, irpt, ilay, icu, izone
     integer(I4B) :: istatus, ireason
-    real(DP)     :: trelease, ttrack, x, y, z
+    real(DP) :: trelease, ttrack, x, y, z
     character(len=40) :: name
   end type PendingTrackEventType
 
@@ -244,12 +244,12 @@ contains
     type(PendingTrackEventType) :: rec
     type(PendingTrackEventType), allocatable :: tmp(:)
 
-    rec%kper     = event%kper;     rec%kstp    = event%kstp
-    rec%imdl     = event%imdl;     rec%iprp    = event%iprp
-    rec%irpt     = event%irpt;     rec%ilay    = event%ilay
-    rec%icu      = event%icu;      rec%izone   = event%izone
-    rec%istatus  = event%istatus;  rec%ireason = event%get_code()
-    rec%trelease = event%trelease; rec%ttrack  = event%ttrack
+    rec%kper = event%kper; rec%kstp = event%kstp
+    rec%imdl = event%imdl; rec%iprp = event%iprp
+    rec%irpt = event%irpt; rec%ilay = event%ilay
+    rec%icu = event%icu; rec%izone = event%izone
+    rec%istatus = event%istatus; rec%ireason = event%get_code()
+    rec%trelease = event%trelease; rec%ttrack = event%ttrack
     rec%x = event%x; rec%y = event%y; rec%z = event%z
     rec%name = trim(adjustl(particle%name))
 
