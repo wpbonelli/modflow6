@@ -15,7 +15,7 @@ from test_gwf_ats01 import build_gwf_sim
 simname = "prtatsexg"
 
 cases = [
-    (simname, 1),          # mxiter=1 (ATS retry)
+    (simname, 1),  # mxiter=1 (ATS retry)
     (simname + "pic", 2),  # mxiter=2 (picard rerun)
 ]
 
