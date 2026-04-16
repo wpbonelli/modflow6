@@ -48,15 +48,14 @@ module ParticleTracksModule
     '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
     &<i4,<i4,<f8,<f8,<f8,<f8,<f8,|S40'
 
-  !> @brief Flat record of a single particle track event.
+  !> @brief Flat record of a particle track event.
 
-  !<
-  type :: PendingTrackEventType
+  type :: TrackRecordType
     integer(I4B) :: kper, kstp, imdl, iprp, irpt, ilay, icu, izone
     integer(I4B) :: istatus, ireason
     real(DP) :: trelease, ttrack, x, y, z
     character(len=40) :: name
-  end type PendingTrackEventType
+  end type TrackRecordType
 
   !> @brief Output file containing all or some particle pathlines.
   !!
@@ -97,7 +96,7 @@ module ParticleTracksModule
     integer(I4B), public :: ntrackfiles !< number of track files
     type(ParticleTrackFileType), public, allocatable :: files(:) !< track files
     type(ParticleTrackEventSelectionType), public :: selected !< event selection
-    type(PendingTrackEventType), public, allocatable :: pending(:) !< buffered events
+    type(TrackRecordType), public, allocatable :: pending(:) !< buffered events
     integer(I4B), public :: npending = 0 !< number of buffered events
   contains
     procedure, public :: init_file
@@ -245,8 +244,8 @@ contains
     type(ParticleType), pointer, intent(in) :: particle
     class(ParticleEventType), pointer, intent(in) :: event
     ! local
-    type(PendingTrackEventType) :: rec
-    type(PendingTrackEventType), allocatable :: tmp(:)
+    type(TrackRecordType) :: rec
+    type(TrackRecordType), allocatable :: tmp(:)
 
     rec%kper = event%kper; rec%kstp = event%kstp
     rec%imdl = event%imdl; rec%iprp = event%iprp
@@ -278,7 +277,7 @@ contains
     class(ParticleTracksType) :: this
     ! local
     integer(I4B) :: n, i
-    type(PendingTrackEventType) :: rec
+    type(TrackRecordType) :: rec
     type(ParticleTrackFileType) :: file
 
     do n = 1, this%npending
@@ -308,7 +307,7 @@ contains
   subroutine write_pending_event(iun, rec, csv)
     ! dummy
     integer(I4B), intent(in) :: iun
-    type(PendingTrackEventType), intent(in) :: rec
+    type(TrackRecordType), intent(in) :: rec
     logical(LGP), intent(in) :: csv
 
     if (csv) then
