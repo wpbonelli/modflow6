@@ -1,0 +1,20 @@
+! ** Do Not Modify! MODFLOW 6 system generated file. **
+module DfnSpecModule
+  use, intrinsic :: iso_fortran_env, only: output_unit
+  implicit none
+  private
+  public :: write_spec
+
+contains
+
+  subroutine write_spec()
+{% for dfn in dfns %}
+    write(output_unit, '(a)') '# --- {{ dfn.name }} ---'
+{% for line in dfn.lines %}
+{{ line | spec_line }}
+{% endfor %}
+    write(output_unit, '(a)') ''
+{% endfor %}
+  end subroutine write_spec
+
+end module DfnSpecModule

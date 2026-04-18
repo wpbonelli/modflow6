@@ -450,6 +450,7 @@ modflow_sources = files(
     'Utilities' / 'BudgetTerm.f90',
     'Utilities' / 'CharString.f90',
     'Utilities' / 'comarg.f90',
+    'Utilities' / 'DfnSpec.f90',
     'Utilities' / 'compilerversion.F90',
     'Utilities' / 'CharString.f90',
     'Utilities' / 'Constants.f90',

@@ -19,6 +19,39 @@ DEFAULT_DFNS_PATH = Path(__file__).parents[1] / "dfns.txt"
 DFN_PATH = PROJ_ROOT_PATH / "doc" / "mf6io" / "mf6ivar" / "dfn"
 SRC_PATH = PROJ_ROOT_PATH / "src"
 IDM_PATH = SRC_PATH / "Idm"
+SPEC_PATH = SRC_PATH / "Utilities" / "DfnSpec.f90"
+
+# overhead chars for the two write-statement forms used by spec_line
+_WRITE_STD = "    write(output_unit, '(a)') "
+_WRITE_NO_ADV = "    write(output_unit, '(a)', advance='no') "
+_MAX_STD = 132 - len(_WRITE_STD) - 2
+_MAX_NO_ADV = 132 - len(_WRITE_NO_ADV) - 2
+
+
+def _spec_line(s: str) -> str:
+    """Jinja filter: emit Fortran write statement(s) for one DFN text line.
+
+    Short lines produce a single write; long lines are split into
+    advance='no' chunks so generated source lines stay within 132 chars.
+    Single-quotes in content are doubled to form valid Fortran literals.
+    Chunks never split a '' pair: if a slice ends with an odd number of
+    trailing quotes, it is shortened by one character so the split always
+    falls between pairs.
+    """
+    escaped = s.replace("'", "''")
+    if len(escaped) <= _MAX_STD:
+        return f"{_WRITE_STD}'{escaped}'"
+    chunks = []
+    while escaped:
+        chunk = escaped[:_MAX_NO_ADV]
+        n_trailing = len(chunk) - len(chunk.rstrip("'"))
+        if n_trailing % 2 == 1:
+            chunk = escaped[:_MAX_NO_ADV - 1]
+        chunks.append(chunk)
+        escaped = escaped[len(chunk):]
+    lines = [f"{_WRITE_NO_ADV}'{c}'" for c in chunks]
+    lines.append("    write(output_unit, '(a)') ''")
+    return "\n".join(lines)
 
 
 _BASE_TYPE_MAP = {
@@ -342,7 +375,22 @@ def _get_template_env() -> Environment:
         keep_trailing_newline=True,
     )
     template_env.filters["value"] = Filters.value
+    template_env.filters["spec_line"] = _spec_line
     return template_env
+
+
+def make_spec(verbose: bool = False) -> None:
+    """Generate DfnSpec.f90, embedding all DFN files verbatim."""
+    template_env = _get_template_env()
+    template = template_env.get_template("DfnSpec.f90.jinja")
+    dfns = [
+        {"name": p.name, "lines": p.read_text(encoding="utf-8").splitlines()}
+        for p in sorted(DFN_PATH.glob("*.dfn"))
+    ]
+    if verbose:
+        print(f"  writing {SPEC_PATH}")
+    with open(SPEC_PATH, "w", newline="\n") as f:
+        f.write(template.render(dfns=dfns))
 
 
 def make_targets(dfn: DfnFile, outdir: PathLike, verbose: bool = False):
@@ -427,6 +475,8 @@ def make_all(
         print(f"  writing {ofspec}")
     with open(ofspec, "w", newline="\n") as f:
         f.write(selector_template.render(components=list(components.keys())))
+
+    make_spec(verbose=verbose)
 
 
 def _expand_dfns(dfns_arg) -> list:

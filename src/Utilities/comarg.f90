@@ -5,6 +5,7 @@ module CommandArguments
                              MVALIDATE
   use VersionModule, only: VERSION, FULLVERSION, MFVNAM, IDEVELOPMODE, &
                            FMTDISCLAIMER, write_license
+  use DfnSpecModule, only: write_spec
   use CompilerVersion
   use SimVariablesModule, only: istdout, isim_level, &
                                 simfile, simlstfile, simstdout, &
@@ -168,6 +169,9 @@ contains
       case ('-LIC', '--LICENSE')
         lstop = .TRUE.
         call write_license()
+      case ('-SPEC', '--SPEC')
+        lstop = .TRUE.
+        call write_spec()
       case ('-CO', '--COMPILER-OPT')
         lstop = .TRUE.
         call get_compile_options(coptions)
@@ -273,6 +277,7 @@ contains
       &' -lic      --license        Display program license information.',/,&
       &' -c        --compiler       Display compiler information.',/,&
       &' -co       --compiler-opt   Display compiler options.',/,&
+      &' -spec     --spec           Emit embedded DFN input spec to stdout.',/,&
       &' -s        --silent         All STDOUT to mfsim.stdout.',/,"// &
       "' -l <str>  --level <str>    STDOUT output to screen based on <str>.',/,&
       &'                            <str>=summary Limited output to STDOUT.',/,&
