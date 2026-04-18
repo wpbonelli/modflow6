@@ -22,7 +22,7 @@ module PrtModule
   use ParticleEventsModule, only: ParticleEventDispatcherType, handle_event
   use ParticleTracksModule, only: ParticleTracksType, &
                                   ParticleTrackFileType, &
-                                  write_particle_event
+                                  add_particle_event
   use SimModule, only: count_errors, store_error, store_error_filename
   use MemoryManagerModule, only: mem_allocate
   use MethodModule, only: MethodType, LEVEL_FEATURE
@@ -334,7 +334,7 @@ contains
 
     ! Subscribe particle track output manager to events
     p => this%tracks
-    call this%events%subscribe(write_particle_event, p)
+    call this%events%subscribe(add_particle_event, p)
 
     ! Set verbose tracing if requested
     if (this%oc%dump_event_trace) this%tracks%iout = 0

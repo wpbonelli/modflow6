@@ -37,8 +37,8 @@ module ParticleTracksModule
   public :: ParticleTrackFileType, &
             ParticleTracksType, &
             ParticleTrackEventSelectionType, &
-            write_particle_event
-  private :: write_pending_event
+            add_particle_event
+  private :: save_record
 
   character(len=*), parameter, public :: TRACKHEADER = &
     'kper,kstp,imdl,iprp,irpt,ilay,icell,izone,&
@@ -238,6 +238,7 @@ contains
   !! The buffer can be flushed to disk by flush_buffer,
   !! or discarded by discard_buffer (e.g., on a failed
   !! ATS retry). The buffer starts at 64 events, then
+  !! doubles in size as needed.
   subroutine buffer_event(this, particle, event)
     ! dummy
     class(ParticleTracksType) :: this
@@ -268,10 +269,9 @@ contains
     this%pending(this%npending) = rec
   end subroutine buffer_event
 
-  !> @brief Flush buffered events to disk.
-  !! Called from prt_ot after a time step converges. Writes each pending
-  !! record to all files for which the event's PRP matches, then resets
-  !! the count.
+  !> @brief Flush the event buffer to disk.
+  !! Called from OT after a time step converges. Writes pending records
+  !! to files for which the event's PRP matches, then resets the buffer.
   subroutine flush_buffer(this)
     ! dummy
     class(ParticleTracksType) :: this
@@ -286,25 +286,35 @@ contains
         file = this%files(i)
         if (file%iun > 0 .and. &
             (file%iprp == -1 .or. file%iprp == rec%iprp)) &
-          call write_pending_event(file%iun, rec, file%csv)
+          call save_record(file%iun, rec, file%csv)
       end do
     end do
     this%npending = 0
   end subroutine flush_buffer
 
-  !> @brief Discard buffered events without writing.
+  !> @brief Discard buffered events.
   !! Called from prt_ad at the start of each new ATS retry attempt,
   !! so that events from failed attempts are never written to disk.
-  !! Resets the count without deallocating, so the allocation is reused.
+  !! Just resets the pending event count, the allocation is reused.
   subroutine discard_buffer(this)
     class(ParticleTracksType) :: this
     this%npending = 0
   end subroutine discard_buffer
 
-  !> @brief Write a single pending (buffered) event record to a file.
-  !! Mirrors save_event but reads from a flat PendingTrackEventType
-  !! record rather than a live polymorphic event + particle pair.
-  subroutine write_pending_event(iun, rec, csv)
+  !> @brief Check whether a particle belongs in a given file i.e.
+  !! if the file is enabled and its group matches the particle's.
+  logical function should_save(this, particle, file) result(save)
+    class(ParticleTracksType), intent(inout) :: this
+    type(ParticleType), pointer, intent(in) :: particle
+    type(ParticleTrackFileType), intent(in) :: file
+    save = (file%iun > 0 .and. &
+            (file%iprp == -1 .or. file%iprp == particle%iprp))
+  end function should_save
+
+  !> @brief Save an event record to a binary or CSV file.
+  !! Mirrors save_event but expects an existing record
+  !! rather than a polymorphic event + particle pair.
+  subroutine save_record(iun, rec, csv)
     ! dummy
     integer(I4B), intent(in) :: iun
     type(TrackRecordType), intent(in) :: rec
@@ -321,64 +331,7 @@ contains
         rec%ilay, rec%icu, rec%izone, rec%istatus, rec%ireason, &
         rec%trelease, rec%ttrack, rec%x, rec%y, rec%z, rec%name
     end if
-  end subroutine write_pending_event
-
-  !> @brief Check whether a particle belongs in a given file i.e.
-  !! if the file is enabled and its group matches the particle's.
-  logical function should_save(this, particle, file) result(save)
-    class(ParticleTracksType), intent(inout) :: this
-    type(ParticleType), pointer, intent(in) :: particle
-    type(ParticleTrackFileType), intent(in) :: file
-    save = (file%iun > 0 .and. &
-            (file%iprp == -1 .or. file%iprp == particle%iprp))
-  end function should_save
-
-  !> @brief Save an event to a binary or CSV file.
-  subroutine save_event(iun, particle, event, csv)
-    ! dummy
-    integer(I4B), intent(in) :: iun
-    type(ParticleType), pointer, intent(in) :: particle
-    class(ParticleEventType), pointer, intent(in) :: event
-    logical(LGP), intent(in) :: csv
-
-    if (csv) then
-      write (iun, '(*(G0,:,","))') &
-        event%kper, &
-        event%kstp, &
-        event%imdl, &
-        event%iprp, &
-        event%irpt, &
-        event%ilay, &
-        event%icu, &
-        event%izone, &
-        event%istatus, &
-        event%get_code(), &
-        event%trelease, &
-        event%ttrack, &
-        event%x, &
-        event%y, &
-        event%z, &
-        trim(adjustl(particle%name))
-    else
-      write (iun) &
-        event%kper, &
-        event%kstp, &
-        event%imdl, &
-        event%iprp, &
-        event%irpt, &
-        event%ilay, &
-        event%icu, &
-        event%izone, &
-        event%istatus, &
-        event%get_code(), &
-        event%trelease, &
-        event%ttrack, &
-        event%x, &
-        event%y, &
-        event%z, &
-        particle%name
-    end if
-  end subroutine save_event
+  end subroutine save_record
 
   !> @brief Is the output unit valid?
   logical function should_print(this)
@@ -386,11 +339,13 @@ contains
     should_print = this%iout >= 0
   end function should_print
 
-  !> @brief Write a particle event to files for which the particle
-  !! is eligible, and print the event to output unit if requested.
-  !! This function is the module's main entry point. It should be
-  !! subscribed as an event handler to particle event dispatchers.
-  function write_particle_event(context, particle, event) result(handled)
+  !> @brief Add a particle event to be written to eligible
+  !! files and printed to an output file unit if requested.
+  !! This function should be subscribed as an event handler
+  !! to particle event dispatchers. Events are buffered, to
+  !! be written to output files upon successful completeion
+  !! of a time step, when the framework OT hook is executed.
+  function add_particle_event(context, particle, event) result(handled)
     ! dummy
     class(*), pointer :: context
     type(ParticleType), pointer, intent(inout) :: particle
@@ -405,6 +360,6 @@ contains
         call context%buffer_event(particle, event)
       handled = .true.
     end select
-  end function write_particle_event
+  end function add_particle_event
 
 end module ParticleTracksModule
