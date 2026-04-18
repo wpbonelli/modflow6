@@ -69,7 +69,9 @@ module PrtModule
     real(DP), dimension(:), pointer, contiguous :: masstrm => null() !< particle mass terminating in cells, new value
     real(DP), dimension(:), pointer, contiguous :: ratetrm => null() !< particle mass termination rate in cells
     type(HashTableType), pointer :: trm_ids => null() !< terminated particle ids
-    integer(I4B) :: trk_last_retry = -1 !< iFailedStepRetry at last buffer discard
+    integer(I4B) :: adv_kstp = 0 !< kstp at last advance
+    integer(I4B) :: adv_kper = 0 !< kper at last advance
+    integer(I4B) :: adv_retry = -1 !< iFailedStepRetry at last advance
   contains
     ! Override BaseModelType procs
     procedure :: model_df => prt_df
@@ -361,30 +363,23 @@ contains
   !> @brief Time step advance (calls package advance subroutines)
   subroutine prt_ad(this)
     ! modules
+    use TdisModule, only: kstp, kper
     use SimVariablesModule, only: isimcheck, iFailedStepRetry
     ! dummy
     class(PrtModelType) :: this
     class(BndType), pointer :: packobj
     ! local
-    integer(I4B) :: irestore
     integer(I4B) :: ip, n, i
 
-    ! Discard buffered track events at the start of each new ATS retry
-    ! attempt so that events from failed attempts are never written to disk.
-    ! trk_last_retry is reset to -1 on clean invocations so that a retry
-    ! count equal to a previous step's final retry count does not falsely
-    ! block the discard. The /= guard prevents discarding twice when prt_ad
-    ! is called more than once within the same retry (Picard re-runs).
-    if (iFailedStepRetry == 0) then
-      this%trk_last_retry = -1
-    else if (iFailedStepRetry /= this%trk_last_retry) then
-      call this%tracks%discard_buffer()
-      this%trk_last_retry = iFailedStepRetry
-    end if
+    ! PRT model should advance exactly once per (kstp, kper, retry).
+    ! Subsequent calls for the same retry (e.g. Picard reruns) must
+    ! be idempotent.
+    if (this%adv_kstp == kstp .and. &
+        this%adv_kper == kper .and. &
+        this%adv_retry == iFailedStepRetry) return
 
-    ! Reset state variable
-    irestore = 0
-    if (iFailedStepRetry > 0) irestore = 1
+    ! Discard buffered track events if last time step solve failed
+    if (iFailedStepRetry > 0) call this%tracks%discard_buffer()
 
     ! Update look-behind mass
     do n = 1, this%dis%nodes
@@ -412,6 +407,10 @@ contains
     do i = 1, this%dis%nja
       this%flowja(i) = DZERO
     end do
+
+    this%adv_kstp = kstp
+    this%adv_kper = kper
+    this%adv_retry = iFailedStepRetry
   end subroutine prt_ad
 
   !> @brief Calculate intercell flow (flowja)

@@ -75,9 +75,6 @@ module PrtPrpModule
     character(len=LENBOUNDNAME), pointer, contiguous :: rptname(:) => null() !< release point names
     character(len=LINELENGTH), allocatable :: period_block_lines(:) !< last period block configuration for fill-forward
     integer(I4B) :: applied_kper !< period for which configuration was last applied
-    integer(I4B) :: release_kstp !< time step for which particles were last released
-    integer(I4B) :: release_kper !< stress period for which particles were last released
-    integer(I4B) :: release_retry !< iFailedStepRetry value for which particles were last released
   contains
     procedure :: prp_allocate_arrays
     procedure :: prp_allocate_scalars
@@ -347,9 +344,6 @@ contains
     this%rttol = DSAME * DEP9
     this%rtfreq = DZERO
     this%applied_kper = 0
-    this%release_kstp = 0
-    this%release_kper = 0
-    this%release_retry = -1
 
   end subroutine prp_allocate_scalars
 
@@ -441,16 +435,6 @@ contains
     ! Coincident release times are merged to
     ! a single time by the release scheduler.
 
-    ! We might be here due to time step convergence failure (ATS) or picard
-    ! loop reruns, whether for output writing (always occurs) or mxiter > 1.
-    ! PRT is unlike the other models in that PRT's advance/solve routines are
-    ! in general stateful, not idempotent, and should not run more than once.
-    ! Stamping (kstp, kper, iFailedStepRetry) and returning early on a match
-    ! guards against multiple advances per unique combination of step/retry.
-    if (this%release_kstp == kstp .and. &
-        this%release_kper == kper .and. &
-        this%release_retry == iFailedStepRetry) return
-
     ! Save or restore particle state for ATS
     if (.not. this%fmi%flows_from_file) then
       if (iFailedStepRetry == 0) then
@@ -487,11 +471,6 @@ contains
     else
       call this%schedule%advance()
     end if
-
-    ! Record that releases have been processed for this (step, retry attempt).
-    this%release_kstp = kstp
-    this%release_kper = kper
-    this%release_retry = iFailedStepRetry
 
     ! Check if any releases will be made this time step.
     if (.not. this%schedule%any()) return
