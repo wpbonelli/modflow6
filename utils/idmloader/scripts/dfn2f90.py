@@ -19,8 +19,6 @@ DEFAULT_DFNS_PATH = Path(__file__).parents[1] / "dfns.txt"
 DFN_PATH = PROJ_ROOT_PATH / "doc" / "mf6io" / "mf6ivar" / "dfn"
 SRC_PATH = PROJ_ROOT_PATH / "src"
 IDM_PATH = SRC_PATH / "Idm"
-SPEC_PATH = SRC_PATH / "Utilities" / "DfnSpec.f90"
-
 # overhead chars for the two write-statement forms used by spec_line
 _WRITE_STD = "    write(output_unit, '(a)') "
 _WRITE_NO_ADV = "    write(output_unit, '(a)', advance='no') "
@@ -46,9 +44,9 @@ def _spec_line(s: str) -> str:
         chunk = escaped[:_MAX_NO_ADV]
         n_trailing = len(chunk) - len(chunk.rstrip("'"))
         if n_trailing % 2 == 1:
-            chunk = escaped[:_MAX_NO_ADV - 1]
+            chunk = escaped[: _MAX_NO_ADV - 1]
         chunks.append(chunk)
-        escaped = escaped[len(chunk):]
+        escaped = escaped[len(chunk) :]
     lines = [f"{_WRITE_NO_ADV}'{c}'" for c in chunks]
     lines.append("    write(output_unit, '(a)') ''")
     return "\n".join(lines)
@@ -379,25 +377,32 @@ def _get_template_env() -> Environment:
     return template_env
 
 
-def make_spec(verbose: bool = False) -> None:
-    """Generate DfnSpec.f90, embedding the full input spec as a TOML document."""
+def make_spec(outpath: PathLike | None = None, verbose: bool = False) -> None:
+    """Generate DfnSpec.f90, writing to outpath or stdout if outpath is None."""
+    import sys
     import warnings
-
-    from modflow_devtools.dfns import DfnSpec
 
     template_env = _get_template_env()
     template = template_env.get_template("DfnSpec.f90.jinja")
 
     with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        spec = DfnSpec.load(DFN_PATH / "toml")
+        warnings.filterwarnings(
+            "ignore", message=".*modflow_devtools.dfns.*experimental.*"
+        )
+        from modflow_devtools.dfns import DfnSpec
+
+        spec = DfnSpec.load(DFN_PATH)
 
     lines = spec.dumps().splitlines()
+    content = template.render(lines=lines)
 
-    if verbose:
-        print(f"  writing {SPEC_PATH}")
-    with open(SPEC_PATH, "w", newline="\n") as f:
-        f.write(template.render(lines=lines))
+    if outpath is None:
+        sys.stdout.write(content)
+    else:
+        if verbose:
+            print(f"  writing {outpath}")
+        with open(outpath, "w", newline="\n") as f:
+            f.write(content)
 
 
 def make_targets(dfn: DfnFile, outdir: PathLike, verbose: bool = False):
@@ -483,8 +488,6 @@ def make_all(
     with open(ofspec, "w", newline="\n") as f:
         f.write(selector_template.render(components=list(components.keys())))
 
-    make_spec(verbose=verbose)
-
 
 def _expand_dfns(dfns_arg) -> list:
     """
@@ -559,11 +562,25 @@ if __name__ == "__main__":
         default=False,
         help="Whether to show verbose output",
     )
+    parser.add_argument(
+        "--spec",
+        metavar="OUTPUT",
+        nargs="?",
+        const="-",
+        default=None,
+        help="Generate DfnSpec.f90 only, writing to OUTPUT ('-' or omitted: stdout)",
+    )
     args = parser.parse_args()
+    verbose = args.verbose
+
+    if args.spec is not None:
+        outpath = None if args.spec == "-" else Path(args.spec)
+        make_spec(outpath=outpath, verbose=verbose)
+        raise SystemExit(0)
+
     dfn_arg = args.dfn if args.dfn else DEFAULT_DFNS_PATH
     dfn_paths = _expand_dfns(dfn_arg)
     outdir = Path(args.outdir) if args.outdir else Path.cwd()
-    verbose = args.verbose
 
     if verbose:
         print("Generating Fortran source files from DFNs:")
