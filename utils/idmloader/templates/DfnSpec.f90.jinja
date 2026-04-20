@@ -8,12 +8,8 @@ module DfnSpecModule
 contains
 
   subroutine write_spec()
-{% for dfn in dfns %}
-    write(output_unit, '(a)') '# --- {{ dfn.name }} ---'
-{% for line in dfn.lines %}
+{% for line in lines %}
 {{ line | spec_line }}
-{% endfor %}
-    write(output_unit, '(a)') ''
 {% endfor %}
   end subroutine write_spec
 

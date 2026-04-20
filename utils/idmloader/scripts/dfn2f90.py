@@ -380,17 +380,24 @@ def _get_template_env() -> Environment:
 
 
 def make_spec(verbose: bool = False) -> None:
-    """Generate DfnSpec.f90, embedding all DFN files verbatim."""
+    """Generate DfnSpec.f90, embedding the full input spec as a TOML document."""
+    import warnings
+
+    from modflow_devtools.dfns import DfnSpec
+
     template_env = _get_template_env()
     template = template_env.get_template("DfnSpec.f90.jinja")
-    dfns = [
-        {"name": p.name, "lines": p.read_text(encoding="utf-8").splitlines()}
-        for p in sorted(DFN_PATH.glob("*.dfn"))
-    ]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        spec = DfnSpec.load(DFN_PATH / "toml")
+
+    lines = spec.dumps().splitlines()
+
     if verbose:
         print(f"  writing {SPEC_PATH}")
     with open(SPEC_PATH, "w", newline="\n") as f:
-        f.write(template.render(dfns=dfns))
+        f.write(template.render(lines=lines))
 
 
 def make_targets(dfn: DfnFile, outdir: PathLike, verbose: bool = False):
