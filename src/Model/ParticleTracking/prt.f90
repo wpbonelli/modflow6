@@ -371,14 +371,16 @@ contains
     ! local
     integer(I4B) :: ip, n, i
 
-    ! PRT model should advance exactly once per (kstp, kper, retry).
-    ! Subsequent calls for the same retry (e.g. Picard reruns) must
-    ! be idempotent.
+    ! The model should advance just once per (step, ATS retry) pair.
+    ! This hook might be called multiple times during the same time
+    ! step event without ATS, or after the step successfully solves,
+    ! due to Picard reruns. It must be idempotent per time step and
+    ! retry combination, otherwise we get an invalid internal state.
     if (this%adv_kstp == kstp .and. &
         this%adv_kper == kper .and. &
         this%adv_retry == iFailedStepRetry) return
 
-    ! Discard buffered track events if last time step solve failed
+    ! Discard buffered events if the last time step failed.
     if (iFailedStepRetry > 0) call this%tracks%discard_buffer()
 
     ! Update look-behind mass
@@ -389,15 +391,14 @@ contains
     ! Advance fmi
     call this%fmi%fmi_ad()
 
-    ! Advance
+    ! Advance release packages
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_ad()
-      if (isimcheck > 0) then
+      if (isimcheck > 0) &
         call packobj%bnd_ck()
-      end if
     end do
-    !
+
     ! Initialize the flowja array.  Flowja is calculated each time,
     ! even if output is suppressed.  (Flowja represents flow of particle
     ! mass and is positive into a cell.  Currently, each particle is assigned
@@ -408,6 +409,7 @@ contains
       this%flowja(i) = DZERO
     end do
 
+    ! Stamp the time step and retry count for the idempotency check above
     this%adv_kstp = kstp
     this%adv_kper = kper
     this%adv_retry = iFailedStepRetry
