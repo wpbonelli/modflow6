@@ -312,8 +312,6 @@ contains
   end function should_save
 
   !> @brief Save an event record to a binary or CSV file.
-  !! Mirrors save_event but expects an existing record
-  !! rather than a polymorphic event + particle pair.
   subroutine save_record(iun, rec, csv)
     ! dummy
     integer(I4B), intent(in) :: iun
