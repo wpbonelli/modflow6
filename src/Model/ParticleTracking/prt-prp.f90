@@ -60,8 +60,8 @@ module PrtPrpModule
     real(DP), pointer :: stoptraveltime => null() !< stop travel time for all points
     ! members
     type(PrtFmiType), pointer :: fmi => null() !< flow model interface
-    type(ParticleStoreType), pointer :: particles => null() !< particle store
-    type(ParticleStoreType), pointer :: particles_old => null() !< old particle state (for ATS)
+    type(ParticleStoreType), pointer :: particles => null() !< particle state
+    type(ParticleStoreType), pointer :: particles_old => null() !< old particle state
     type(ParticleReleaseScheduleType), pointer :: schedule => null() !< particle release schedule
     integer(I4B), pointer :: nreleasepoints => null() !< number of release points
     integer(I4B), pointer :: nreleasetimes => null() !< number of user-specified particle release times
@@ -435,7 +435,7 @@ contains
     ! Coincident release times are merged to
     ! a single time by the release scheduler.
 
-    ! Save or restore particle state for ATS
+    ! Save or restore particle state for retry
     if (.not. this%fmi%flows_from_file) then
       if (iFailedStepRetry == 0) then
         ! save

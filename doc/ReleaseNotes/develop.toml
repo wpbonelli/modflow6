@@ -47,4 +47,4 @@ description = "The adaptive time stepping algorithm (ATS) was not working correc
 [[items]]
 section = "fixes"
 subsection = "model"
-description = "A PRT model could not previously be coupled via an exchange to a GWF model that uses adaptive time stepping (ATS). This is now supported."
+description = "A PRT model coupled via an exchange to a GWF model that uses adaptive time stepping (ATS) would erroneously produce output for retried time steps. This bug has been fixed and a PRT model coupled to an ATS flow model will no longer produce invalid output."

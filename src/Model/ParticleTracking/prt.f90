@@ -371,11 +371,27 @@ contains
     ! local
     integer(I4B) :: ip, n, i
 
-    ! The model should advance just once per (step, ATS retry) pair.
-    ! This hook might be called multiple times during the same time
-    ! step event without ATS, or after the step successfully solves,
-    ! due to Picard reruns. It must be idempotent per time step and
-    ! retry combination, otherwise we get an invalid internal state.
+    ! This routine can be called by the framework more than once per
+    ! time step. This can happen for three possible reasons:
+    !
+    ! - ATS retry
+    ! - Picard loop
+    ! - post-Picard output run
+    !
+    ! Once per unique solve attempt, advance() must run: to discard
+    ! events buffered in a failed solve attempt, restore old particle
+    ! state, re-release particles, etc. If Picard, on the other hand,
+    ! this routine should no-op, at least for now, while there is no
+    ! 2-way coupling between the flow and tracking models. In other
+    ! words this routine should be idempotent per solution (re)try.
+    !
+    ! The Picard possibilities require mxiter > 1. This can happen
+    ! independent of whether ATS is on. If mxiter > 1, the loop is
+    ! followed by a final rerun to write outputs.
+    !
+    ! So at the end of this routine we stamp the last kper/kstp and
+    ! retry, and check it here, to make sure we advance exactly once
+    ! per (kstp, kper, iFailedStepRetry) triple.
     if (this%adv_kstp == kstp .and. &
         this%adv_kper == kper .and. &
         this%adv_retry == iFailedStepRetry) return
