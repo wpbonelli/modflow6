@@ -348,8 +348,8 @@ contains
   !! trelease, tstop) is omitted because the main particle store already
   !! holds it and it does not change during tracking, so the cache store
   !! (particles_old) never needs to hold it. Both stores must be the same
-  !! size. If this routine is ever used outside the ATS save/restore
-  !! context it may need to copy immutable state too.
+  !! size. If this routine is ever used beyond the ATS retry context, it
+  !! may need to copy immutable state too.
   !<
   subroutine copy_from(this, source)
     ! dummy

@@ -604,9 +604,7 @@ contains
     integer(I4B) :: ibudfl
     integer(I4B) :: ipflag
 
-    ! Flush buffered track events to disk. prt_ot is called once per
-    ! converged time step from Mf6FinalizeTimestep, outside the ATS
-    ! retry loop, so the buffer holds only events from the successful attempt.
+    ! Flush buffered track events to disk
     call this%tracks%flush_buffer()
 
     ! Set write and print flags
