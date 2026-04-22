@@ -293,9 +293,9 @@ contains
   end subroutine flush_buffer
 
   !> @brief Discard buffered events.
-  !! Called from prt_ad at the start of each new ATS retry attempt,
-  !! so that events from failed attempts are never written to disk.
-  !! Just resets the pending event count, the allocation is reused.
+  !! Called from prt_ad at the start of each tracking retry,
+  !! so events from failed attempts are never written to disk.
+  !! Resets the pending event count, the allocation is reused.
   subroutine discard_buffer(this)
     class(ParticleTracksType) :: this
     this%npending = 0
