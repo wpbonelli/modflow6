@@ -343,14 +343,13 @@ contains
 
   !> @brief Copy mutable particle state to this store from another one.
   !!
-  !! Copies all mutable state arrays from source to this store. Copying
-  !! only mutable state (positions, status, tracking time, etc) without
-  !! immutable state (identity, options) saves space and time, but note
-  !! that it assumes this store already has all the immutable state; if
-  !! this routine is ever used beyond the context of ATS compatibility,
-  !! it will probably need modifying to copy immutable state as well.
-  !!
-  !! This routine assumes both stores are the same size.
+  !! Only mutable state (positions, status, tracking time, domain and
+  !! boundary indices) is copied. Immutable state (identity, options,
+  !! trelease, tstop) is omitted because the main particle store already
+  !! holds it and it does not change during tracking, so the cache store
+  !! (particles_old) never needs to hold it. Both stores must be the same
+  !! size. If this routine is ever used outside the ATS save/restore
+  !! context it may need to copy immutable state too.
   !<
   subroutine copy_from(this, source)
     ! dummy
