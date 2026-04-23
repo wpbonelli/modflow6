@@ -53,7 +53,7 @@ module PrtModule
     type(MethodDisType), pointer :: method_dis => null() ! DIS tracking method
     type(MethodDisvType), pointer :: method_disv => null() ! DISV tracking method
     type(ParticleEventDispatcherType), pointer :: events => null() ! event dispatcher
-    class(ParticleTracksType), pointer :: tracks ! track output manager
+    type(ParticleTracksType), pointer :: tracks ! track output manager
     integer(I4B), pointer :: infmi => null() ! unit number FMI
     integer(I4B), pointer :: inmip => null() ! unit number MIP
     integer(I4B), pointer :: inmvt => null() ! unit number MVT
@@ -261,6 +261,9 @@ contains
     ! Set up output control and budget
     call this%oc%oc_ar(this%dis, DHNOFLO)
     call this%budget%set_ibudcsv(this%oc%ibudcsv)
+
+    ! Initialize the event buffer (memory or scratch file per OC option)
+    call this%tracks%init_buffer(this%oc%scratch_buffer)
 
     ! Select tracking events
     call this%tracks%select_events( &

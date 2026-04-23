@@ -4,7 +4,8 @@ that PRT "stages" particle state during each attempted solve and only
 "commits" it after a successful solve. Also verify that PRT re-solves
 on Picard iterations, since each iteration may yield different flows.
 
-There are two cases:
+There are four cases, covering both buffer strategies (memory and scratch
+file) and both solver configurations:
   mxiter=1: ATS retry only (no Picard loop)
   mxiter=2: Picard loop enabled
 
@@ -25,13 +26,15 @@ from test_gwf_ats01 import build_gwf_sim
 
 simname = "prtatsexg"
 
-cases = [
-    (simname, 1),  # mxiter=1 (ATS retry)
-    (simname + "pic", 2),  # mxiter=2 (picard rerun)
-]
+cases = {
+    "mxiter=1, memory buffer": (simname, 1, False),
+    "mxiter=2, memory buffer": (simname + "pic", 2, False),
+    "mxiter=1, scratch buffer": (simname, 1, True),
+    "mxiter=2, scratch buffer": (simname + "pic", 2, True),
+}
 
 
-def build_mf6_sim(name, ws, mf6, mxiter=1):
+def build_mf6_sim(name, ws, mf6, mxiter=1, scratch_buffer=False):
     gwf_name = get_model_name(name, "gwf")
     prt_name = get_model_name(name, "prt")
 
@@ -80,6 +83,7 @@ def build_mf6_sim(name, ws, mf6, mxiter=1):
         budget_filerecord=[prt_budget_file],
         track_filerecord=[prt_track_file],
         trackcsv_filerecord=[prt_track_csv_file],
+        scratch_buffer=scratch_buffer,
         printrecord=[("BUDGET", "ALL")],
         saverecord=[("BUDGET", "ALL")],
     )
@@ -108,9 +112,14 @@ def build_mf6_sim(name, ws, mf6, mxiter=1):
     return sim
 
 
-def build_models(idx, test):
-    _, mxiter = cases[idx]
-    return build_mf6_sim(test.name, test.workspace, test.targets["mf6"], mxiter=mxiter)
+def build_models(idx, test, mxiter, scratch):
+    return build_mf6_sim(
+        test.name,
+        test.workspace,
+        test.targets["mf6"],
+        mxiter=mxiter,
+        scratch_buffer=scratch,
+    )
 
 
 def check_output(idx, test, snapshot):
@@ -193,13 +202,13 @@ def plot_output(idx, test):
 
 
 @pytest.mark.snapshot
-@pytest.mark.parametrize("idx, case", enumerate(cases))
+@pytest.mark.parametrize("idx, case", enumerate(cases.values()), ids=cases.keys())
 def test_mf6model(idx, case, function_tmpdir, targets, array_snapshot, plot):
-    name, _ = case
+    name, mxiter, scratch = case
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
-        build=lambda t: build_models(idx, t),
+        build=lambda t: build_models(idx, t, mxiter, scratch),
         check=lambda t: check_output(idx, t, array_snapshot),
         plot=lambda t: plot_output(idx, t) if plot else None,
         targets=targets,
