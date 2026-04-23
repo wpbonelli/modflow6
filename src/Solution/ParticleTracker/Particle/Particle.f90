@@ -341,16 +341,8 @@ contains
     this%icycwin(ip) = particle%icycwin
   end subroutine put
 
-  !> @brief Copy mutable particle state to this store from another one.
-  !!
-  !! Only mutable state (positions, status, tracking time, domain and
-  !! boundary indices) is copied. Immutable state (identity, options,
-  !! trelease, tstop) is omitted because the main particle store already
-  !! holds it and it does not change during tracking, so the cache store
-  !! (particles_old) never needs to hold it. Both stores must be the same
-  !! size. If this routine is ever used beyond the ATS retry context, it
-  !! may need to copy immutable state too.
-  !<
+  !> @brief Copy all particle state from source to this store.
+  !! The two particle stores must already be of the same size.
   subroutine copy_from(this, source)
     ! dummy
     class(ParticleStoreType), intent(inout) :: this
@@ -367,6 +359,18 @@ contains
       call pstop(1, errmsg)
     end if
 
+    this%name(:) = source%name(:)
+    this%imdl(:) = source%imdl(:)
+    this%iprp(:) = source%iprp(:)
+    this%irpt(:) = source%irpt(:)
+    this%extend(:) = source%extend(:)
+    this%frctrn(:) = source%frctrn(:)
+    this%istopweaksink(:) = source%istopweaksink(:)
+    this%istopzone(:) = source%istopzone(:)
+    this%idrymeth(:) = source%idrymeth(:)
+    this%iexmeth(:) = source%iexmeth(:)
+    this%icycwin(:) = source%icycwin(:)
+    this%extol(:) = source%extol(:)
     this%itrdomain(:, :) = source%itrdomain(:, :)
     this%iboundary(:, :) = source%iboundary(:, :)
     this%icu(:) = source%icu(:)
@@ -376,6 +380,8 @@ contains
     this%x(:) = source%x(:)
     this%y(:) = source%y(:)
     this%z(:) = source%z(:)
+    this%trelease(:) = source%trelease(:)
+    this%tstop(:) = source%tstop(:)
     this%ttrack(:) = source%ttrack(:)
   end subroutine copy_from
 

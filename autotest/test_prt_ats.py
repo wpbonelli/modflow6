@@ -1,5 +1,16 @@
 """
-Test a PRT model exchange-coupled to an ATS-enabled GWF model.
+Test a PRT model exchange-coupled to an ATS-enabled GWF model. Verify
+that PRT "stages" particle state during each attempted solve and only
+"commits" it after a successful solve. Also verify that PRT re-solves
+on Picard iterations, since each iteration may yield different flows.
+
+There are two cases:
+  mxiter=1: ATS retry only (no Picard loop)
+  mxiter=2: Picard loop enabled
+
+The GWF model is nonlinear (unconfined, icelltype=1), so with mxiter=2
+the GWF results are different on the 2nd iteration, and PRT also gives
+different particle trajectories.
 """
 
 import flopy
@@ -102,7 +113,7 @@ def build_models(idx, test):
     return build_mf6_sim(test.name, test.workspace, test.targets["mf6"], mxiter=mxiter)
 
 
-def check_output(idx, test):
+def check_output(idx, test, snapshot):
     name = test.name
     ws = test.workspace
     gwf_name = get_model_name(name, "gwf")
@@ -123,6 +134,13 @@ def check_output(idx, test):
     prt_cbb = CellBudgetFile(prt_budget_file)
     assert gwf_times == set(prt_cbb.get_times())
     assert (prt_pls["ireason"] == 0).sum() == 9
+
+    # Compare particle tracks to snapshot. mxiter=1 and mxiter=2 produce
+    # different trajectories because the GWF model is nonlinear (unconfined,
+    # icelltype=1): with mxiter=2 PRT re-tracks on each Picard iteration with
+    # updated GWF flows, so the final paths reflect more converged flow results.
+    actual = prt_pls.drop("name", axis=1).round(3)
+    assert snapshot == actual.to_records(index=False)
 
 
 def plot_output(idx, test):
@@ -174,14 +192,15 @@ def plot_output(idx, test):
     plt.savefig(ws / f"{name}.png")
 
 
+@pytest.mark.snapshot
 @pytest.mark.parametrize("idx, case", enumerate(cases))
-def test_mf6model(idx, case, function_tmpdir, targets, plot):
+def test_mf6model(idx, case, function_tmpdir, targets, array_snapshot, plot):
     name, _ = case
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
         build=lambda t: build_models(idx, t),
-        check=lambda t: check_output(idx, t),
+        check=lambda t: check_output(idx, t, array_snapshot),
         plot=lambda t: plot_output(idx, t) if plot else None,
         targets=targets,
     )

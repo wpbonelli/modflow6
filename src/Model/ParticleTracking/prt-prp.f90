@@ -60,8 +60,8 @@ module PrtPrpModule
     real(DP), pointer :: stoptraveltime => null() !< stop travel time for all points
     ! members
     type(PrtFmiType), pointer :: fmi => null() !< flow model interface
-    type(ParticleStoreType), pointer :: particles => null() !< particle state
-    type(ParticleStoreType), pointer :: particles_old => null() !< old particle state
+    type(ParticleStoreType), pointer :: particles => null() !< committed particle state (end of last successful time step)
+    type(ParticleStoreType), pointer :: particles_staging => null() !< staging particle state for the current solve attempt
     type(ParticleReleaseScheduleType), pointer :: schedule => null() !< particle release schedule
     integer(I4B), pointer :: nreleasepoints => null() !< number of release points
     integer(I4B), pointer :: nreleasetimes => null() !< number of user-specified particle release times
@@ -83,6 +83,7 @@ module PrtPrpModule
     procedure :: bnd_rp => prp_rp
     procedure :: bnd_cq_simrate => prp_cq_simrate
     procedure :: bnd_da => prp_da
+    procedure :: prp_commit
     procedure :: define_listlabel
     procedure :: prp_set_pointers
     procedure :: source_options => prp_options
@@ -234,10 +235,10 @@ contains
 
     ! Deallocate objects
     call this%particles%destroy(this%memoryPath)
-    call this%particles_old%destroy(trim(this%memoryPath)//'-OLD')
+    call this%particles_staging%destroy(trim(this%memoryPath)//'-STAGING')
     call this%schedule%destroy()
     deallocate (this%particles)
-    deallocate (this%particles_old)
+    deallocate (this%particles_staging)
     deallocate (this%schedule)
   end subroutine prp_da
 
@@ -267,8 +268,8 @@ contains
       this%particles, 0, &
       this%memoryPath)
     call create_particle_store( &
-      this%particles_old, 0, &
-      trim(this%memoryPath)//'-OLD')
+      this%particles_staging, 0, &
+      trim(this%memoryPath)//'-STAGING')
 
     ! Allocate arrays
     call mem_allocate(this%rptx, this%nreleasepoints, 'RPTX', this%memoryPath)
@@ -421,7 +422,6 @@ contains
   !> @brief Advance a time step and release particles if scheduled.
   subroutine prp_ad(this)
     use TdisModule, only: totalsimtime, kstp, kper
-    use SimVariablesModule, only: iFailedStepRetry
     class(PrtPrpType) :: this
     integer(I4B) :: ip, it
     real(DP) :: t
@@ -435,22 +435,13 @@ contains
     ! Coincident release times are merged to
     ! a single time by the release scheduler.
 
-    ! Save or restore particle state for retry
+    ! Reset staging from committed state for this solve attempt.
     if (.not. this%fmi%flows_from_file) then
-      if (iFailedStepRetry == 0) then
-        ! save
-        call this%particles_old%resize( &
-          this%particles%num_stored(), &
-          trim(this%memoryPath)//'-OLD')
-        call this%particles_old%copy_from(this%particles)
-      else
-        ! restore
-        call this%particles%resize( &
-          this%particles_old%num_stored(), &
-          this%memoryPath)
-        call this%particles%copy_from(this%particles_old)
-        this%nparticles = this%particles_old%num_stored()
-      end if
+      call this%particles_staging%resize( &
+        this%particles%num_stored(), &
+        trim(this%memoryPath)//'-STAGING')
+      call this%particles_staging%copy_from(this%particles)
+      this%nparticles = this%particles%num_stored()
     end if
 
     ! Reset mass accumulators for this time step.
@@ -478,12 +469,12 @@ contains
     ! Log the schedule to the list file.
     call this%log_release()
 
-    ! Expand the particle store. We know from the
+    ! Expand the staging store. We know from the
     ! schedule how many particles will be released.
-    call this%particles%resize( &
-      this%particles%num_stored() + &
+    call this%particles_staging%resize( &
+      this%particles_staging%num_stored() + &
       (this%nreleasepoints * this%schedule%count()), &
-      this%memoryPath)
+      trim(this%memoryPath)//'-STAGING')
 
     ! Release a particle from each point for
     ! each release time in the current step.
@@ -509,6 +500,15 @@ contains
       end do
     end do
   end subroutine prp_ad
+
+  !> @brief Commit staged particle state to the "final" store.
+  subroutine prp_commit(this)
+    class(PrtPrpType) :: this
+    call this%particles%resize( &
+      this%particles_staging%num_stored(), &
+      this%memoryPath)
+    call this%particles%copy_from(this%particles_staging)
+  end subroutine prp_commit
 
   !> @brief No-op AD method override for exchange PRP.
   subroutine exg_prp_ad(this)
@@ -615,7 +615,7 @@ contains
     call this%initialize_particle(particle, ip, trelease)
     np = this%nparticles + 1
     this%nparticles = np
-    call this%particles%put(particle, np)
+    call this%particles_staging%put(particle, np)
     deallocate (particle)
     this%rptm(ip) = this%rptm(ip) + DONE ! TODO configurable mass
 
