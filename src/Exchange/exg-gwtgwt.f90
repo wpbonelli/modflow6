@@ -10,9 +10,9 @@
 module GwtGwtExchangeModule
 
   use KindModule, only: DP, I4B, LGP
-  use SimVariablesModule, only: errmsg, model_loc_idx
+  use SimVariablesModule, only: errmsg, warnmsg, model_loc_idx
   use SimModule, only: store_error, store_error_filename, &
-                       count_errors, ustop
+                       count_errors, ustop, store_warning
   use BaseModelModule, only: BaseModelType, GetBaseModelFromList
   use BaseExchangeModule, only: BaseExchangeType, AddBaseExchangeToList
   use ConstantsModule, only: LENBOUNDNAME, NAMEDBOUNDFLAG, LINELENGTH, &
@@ -315,12 +315,12 @@ contains
         end if
       end do
       if (ncount > 1) then
-        write (errmsg, '(a,a,a,a,i0,a,i0,a,i0,a)') &
-          'GWT-GWT exchange ', trim(this%name), ' requires at most one ', &
-          ' connection between cells ', this%nodem1(n), &
+        write (warnmsg, '(a,a,a,i0,a,i0,a,i0,a)') &
+          'GWT-GWT exchange ', trim(this%name), &
+          ' has multiple connections between cells ', this%nodem1(n), &
           ' (model 1) and ', this%nodem2(n), ' (model 2): ', ncount, &
           ' connections defined for this cell pair.'
-        call store_error(errmsg, terminate=.true.)
+        call store_warning(warnmsg)
       end if
     end do
     !

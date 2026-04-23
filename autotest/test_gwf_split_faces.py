@@ -9,9 +9,9 @@ Three test cases are included:
 2. GWF-GWF exchange with interface model enabled
 3. Single DISV grid with 2 adjacent cells (no exchange)
 
-The former two are not allowed, and MF6 should raise an error. The last
-case should run successfully, as we currently tolerate such split faces
-within a single grid.
+All three cases should run successfully. The exchange cases should issue
+a warning about multiple connections between the same cell pair. The
+single-grid case should run silently.
 """
 
 import flopy
@@ -226,8 +226,12 @@ def check_output(idx, test):
         assert -0.1 < head2 < 0.1
         assert head1 > head2
     else:
-        # exchange cases
-        pass
+        # exchange cases: expect a warning about multiple connections
+        with open(test.workspace / "mfsim.lst") as f:
+            lines = f.readlines()
+        assert any(
+            "has multiple connections between cells" in line for line in lines
+        ), "expected warning about multiple connections not found in mfsim.lst"
 
 
 @pytest.mark.parametrize("idx, name", enumerate(cases))
@@ -238,6 +242,6 @@ def test_mf6model(idx, name, function_tmpdir, targets):
         targets=targets,
         build=lambda t: build_models(idx, t),
         check=lambda t: check_output(idx, t),
-        xfail="gwfgwf" in name,
+        xfail=False,
     )
     test.run()

@@ -10,9 +10,9 @@
 module GwfGwfExchangeModule
 
   use KindModule, only: DP, I4B, LGP
-  use SimVariablesModule, only: errmsg
+  use SimVariablesModule, only: errmsg, warnmsg
   use SimModule, only: count_errors, store_error, store_error_filename, &
-                       store_error_unit
+                       store_error_unit, store_warning
   use BaseModelModule, only: BaseModelType, GetBaseModelFromList
   use BaseExchangeModule, only: BaseExchangeType, AddBaseExchangeToList
   use BaseDisModule, only: DisBaseType
@@ -377,12 +377,12 @@ contains
         end if
       end do
       if (ncount > 1) then
-        write (errmsg, '(a,a,a,a,i0,a,i0,a,i0,a)') &
-          'GWF-GWF exchange ', trim(this%name), ' requires at most one ', &
-          ' connection between cells ', this%nodem1(n), &
+        write (warnmsg, '(a,a,a,i0,a,i0,a,i0,a)') &
+          'GWF-GWF exchange ', trim(this%name), &
+          ' has multiple connections between cells ', this%nodem1(n), &
           ' (model 1) and ', this%nodem2(n), ' (model 2): ', ncount, &
           ' connections defined for this cell pair.'
-        call store_error(errmsg, terminate=.true.)
+        call store_warning(warnmsg)
       end if
     end do
   end subroutine validate_exchange
