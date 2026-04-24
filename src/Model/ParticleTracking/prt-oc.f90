@@ -33,7 +33,6 @@ module PrtOcModule
     logical(LGP), pointer :: trackdropped => null() !< whether to track drops to water table
     integer(I4B), pointer :: ntracktimes => null() !< number of user-specified tracking times
     logical(LGP), pointer :: dump_event_trace => null() !< whether to dump event trace for debugging
-    logical(LGP), pointer :: scratch_buffer => null() !< whether to use scratch file instead of memory for event buffering
     type(TimeSelectType), pointer :: tracktimes !< user-specified tracking times
 
   contains
@@ -79,7 +78,6 @@ contains
     allocate (this%name_model)
     allocate (this%input_fname)
     call mem_allocate(this%dump_event_trace, 'DUMP_EVENT_TRACE', this%memoryPath)
-    call mem_allocate(this%scratch_buffer, 'SCRATCH_BUFFER', this%memoryPath)
     call mem_allocate(this%inunit, 'INUNIT', this%memoryPath)
     call mem_allocate(this%iout, 'IOUT', this%memoryPath)
     call mem_allocate(this%ibudcsv, 'IBUDCSV', this%memoryPath)
@@ -103,7 +101,6 @@ contains
     this%input_mempath = input_mempath
     this%input_fname = ''
     this%dump_event_trace = .false.
-    this%scratch_buffer = .false.
     this%inunit = 0
     this%iout = 0
     this%ibudcsv = 0
@@ -181,7 +178,6 @@ contains
 
     deallocate (this%name_model)
     call mem_deallocate(this%dump_event_trace)
-    call mem_deallocate(this%scratch_buffer)
     call mem_deallocate(this%inunit)
     call mem_deallocate(this%iout)
     call mem_deallocate(this%ibudcsv)
@@ -255,8 +251,6 @@ contains
                        found%track_usertime)
     call mem_set_value(evinput, 'DEV_DUMP_EVTRACE', this%input_mempath, &
                        found%dev_dump_evtrace)
-    call mem_set_value(evinput, 'SCRATCH_BUFFER', this%input_mempath, &
-                       found%scratch_buffer)
 
     if (found%track_release) this%trackrelease = .true.
     if (found%track_exit) this%trackfeatexit = .true.
@@ -267,7 +261,6 @@ contains
     if (found%track_weaksink) this%trackweaksink = .true.
     if (found%track_usertime) this%trackusertime = .true.
     if (found%dev_dump_evtrace) this%dump_event_trace = .true.
-    if (found%scratch_buffer) this%scratch_buffer = .true.
 
     ! default to all events
     if (.not. (found%track_release .or. &
