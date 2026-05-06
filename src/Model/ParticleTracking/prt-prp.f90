@@ -1073,6 +1073,7 @@ contains
   !> @brief Load package data (release points).
   subroutine prp_packagedata(this)
     use MemoryManagerModule, only: mem_setptr
+    use MemoryManagerExtModule, only: memorystore_release
     use GeomUtilModule, only: get_node
     use CharacterStringModule, only: CharacterStringType
     ! dummy
@@ -1203,6 +1204,13 @@ contains
 
     ! cleanup
     deallocate (nboundchk)
+
+    call memorystore_release('IRPTNO', this%input_mempath)
+    call memorystore_release('CELLID', this%input_mempath)
+    call memorystore_release('XRPT', this%input_mempath)
+    call memorystore_release('YRPT', this%input_mempath)
+    call memorystore_release('ZRPT', this%input_mempath)
+    call memorystore_release('BOUNDNAME', this%input_mempath)
   end subroutine prp_packagedata
 
   !> @brief Load explicitly specified release times.

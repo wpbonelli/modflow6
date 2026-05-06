@@ -772,6 +772,7 @@ contains
     ! -- modules
     !use KindModule, only: LGP
     use MemoryManagerModule, only: mem_setptr
+    use MemoryManagerExtModule, only: memorystore_release
     use CharacterStringModule, only: CharacterStringType
     ! -- dummy
     class(TspSsmType) :: this
@@ -842,6 +843,10 @@ contains
     if (count_errors() > 0) then
       call store_error_filename(this%input_fname)
     end if
+
+    call memorystore_release('PNAME_SOURCES', this%input_mempath)
+    call memorystore_release('SRCTYPE', this%input_mempath)
+    call memorystore_release('AUXNAME', this%input_mempath)
   end subroutine source_sources
 
   !> @brief Source fileinput input block
@@ -851,6 +856,7 @@ contains
   subroutine source_fileinput(this)
     ! -- modules
     use MemoryManagerModule, only: mem_setptr, get_isize
+    use MemoryManagerExtModule, only: memorystore_release
     use CharacterStringModule, only: CharacterStringType
     ! -- dummy
     class(TspSsmType) :: this
@@ -949,6 +955,13 @@ contains
     if (count_errors() > 0) then
       call store_error_filename(this%input_fname)
     end if
+
+    call memorystore_release('PNAME', this%input_mempath)
+    call memorystore_release('SPC6', this%input_mempath)
+    call memorystore_release('FILEIN', this%input_mempath)
+    call memorystore_release('SPC6_FILENAME', this%input_mempath)
+    call memorystore_release('MIXED', this%input_mempath)
+    call memorystore_release('SPC6_MEMPATH', this%input_mempath)
   end subroutine source_fileinput
 
   !> @ brief Set iauxpak array value for package ip

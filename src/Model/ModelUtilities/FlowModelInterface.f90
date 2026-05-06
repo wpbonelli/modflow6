@@ -342,7 +342,7 @@ contains
   subroutine source_packagedata(this)
     ! -- modules
     use MemoryManagerModule, only: mem_setptr
-    use MemoryManagerExtModule, only: mem_set_value
+    use MemoryManagerExtModule, only: mem_set_value, memorystore_release
     use CharacterStringModule, only: CharacterStringType
     use OpenSpecModule, only: ACCESS, FORM
     use ConstantsModule, only: LINELENGTH, DEM6, LENPACKAGENAME
@@ -422,6 +422,10 @@ contains
     if (count_errors() > 0) then
       call store_error_filename(this%input_fname)
     end if
+
+    call memorystore_release('FLOWTYPE', this%input_mempath)
+    call memorystore_release('FILEIN', this%input_mempath)
+    call memorystore_release('FNAME', this%input_mempath)
   end subroutine source_packagedata
 
   !> @brief Read/validate flow model grid

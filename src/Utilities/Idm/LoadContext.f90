@@ -979,7 +979,7 @@ contains
     logical(LGP) :: found
     allocate (intptr)
     intptr = 0
-    call mem_set_value(intptr, varname, mempath, found)
+    call mem_set_value(intptr, varname, mempath, found, release=.false.)
   end subroutine setval
 
   !> @brief set intptr to varname
