@@ -40,7 +40,7 @@ module LayerArrayLoadModule
   contains
     procedure :: ainit
     procedure :: df
-    procedure :: ad
+    procedure :: ts_advance
     procedure :: rp
     procedure :: destroy
     procedure :: reset
@@ -118,10 +118,10 @@ contains
     call this%tasmanager%tasmanager_df()
   end subroutine df
 
-  subroutine ad(this)
+  subroutine ts_advance(this)
     class(LayerArrayLoadType), intent(inout) :: this
     call this%tasmanager%ad()
-  end subroutine ad
+  end subroutine ts_advance
 
   subroutine rp(this, parser)
     use MemoryManagerModule, only: mem_setptr

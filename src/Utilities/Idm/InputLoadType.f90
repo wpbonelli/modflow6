@@ -95,7 +95,7 @@ module InputLoadTypeModule
   contains
     procedure :: init => dynamic_init
     procedure :: df => dynamic_df
-    procedure :: ad => dynamic_ad
+    procedure :: ts_advance => dynamic_ad
     procedure :: destroy => dynamic_destroy
   end type DynamicPkgLoadType
 
@@ -144,7 +144,7 @@ module InputLoadTypeModule
     procedure :: get => dynamicpkgs_get
     procedure :: rp => dynamicpkgs_rp
     procedure :: df => dynamicpkgs_df
-    procedure :: ad => dynamicpkgs_ad
+    procedure :: ts_advance => dynamicpkgs_ad
     procedure :: size => dynamicpkgs_size
     procedure :: destroy => dynamicpkgs_destroy
   end type ModelDynamicPkgsType
@@ -689,7 +689,7 @@ contains
     integer(I4B) :: n
     do n = 1, this%pkglist%Count()
       dynamic_pkg => this%get(n)
-      call dynamic_pkg%ad()
+      call dynamic_pkg%ts_advance()
     end do
   end subroutine dynamicpkgs_ad
 

@@ -508,7 +508,7 @@ contains
     use BaseSolutionModule, only: BaseSolutionType, GetBaseSolutionFromList
     use SimModule, only: converge_reset
     use SimVariablesModule, only: isim_mode
-    use IdmLoadModule, only: idm_rp, idm_ad
+    use IdmLoadModule, only: idm_rp, idm_ts_advance
     use SourceLoadModule, only: export_post_prepare
     ! -- local variables
     class(BaseModelType), pointer :: mp => null()
@@ -605,8 +605,8 @@ contains
     ! -- set time step
     call tdis_set_timestep()
 
-    ! advance IDM
-    call idm_ad()
+    ! timeseries advance
+    call idm_ts_advance()
 
     ! stop timer
     call g_prof%stop(g_prof%tmr_prep_tstp)
@@ -627,7 +627,7 @@ contains
     use ListsModule, only: solutiongrouplist
     use SimVariablesModule, only: iFailedStepRetry
     use SolutionGroupModule, only: SolutionGroupType, GetSolutionGroupFromList
-    use IdmLoadModule, only: idm_ad
+    use IdmLoadModule, only: idm_ts_advance
     ! -- local variables
     class(SolutionGroupType), pointer :: sgp => null()
     integer(I4B) :: isg
@@ -645,8 +645,8 @@ contains
     retryloop: do
 
       if (iFailedStepRetry > 0) then
-        ! advance IDM
-        call idm_ad()
+        ! timeseries advance
+        call idm_ts_advance()
       end if
 
       do isg = 1, solutiongrouplist%Count()

@@ -44,7 +44,7 @@ module IdmMf6FileModule
   contains
     procedure :: init => dynamic_init
     procedure :: df => dynamic_df
-    procedure :: ad => dynamic_ad
+    procedure :: ts_advance => dynamic_ad
     procedure :: rp => dynamic_rp
     procedure :: read_ionper => dynamic_read_ionper
     procedure :: create_loader => dynamic_create_loader
@@ -198,7 +198,7 @@ contains
   subroutine dynamic_ad(this)
     class(Mf6FileDynamicPkgLoadType), intent(inout) :: this
     ! invoke loader advance
-    call this%rp_loader%ad()
+    call this%rp_loader%ts_advance()
   end subroutine dynamic_ad
 
   !> @brief read and prepare routine for dynamic loader
