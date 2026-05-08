@@ -401,6 +401,21 @@ pixi run build-mf5to6 builddir
 
 **Note:** If using Visual Studio Code, you can use tasks as described [here](.vscode/README.md) to automate the above.
 
+## Version string
+
+The version string displayed by `mf6 -v` and written to listing files is composed at build time from several components defined in `src/Utilities/version.f90.in`:
+
+- `VERSIONNUMBER`: the base version (e.g. `6.8.0.dev0`), manually maintained and set one minor release ahead of the last tag on the `develop` branch
+- `VERSIONVCSTAG`: a commit identifier suffix injected at build time (e.g. `+4d7f41ab`), or empty on official releases
+- `VERSIONTITLE`: the release date (e.g. ` 04/29/2026`) set by `update_version.py` for official releases, empty for development builds
+
+There is a "short" version string and a "full" version string, the former including only number and tag, the latter including all three parts.
+
+- `VERSION`: `VERSIONNUMBER` + `VERSIONVCSTAG` — used for the short `-v` display
+- `FULLVERSION`: `VERSIONNUMBER` + `VERSIONVCSTAG` + `VERSIONTITLE` — used for headers written to stdout and `.lst` files
+
+**Note**: the version string VCS tag mechanism only works with Meson. Visual Studio project files and makefiles reference a static `src/Utilities/version.f90` maintained alongside the `.in` template, so binaries built with Visual Studio or `make` will not include a VCS tag. The static file is kept in sync with the template by `update_version.py`, so only the template file requires manual editing.
+
 ## Formatting
 
 ### Spell checking
