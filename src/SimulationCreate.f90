@@ -98,11 +98,11 @@ contains
     use MemoryManagerModule, only: mem_setptr
     use SimVariablesModule, only: idm_context
     use MemoryManagerModule, only: mem_set_print_option
-    use SimVariablesModule, only: isimcontinue, isimcheck
+    use SimVariablesModule, only: isimcontinue, isimcheck, itolerate_unknown
     ! -- dummy
     ! -- locals
     character(len=LENMEMPATH) :: input_mempath
-    integer(I4B), pointer :: simcontinue, nocheck, maxerror
+    integer(I4B), pointer :: simcontinue, nocheck, maxerror, tolerateunknown
     character(len=:), pointer :: prmem
     character(len=LINELENGTH) :: errmsg
     !
@@ -112,11 +112,13 @@ contains
     ! -- set pointers to input context option params
     call mem_setptr(simcontinue, 'CONTINUE', input_mempath)
     call mem_setptr(nocheck, 'NOCHECK', input_mempath)
+    call mem_setptr(tolerateunknown, 'TOLERATE_UNKNOWN', input_mempath)
     call mem_setptr(prmem, 'PRMEM', input_mempath)
     call mem_setptr(maxerror, 'MAXERRORS', input_mempath)
     !
     ! -- update sim options
     isimcontinue = simcontinue
+    itolerate_unknown = tolerateunknown
     if (nocheck == 1) then
       isimcheck = 0
     else
@@ -154,6 +156,11 @@ contains
       if (prmem /= '') then
         write (iout, '(4x, a, a, a)') &
           'MEMORY_PRINT_OPTION SET TO "', trim(prmem), '".'
+      end if
+      !
+      if (itolerate_unknown == 1) then
+        write (iout, '(4x, a)') &
+          'UNRECOGNIZED TOP-LEVEL INPUT OPTIONS WILL BE WARNED AND SKIPPED.'
       end if
       !
       write (iout, '(1x,a)') 'END OF SIMULATION OPTIONS'
