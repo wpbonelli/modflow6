@@ -53,3 +53,8 @@ description = "Mover (MVR) Package connections across two or more models running
 section = "fixes"
 subsection = "exchanges"
 description = "Avoids an unhandled and unnecessary exception in cases where a GWF-GWF exchange is configured with a MVR package, but the corresponding GWT-GWT exchange does not have a MVT package enabled."
+
+[[items]]
+section = "fixes"
+subsection = "netcdf"
+description = "Fix an indexing issue in structured NetCDF export where READASARRAYS packages (RCHA, EVTA) with time-varying per-period arrays would crash with a NetCDF edge-exceeds-bound error when writing any stress period after the first."
