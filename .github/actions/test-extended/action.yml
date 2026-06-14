@@ -1,33 +1,13 @@
 name: Test Extended MF6
-description: Build and test Extended MODFLOW 6
+description: Build and test extended MF6 on macOS and Linux
 runs:
   using: "composite"
   steps:
-    - name: Install netcdf
-      if: runner.os == 'Linux'
+    - name: Configure netcdf
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install build-essential \
-          libnetcdf-dev \
-          libnetcdff-dev \
-          netcdf-bin
         nc-config --all
         nf-config --all
-
-    - name: Install netcdf
-      if: runner.os == 'macOS'
-      shell: bash
-      run: |
-        brew install netcdf-fortran libevent
-        nc-config --all
-        nf-config --all
-
-    - name: Setup GNU Fortran
-      uses: fortran-lang/setup-fortran@v1
-      with:
-        compiler: gcc
-        version: 13
 
     - name: Build OpenMPI (macOS)
       if: runner.os == 'macOS'
