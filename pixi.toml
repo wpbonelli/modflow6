@@ -12,7 +12,9 @@ filelock = "*"
 flaky = "*"
 fortran-language-server = "*"
 fprettify = "*"
+gcc = "*"
 geopandas = "*"
+gfortran = "*"
 gitpython = "*"
 jinja2 = ">=3.1.5,<4"
 jupytext = "*"
@@ -24,6 +26,7 @@ ninja = "*"
 numpy = ">=2.2.6,<3"  # pinned for random reasons
 pandas = "*"
 pip = "*"
+pkg-config = "*"
 pooch = "*"
 pydotplus = "*"
 pyshp = "*"
@@ -48,9 +51,9 @@ xmipy = ">=1.4.0"
 [pypi-dependencies]
 modflow-devtools = { version = "==1.8.0", extras = ["test", "dfn", "models"] }
 
-# os-specific dependencies
-[target.win-64.dependencies]
-test-drive = "!=0.6.0"
+[target.linux-64.dependencies]
+gcc = "13.*"
+gfortran = "13.*"
 
 [tasks]
 # install
@@ -164,16 +167,10 @@ platforms = ["linux-64", "osx-arm64"]
 
 [feature.gcc-extended-build.dependencies]
 git = "*"
-gcc = "*"
-gfortran = "*"
 libnetcdf = "*"
 netcdf-fortran = "*"
 openmpi = "*"
 petsc = "<3.23.0"
-
-[feature.gcc-extended-build.target.linux-64.dependencies]
-gcc = "13.*"
-gfortran = "13.*"
 
 [feature.gcc-extended-build.tasks]
 gcc-extended-build-update-pc-files = { cmd = "echo updating netcdf pc files && python gcc-extended-build-update-pc-files.py", cwd = "distribution" }
