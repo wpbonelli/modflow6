@@ -27,7 +27,7 @@ runs:
       uses: fortran-lang/setup-fortran@v1
       with:
         compiler: gcc
-        version: 13
+        version: ${{ runner.os == 'macOS' && '15' || '13' }}
 
     - name: Build OpenMPI (macOS)
       if: runner.os == 'macOS'
