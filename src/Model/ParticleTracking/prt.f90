@@ -22,6 +22,7 @@ module PrtModule
   use ParticleEventsModule, only: ParticleEventDispatcherType, handle_event
   use ParticleTracksModule, only: ParticleTracksType, &
                                   ParticleTrackFileType, &
+                                  ParticleTrackEventSelectionType, &
                                   add_particle_event
   use SimModule, only: count_errors, store_error, store_error_filename
   use MemoryManagerModule, only: mem_allocate
@@ -253,6 +254,7 @@ contains
     integer(I4B) :: ip, nprp
     class(BndType), pointer :: packobj
     class(*), pointer :: p
+    type(ParticleTrackEventSelectionType) :: model_sel, prp_sel
 
     ! Set up basic packages
     call this%fmi%fmi_ar(this%ibound)
@@ -265,16 +267,15 @@ contains
     ! Initialize the event buffer (memory or scratch file per OC option)
     call this%tracks%init_buffer(this%oc%scratch_buffer)
 
-    ! Select tracking events
-    call this%tracks%select_events( &
-      this%oc%trackrelease, &
-      this%oc%trackfeatexit, &
-      this%oc%tracktimestep, &
-      this%oc%trackterminate, &
-      this%oc%trackweaksink, &
-      this%oc%trackusertime, &
-      this%oc%tracksubfexit, &
-      this%oc%trackdropped)
+    ! Build event selection from OC for model-level files
+    model_sel%release = this%oc%trackrelease
+    model_sel%featexit = this%oc%trackfeatexit
+    model_sel%subfexit = this%oc%tracksubfexit
+    model_sel%timestep = this%oc%tracktimestep
+    model_sel%terminate = this%oc%trackterminate
+    model_sel%weaksink = this%oc%trackweaksink
+    model_sel%usertime = this%oc%trackusertime
+    model_sel%dropped = this%oc%trackdropped
 
     ! Set up boundary pkgs and pkg-scoped track files
     nprp = 0
@@ -286,16 +287,24 @@ contains
         call packobj%prp_set_pointers(this%ibound, this%mip%izone)
         call packobj%bnd_ar()
         call packobj%bnd_ar()
+        ! Use per-PRP selection if specified, otherwise inherit OC selection
+        if (packobj%prp_has_selection) then
+          prp_sel = packobj%prp_selected
+        else
+          prp_sel = model_sel
+        end if
         if (packobj%itrkout > 0) then
           call this%tracks%init_file( &
             packobj%itrkout, &
-            iprp=nprp)
+            iprp=nprp, &
+            selected=prp_sel)
         end if
         if (packobj%itrkcsv > 0) then
           call this%tracks%init_file( &
             packobj%itrkcsv, &
             csv=.true., &
-            iprp=nprp)
+            iprp=nprp, &
+            selected=prp_sel)
         end if
       class default
         call packobj%bnd_ar()
@@ -304,9 +313,10 @@ contains
 
     ! Set up model-scoped track files
     if (this%oc%itrkout > 0) &
-      call this%tracks%init_file(this%oc%itrkout)
+      call this%tracks%init_file(this%oc%itrkout, selected=model_sel)
     if (this%oc%itrkcsv > 0) &
-      call this%tracks%init_file(this%oc%itrkcsv, csv=.true.)
+      call this%tracks%init_file(this%oc%itrkcsv, csv=.true., &
+                                 selected=model_sel)
 
     ! Initialize and select the tracking method based on discretization
     select type (dis => this%dis)

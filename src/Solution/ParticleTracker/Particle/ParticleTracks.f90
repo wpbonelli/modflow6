@@ -14,8 +14,10 @@
 !! events if requested. Each track file is associated with either a PRP
 !! package or with the full PRT model (there may only be 1 such latter).
 !!
-!! Events can be buffered in memory or in a scratch file, and in either
-!! case are flushed to disk only when a time step successfully finishes.
+!! Events are buffered in memory or in a scratch file and are flushed to
+!! disk only when a time step successfully finishes. All events are
+!! buffered unconditionally; each file's own event selection and scope
+!! filter are applied at flush time.
 !<
 module ParticleTracksModule
 
@@ -29,7 +31,7 @@ module ParticleTracksModule
   use WeakSinkEventModule, only: WeakSinkEventType
   use UserTimeEventModule, only: UserTimeEventType
   use CellExitEventModule, only: CellExitEventType
-  use SubcellExitEventModule, only: SubcellExitEventType
+  use SubcellExitEventModule, only: SubCellExitEventType
   use DroppedEventModule, only: DroppedEventType
   use ParticleEventsModule, only: ParticleEventDispatcherType
   use BaseDisModule, only: DisBaseType
@@ -51,39 +53,21 @@ module ParticleTracksModule
     '<i4,<i4,<i4,<i4,<i4,<i4,<i4,<i4,&
     &<i4,<i4,<f8,<f8,<f8,<f8,<f8,|S40'
 
-  !> @brief Selection of particle events.
-  type :: ParticleTrackEventSelectionType
-    logical(LGP) :: release !< track release events
-    logical(LGP) :: featexit !< track grid feature exits
-    logical(LGP) :: timestep !< track timestep ends
-    logical(LGP) :: terminate !< track termination events
-    logical(LGP) :: weaksink !< track weak sink exit events
-    logical(LGP) :: usertime !< track user-selected times
-    logical(LGP) :: subfexit !< track subfeature exits
-    logical(LGP) :: dropped !< track water table drops
-  end type ParticleTrackEventSelectionType
-
   !> @brief Particle track output manager. Handles printing as well as writing
   !! to files. One output unit can be configured for printing. Multiple files
   !! can be configured for writing, with each file optionally associated with
-  !! a PRP package or with the full model. Events can be filtered by type, so
-  !! that only certain event types are printed or written to files. Particle
-  !! events are buffered in memory or in a scratch file, flushed to disk only
-  !! when the time step is successfully solved for the last time (there may
-  !! be multiple solves per time step, depending on ATS and Picard options).
+  !! a PRP package or with the full model. Each file carries its own event
+  !! selection. All events are buffered; per-file filtering happens at flush.
   !<
   type :: ParticleTracksType
     private
     integer(I4B), public :: iout = -1 !< log file unit
     integer(I4B), public :: ntrackfiles !< number of track files
     type(ParticleTrackFileType), public, allocatable :: files(:) !< track files
-    type(ParticleTrackEventSelectionType), public :: selected !< event selection
     class(ParticleTrackEventBufferType), allocatable :: buffer !< event buffer
   contains
     procedure, public :: init_file
     procedure, public :: init_buffer
-    procedure, public :: is_selected
-    procedure, public :: select_events
     procedure, public :: buffer_event
     procedure, public :: flush_buffer
     procedure, public :: discard_buffer
@@ -94,11 +78,12 @@ module ParticleTracksModule
 contains
 
   !> @brief Initialize a binary or CSV output file.
-  subroutine init_file(this, iun, csv, iprp)
+  subroutine init_file(this, iun, csv, iprp, selected)
     class(ParticleTracksType) :: this
     integer(I4B), intent(in) :: iun
     logical(LGP), intent(in), optional :: csv
     integer(I4B), intent(in), optional :: iprp
+    type(ParticleTrackEventSelectionType), intent(in), optional :: selected
     type(ParticleTrackFileType), pointer :: file
 
     call this%expand_files(increment=1)
@@ -107,6 +92,7 @@ contains
     file%iun = iun
     if (present(csv)) file%csv = csv
     if (present(iprp)) file%iprp = iprp
+    if (present(selected)) file%selected = selected
     this%ntrackfiles = size(this%files)
     this%files(this%ntrackfiles) = file
   end subroutine init_file
@@ -155,63 +141,6 @@ contains
     end if
   end subroutine expand_files
 
-  !> @brief Pick events to track.
-  subroutine select_events(this, &
-                           release, &
-                           featexit, &
-                           timestep, &
-                           terminate, &
-                           weaksink, &
-                           usertime, &
-                           subfexit, &
-                           dropped)
-    class(ParticleTracksType) :: this
-    logical(LGP), intent(in) :: release
-    logical(LGP), intent(in) :: featexit
-    logical(LGP), intent(in) :: timestep
-    logical(LGP), intent(in) :: terminate
-    logical(LGP), intent(in) :: weaksink
-    logical(LGP), intent(in) :: usertime
-    logical(LGP), intent(in) :: subfexit
-    logical(LGP), intent(in) :: dropped
-    this%selected%release = release
-    this%selected%featexit = featexit
-    this%selected%timestep = timestep
-    this%selected%terminate = terminate
-    this%selected%weaksink = weaksink
-    this%selected%usertime = usertime
-    this%selected%subfexit = subfexit
-    this%selected%dropped = dropped
-  end subroutine select_events
-
-  !> @brief Check if a given event code is selected for tracking.
-  logical function is_selected(this, event) result(selected)
-    class(ParticleTracksType), intent(inout) :: this
-    class(ParticleEventType), intent(in) :: event
-
-    select type (event)
-    type is (ReleaseEventType)
-      selected = this%selected%release
-    type is (CellExitEventType)
-      selected = this%selected%featexit
-    type is (SubcellExitEventType)
-      selected = this%selected%subfexit
-    type is (TimeStepEventType)
-      selected = this%selected%timestep
-    type is (TerminationEventType)
-      selected = this%selected%terminate
-    type is (WeakSinkEventType)
-      selected = this%selected%weaksink
-    type is (UserTimeEventType)
-      selected = this%selected%usertime
-    type is (DroppedEventType)
-      selected = this%selected%dropped
-    class default
-      call pstop(1, "unknown event type")
-      selected = .false.
-    end select
-  end function is_selected
-
   !> @brief Buffer an event for deferred write.
   subroutine buffer_event(this, particle, event)
     class(ParticleTracksType) :: this
@@ -246,9 +175,11 @@ contains
   !> @brief Add a particle event to be written to eligible
   !! files and printed to an output file unit if requested.
   !! This function should be subscribed as an event handler
-  !! to particle event dispatchers. Events are buffered, to
+  !! to particle event dispatchers. Events are buffered to
   !! be written to output files upon successful completion
   !! of a time step when the framework OT hook is executed.
+  !! All events are buffered; per-file filtering is deferred
+  !! to flush time via each file's wants_record method.
   function add_particle_event(context, particle, event) result(handled)
     class(*), pointer :: context
     type(ParticleType), pointer, intent(inout) :: particle
@@ -259,8 +190,7 @@ contains
     type is (ParticleTracksType)
       if (context%iout >= 0) &
         call event%log(context%iout)
-      if (context%is_selected(event)) &
-        call context%buffer_event(particle, event)
+      call context%buffer_event(particle, event)
       handled = .true.
     end select
   end function add_particle_event

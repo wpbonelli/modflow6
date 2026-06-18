@@ -54,8 +54,7 @@ contains
     do n = 1, this%nrecords
       read (this%iun) rec
       do i = 1, size(files)
-        if (files(i)%iun > 0 .and. &
-            (files(i)%iprp == -1 .or. files(i)%iprp == rec%iprp)) &
+        if (files(i)%wants_record(rec)) &
           call save_record(files(i)%iun, rec, files(i)%csv)
       end do
     end do

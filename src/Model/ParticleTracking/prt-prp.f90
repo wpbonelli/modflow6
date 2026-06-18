@@ -14,9 +14,11 @@ module PrtPrpModule
   use SimVariablesModule, only: errmsg, warnmsg
   use ParticleTracksModule, only: ParticleTracksType, &
                                   TRACKHEADER, TRACKDTYPES
+  use ParticleTrackEventBufferModule, only: ParticleTrackEventSelectionType
   use GeomUtilModule, only: point_in_polygon, get_ijk, get_jk
   use MemoryManagerModule, only: mem_allocate, mem_deallocate, &
                                  mem_reallocate
+  use MemoryManagerExtModule, only: mem_set_value
   use ParticleReleaseScheduleModule, only: ParticleReleaseScheduleType, &
                                            create_release_schedule
   use DisModule, only: DisType
@@ -48,6 +50,8 @@ module PrtPrpModule
     integer(I4B), pointer :: itrkout => null() !< binary track file
     integer(I4B), pointer :: itrkhdr => null() !< track header file
     integer(I4B), pointer :: itrkcsv => null() !< CSV track file
+    logical(LGP) :: prp_has_selection = .false. !< true if TRACK_* keywords were specified
+    type(ParticleTrackEventSelectionType) :: prp_selected !< per-PRP event selection
     integer(I4B), pointer :: irlstls => null() !< release time file
     integer(I4B), pointer :: iexmeth => null() !< method for iterative solution of particle exit location and time in generalized Pollock's method
     integer(I4B), pointer :: ichkmeth => null() !< method for checking particle release coordinates are in the specified cells, 0 = none, 1 = eager
@@ -879,6 +883,7 @@ contains
       &[character(len=LENVARNAME) :: 'NONE', 'EAGER']
     character(len=LINELENGTH) :: trackfile, trackcsvfile, fname
     type(PrtPrpParamFoundType) :: found
+    integer(I4B), pointer :: evinput
     character(len=*), parameter :: fmtextolwrn = &
       "('WARNING: EXIT_SOLVE_TOLERANCE is set to ',g10.3,' &
       &which is much greater than the default value of ',g10.3,'. &
@@ -907,6 +912,60 @@ contains
                        found%trackfile)
     call mem_set_value(trackcsvfile, 'TRACKCSVFILE', this%input_mempath, &
                        found%trackcsvfile)
+
+    ! per-PRP event selection keywords (same names as OC)
+    allocate (evinput)
+    call mem_set_value(evinput, 'TRACK_RELEASE', this%input_mempath, &
+                       found%track_release)
+    call mem_set_value(evinput, 'TRACK_EXIT', this%input_mempath, &
+                       found%track_exit)
+    call mem_set_value(evinput, 'TRACK_SUBF_EXIT', this%input_mempath, &
+                       found%track_subf_exit)
+    call mem_set_value(evinput, 'TRACK_TIMESTEP', this%input_mempath, &
+                       found%track_timestep)
+    call mem_set_value(evinput, 'TRACK_TERMINATE', this%input_mempath, &
+                       found%track_terminate)
+    call mem_set_value(evinput, 'TRACK_WEAKSINK', this%input_mempath, &
+                       found%track_weaksink)
+    call mem_set_value(evinput, 'TRACK_USERTIME', this%input_mempath, &
+                       found%track_usertime)
+    call mem_set_value(evinput, 'TRACK_DROPPED', this%input_mempath, &
+                       found%track_dropped)
+
+    if (found%track_release) then
+      this%prp_selected%release = .true.
+      this%prp_has_selection = .true.
+    end if
+    if (found%track_exit) then
+      this%prp_selected%featexit = .true.
+      this%prp_has_selection = .true.
+    end if
+    if (found%track_subf_exit) then
+      this%prp_selected%subfexit = .true.
+      this%prp_has_selection = .true.
+    end if
+    if (found%track_timestep) then
+      this%prp_selected%timestep = .true.
+      this%prp_has_selection = .true.
+    end if
+    if (found%track_terminate) then
+      this%prp_selected%terminate = .true.
+      this%prp_has_selection = .true.
+    end if
+    if (found%track_weaksink) then
+      this%prp_selected%weaksink = .true.
+      this%prp_has_selection = .true.
+    end if
+    if (found%track_usertime) then
+      this%prp_selected%usertime = .true.
+      this%prp_has_selection = .true.
+    end if
+    if (found%track_dropped) then
+      this%prp_selected%dropped = .true.
+      this%prp_has_selection = .true.
+    end if
+    deallocate (evinput)
+
     call mem_set_value(this%localz, 'LOCALZ', this%input_mempath, &
                        found%localz)
     call mem_set_value(this%extend, 'EXTEND', this%input_mempath, &

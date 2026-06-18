@@ -9,6 +9,7 @@ module ParticleEventModule
   public :: ParticleEventType
   public :: RELEASE
   public :: FEATEXIT
+  public :: SUBFEXIT
   public :: TIMESTEP
   public :: TERMINATE
   public :: WEAKSINK
@@ -28,6 +29,7 @@ module ParticleEventModule
     enumerator :: WEAKSINK = 4 !< particle entered a weak sink
     enumerator :: USERTIME = 5 !< user-specified tracking time
     enumerator :: DROPPED = 6 !< particle dropped to the water table
+    enumerator :: SUBFEXIT = 7 !< particle exited a sub-grid-scale feature
   end enum
 
   !> @brief Base type for particle events.

@@ -25,6 +25,14 @@ module PrtPrpInputModule
     logical :: trackcsvfr = .false.
     logical :: trackcsv = .false.
     logical :: trackcsvfile = .false.
+    logical :: track_release = .false.
+    logical :: track_exit = .false.
+    logical :: track_subf_exit = .false.
+    logical :: track_timestep = .false.
+    logical :: track_terminate = .false.
+    logical :: track_weaksink = .false.
+    logical :: track_usertime = .false.
+    logical :: track_dropped = .false.
     logical :: stoptime = .false.
     logical :: stoptraveltime = .false.
     logical :: istopweaksink = .false.
@@ -310,6 +318,158 @@ module PrtPrpInputModule
     .false., & ! developmode
     .true., & ! multi-record
     .true., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    prtprp_track_release = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'PRP', & ! subcomponent
+    'OPTIONS', & ! block
+    'TRACK_RELEASE', & ! tag name
+    'TRACK_RELEASE', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'track release events', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    prtprp_track_exit = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'PRP', & ! subcomponent
+    'OPTIONS', & ! block
+    'TRACK_EXIT', & ! tag name
+    'TRACK_EXIT', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'track grid feature exit events', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    prtprp_track_subf_exit = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'PRP', & ! subcomponent
+    'OPTIONS', & ! block
+    'TRACK_SUBFEATURE_EXIT', & ! tag name
+    'TRACK_SUBF_EXIT', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'track sub-grid-scale feature exit events', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    prtprp_track_timestep = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'PRP', & ! subcomponent
+    'OPTIONS', & ! block
+    'TRACK_TIMESTEP', & ! tag name
+    'TRACK_TIMESTEP', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'track timestep end events', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    prtprp_track_terminate = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'PRP', & ! subcomponent
+    'OPTIONS', & ! block
+    'TRACK_TERMINATE', & ! tag name
+    'TRACK_TERMINATE', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'track termination events', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    prtprp_track_weaksink = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'PRP', & ! subcomponent
+    'OPTIONS', & ! block
+    'TRACK_WEAKSINK', & ! tag name
+    'TRACK_WEAKSINK', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'track weak sink exit events', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    prtprp_track_usertime = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'PRP', & ! subcomponent
+    'OPTIONS', & ! block
+    'TRACK_USERTIME', & ! tag name
+    'TRACK_USERTIME', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'track user-specified time events', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    prtprp_track_dropped = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'PRP', & ! subcomponent
+    'OPTIONS', & ! block
+    'TRACK_DROPPED', & ! tag name
+    'TRACK_DROPPED', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'track water table drop events', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
     .false., & ! layered
     .false. & ! timeseries
     )
@@ -938,6 +1098,14 @@ module PrtPrpInputModule
     prtprp_trackcsvfr, &
     prtprp_trackcsv, &
     prtprp_trackcsvfile, &
+    prtprp_track_release, &
+    prtprp_track_exit, &
+    prtprp_track_subf_exit, &
+    prtprp_track_timestep, &
+    prtprp_track_terminate, &
+    prtprp_track_weaksink, &
+    prtprp_track_usertime, &
+    prtprp_track_dropped, &
     prtprp_stoptime, &
     prtprp_stoptraveltime, &
     prtprp_istopweaksink, &

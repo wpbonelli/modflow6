@@ -3,7 +3,7 @@ module SubCellExitEventModule
   use ConstantsModule, only: LENHUGELINE
   use ErrorUtilModule, only: pstop
   use ParticleModule, only: ParticleType
-  use ParticleEventModule, only: FEATEXIT
+  use ParticleEventModule, only: SUBFEXIT
   use FeatExitEventModule, only: FeatExitEventType
   implicit none
 
@@ -24,7 +24,7 @@ contains
   function get_code(this) result(code)
     class(SubCellExitEventType), intent(in) :: this
     integer(I4B) :: code
-    code = FEATEXIT
+    code = SUBFEXIT
   end function get_code
 
   function get_verb(this) result(verb)
