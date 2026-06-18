@@ -37,7 +37,7 @@ def write_bad_option(ws, name):
     npf_file = ws / f"{name}.npf"
     with open(npf_file, "w") as f:
         f.write("BEGIN options\n")
-        f.write("  BOGUS_OPTION\n")
+        f.write("  UNKNOWN\n")
         f.write("END options\n\n")
         f.write("BEGIN griddata\n")
         f.write("  ICELLTYPE\n")
