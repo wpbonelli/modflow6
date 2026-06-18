@@ -18,7 +18,7 @@ module SimNamInputModule
     logical :: prprof = .false.
     logical :: maxerrors = .false.
     logical :: print_input = .false.
-    logical :: tolerate_unknown = .false.
+    logical :: strict = .false.
     logical :: hpc_filerecord = .false.
     logical :: hpc6 = .false.
     logical :: filein = .false.
@@ -160,16 +160,16 @@ module SimNamInputModule
     )
 
   type(InputParamDefinitionType), parameter :: &
-    simnam_tolerate_unknown = InputParamDefinitionType &
+    simnam_strict = InputParamDefinitionType &
     ( &
     'SIM', & ! component
     'NAM', & ! subcomponent
     'OPTIONS', & ! block
-    'TOLERATE_UNKNOWN', & ! tag name
-    'TOLERATE_UNKNOWN', & ! fortran variable
+    'STRICT', & ! tag name
+    'STRICT', & ! fortran variable
     'KEYWORD', & ! type
     '', & ! shape
-    'tolerate unknown options', & ! longname
+    'strict input checking', & ! longname
     .false., & ! required
     .false., & ! developmode
     .false., & ! multi-record
@@ -491,7 +491,7 @@ module SimNamInputModule
     simnam_prprof, &
     simnam_maxerrors, &
     simnam_print_input, &
-    simnam_tolerate_unknown, &
+    simnam_strict, &
     simnam_hpc_filerecord, &
     simnam_hpc6, &
     simnam_filein, &

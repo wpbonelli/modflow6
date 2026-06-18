@@ -8,7 +8,7 @@
 module LoadMf6FileModule
 
   use KindModule, only: DP, I4B, LGP
-  use SimVariablesModule, only: errmsg, warnmsg, itolerate_unknown
+  use SimVariablesModule, only: errmsg, warnmsg, isimstrict
   use SimModule, only: store_error, store_warning
   use ConstantsModule, only: LINELENGTH, LENVARNAME
   use BlockParserModule, only: BlockParserType
@@ -316,7 +316,7 @@ contains
           if (endOfBlock) exit
           ! process line as tag(s)
           call this%parser%GetStringCaps(tag)
-          if (itolerate_unknown == 1) then
+          if (isimstrict == 0) then
             idt => get_param_definition_type( &
                    this%mf6_input%param_dfns, &
                    this%mf6_input%component_type, &

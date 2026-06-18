@@ -587,7 +587,7 @@ contains
       intvar = 1
     case ('PRINT_INPUT')
       intvar = 0
-    case ('TOLERATE_UNKNOWN')
+    case ('STRICT')
       intvar = 0
     case default
       write (errmsg, '(a,a)') &
