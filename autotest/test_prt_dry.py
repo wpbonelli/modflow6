@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
+from flopy.utils import PathlineFile
 from framework import TestFramework
 from prt_test_utils import get_model_name
 
@@ -342,6 +343,59 @@ def build_prt_sim(name, gwf, prt_ws, mf6, drape=False, dry_tracking_method=False
     return sim
 
 
+def build_mp7_sim(name, ws, mp7, gwf):
+    """
+    Build an MP7 simulation releasing particles from the same dry-layer cells
+    as the PRT drape case. Used to document the drape behavior difference:
+    PRT places draped particles at the water table (top of the saturated zone,
+    z≈1585), while MP7 preserves the original localZ=0.5, which maps to the
+    mid-point of the saturated zone in the active cell (z≈1582.5). See
+    MethodDis.f90:366-368 and MethodCell.f90:167-171 (PRT) vs.
+    ParticleTrackingEngine.f90:741-787 (MP7 water-table tracking).
+    """
+    gwf_ws = gwf.model_ws
+    rel_gwf_ws = os.path.relpath(gwf_ws, start=ws)
+    mp7_name = get_model_name(name, "mp7")
+
+    lay = 1
+    row, col = (int(nrow / 4), int(ncol / 4))
+    mp7_cells = [(lay + k, row + i, col + j) for k, i, j in offsets]
+
+    partdata = flopy.modpath.ParticleData(
+        partlocs=mp7_cells,
+        structured=True,
+        localx=[0.5] * len(mp7_cells),
+        localy=[0.5] * len(mp7_cells),
+        localz=[0.5] * len(mp7_cells),
+        timeoffset=0.0,
+        drape=1,
+    )
+    pg = flopy.modpath.ParticleGroup(
+        particlegroupname="G1",
+        particledata=partdata,
+        filename=f"{mp7_name}.sloc",
+    )
+    mp = flopy.modpath.Modpath7(
+        modelname=mp7_name,
+        flowmodel=gwf,
+        exe_name=mp7,
+        model_ws=ws,
+        headfilename=f"{rel_gwf_ws}/{gwf.name}.hds",
+        budgetfilename=f"{rel_gwf_ws}/{gwf.name}.cbb",
+    )
+    flopy.modpath.Modpath7Bas(mp, porosity=0.1)
+    flopy.modpath.Modpath7Sim(
+        mp,
+        simulationtype="pathline",
+        trackingdirection="forward",
+        budgetoutputoption="summary",
+        weaksinkoption="pass_through",
+        stoptimeoption="extend",
+        particlegroups=[pg],
+    )
+    return mp
+
+
 def build_models(idx, test, newton, drape=False, dry_tracking_method=False):
     gwf_sim = build_gwf_sim(
         test.name, test.workspace / "gwf", test.targets["mf6"], newton=newton
@@ -354,6 +408,16 @@ def build_models(idx, test, newton, drape=False, dry_tracking_method=False):
         drape=drape,
         dry_tracking_method=dry_tracking_method,
     )
+    if drape:
+        mp7_exe = test.targets.get("mp7")
+        if mp7_exe:
+            mp7 = build_mp7_sim(
+                test.name,
+                test.workspace / "mp7",
+                mp7_exe,
+                gwf_sim.get_model(),
+            )
+            return gwf_sim, prt_sim, mp7
     return gwf_sim, prt_sim
 
 
@@ -378,6 +442,53 @@ def check_output(idx, test, snapshot):
 
     if "drape" in name:
         assert len(actual[actual.ireason == 0]) == nparts  # release
+
+        # PRT drops particles to the water table (ireason=6) after draping to
+        # the first active layer. The drop z is ~1585, the water table height
+        # in layer 1 at the end of the first (steady-state) stress period.
+        prt_drape_z = pls[pls.ireason == 0].z.values
+        assert len(prt_drape_z) == nparts
+        assert (prt_drape_z < 1590.0).all()
+
+        # When MP7 is available, document the known drape behavior difference.
+        # PRT places particles at the water table (top of layer 1's saturated
+        # zone, z≈1585). MP7 preserves the original localZ=0.5 from the release
+        # spec, which maps to the mid-point of the saturated zone in layer 1:
+        # z = (1-0.5)*bottom + 0.5*head = (1-0.5)*1580 + 0.5*1585 ≈ 1582.5.
+        # So PRT actually releases particles ~2.5m ABOVE MP7. At termination,
+        # MP7 endpoints are slightly higher than PRT endpoints, because MP7
+        # carries particles upward as the water table rises during injection
+        # (local z-coordinate is preserved, so globalZ follows SaturatedTop).
+        # Note: the original analysis compared MP7's timeseries output (which
+        # records z=1590 for the initial dry-cell position) with PRT's CSV;
+        # comparing the pathline files directly shows the actual tracking
+        # positions are much closer and PRT starts above MP7, not below.
+        if len(test.sims) == 3:
+            mp7_ws = test.workspace / "mp7"
+            mp7_name = get_model_name(name, "mp7")
+            mp7_plf = PathlineFile(mp7_ws / f"{mp7_name}.mppth")
+            mp7_pls = pd.DataFrame(
+                mp7_plf.get_destination_pathline_data(
+                    range(gwf.modelgrid.nnodes), to_recarray=True
+                )
+            )
+
+            # MP7 initial positions: in the middle of layer 1's saturated zone
+            # (localZ=0.5 preserved from the release spec, z≈1582.5).
+            mp7_first = mp7_pls.loc[mp7_pls.groupby("particleid")["time"].idxmin()]
+            assert (mp7_first.z.values > 1580.0).all()
+            assert (mp7_first.z.values < 1590.0).all()
+
+            # PRT releases at the water table; MP7 at localZ=0.5 mid-zone:
+            # PRT z > MP7 z at release.
+            assert (prt_drape_z > mp7_first.z.values).all()
+
+            # At termination MP7 is slightly higher than PRT due to water-table
+            # following during the transient injection period.
+            mp7_last = mp7_pls.loc[mp7_pls.groupby("particleid")["time"].idxmax()]
+            prt_end_z = pls[pls.ireason == 3].z.values
+            assert mp7_last.z.mean() > prt_end_z.mean()
+
     elif "drop" in name:
         # ignore particle 4, it terminates early when
         # mf6 is built with optimization=2 with ifort

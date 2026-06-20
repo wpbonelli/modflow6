@@ -1,0 +1,632 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.183
+           Sonnet 4.6 · Claude Pro
+  ▘▘ ▝▝    ~/dev/modflow6/autotest
+
+
+❯ Have a look at the prt-mp7 comparison/analysis text files in                  
+  ../modflow-training-princeton2026 and consider how we can most easily         
+  reproduce the comparison in a test. I think we have a PRT test using the      
+  exact model used in the class example, it's test_prt_dry.py. Can we add an    
+  MP7 model to it to programmatically reproduce this and consider what to do    
+  about it?                                                                     
+
+⏺ Let me look at the training materials and the existing test file in parallel.
+
+  Read 2 files, listed 2 directories (ctrl+o to expand)
+
+⏺ Now let me read the existing test and the training model notebook to
+  understand the setup.
+
+  Read 1 file, listed 1 directory (ctrl+o to expand)
+
+⏺ Let me look at the training notebook to understand the prt-a model structure,
+  specifically the MP7 configuration.
+
+  Read 1 file, listed 4 directories (ctrl+o to expand)
+
+⏺ Let me check how MP7 comparisons are done in other PRT tests.
+
+  Searched for 3 patterns, read 1 file (ctrl+o to expand)
+
+⏺ Good. Now let me look at what gets used for the MP7 LRCParticleData / drape
+  setup in existing tests, and check prt_test_utils for relevant utilities.
+
+  Searched for 2 patterns, read 2 files (ctrl+o to expand)
+
+⏺ Let me check how MP7 targets are handled in the test framework.
+
+  Searched for 4 patterns, read 1 file (ctrl+o to expand)
+
+⏺ Let me check a simpler MP7 test for reference on path handling.
+
+  Searched for 2 patterns, read 1 file (ctrl+o to expand)
+
+⏺ Let me check how TestFramework handles variable numbers of sims.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Now I have a complete picture. Let me implement the MP7 comparison for the
+  _drape case. The key findings from the analysis:
+
+  1. PRT drapes to water table (~1585 m) via defn%top = bot + sat*thickness
+  2. MP7 drapes to cell top (1590 m) because for dry cells it sets SaturatedTop 
+  = cell_bottom, and globalZ = (1-localZ)*bottom + localZ*SaturatedTop = 1590
+  regardless of localZ
+  3. This ~5m initial difference persists — MP7 particles follow the rising
+  water table (local-coord-based), PRT particles track in global coords and sink
+
+⏺ Update(test_prt_dry.py)
+  ⎿  Added 1 line
+      20  import numpy as np
+      21  import pandas as pd
+      22  import pytest
+      23 +from flopy.utils.binaryfile import PathlineFile                
+      24  from framework import TestFramework
+      25  from prt_test_utils import get_model_name
+      26  
+
+⏺ Now add build_mp7_sim and modify build_models:
+
+⏺ Update(test_prt_dry.py)
+  ⎿  Added 63 lines
+      343      return sim
+      344  
+      345  
+      346 +def build_mp7_sim(name, ws, mp7, gwf):                        
+      347 +    """                                                       
+      348 +    Build an MP7 simulation releasing particles from the same 
+          +dry-layer cells                                               
+      349 +    as the PRT drape case. Used to document the known drape be
+          +havior difference:                                            
+      350 +    MP7 places draped particles at the geometric top of the fi
+          +rst active cell                                               
+      351 +    (z=1590, the top of layer 1), while PRT places them at the
+          + water table                                                  
+      352 +    (~1585). See ParticleTrackingEngine.f90:755-757 and       
+      353 +    ModflowRectangularGrid.f90:525 (MP7) vs. MethodDis.f90:366
+          +-368 and                                                      
+      354 +    MethodCell.f90:167-171 (PRT).                             
+      355 +    """                                                       
+      356 +    gwf_ws = gwf.model_ws                                     
+      357 +    rel_gwf_ws = os.path.relpath(gwf_ws, start=ws)            
+      358 +    mp7_name = get_model_name(name, "mp7")                    
+      359 +                                                              
+      360 +    lay = 1                                                   
+      361 +    row, col = (int(nrow / 4), int(ncol / 4))                 
+      362 +    mp7_cells = [(lay + k, row + i, col + j) for k, i, j in of
+          +fsets]                                                        
+      363 +                                                              
+      364 +    partdata = flopy.modpath.ParticleData(                    
+      365 +        partlocs=mp7_cells,                                   
+      366 +        structured=True,                                      
+      367 +        localx=[0.5] * len(mp7_cells),                        
+      368 +        localy=[0.5] * len(mp7_cells),                        
+      369 +        localz=[0.5] * len(mp7_cells),                        
+      370 +        timeoffset=0.0,                                       
+      371 +        drape=1,                                              
+      372 +    )                                                         
+      373 +    pg = flopy.modpath.ParticleGroup(                         
+      374 +        particlegroupname="G1",                               
+      375 +        particledata=partdata,                                
+      376 +        filename=f"{mp7_name}.sloc",                          
+      377 +    )                                                         
+      378 +    mp = flopy.modpath.Modpath7(                              
+      379 +        modelname=mp7_name,                                   
+      380 +        flowmodel=gwf,                                        
+      381 +        exe_name=mp7,                                         
+      382 +        model_ws=ws,                                          
+      383 +        headfilename=f"{rel_gwf_ws}/{gwf.name}.hds",          
+      384 +        budgetfilename=f"{rel_gwf_ws}/{gwf.name}.cbb",        
+      385 +    )                                                         
+      386 +    flopy.modpath.Modpath7Bas(mp, porosity=0.1)               
+      387 +    flopy.modpath.Modpath7Sim(                                
+      388 +        mp,                                                   
+      389 +        simulationtype="pathline",                            
+      390 +        trackingdirection="forward",                          
+      391 +        budgetoutputoption="summary",                         
+      392 +        weaksinkoption="pass_through",                        
+      393 +        stoptimeoption="extend",                              
+      394 +        particlegroups=[pg],                                  
+      395 +    )                                                         
+      396 +    return mp                                                 
+      397 +                                                              
+      398 +                                                              
+      399  def build_models(idx, test, newton, drape=False, dry_tracking_
+           method=False):
+      400      gwf_sim = build_gwf_sim(
+      401          test.name, test.workspace / "gwf", test.targets["mf6"]
+           , newton=newton
+     ...
+      408          drape=drape,
+      409          dry_tracking_method=dry_tracking_method,
+      410      )
+      411 +    if drape:                                                 
+      412 +        mp7_exe = test.targets.get("mp7")                     
+      413 +        if mp7_exe:                                           
+      414 +            mp7 = build_mp7_sim(                              
+      415 +                test.name,                                    
+      416 +                test.workspace / "mp7",                       
+      417 +                mp7_exe,                                      
+      418 +                gwf_sim.get_model(),                          
+      419 +            )                                                 
+      420 +            return gwf_sim, prt_sim, mp7                      
+      421      return gwf_sim, prt_sim
+      422  
+      423  
+
+⏺ Now update check_output to add the MP7 comparison for the drape case:
+
+⏺ Update(test_prt_dry.py)
+  ⎿  Added 39 lines
+      442  
+      443      if "drape" in name:
+      444          assert len(actual[actual.ireason == 0]) == nparts  # r
+           elease
+      445 +                                                              
+      446 +        # PRT drops particles to the water table (ireason=6) a
+          +fter draping to                                               
+      447 +        # the first active layer. The drop z is ~1585, the wat
+          +er table height                                               
+      448 +        # in layer 1 at the end of the first (steady-state) st
+          +ress period.                                                  
+      449 +        prt_drop_z = pls[pls.ireason == 6].z.values           
+      450 +        assert len(prt_drop_z) == nparts                      
+      451 +        assert (prt_drop_z < 1590.0).all()                    
+      452 +                                                              
+      453 +        # When MP7 is available, verify the known algorithmic 
+          +difference between                                            
+      454 +        # PRT and MP7 drape behavior. MP7 places draped partic
+          +les at the                                                    
+      455 +        # geometric top of the first active cell (z=1590, the 
+          +bottom of the dry                                             
+      456 +        # layer 0 = the top of active layer 1). PRT places the
+          +m at the water                                                
+      457 +        # table (~1585). The ~5m initial z difference persists
+          + to termination:                                              
+      458 +        # MP7 endpoints cluster near the water table (which ri
+          +ses during                                                    
+      459 +        # injection, following particles' local coordinates), 
+          +while PRT                                                     
+      460 +        # endpoints sink toward the cell bottom (tracking in g
+          +lobal coordinates).                                           
+      461 +        if len(test.sims) == 3:                               
+      462 +            mp7_ws = test.workspace / "mp7"                   
+      463 +            mp7_name = get_model_name(name, "mp7")            
+      464 +            mp7_plf = PathlineFile(mp7_ws / f"{mp7_name}.mppth
+          +")                                                            
+      465 +            mp7_pls = pd.DataFrame(                           
+      466 +                mp7_plf.get_destination_pathline_data(        
+      467 +                    range(gwf.modelgrid.nnodes), to_recarray=T
+          +rue                                                           
+      468 +                )                                             
+      469 +            )                                                 
+      470 +                                                              
+      471 +            # MP7 initial positions: all particles at z=1590 (
+          +cell top of                                                   
+      472 +            # layer 1), because for a dry cell, SaturatedTop =
+          + cell_bottom,                                                 
+      473 +            # and globalZ = (1-localZ)*bottom + localZ*Saturat
+          +edTop = 1590.                                                 
+      474 +            mp7_first = mp7_pls.loc[mp7_pls.groupby("particlei
+          +d")["time"].idxmin()]                                         
+      475 +            assert np.allclose(mp7_first.z.values, 1590.0, ato
+          +l=1.0)                                                        
+      476 +                                                              
+      477 +            # PRT starts ~5m lower than MP7; this difference c
+          +arries through to                                             
+      478 +            # termination. MP7 endpoints stay near the (rising
+          +) water table;                                                
+      479 +            # PRT endpoints settle near the cell bottom.      
+      480 +            mp7_last = mp7_pls.loc[mp7_pls.groupby("particleid
+          +")["time"].idxmax()]                                          
+      481 +            prt_end_z = pls[pls.ireason == 3].z.values        
+      482 +            assert mp7_last.z.mean() > prt_end_z.mean()       
+      483 +                                                              
+      484      elif "drop" in name:
+      485          # ignore particle 4, it terminates early when
+      486          # mf6 is built with optimization=2 with ifort
+
+⏺ Let me verify the final state of the modified sections looks correct:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ The code looks correct. Let me do a quick sanity check on the full file
+  structure:
+⏺ Bash(python -c "import ast;
+      ast.parse(open('autotest/test_prt_dry.py').read()); print('Syntax OK')")
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ use the pixi env                                                              
+
+⏺ Bash(pixi run python -c "import ast;
+      ast.parse(open('autotest/test_prt_dry.py').read()); print('Syntax OK')")
+  ⎿  Syntax OK
+
+⏺ Good. The changes are syntactically valid. Here's a summary of what was done
+  and what to consider:
+
+  Changes made to autotest/test_prt_dry.py:
+
+  1. Added from flopy.utils.binaryfile import PathlineFile import
+  2. Added build_mp7_sim() — releases 5 particles from the same dry layer-0
+  cells as PRT, with drape=1, weaksinkoption="pass_through",
+  stoptimeoption="extend" (to track through all 3 periods)
+  3. Modified build_models() — conditionally builds and returns MP7 as a third
+  sim only for the _drape case and only if mp7 binary is available (gracefully
+  skipped otherwise)
+  4. Added assertions in check_output for the _drape case:
+    - PRT ireason=6 (drop-to-water-table) z values are all < 1590 (~5m below
+  cell top)
+    - MP7 initial z values are ≈ 1590 (cell top — the known algorithmic
+  difference)
+    - MP7 endpoint z mean > PRT endpoint z mean (the difference persists to
+  termination)
+
+  What to do about the difference:
+
+  The root cause is documented in the test docstring and comments — MP7 uses
+  SaturatedTop = cell_bottom for dry cells, making all localZ values map to the
+  same globalZ (the geometric top of the next active layer). PRT uses the actual
+  hydraulic head as defn%top.
+
+  Options going forward:
+  1. Accept it — the test now documents the difference as a known behavioral
+  divergence
+  2. Add a PRT option to place draped particles at the cell top instead of the
+  water table (matching MP7 precedent for users who want that)
+  3. Fix MP7 interpretation — arguably PRT's water-table placement is more
+  physically correct; if so, update docs/release notes to explicitly call this
+  out as a deliberate departure from MP7 precedent
+
+✻ Crunched for 18s
+
+※ recap: Added MP7 comparison to the prtdry_drape test case in test_prt_dry.py to document the known drape z-placement difference between PRT and MP7. Next: run the drape test case to verify the assertions pass. (disable recaps in /config)
+
+❯ Ok, good. One correction: we don't expect dropped events from PRT, we have    
+  fixed some drape behavior in between the original analysis and this work. I   
+  updated the assertions to reflect this. But I'm still seeing test failures.   
+  See if we need to revise the analysis at all, run the test with e.g. pixi run 
+  -e rtd autotest -n 0 -k "prt_dry"                                             
+
+⏺ Bash(pixi run -e rtd autotest -n 0 -k "prt_dry" 2>&1)
+  ⎿  Error: Exit code 1
+     ✨ Pixi task (autotest in rtd): pytest -v -n auto --durations 0 
+     --keep-failed .failed -n 0 -k prt_dry
+     ============================= test session starts 
+     ==============================
+     platform darwin -- Python 3.10.18, pytest-8.4.2, pluggy-1.6.0 -- 
+     /Users/wbonelli/dev/modflow6/.pixi/envs/rtd/bin/python3.10
+     cachedir: .pytest_cache
+     benchmark: 5.1.0 (defaults: timer=time.perf_counter disable_gc=False 
+     min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 
+     warmup=False warmup_iterations=100000)
+     rootdir: /Users/wbonelli/dev/modflow6/autotest
+     configfile: pytest.ini
+     plugins: syrupy-4.9.1, flaky-3.8.1, xdist-3.8.0, order-1.3.0, dotenv-0.5.2,
+     benchmark-5.1.0, cov-7.0.0
+     collecting ... collected 1161 items / 1156 deselected / 5 selected
+     … +117 lines (ctrl+o to expand)
+
+⏺ The assert False is vague — let me get the full traceback:
+
+⏺ Bash(cd autotest && pixi run -e rtd python -m pytest -v -n 0 -k "prtdry_drape"
+      --tb=long 2>&1 | tail -80)
+  ⎿      Solving:  Stress period:     2    Time step:    21
+         Solving:  Stress period:     2    Time step:    22
+         Solving:  Stress period:     2    Time step:    23
+     … +91 lines (ctrl+o to expand)
+  ⎿  (timeout 2m)
+
+⏺ The traceback is being suppressed. Let me read the current state of the file
+  (the user modified the assertions) and check what's actually failing:
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Let me check what's actually in the PRT output to understand what the
+  assertions see:
+
+  Listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(pixi run -e rtd python -c "
+      import pandas as pd…)
+  ⎿  Error: Exit code 1
+     Traceback (most recent call last):
+       File "<string>", line 6, in <module>
+       File "/Users/wbonelli/dev/modflow6/.pixi/envs/rtd/lib/python3.10/site-pac
+     kages/pandas/io/parsers/readers.py", line 1026, in read_csv
+         return _read(filepath_or_buffer, kwds)
+       File "/Users/wbonelli/dev/modflow6/.pixi/envs/rtd/lib/python3.10/site-pac
+     kages/pandas/io/parsers/readers.py", line 620, in _read
+         parser = TextFileReader(filepath_or_buffer, **kwds)
+       File "/Users/wbonelli/dev/modflow6/.pixi/envs/rtd/lib/python3.10/site-pac
+     kages/pandas/io/parsers/readers.py", line 1620, in __init__
+         self._engine = self._make_engine(f, self.engine)
+       File "/Users/wbonelli/dev/modflow6/.pixi/envs/rtd/lib/python3.10/site-pac
+     kages/pandas/io/parsers/readers.py", line 1880, in _make_engine
+     … +4 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, listed 5 directories (ctrl+o to expand)
+
+⏺ Bash(pixi run -e rtd python -c "
+      import pandas as pd…)
+  ⎿  ['tracking_1.prp', 'prtdry_drape_prt.nam', 'prtdry_drape_prt.oc', 'prt
+     dry_drape.tdis', 'prtdry_drape_prt.trk.hdr', 'prtdry_drape_prt.lst', '
+     prtdry_drape_prt.bud', 'prtdry_drape_prt.csv', 'prtdry_drape_prt.dis',
+     … +2 lines (ctrl+o to expand)
+
+⏺ Bash(pixi run -e rtd python -c "
+      import pandas as pd…)
+  ⎿  Error: Exit code 1
+     Traceback (most recent call last):
+       File "<string>", line 4, in <module>
+     ImportError: cannot import name 'PathlineFile' from 
+     'flopy.utils.binaryfile' (/Users/wbonelli/dev/modflow6/.pixi/envs/rtd/lib/p
+     ython3.10/site-packages/flopy/utils/binaryfile/__init__.py)
+
+⏺ Bash(pixi run -e rtd python -c "import flopy; print(dir(flopy.utils))" 2>&1 |
+      tr ',' '\n' | grep -i path)
+  ⎿   'PathlineFile'
+      '__path__'
+      'modpathfile'
+
+⏺ Bash(pixi run -e rtd python -c "
+      import pandas as pd…)
+  ⎿  === PRT ireason counts ===
+     ireason
+     0      5
+     … +36 lines (ctrl+o to expand)
+
+⏺ Now I can see what's happening. The actual data is:
+  - PRT release (ireason=0) z ≈ 1585 (water table, top of saturated zone)
+  - MP7 initial z ≈ 1582.7 — NOT 1590 as the analysis predicted!
+
+  The analysis was comparing MP7's timeseries output (which shows the particle's
+  initial position in the dry layer-0 cell as z=1590) with PRT's actual
+  tracking position. The pathline file records the particle position in layer 1
+  after draping, where localZ=0.5 maps to (1-0.5)*1580 + 0.5*1585 ≈ 1582.5. Let
+  me check the snapshot situation too:
+
+  Searched for 1 pattern, listed 3 directories (ctrl+o to expand)
+
+⏺ Good. Two fixes needed:
+  1. The PathlineFile import is wrong — it's flopy.utils.PathlineFile, not
+  flopy.utils.binaryfile.PathlineFile
+  2. The MP7 initial-z assertion is wrong — MP7's pathline shows z≈1582.7
+  (localZ=0.5 preserved in layer 1), not 1590; and PRT release z≈1585 (water
+  table), so PRT actually starts above MP7
+  3. The snapshot is stale (PRT drape fix changed the output)
+
+  The analysis was comparing MP7's timeseries output (dry-cell coordinate:
+  z=1590) against PRT's CSV, but the pathline file records the actual tracking
+  position in layer 1 where localZ=0.5 → (0.5×1580 + 0.5×1585) ≈ 1582.5.
+
+⏺ Update(test_prt_dry.py)
+  ⎿  Error editing file
+  Read 1 file (ctrl+o to expand)
+
+⏺ Good — the user already changed the import to from flopy.utils import 
+  PathlineFile. Now I just need to fix the assertions. The wrong one is the
+  np.allclose(..., 1590.0) check, and the comment about what PRT vs MP7 do needs
+  correcting too:
+
+⏺ Update(test_prt_dry.py)
+  ⎿  Added 23 lines, removed 15 lines
+      450          assert len(prt_drape_z) == nparts
+      451          assert (prt_drape_z < 1590.0).all()
+      452  
+      453 -        # When MP7 is available, verify the known algorithmic 
+          -difference between                                            
+      454 -        # PRT and MP7 drape behavior. MP7 places draped partic
+          -les at the                                                    
+      455 -        # geometric top of the first active cell (z=1590, the 
+          -bottom of the dry                                             
+      456 -        # layer 0 = the top of active layer 1). PRT places the
+          -m at the water                                                
+      457 -        # table (~1585). The ~5m initial z difference persists
+          - to termination:                                              
+      458 -        # MP7 endpoints cluster near the water table (which ri
+          -ses during                                                    
+      459 -        # injection, following particles' local coordinates), 
+          -while PRT                                                     
+      460 -        # endpoints sink toward the cell bottom (tracking in g
+          -lobal coordinates).                                           
+      453 +        # When MP7 is available, document the known drape beha
+          +vior difference.                                              
+      454 +        # PRT places particles at the water table (top of laye
+          +r 1's saturated                                               
+      455 +        # zone, z≈1585). MP7 preserves the original localZ=0.5
+          + from the release                                             
+      456 +        # spec, which maps to the mid-point of the saturated z
+          +one in layer 1:                                               
+      457 +        # z = (1-0.5)*bottom + 0.5*head = (1-0.5)*1580 + 0.5*1
+          +585 ≈ 1582.5.                                                 
+      458 +        # So PRT actually releases particles ~2.5m ABOVE MP7. 
+          +At termination,                                               
+      459 +        # MP7 endpoints are slightly higher than PRT endpoints
+          +, because MP7                                                 
+      460 +        # carries particles upward as the water table rises du
+          +ring injection                                                
+      461 +        # (local z-coordinate is preserved, so globalZ follows
+          + SaturatedTop).                                               
+      462 +        # Note: the original analysis compared MP7's timeserie
+          +s output (which                                               
+      463 +        # records z=1590 for the initial dry-cell position) wi
+          +th PRT's CSV;                                                 
+      464 +        # comparing the pathline files directly shows the actu
+          +al tracking                                                   
+      465 +        # positions are much closer and PRT starts above MP7, 
+          +not below.                                                    
+      466          if len(test.sims) == 3:
+      467              mp7_ws = test.workspace / "mp7"
+      468              mp7_name = get_model_name(name, "mp7")
+     ...
+      473                  )
+      474              )
+      475  
+      471 -            # MP7 initial positions: all particles at z=1590 (
+          -cell top of                                                   
+      472 -            # layer 1), because for a dry cell, SaturatedTop =
+          - cell_bottom,                                                 
+      473 -            # and globalZ = (1-localZ)*bottom + localZ*Saturat
+          -edTop = 1590.                                                 
+      476 +            # MP7 initial positions: in the middle of layer 1'
+          +s saturated zone                                              
+      477 +            # (localZ=0.5 preserved from the release spec, z≈1
+          +582.5).                                                       
+      478              mp7_first = mp7_pls.loc[mp7_pls.groupby("particlei
+           d")["time"].idxmin()]
+      475 -            assert np.allclose(mp7_first.z.values, 1590.0, ato
+          -l=1.0)                                                        
+      479 +            assert (mp7_first.z.values > 1580.0).all()        
+      480 +            assert (mp7_first.z.values < 1590.0).all()        
+      481  
+      477 -            # PRT starts ~5m lower than MP7; this difference c
+          -arries through to                                             
+      478 -            # termination. MP7 endpoints stay near the (rising
+          -) water table;                                                
+      479 -            # PRT endpoints settle near the cell bottom.      
+      482 +            # PRT releases at the water table; MP7 at localZ=0
+          +.5 mid-zone:                                                  
+      483 +            # PRT z > MP7 z at release.                       
+      484 +            assert (prt_drape_z > mp7_first.z.values).all()   
+      485 +                                                              
+      486 +            # At termination MP7 is slightly higher than PRT d
+          +ue to water-table                                             
+      487 +            # following during the transient injection period.
+      488              mp7_last = mp7_pls.loc[mp7_pls.groupby("particleid
+           ")["time"].idxmax()]
+      489              prt_end_z = pls[pls.ireason == 3].z.values
+      490              assert mp7_last.z.mean() > prt_end_z.mean()
+
+⏺ Also update the build_mp7_sim docstring to match reality:
+
+⏺ Update(test_prt_dry.py)
+  ⎿  Added 6 lines, removed 6 lines
+      346  def build_mp7_sim(name, ws, mp7, gwf):
+      347      """
+      348      Build an MP7 simulation releasing particles from the same 
+           dry-layer cells
+      349 -    as the PRT drape case. Used to document the known drape be
+          -havior difference:                                            
+      350 -    MP7 places draped particles at the geometric top of the fi
+          -rst active cell                                               
+      351 -    (z=1590, the top of layer 1), while PRT places them at the
+          - water table                                                  
+      352 -    (~1585). See ParticleTrackingEngine.f90:755-757 and       
+      353 -    ModflowRectangularGrid.f90:525 (MP7) vs. MethodDis.f90:366
+          --368 and                                                      
+      354 -    MethodCell.f90:167-171 (PRT).                             
+      349 +    as the PRT drape case. Used to document the drape behavior
+          + difference:                                                  
+      350 +    PRT places draped particles at the water table (top of the
+          + saturated zone,                                              
+      351 +    z≈1585), while MP7 preserves the original localZ=0.5, whic
+          +h maps to the                                                 
+      352 +    mid-point of the saturated zone in the active cell (z≈1582
+          +.5). See                                                      
+      353 +    MethodDis.f90:366-368 and MethodCell.f90:167-171 (PRT) vs.
+      354 +    ParticleTrackingEngine.f90:741-787 (MP7 water-table tracki
+          +ng).                                                          
+      355      """
+      356      gwf_ws = gwf.model_ws
+      357      rel_gwf_ws = os.path.relpath(gwf_ws, start=ws)
+
+❯ Good, now can you please explain the MP7 vs PRT behavior difference in more   
+  detail?                                                                       
+
+⏺ Now run the test with --snapshot-update since the drape fix changed PRT's
+  output:
+
+⏺ Bash(cd autotest && pixi run -e rtd python -m pytest -v -n 0 -k "prtdry_drape"
+      --snapshot-update 2>&1 | tail -30)
+  ⎿  Error: Exit code 1
+     (eval):cd:1: no such file or directory: autotest
+
+⏺ Bash(pixi run -e rtd autotest --snapshot-update -n 0 -k "prtdry_drape" 2>&1 |
+      tail -30)
+  ⎿  ✨ Pixi task (autotest in rtd): pytest -v -n auto --durations 0 --keep
+     -failed .failed --snapshot-update -n 0 -k prtdry_drape
+     ============================= test session starts ====================
+     … +24 lines (ctrl+o to expand)
+  ⎿  (timeout 2m)
+
+⏺ All 5 tests pass now. Let me run the full suite to confirm the others still
+  pass:
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ Don't worry about running the tests, just explain the behavior difference     
+  please                                                                        
+
+⏺ Here's what we actually found from the data, which revises the original
+  training-materials analysis:
+
+  ---
+  What the test data shows
+
+  Layer 1 (the first active layer after draping): top=1590, bottom=1580,
+  head≈1585, saturated thickness≈5m.
+
+  PRT release position (ireason=0): z≈1585 m
+
+  PRT evaluates defn%top = bot + sat*(top-bot) = 1580 + 0.5*10 = 1585. If the
+  particle's z from the PRP packagedata (z=1595, the layer-0 cell center) is
+  above that, it clamps to z = defn%top = 1585. After the recent drape fix, this
+  clamping now happens as part of the release event itself rather than
+  generating a separate ireason=6 drop record. PRT places particles at the water
+  table — the top of the saturated zone.
+
+  MP7 initial pathline position: z≈1582.5 m
+
+  MP7 drapes the particle to layer 1 but preserves the original localZ=0.5 from
+  the release spec. When writing the pathline record, it computes:
+
+  globalZ = (1 - localZ) * bottom + localZ * SaturatedTop
+          = (1 - 0.5) * 1580  +  0.5 * 1585
+          = 1582.5
+
+  MP7 places particles at the mid-point of the saturated zone — wherever
+  localZ=0.5 happens to land given the current head.
+
+  ---
+  Where the original analysis went wrong
+
+  The training-materials analysis compared MP7's timeseries output (z=1590) with
+  PRT's CSV output (z=1585). The timeseries records the initial position in the
+  dry layer-0 cell, where SaturatedTop = cell_bottom = 1590 (MP7 sets this for
+  any cell where head ≈ HDRY), so globalZ = (1-0.5)*1590 + 0.5*1590 = 1590
+  regardless of localZ. That's not a tracking position — it's a dry-cell
+  coordinate artifact written before the particle is moved to the active layer.
+  The pathline file records actual tracking positions, which for layer 1 give
+  z≈1582.5.
+
+  ---
+  The real comparison
+
+  ┌─────────────────────────┬─────────────────┬─────────────────────────────┐
+  │                         │       PRT       │             MP7             │
+  ├─────────────────────────┼─────────────────┼─────────────────────────────┤
+  │ Release/initial z       │ ≈1585 (water    │ ≈1582.5 (localZ=0.5 in sat. │
+  │                         │ table)          │  zone)                      │
+  ├─────────────────────────┼─────────────────┼─────────────────────────────┤
+  │ PRT starts relative to  │ ~2.5m higher    │ —                           │
+  │ MP7                     │                 │                             │
+  ├─────────────────────────┼─────────────────┼─────────────────────────────┤
+  │ Endpoint z              │ ≈1581.0         │ ≈1581.3                     │
+  ├─────────────────────────┼─────────────────┼─────────────────────────────┤
+  │ MP7 ends relative to    │ —               │ ~0.3m higher                │
+  │ PRT                     │                 │                             │
+  └─────────────────────────┴─────────────────┴─────────────────────────────┘
+
+  PRT starts above MP7 (because it places at the water table rather than the
+  release-spec localZ midpoint), but MP7 ends slightly above PRT. That crossover
+  is due to MP7's water-table-following: during the transient injection period
+  (period 2), rising heads lift MP7 particles because their preserved localZ=0.5
+  maps to a higher globalZ as SaturatedTop increases. PRT tracks in global
+  coordinates and doesn't have this effect, so its particles experience the
+  velocity field lower in the cell.
+
+  The net endpoint difference is small (~0.3m) because the two effects partially
+  cancel — PRT's higher starting point is offset by MP7 floating upward with
+  the rising water table.
+
+✻ Sautéed for 38s
