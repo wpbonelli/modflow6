@@ -632,7 +632,6 @@ contains
     integer(I4B) :: irow, icol, ilay, icpl
     integer(I4B) :: ic, icu, ic_old
     real(DP) :: x, y, z
-    real(DP) :: top, bot, hds
     ! formats
     character(len=*), parameter :: fmticterr = &
       "('Error in ',a,': Flow model interface does not contain ICELLTYPE. &
@@ -687,32 +686,18 @@ contains
     particle%ilay = ilay
     particle%izone = this%rptzone(ic)
 
-    ! if the particle was draped, override the release z coord and
-    ! set it to the saturated top of the cell. this puts a draped
-    ! a draped particle at the water table for a convertible cell
-    ! or at the geometric cell top for a confined cell. if it was
-    ! not draped and localz is enabled, calculate a model z coord
-    ! using the geometric cell top if the cell is confined or the
-    ! water table as the effective top if the cell is convertible.
+    ! if the particle was draped to this cell, set the z coord to
+    ! the effective top of the cell. if it was not draped, and is
+    ! a local z coord, calculate the corresponding model z coord.
     if (draped) then
       z = this%fmi%dis%bot(ic) + &
           this%fmi%gwfsat(ic) * &
           (this%fmi%dis%top(ic) - this%fmi%dis%bot(ic))
     else if (this%localz) then
-      ! TODO: is this sufficient instead of the below??
-      ! z = this%fmi%dis%bot(ic) + &
-      !     this%rptz(ip) * &
-      !     this%fmi%gwfsat(ic) * &
-      !     (this%fmi%dis%top(ic) - this%fmi%dis%bot(ic))
-
-      top = this%fmi%dis%top(ic)
-      bot = this%fmi%dis%bot(ic)
-      if (this%fmi%gwfceltyp(icu) /= 0) then
-        hds = this%fmi%gwfhead(ic)
-        top = min(top, hds)
-        top = max(top, bot)
-      end if
-      z = bot + this%rptz(ip) * (top - bot)
+      z = this%fmi%dis%bot(ic) + &
+          this%rptz(ip) * &
+          this%fmi%gwfsat(ic) * &
+          (this%fmi%dis%top(ic) - this%fmi%dis%bot(ic))
     else
       z = this%rptz(ip)
     end if
@@ -773,7 +758,7 @@ contains
         (ionper > nper) .and. &
         size(this%schedule%time_select%times) == 0) then
       ! If the user hasn't provided any release settings (neither
-      ! explicit release times, release time frequency, or period
+      ! explicit release times, release time frequency, nor period
       ! block release settings), default to a single release at the
       ! start of the simulation (t=0). Add t=0 directly to the time
       ! selection rather than time step selection because the latter

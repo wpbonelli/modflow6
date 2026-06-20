@@ -98,3 +98,8 @@ description = "Previously PRT model particle events were written to output file(
 section = "fixes"
 subsection = "model"
 description = "A PRT model coupled by an exchange to a GWF model that uses adaptive time stepping (ATS) would erroneously produce output for discarded/retried time step solve attempts. PRT output would also be erroneously produced for discarded Picard iterations. This has been fixed such that PRT will only produce output for successful solve attempts when used with an ATS flow model, and only for the final Picard iteration when MXITER > 1."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "In MF6.7.0, the PRT model began to require binary grid (GRB) files provided to the Flow Model Interface (FMI) package to contain ICELLTYPE when any Particle Release Point (PRP) package used LOCAL\\_Z release coordinates, so PRT could distinguish confined from convertible cells when converting local z to model z coordinates. This requirement is unnecessary and has been removed. A single formula $z = bot + localz \\cdot sat \\cdot (top - bot)$ works correctly for both cell types, since $sat = 1$ for confined cells, and for convertible cells $sat = (head - bot) / (top - bot)$ clamped to $[0, 1]$. Particle z coordinates near the cell top or bottom may differ slightly from before, since saturation is smoothed near the top and bottom."
