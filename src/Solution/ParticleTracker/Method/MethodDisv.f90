@@ -491,7 +491,6 @@ contains
     defn%faceflow = DZERO
     call this%load_cell_boundary_flows(defn)
     call this%load_cell_face_flows(defn)
-    call this%cap_cell_wt_flow(defn)
     call this%load_cell_no_exit_face(defn)
 
     ! Add up net distributed flow

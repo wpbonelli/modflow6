@@ -161,10 +161,10 @@
       442  
       443      if "drape" in name:
       444          assert len(actual[actual.ireason == 0]) == nparts  # r
-           elease
+           release
       445 +                                                              
       446 +        # PRT drops particles to the water table (ireason=6) a
-          +fter draping to                                               
+          +after draping to                                               
       447 +        # the first active layer. The drop z is ~1585, the wat
           +er table height                                               
       448 +        # in layer 1 at the end of the first (steady-state) st
@@ -520,7 +520,7 @@
           + difference:                                                  
       350 +    PRT places draped particles at the water table (top of the
           + saturated zone,                                              
-      351 +    z≈1585), while MP7 preserves the original localZ=0.5, whic
+      351 +    z≈1585), while MP7 preserves the original localZ=0.5, which
           +h maps to the                                                 
       352 +    mid-point of the saturated zone in the active cell (z≈1582
           +.5). See                                                      

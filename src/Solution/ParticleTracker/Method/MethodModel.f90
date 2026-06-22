@@ -18,7 +18,6 @@ module MethodModelModule
     procedure, public :: assess
     procedure, public :: get_level
     ! cell load utilities
-    procedure :: cap_cell_wt_flow
     procedure :: load_cell_no_exit_face
     procedure :: load_cell_saturation_status
   end type MethodModelType
@@ -41,32 +40,6 @@ contains
     integer(I4B) :: level
     level = LEVEL_MODEL
   end function get_level
-
-  !> @brief Prevent non-boundary upwards flow at the water table.
-  !!
-  !! Unless the top face is an assigned boundary with outflow,
-  !! cells which contain a water table should not have upward
-  !! flow through the top (i.e., the water table). Prevent it
-  !! by capping the top face flow at zero in these conditions.
-  !!
-  !! Assumes cell properties and flows are already loaded.
-  !<
-  subroutine cap_cell_wt_flow(this, defn)
-    class(MethodModelType), intent(inout) :: this
-    type(CellDefnType), pointer, intent(inout) :: defn
-    ! local
-    integer(I4B) :: itopface
-
-    ! If the cell contains a water table that is not an
-    ! assigned boundary face with upflow, cap flow at 0.
-    itopface = this%fmi%max_faces ! fmi's lateral face indices are not closed
-    if (this%fmi%is_boundary_face(defn%icell, itopface)) return
-    if (defn%isatstat == SATURATION_WATERTABLE) then
-      itopface = defn%npolyverts + 3 ! cell defn's lateral face indices are closed
-      defn%faceflow(itopface) = max(DZERO, defn%faceflow(itopface))
-    end if
-
-  end subroutine cap_cell_wt_flow
 
   !> @brief Set flag indicating if the cell has any faces with outflow.
   !! Assumes cell properties and flows are already loaded.

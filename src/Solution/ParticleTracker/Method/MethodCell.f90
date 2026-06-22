@@ -4,11 +4,13 @@ module MethodCellModule
   use ErrorUtilModule, only: pstop
   use ConstantsModule, only: DONE, DZERO
   use MethodModule, only: MethodType, LEVEL_FEATURE
-  use ParticleModule, only: ParticleType, ACTIVE, TERM_NO_EXITS, TERM_BOUNDARY
+  use ParticleModule, only: ParticleType, ACTIVE, TERM_NO_EXITS, TERM_BOUNDARY, &
+                            TERM_INACTIVE
   use ParticleEventModule, only: ParticleEventType
   use CellExitEventModule, only: CellExitEventType
   use SubCellExitEventModule, only: SubCellExitEventType
-  use CellDefnModule, only: CellDefnType, SATURATION_DRY
+  use CellDefnModule, only: CellDefnType, SATURATION_DRY, SATURATION_WATERTABLE
+  use CellRectModule, only: CellRectType
   use IteratorModule, only: IteratorType
   implicit none
 
@@ -36,12 +38,14 @@ contains
   !! or top face of a partially saturated cell, terminate.
   !<
   subroutine try_pass(this, particle, nextlevel, advancing)
+    use TdisModule, only: endofsimulation, totimc, totim
     class(MethodCellType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     logical(LGP) :: advancing
     integer(I4B) :: nextlevel
     ! local
-    integer(I4B) :: ic, iboundary, icellface
+    integer(I4B) :: ic, iboundary, icellface, i
+    real(DP) :: t, ttrackmax
 
     if (.not. particle%advancing) then
       advancing = .false.
@@ -54,6 +58,54 @@ contains
     iboundary = particle%iboundary(LEVEL_FEATURE)
     icellface = this%iboundary_to_icellface(iboundary)
     if (icellface <= 0) return
+
+    ! Water-table top-face exit: dispatch through dry tracking method
+    ! rather than passing into the dry cell above.
+    if (this%cell%defn%isatstat == SATURATION_WATERTABLE .and. &
+        icellface == this%fmi%max_faces) then
+      if (particle%idrymeth == 0) then
+        ! DROP (float): zero the top-face velocity so the subcell loop
+        ! re-runs and exits laterally instead.  Only implemented for DIS
+        ! (CellRectType); other cell types fall through to termination.
+        select type (cell => this%cell)
+        type is (CellRectType)
+          cell%vz2 = DZERO
+          particle%iboundary(LEVEL_FEATURE) = 0
+          ! advancing stays .true.; inner loop continues with vz2 = 0
+          return
+        end select
+      else if (particle%idrymeth == 1) then
+        ! STOP: terminate at the water table surface
+        advancing = .false.
+        call this%cellexit(particle)
+        call this%terminate(particle, status=TERM_INACTIVE)
+        return
+      else if (particle%idrymeth == 2) then
+        ! STAY: beach the particle at the water-table surface
+        advancing = .false.
+        particle%iboundary(LEVEL_FEATURE) = 0
+        particle%advancing = .false.
+        ttrackmax = totim
+        particle%ttrack = totim
+        call this%timestep(particle)
+        call this%tracktimes%advance()
+        if (this%tracktimes%any()) then
+          do i = this%tracktimes%selection(1), this%tracktimes%selection(2)
+            t = this%tracktimes%times(i)
+            if (t < totimc) cycle
+            if (t > totim) exit
+            particle%ttrack = t
+            call this%usertime(particle)
+            if (t > ttrackmax) ttrackmax = t
+          end do
+        end if
+        if (endofsimulation) then
+          particle%ttrack = ttrackmax
+          call this%terminate(particle, status=TERM_NO_EXITS)
+        end if
+        return
+      end if
+    end if
 
     ! on a cell face, done advancing. raise an exit event
     advancing = .false.
