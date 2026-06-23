@@ -1,28 +1,30 @@
 Input to the River (RIV) Package is read from the file that has type ``RIV6'' in the Name File.  Any number of RIV Packages can be specified for a single groundwater flow model.
 
-River input can be specified using lists or arrays.  List-based input for the RIV package is the default, and is described here.  Instructions for specifying array-based RIV input are described in the next section.
+River input can be specified using lists or grid arrays.  Grid array-based input for the RIV package is activated by providing READARRAYGRID within the OPTIONS block.  Instructions for specifying list-based river input is described in the previous section.
+
+When grid array-based input is used for the river package, the DIMENSIONS block is optional.  The input array size is determined from the model grid.  Cells that define no data should contain the DNODATA (3.0E+30) value.  When defined, the MAXBOUND dimension represents the maximum number of defined river (non-DNODATA) cells found in any stress period.  Defining MAXBOUND can reduce the memory footprint of the grid array-based RIV package, especially when the input grid arrays are sparse and the model grid is large.
 
 \vspace{5mm}
 \subsubsection{Structure of Blocks}
 \vspace{5mm}
 
 \noindent \textit{FOR EACH SIMULATION}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-riv-options.dat}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-riv-dimensions.dat}
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-rivg-options.dat}
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-rivg-dimensions.dat}
 \vspace{5mm}
 \noindent \textit{FOR ANY STRESS PERIOD}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-riv-period.dat}
-\packageperioddescription
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-rivg-period.dat}
+\packageperioddescriptiongridarray{river}
 
 \vspace{5mm}
 \subsubsection{Explanation of Variables}
 \begin{description}
-\input{./mf6ivar/tex/gwf-riv-desc.tex}
+\input{./mf6ivar/tex/gwf-rivg-desc.tex}
 \end{description}
 
 \vspace{5mm}
 \subsubsection{Example Input File}
-\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-riv-example.dat}
+\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-rivg-example.dat}
 
 \vspace{5mm}
 \subsubsection{Available observation types}
@@ -52,4 +54,4 @@ River Package observations include the simulated river flow rates (\texttt{riv})
 
 \vspace{5mm}
 \subsubsection{Example Observation Input File}
-\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-riv-example-obs.dat}
+\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-rivg-example-obs.dat}

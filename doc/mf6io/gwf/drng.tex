@@ -1,28 +1,30 @@
 Input to the Drain (DRN) Package is read from the file that has type ``DRN6'' in the Name File.  Any number of DRN Packages can be specified for a single groundwater flow model.
 
-Drain input can be specified using lists or arrays.  List-based input for the DRN package is the default, and is described here.  Instructions for specifying array-based DRN input are described in the next section.
+Drain input can be specified using lists or grid arrays.  Grid array-based input for the DRN package is activated by providing READARRAYGRID within the OPTIONS block.  Instructions for specifying list-based drain input is described in the previous section.
+
+When grid array-based input is used for the drain package, the DIMENSIONS block is optional.  The input array size is determined from the model grid.  Cells that define no data should contain the DNODATA (3.0E+30) value.  When defined, the MAXBOUND dimension represents the maximum number of defined drain (non-DNODATA) cells found in any stress period.  Defining MAXBOUND can reduce the memory footprint of the grid array-based DRN package, especially when the input grid arrays are sparse and the model grid is large.
 
 \vspace{5mm}
 \subsubsection{Structure of Blocks}
 \vspace{5mm}
 
 \noindent \textit{FOR EACH SIMULATION}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-drn-options.dat}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-drn-dimensions.dat}
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-drng-options.dat}
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-drng-dimensions.dat}
 \vspace{5mm}
 \noindent \textit{FOR ANY STRESS PERIOD}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-drn-period.dat}
-\packageperioddescription
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-drng-period.dat}
+\packageperioddescriptiongridarray{drain}
 
 \vspace{5mm}
 \subsubsection{Explanation of Variables}
 \begin{description}
-\input{./mf6ivar/tex/gwf-drn-desc.tex}
+\input{./mf6ivar/tex/gwf-drng-desc.tex}
 \end{description}
 
 \vspace{5mm}
 \subsubsection{Example Input File}
-\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-drn-example.dat}
+\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-drng-example.dat}
 
 \vspace{5mm}
 \subsubsection{Available observation types}
@@ -47,4 +49,4 @@ DRN & to-mvr & cellid or boundname & -- & Drain boundary discharge that is avail
 
 \vspace{5mm}
 \subsubsection{Example Observation Input File}
-\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-drn-example-obs.dat}
+\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-drng-example-obs.dat}

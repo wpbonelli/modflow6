@@ -1,28 +1,30 @@
 Input to the General-Head Boundary (GHB) Package is read from the file that has type ``GHB6'' in the Name File.  Any number of GHB Packages can be specified for a single groundwater flow model.
 
-General-Head Boundary input can be specified using lists or arrays.  List-based input for the GHB package is the default, and is described here.  Instructions for specifying array-based GHB input are described in the next section.
+General-Head Boundary input can be specified using lists or grid arrays.  Grid array-based input for the GHB package is activated by providing READARRAYGRID within the OPTIONS block.  Instructions for specifying list-based general-head boundaries is described in the previous section.
+
+When grid array-based input is used for general-head boundaries, the DIMENSIONS block is optional.  The input array size is determined from the model grid.  Cells that define no data should contain the DNODATA (3.0E+30) value.  When defined, the MAXBOUND dimension represents the maximum number of defined general-head boundary (non-DNODATA) cells found in any stress period.  Defining MAXBOUND can reduce the memory footprint of the grid array-based GHB package, especially when the input grid arrays are sparse and the model grid is large.
 
 \vspace{5mm}
 \subsubsection{Structure of Blocks}
 \vspace{5mm}
 
 \noindent \textit{FOR EACH SIMULATION}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-ghb-options.dat}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-ghb-dimensions.dat}
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-ghbg-options.dat}
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-ghbg-dimensions.dat}
 \vspace{5mm}
 \noindent \textit{FOR ANY STRESS PERIOD}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-ghb-period.dat}
-\packageperioddescription
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-ghbg-period.dat}
+\packageperioddescriptiongridarray{general-head boundary}
 
 \vspace{5mm}
 \subsubsection{Explanation of Variables}
 \begin{description}
-\input{./mf6ivar/tex/gwf-ghb-desc.tex}
+\input{./mf6ivar/tex/gwf-ghbg-desc.tex}
 \end{description}
 
 \vspace{5mm}
 \subsubsection{Example Input File}
-\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-ghb-example.dat}
+\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-ghbg-example.dat}
 
 \vspace{5mm}
 \subsubsection{Available observation types}
@@ -46,4 +48,4 @@ General-Head Boundary Package observations include the simulated general-head bo
 
 \vspace{5mm}
 \subsubsection{Example Observation Input File}
-\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-ghb-example-obs.dat}
+\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-ghbg-example-obs.dat}

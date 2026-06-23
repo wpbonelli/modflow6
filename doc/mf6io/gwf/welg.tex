@@ -1,28 +1,30 @@
 Input to the Well (WEL) Package is read from the file that has type ``WEL6'' in the Name File.  Any number of WEL Packages can be specified for a single groundwater flow model.
 
-Well input can be specified using lists or arrays.  List-based input for the WEL package is the default, and is described here.  Instructions for specifying array-based WEL input are described in the next section.
+Well input can be specified using lists or grid arrays.  Grid array-based input for the WEL package is activated by providing READARRAYGRID within the OPTIONS block.  Instructions for specifying list-based well input is described in the previous section.
+
+When grid array-based input is used for the well package, the DIMENSIONS block is optional.  The input array size is determined from the model grid.  Cells that define no data should contain the DNODATA (3.0E+30) value.  When defined, the MAXBOUND dimension represents the maximum number of defined well (non-DNODATA) cells found in any stress period.  Defining MAXBOUND can reduce the memory footprint of the grid array-based WEL package, especially when the input grid arrays are sparse and the model grid is large.
 
 \vspace{5mm}
 \subsubsection{Structure of Blocks}
 \vspace{5mm}
 
 \noindent \textit{FOR EACH SIMULATION}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-wel-options.dat}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-wel-dimensions.dat}
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-welg-options.dat}
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-welg-dimensions.dat}
 \vspace{5mm}
 \noindent \textit{FOR ANY STRESS PERIOD}
-\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-wel-period.dat}
-\packageperioddescription
+\lstinputlisting[style=blockdefinition]{./mf6ivar/tex/gwf-welg-period.dat}
+\packageperioddescriptiongridarray{well}
 
 \vspace{5mm}
 \subsubsection{Explanation of Variables}
 \begin{description}
-\input{./mf6ivar/tex/gwf-wel-desc.tex}
+\input{./mf6ivar/tex/gwf-welg-desc.tex}
 \end{description}
 
 \vspace{5mm}
 \subsubsection{Example Input File}
-\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-wel-example.dat}
+\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-welg-example.dat}
 
 \vspace{5mm}
 \subsubsection{Available observation types}
@@ -46,4 +48,4 @@ Well Package observations include the simulated well rates (\texttt{wel}), the w
 
 \vspace{5mm}
 \subsubsection{Example Observation Input File}
-\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-wel-example-obs.dat}
+\lstinputlisting[style=inputfile]{./mf6ivar/examples/gwf-welg-example-obs.dat}
