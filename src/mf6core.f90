@@ -660,9 +660,10 @@ contains
   !> @brief Called before running the retry loop,
   !< resets the counter
   subroutine Mf6PrepareRetryLoop()
-    use SimVariablesModule, only: iFailedStepRetry
+    use SimVariablesModule, only: iFailedStepRetry, lastStepFailed
 
     iFailedStepRetry = 0
+    lastStepFailed = 0
 
   end subroutine Mf6PrepareRetryLoop
 

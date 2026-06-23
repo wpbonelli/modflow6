@@ -308,6 +308,7 @@ contains
     !DIR$ ATTRIBUTES DLLEXPORT :: xmi_finalize_solve
     ! -- modules
     use BaseSolutionModule, only: BaseSolutionType
+    use SimVariablesModule, only: isimcnvg, lastStepFailed
     ! -- dummy variables
     integer(kind=c_int), intent(in) :: subcomponent_idx !< index of the subcomponent (i.e. Numerical Solution)
     integer(kind=c_int) :: bmi_status !< BMI status code
@@ -329,6 +330,8 @@ contains
     if (.not. hasConverged == 1) then
       write (bmi_last_error, fmt_fail_cvg_sol) subcomponent_idx
       call report_bmi_error(bmi_last_error)
+      isimcnvg = 0
+      lastStepFailed = 1
     end if
 
     ! non-convergence is no reason to crash the API:

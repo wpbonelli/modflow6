@@ -37,16 +37,14 @@ contains
 
   !> @brief Call this before the solve
   !<
-  function api_finish_retry(do_retry) result(bmi_status) &
+  function api_finish_retry(finish_retry) result(bmi_status) &
     bind(C, name="finish_retry")
     !DIR$ ATTRIBUTES DLLEXPORT :: api_finish_retry
     ! -- dummy variables
     integer(kind=c_int) :: bmi_status !< BMI status code
-    logical(kind=c_bool) :: do_retry
-    logical(LGP) :: finished
+    logical(kind=c_bool) :: finish_retry
 
-    finished = Mf6FinishRetry()
-    do_retry = .not. finished
+    finish_retry = Mf6FinishRetry()
 
     bmi_status = BMI_SUCCESS
 
