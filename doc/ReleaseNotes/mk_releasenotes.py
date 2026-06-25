@@ -48,7 +48,11 @@ if __name__ == "__main__":
                 f"{fragment.name}: invalid section '{item['section']}'"
                 f", expected one of: {list(sections)}"
             )
-        if "subsection" in item and item["subsection"] and item["subsection"] not in subsections:
+        if (
+            "subsection" in item
+            and item["subsection"]
+            and item["subsection"] not in subsections
+        ):
             errors.append(
                 f"{fragment.name}: invalid subsection '{item['subsection']}'"
                 f", expected one of: {list(subsections)}"
