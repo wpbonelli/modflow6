@@ -67,9 +67,8 @@ if __name__ == "__main__":
     if patch:
         items = [item for item in items if item["section"] == "fixes"]
         sections = {k: v for k, v in sections.items() if k == "fixes"}
-        subsections = {
-            k: subsections[k] for k in [item["subsection"] for item in items]
-        }
+        used_subsections = {item["subsection"] for item in items}
+        subsections = {k: v for k, v in subsections.items() if k in used_subsections}
     # make sure each item has a subsection entry even if empty
     for item in items:
         if not item.get("subsection"):
