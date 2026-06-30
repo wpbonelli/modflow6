@@ -626,7 +626,6 @@ contains
     use KindModule, only: I4B
     use ListsModule, only: solutiongrouplist
     use SolutionGroupModule, only: SolutionGroupType, GetSolutionGroupFromList
-    use IdmLoadModule, only: idm_ts_advance
     ! -- local variables
     class(SolutionGroupType), pointer :: sgp => null()
     integer(I4B) :: isg
@@ -671,12 +670,12 @@ contains
   !> @brief When retrying, this advances IDM
   !<
   subroutine Mf6StartRetry()
-    use SimVariablesModule, only: iFailedStepRetry
-    use IdmLoadModule, only: idm_ad
+    use SimVariablesModule, only: iFailedStepRetry    
+    use IdmLoadModule, only: idm_ts_advance
 
     if (iFailedStepRetry > 0) then
       ! advance IDM
-      call idm_ad()
+      call idm_ts_advance()
     end if
 
   end subroutine Mf6StartRetry
