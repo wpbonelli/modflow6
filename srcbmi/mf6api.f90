@@ -35,8 +35,8 @@ contains
 
   end function api_start_retry
 
-  !> @brief Call this before the solve
-  !<
+  !> @brief Call this after the solve, when true the retry
+  !< loop should be exited and the timestep is finished
   function api_finish_retry(finish_retry) result(bmi_status) &
     bind(C, name="finish_retry")
     !DIR$ ATTRIBUTES DLLEXPORT :: api_finish_retry

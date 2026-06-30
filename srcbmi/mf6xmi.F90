@@ -326,10 +326,8 @@ contains
     ! finish up
     call bs%finalizeSolve(iterationCounter, hasConverged, 0)
 
-    ! check convergence on solution
+    ! set convergence flag and status for possible retries
     if (.not. hasConverged == 1) then
-      write (bmi_last_error, fmt_fail_cvg_sol) subcomponent_idx
-      call report_bmi_error(bmi_last_error)
       isimcnvg = 0
       lastStepFailed = 1
     end if
