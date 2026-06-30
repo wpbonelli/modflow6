@@ -670,7 +670,7 @@ contains
   !> @brief When retrying, this advances IDM
   !<
   subroutine Mf6StartRetry()
-    use SimVariablesModule, only: iFailedStepRetry    
+    use SimVariablesModule, only: iFailedStepRetry
     use IdmLoadModule, only: idm_ts_advance
 
     if (iFailedStepRetry > 0) then
