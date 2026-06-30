@@ -47,12 +47,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout MF6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
 
       - name: Check Fortran source formatting
         run: pixi run check-format
@@ -87,7 +87,7 @@ jobs:
       FC_V: 13
     steps:
       - name: Checkout MF6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup ${{ env.FC }} ${{ env.FC_V }}
         uses: fortran-lang/setup-fortran@v1
@@ -96,9 +96,9 @@ jobs:
           version: ${{ env.FC_V }}
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
 
       - name: Setup MF6
         run: pixi run setup -Dwerror=true builddir
@@ -119,6 +119,43 @@ jobs:
       - name: Unit test MF6
         run: pixi run test builddir
 
+  pixi-gcc-extended-build:
+    name: Pixi gcc-extended-build environment testing
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+          - os: macos-14
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout MF6
+        uses: actions/checkout@v7
+
+      - name: Setup pixi
+        uses: prefix-dev/setup-pixi@v0.10.0
+        with:
+          pixi-version: v0.70.1
+
+      - name: Update netcdf-fortran.pc and test-drive
+        run: |
+          pixi run -e gcc-extended-build gcc-extended-build-update
+
+      - name: Setup and build the extended MF6 build in the gcc-extended-build environment
+        run: |
+          pixi run -e gcc-extended-build setup builddir -Dextended=true
+          pixi run -e gcc-extended-build build builddir
+
+      - name: Show build log
+        if: failure()
+        run: cat builddir/meson-logs/meson-log.txt
+
+      - name: Unit test the extended MF6 build in the gcc-extended-build environment
+        run: pixi run -e gcc-extended-build test builddir
+        
   build-static:
     name: Static gcc build
     runs-on: ${{ matrix.os }}
@@ -136,7 +173,7 @@ jobs:
       FC_V: 13
     steps:
       - name: Checkout MF6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup ${{ env.FC }} ${{ env.FC_V }}
         uses: fortran-lang/setup-fortran@v1
@@ -145,9 +182,9 @@ jobs:
           version: ${{ env.FC_V }}
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
 
       - name: Setup static MF6
         run: pixi run setup -Dwerror=true -Ddefault_library=static builddir
@@ -211,7 +248,7 @@ jobs:
       FC_V: 13
     steps:
       - name: Checkout MF6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: modflow6
 
@@ -222,9 +259,9 @@ jobs:
           version: ${{ env.FC_V }}
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
           manifest-path: "modflow6/pixi.toml"
 
       - name: Custom pixi install
@@ -293,10 +330,6 @@ jobs:
           - os: macos-14
             debug: true
             xcode-version: '15.1.0'
-          # intel mac, release mode
-          - os: macos-15-intel
-            debug: false
-            xcode-version: '16.1.0'
           # ubuntu, release mode
           - os: ubuntu-22.04
             debug: false
@@ -326,18 +359,18 @@ jobs:
           swap-storage: true
 
       - name: Checkout MF6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: modflow6
 
       - name: Checkout test models
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-testmodels
           path: modflow6-testmodels
 
       - name: Checkout examples
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-examples
           path: modflow6-examples
@@ -349,9 +382,9 @@ jobs:
           version: ${{ env.FC_V }}
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
           manifest-path: "modflow6/pixi.toml"
 
       - name: Custom pixi install
@@ -391,8 +424,6 @@ jobs:
           setupargs=""
           if [[ "${{ matrix.debug }}" == "true" ]]; then
             setupargs="-Ddebug=true -Doptimization=0"
-          elif [[ "${{ matrix.os }}" == "macos-14" ]]; then
-            setupargs="-Doptimization=1"
           fi
           echo "MESON_SETUP_ARGS=$setupargs" >> $GITHUB_ENV
 
@@ -476,7 +507,7 @@ jobs:
         run: |
           filters=""
           if [[ "${{ matrix.os }}" == "macos-14" ]]; then
-            # comparison fails on macos-14 with optimization=1
+            # sfr rewet comparison fails on macos-14
             filters="not test028_sfr_rewet"
           fi
           echo "filters=$filters" >> $GITHUB_OUTPUT
@@ -528,7 +559,7 @@ jobs:
 
       - name: Checkout usgslatex
         if: runner.os == 'Linux'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/usgslatex
           path: usgslatex
@@ -585,26 +616,26 @@ jobs:
           swap-storage: true
 
       - name: Checkout MF6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: modflow6
 
       - name: Checkout test models
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-testmodels
           path: modflow6-testmodels
 
       - name: Checkout examples
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-examples
           path: modflow6-examples
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
           manifest-path: "modflow6/pixi.toml"
 
       - name: Custom pixi install
@@ -733,7 +764,7 @@ jobs:
           swap-storage: true
 
       - name: Checkout MF6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: modflow6
 
@@ -745,9 +776,9 @@ jobs:
           version: 13
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
           manifest-path: "modflow6/pixi.toml"
 
       - name: Custom pixi install

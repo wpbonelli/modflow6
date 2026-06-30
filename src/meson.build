@@ -19,10 +19,9 @@ modflow_sources = files(
     'Distributed' / 'VirtualDataContainer.f90',
     'Distributed' / 'VirtualDataLists.f90',
     'Distributed' / 'VirtualDataManager.f90',
-    'Distributed' / 'VirtualExchange.f90',    
-    'Distributed' / 'VirtualGweExchange.f90',
+    'Distributed' / 'VirtualExchange.f90',
     'Distributed' / 'VirtualGwfExchange.f90',
-    'Distributed' / 'VirtualGwtExchange.f90',
+    'Distributed' / 'VirtualTspExchange.f90',
     'Distributed' / 'VirtualModel.f90',
     'Distributed' / 'VirtualGweModel.f90',
     'Distributed' / 'VirtualGwfModel.f90',
@@ -32,6 +31,7 @@ modflow_sources = files(
     'Exchange' / 'DisConnExchange.f90',
     'Exchange' / 'GhostNode.f90',
     'Exchange' / 'GwfExchangeMover.f90',
+    'Exchange' / 'TspExchangeMover.f90',
     'Exchange' / 'NumericalExchange.f90',
     'Exchange' / 'exg-chfgwf.f90',
     'Exchange' / 'exg-gwfgwf.f90',
@@ -363,6 +363,9 @@ modflow_sources = files(
     'Solution' / 'ParticleTracker' / 'Method' / 'TernarySolveUtils.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'Particle.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'ParticleReleaseSchedule.f90',
+    'Solution' / 'ParticleTracker' / 'Particle' / 'ParticleTrackEventBuffer.f90',
+    'Solution' / 'ParticleTracker' / 'Particle' / 'MemoryBuffer.f90',
+    'Solution' / 'ParticleTracker' / 'Particle' / 'ScratchFileBuffer.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'ParticleTracks.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'Events' / 'ParticleEvents.f90',
     'Solution' / 'ParticleTracker' / 'Particle' / 'Events' / 'ParticleEvent.f90',
@@ -495,13 +498,12 @@ modflow_sources = files(
     'Utilities' / 'Table.f90',
     'Utilities' / 'TableTerm.f90',
     'Utilities' / 'Timer.f90',
-    'Utilities' / 'version.f90',
     'mf6core.f90',
     'mf6lists.f90',
     'SimulationCreate.f90',
     'RunControl.f90',
     'RunControlFactory.F90'
-)
+) + [version_f90]
 
 modflow_petsc_sources = files(
   'Utilities' / 'Vector' / 'PetscVector.F90',

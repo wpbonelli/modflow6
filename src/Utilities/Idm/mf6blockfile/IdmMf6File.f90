@@ -44,7 +44,7 @@ module IdmMf6FileModule
   contains
     procedure :: init => dynamic_init
     procedure :: df => dynamic_df
-    procedure :: ad => dynamic_ad
+    procedure :: ts_advance => dynamic_ad
     procedure :: rp => dynamic_rp
     procedure :: read_ionper => dynamic_read_ionper
     procedure :: create_loader => dynamic_create_loader
@@ -198,7 +198,7 @@ contains
   subroutine dynamic_ad(this)
     class(Mf6FileDynamicPkgLoadType), intent(inout) :: this
     ! invoke loader advance
-    call this%rp_loader%ad()
+    call this%rp_loader%ts_advance()
   end subroutine dynamic_ad
 
   !> @brief read and prepare routine for dynamic loader
@@ -273,7 +273,6 @@ contains
     use Mf6FileSettingLoadModule, only: SettingLoadType
     use Mf6FileKeystringModule, only: KeystringLoadType
     use Mf6FileStoInputModule, only: StoInputType
-    use FeatureFlagsModule, only: developmode
     class(Mf6FileDynamicPkgLoadType), intent(inout) :: this
     class(ListLoadType), pointer :: list_loader
     class(GridArrayLoadType), pointer :: arrgrid_loader
@@ -297,10 +296,6 @@ contains
       allocate (arrlayer_loader)
       this%rp_loader => arrlayer_loader
     else if (this%readarraygrid) then
-      call developmode('Input file "'//trim(this%input_name)// &
-        '" READARRAYGRID option is still under development, install the &
-        &nightly build or compile from source with IDEVELOPMODE = 1.', &
-        this%iout)
       allocate (arrgrid_loader)
       this%rp_loader => arrgrid_loader
     else

@@ -37,7 +37,7 @@ module ListLoadModule
   contains
     procedure :: ainit
     procedure :: df
-    procedure :: ad
+    procedure :: ts_advance
     procedure :: reset
     procedure :: rp
     procedure :: destroy
@@ -125,11 +125,11 @@ contains
     end do
   end subroutine df
 
-  subroutine ad(this)
+  subroutine ts_advance(this)
     class(ListLoadType), intent(inout) :: this
     ! advance timeseries
     call this%tsmanager%ad()
-  end subroutine ad
+  end subroutine ts_advance
 
   subroutine reset(this)
     use StructArrayModule, only: StructArrayType

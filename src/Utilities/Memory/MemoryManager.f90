@@ -42,6 +42,7 @@ module MemoryManagerModule
 
   public :: memorystore
   public :: mem_print_detailed
+  public :: mem_release
 
   type(MemoryStoreType) :: memorystore
   type(TableType), pointer :: memtab => null()
@@ -796,7 +797,7 @@ contains
     end if
     !
     ! -- update counter
-    nvalues_aint = nvalues_aint + 1
+    nvalues_adbl = nvalues_adbl + 1
     !
     ! -- allocate memory type
     allocate (mt)
@@ -1223,8 +1224,8 @@ contains
         call allocate_error(name, mem_path, istat, isize)
       end if
       !
-      ! -- copy existing values
-      do n = 1, nrow_old
+      ! -- copy existing values (only up to the new size to handle shrinking)
+      do n = 1, min(nrow_old, nrow)
         astrtemp(n) = astr(n)
       end do
       !
@@ -1310,9 +1311,14 @@ contains
         call allocate_error(name, mem_path, istat, isize)
       end if
       !
-      ! -- copy existing values
-      do n = 1, nrow_old
+      ! -- copy existing values (only up to the new size to handle shrinking)
+      do n = 1, min(nrow_old, nrow)
         astrtemp(n) = acharstr1d(n)
+        call acharstr1d(n)%destroy()
+      end do
+      !
+      ! -- destroy remaining elements if shrinking
+      do n = nrow + 1, nrow_old
         call acharstr1d(n)%destroy()
       end do
       !
@@ -1469,8 +1475,9 @@ contains
     if (istat /= 0) then
       call allocate_error(name, mem_path, istat, isize)
     end if
-    do i = 1, ishape(2)
-      do j = 1, ishape(1)
+    ! Copy only what fits in the new array to handle shrinking
+    do i = 1, min(ishape(2), nrow)
+      do j = 1, min(ishape(1), ncol)
         aint(j, i) = mt%aint2d(j, i)
       end do
     end do
@@ -1559,8 +1566,9 @@ contains
     if (istat /= 0) then
       call allocate_error(name, mem_path, istat, isize)
     end if
-    do i = 1, ishape(2)
-      do j = 1, ishape(1)
+    ! Copy only what fits in the new array to handle shrinking
+    do i = 1, min(ishape(2), nrow)
+      do j = 1, min(ishape(1), ncol)
         adbl(j, i) = mt%adbl2d(j, i)
       end do
     end do
@@ -2649,6 +2657,41 @@ contains
     end do
 
   end function calc_virtual_mem
+
+  !> @brief Release a memory store entry: deallocate data and update counters
+  !!
+  !! Deallocates the data held by mt, zeroes mt%isize, and decrements the
+  !! appropriate nvalues_* counter for master entries. no-op when data has
+  !! already been released. Primarily intended to support the release of
+  !! input context memory prior to simulation runtime.
+  !<
+  subroutine mem_release(mt)
+    type(MemoryType), pointer, intent(inout) :: mt
+
+    if (.not. mt%mt_associated()) return
+
+    if (mt%master) then
+      if (mt%memtype(1:6) == 'STRING') then
+        ! nvalues_astr increments differ: scalar adds element_size (ilen),
+        ! arrays (str1d, charstr1d) add isize only. For IDM release the
+        ! variables are arrays, so decrement by isize to match.
+        if (mt%isize == 1) then
+          nvalues_astr = nvalues_astr - mt%element_size
+        else
+          nvalues_astr = nvalues_astr - mt%isize
+        end if
+      else if (mt%memtype(1:7) == 'LOGICAL') then
+        nvalues_alogical = nvalues_alogical - mt%isize
+      else if (mt%memtype(1:7) == 'INTEGER') then
+        nvalues_aint = nvalues_aint - mt%isize
+      else if (mt%memtype(1:6) == 'DOUBLE') then
+        nvalues_adbl = nvalues_adbl - mt%isize
+      end if
+    end if
+
+    call mt%mt_deallocate()
+    mt%isize = 0
+  end subroutine mem_release
 
   !> @brief Deallocate memory in the memory manager
   !<

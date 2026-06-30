@@ -40,7 +40,7 @@ module LayerArrayLoadModule
   contains
     procedure :: ainit
     procedure :: df
-    procedure :: ad
+    procedure :: ts_advance
     procedure :: rp
     procedure :: destroy
     procedure :: reset
@@ -118,10 +118,10 @@ contains
     call this%tasmanager%tasmanager_df()
   end subroutine df
 
-  subroutine ad(this)
+  subroutine ts_advance(this)
     class(LayerArrayLoadType), intent(inout) :: this
     call this%tasmanager%ad()
-  end subroutine ad
+  end subroutine ts_advance
 
   subroutine rp(this, parser)
     use MemoryManagerModule, only: mem_setptr
@@ -237,7 +237,7 @@ contains
 
   subroutine reset(this)
     class(LayerArrayLoadType), intent(inout) :: this
-    integer(I4B) :: n, m
+    integer(I4B) :: n
 
     if (this%tas_active /= 0) then
       ! reset tasmanager
@@ -252,12 +252,6 @@ contains
       this%param_reads(n)%invar = 0
     end do
 
-    ! explicitly reset auxvar array each period
-    do m = 1, this%ctx%ncpl
-      do n = 1, this%ctx%naux
-        this%ctx%auxvar(n, m) = DZERO
-      end do
-    end do
   end subroutine reset
 
   subroutine init_charstr1d(this, varname, input_name)

@@ -1585,7 +1585,7 @@ contains
     ! -- modules
     use SimModule, only: count_errors, store_error
     use MemoryManagerModule, only: mem_reallocate
-    use MemoryManagerExtModule, only: mem_set_value
+    use MemoryManagerExtModule, only: mem_set_value, memorystore_release
     use GwfNpfInputModule, only: GwfNpfParamFoundType
     ! -- dummy
     class(GwfNpftype) :: this
@@ -1602,7 +1602,8 @@ contains
     ! -- update defaults with idm sourced values
     call mem_set_value(this%icelltype, 'ICELLTYPE', this%input_mempath, map, &
                        found%icelltype)
-    call mem_set_value(this%k11, 'K', this%input_mempath, map, found%k)
+    call mem_set_value(this%k11, 'K', this%input_mempath, map, found%k, &
+                       release=.false.)
     call mem_set_value(this%k33, 'K33', this%input_mempath, map, found%k33)
     call mem_set_value(this%k22, 'K22', this%input_mempath, map, found%k22)
     call mem_set_value(this%wetdry, 'WETDRY', this%input_mempath, map, &
@@ -1648,10 +1649,12 @@ contains
     !
     ! -- handle not found side effects
     if (.not. found%k33) then
-      call mem_set_value(this%k33, 'K', this%input_mempath, map, afound(1))
+      call mem_set_value(this%k33, 'K', this%input_mempath, map, afound(1), &
+                         release=.false.)
     end if
     if (.not. found%k22) then
-      call mem_set_value(this%k22, 'K', this%input_mempath, map, afound(2))
+      call mem_set_value(this%k22, 'K', this%input_mempath, map, afound(2), &
+                         release=.false.)
     end if
     if (.not. found%wetdry) call mem_reallocate(this%wetdry, 1, 'WETDRY', &
                                                 trim(this%memoryPath))
@@ -1661,6 +1664,9 @@ contains
       call mem_reallocate(this%angle2, 0, 'ANGLE2', trim(this%memoryPath))
     if (.not. found%angle3 .and. this%ixt3d == 0) &
       call mem_reallocate(this%angle3, 0, 'ANGLE3', trim(this%memoryPath))
+    !
+    ! -- cleanup
+    call memorystore_release('K', this%input_mempath)
     !
     ! -- log griddata
     if (this%iout > 0) then

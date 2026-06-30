@@ -62,29 +62,19 @@ jobs:
           - os: ${{ inputs.linux_version }}
             compiler: ${{ inputs.compiler_toolchain }}
             version: ${{ inputs.compiler_version }}
-            optimization: 2
             extended: false
           - os: macos-14
             compiler: gcc
             version: 13
-            optimization: 1
             extended: false
             xcode-version: '15.1.0'
-          - os: macos-15-intel
-            compiler: gcc
-            version: 13
-            optimization: 1
-            extended: false
-            xcode-version: '16.1.0'
           - os: windows-2022
             compiler: ${{ inputs.compiler_toolchain }}
             version: ${{ inputs.compiler_version }}
-            optimization: 2
             extended: false
           - os: windows-2022
             compiler: intel-classic
             version: "2021.6"
-            optimization: 2
             extended: true
     defaults:
       run:
@@ -106,7 +96,7 @@ jobs:
           swap-storage: true
 
       - name: Checkout modflow6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/modflow6
           path: modflow6
@@ -114,14 +104,14 @@ jobs:
 
       - name: Checkout modflow6-testmodels
         if: inputs.run_tests == true && !(runner.os == 'Windows' && matrix.extended)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-testmodels
           path: modflow6-testmodels
 
       - name: Checkout modflow6-examples
         if: inputs.run_tests == true && !(runner.os == 'Windows' && matrix.extended)
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-examples
           path: modflow6-examples
@@ -135,9 +125,9 @@ jobs:
           version: ${{ matrix.version }}
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
           manifest-path: "modflow6/pixi.toml"
 
       - name: Custom pixi install
@@ -206,7 +196,7 @@ jobs:
             # run only parallel/extended tests in developmode, run all tests in releasemode
             filters="test_par or test_netcdf"
           fi
-          # comparison fails on macos with optimization=1
+          # sfr rewet comparison fails on macos
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             if [[ "$filters" != "" ]]; then
               filters="$filters and not test028_sfr_rewet"
@@ -244,14 +234,14 @@ jobs:
         if: (!(runner.os == 'Windows' && matrix.extended))
         working-directory: modflow6
         run: |
-          pixi run setup builddir -Doptimization=${{ matrix.optimization }}
+          pixi run setup builddir
           pixi run build builddir
 
       - name: Build mf5to6 converter
         if: (!(runner.os == 'Windows' && matrix.extended))
         working-directory: modflow6
         run: |
-          pixi run setup-mf5to6 builddir -Doptimization=${{ matrix.optimization }}
+          pixi run setup-mf5to6 builddir
           pixi run build-mf5to6 builddir
 
       - name: Show build log
@@ -400,7 +390,7 @@ jobs:
       # compiling binaries, building documentation
       - name: Checkout usgslatex
         if: ${{ runner.os == 'Linux' && inputs.run_tests == true }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/usgslatex
           path: usgslatex
@@ -447,20 +437,20 @@ jobs:
           swap-storage: true
 
       - name: Checkout modflow6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/modflow6
           path: modflow6
           ref: ${{ inputs.branch }}
 
       - name: Checkout modflow6-examples
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-examples
           path: modflow6-examples
 
       - name: Checkout usgslatex
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/usgslatex
           path: usgslatex
@@ -479,9 +469,9 @@ jobs:
         run: sudo ./install.sh --all-users
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
           manifest-path: "modflow6/pixi.toml"
 
       - name: Custom pixi install
@@ -611,9 +601,6 @@ jobs:
           - os: macos-14
             compiler: gcc
             version: 13
-          - os: macos-15-intel
-            compiler: gcc
-            version: 13
           - os: windows-2022
             compiler: ${{ inputs.compiler_toolchain }}
             version: ${{ inputs.compiler_version }}
@@ -627,14 +614,14 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout modflow6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/modflow6
           path: modflow6
           ref: ${{ inputs.branch }}
 
       - name: Checkout modflow6-examples
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-examples
           path: modflow6-examples
@@ -646,9 +633,9 @@ jobs:
           version: ${{ matrix.version }}
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.5
+        uses: prefix-dev/setup-pixi@v0.10.0
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
           manifest-path: "modflow6/pixi.toml"
 
       - name: Custom pixi install
@@ -721,6 +708,7 @@ jobs:
           if [[ "${{ inputs.releasemode }}" == "true" ]]; then
             zip -r $distname.zip \
               $distname/bin \
+              $distname/dfns \
               $distname/src \
               $distname/srcbmi \
               $distname/doc \
@@ -739,6 +727,7 @@ jobs:
           else
             zip -r $distname.zip \
               $distname/bin/* \
+              $distname/dfns \
               $distname/doc/mf6io.pdf \
               $distname/doc/release.pdf \
               $distname/code.json \
@@ -756,6 +745,7 @@ jobs:
           if [[ "${{ inputs.releasemode }}" == "true" ]]; then
             7z a -tzip $distname.zip \
               $distname/bin \
+              $distname/dfns \
               $distname/src \
               $distname/srcbmi \
               $distname/doc \
@@ -773,6 +763,7 @@ jobs:
           else
             7z a -tzip $distname.zip \
               $distname/bin/* \
+              $distname/dfns \
               $distname/doc/mf6io.pdf \
               $distname/doc/release.pdf \
               $distname/code.json \
@@ -787,6 +778,20 @@ jobs:
         with:
           name: "${{ needs.build.outputs.distname }}_${{ steps.ostag.outputs.ostag }}"
           path: "${{ needs.build.outputs.distname }}_${{ steps.ostag.outputs.ostag }}.zip"
+
+      - name: Create DFN asset
+        if: runner.os == 'Linux'
+        run: |
+          distname="${{ needs.build.outputs.distname }}_${{ steps.ostag.outputs.ostag }}"
+          cd "$distname/dfns"
+          zip -r "../../${{ needs.build.outputs.distname }}_dfns.zip" .
+
+      - name: Upload DFN asset
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: "${{ needs.build.outputs.distname }}_dfns"
+          path: "${{ needs.build.outputs.distname }}_dfns.zip"
 
       - name: Upload release notes
         if: runner.os == 'Linux'

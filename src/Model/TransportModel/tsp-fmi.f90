@@ -558,7 +558,7 @@ contains
   subroutine gwtfmi_source_packagedata(this)
     ! -- modules
     use MemoryManagerModule, only: mem_setptr
-    use MemoryManagerExtModule, only: mem_set_value
+    use MemoryManagerExtModule, only: mem_set_value, memorystore_release
     use CharacterStringModule, only: CharacterStringType
     use OpenSpecModule, only: ACCESS, FORM
     use ConstantsModule, only: LINELENGTH, DEM6, LENPACKAGENAME
@@ -605,19 +605,19 @@ contains
       case ('GWFBUDGET')
         inunit = getunit()
         call openfile(inunit, this%iout, fname, 'DATA(BINARY)', FORM, &
-                      ACCESS, 'UNKNOWN')
+                      ACCESS, 'OLD')
         this%iubud = inunit
         call this%initialize_bfr()
       case ('GWFHEAD')
         inunit = getunit()
         call openfile(inunit, this%iout, fname, 'DATA(BINARY)', FORM, &
-                      ACCESS, 'UNKNOWN')
+                      ACCESS, 'OLD')
         this%iuhds = inunit
         call this%initialize_hfr()
       case ('GWFMOVER')
         inunit = getunit()
         call openfile(inunit, this%iout, fname, 'DATA(BINARY)', FORM, &
-                      ACCESS, 'UNKNOWN')
+                      ACCESS, 'OLD')
         this%iumvr = inunit
         call budgetobject_cr_bfr(this%mvrbudobj, 'MVT', this%iumvr, &
                                  this%iout)
@@ -640,7 +640,7 @@ contains
         iapt = iapt + 1
         inunit = getunit()
         call openfile(inunit, this%iout, fname, 'DATA(BINARY)', FORM, &
-                      ACCESS, 'UNKNOWN')
+                      ACCESS, 'OLD')
         call budgetobject_cr_bfr(budobjptr, flowtype, inunit, &
                                  this%iout, colconv2=['GWF             '])
         call budobjptr%fill_from_bfr(this%dis, this%iout)
@@ -651,6 +651,10 @@ contains
     if (count_errors() > 0) then
       call store_error_filename(this%input_fname)
     end if
+
+    call memorystore_release('FLOWTYPE', this%input_mempath)
+    call memorystore_release('FILEIN', this%input_mempath)
+    call memorystore_release('FNAME', this%input_mempath)
   end subroutine gwtfmi_source_packagedata
 
   !> @brief Set the pointer to a budget object
