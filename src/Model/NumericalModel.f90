@@ -294,7 +294,7 @@ contains
   end subroutine allocate_arrays
 
   subroutine set_xptr(this, xsln, sln_offset, varNameTgt, memPathTgt)
-    use MemoryManagerModule, only: mem_checkin
+    use MemoryManagerModule, only: mem_checkin, mem_set_attributes
     ! dummy
     class(NumericalModelType) :: this
     real(DP), dimension(:), pointer, contiguous, intent(in) :: xsln
@@ -307,6 +307,10 @@ contains
     offset = this%moffset - sln_offset
     this%x => xsln(offset + 1:offset + this%neq)
     call mem_checkin(this%x, 'X', this%memoryPath, varNameTgt, memPathTgt)
+    ! X is the model's primary dependent-variable output, but unlike SIMVALS
+    ! it's also a legitimate write target (e.g. coupled-model workflows write
+    ! it directly) - output, but not readonly
+    call mem_set_attributes('X', this%memoryPath, output=.true.)
   end subroutine set_xptr
 
   subroutine set_rhsptr(this, rhssln, sln_offset, varNameTgt, memPathTgt)

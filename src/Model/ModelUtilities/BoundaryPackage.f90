@@ -1004,7 +1004,7 @@ contains
   !<
   subroutine allocate_arrays(this, nodelist, auxvar)
     ! -- modules
-    use MemoryManagerModule, only: mem_allocate, mem_setptr
+    use MemoryManagerModule, only: mem_allocate, mem_setptr, mem_set_attributes
     ! -- dummy
     class(BndType) :: this !< BndType object
     integer(I4B), dimension(:), pointer, contiguous, optional :: nodelist !< package nodelist
@@ -1044,6 +1044,10 @@ contains
     !
     ! -- Allocate the simvals array
     call mem_allocate(this%simvals, this%maxbound, 'SIMVALS', this%memoryPath)
+    ! -- simvals is a computed, per-timestep budget term: not user-writable,
+    !    and it's the canonical example of a pure output variable
+    call mem_set_attributes('SIMVALS', this%memoryPath, readonly=.true., &
+                             output=.true.)
     if (this%imover == 1) then
       call mem_allocate(this%simtomvr, this%maxbound, 'SIMTOMVR', &
                         this%memoryPath)
