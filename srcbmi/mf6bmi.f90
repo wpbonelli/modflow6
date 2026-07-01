@@ -27,7 +27,7 @@ module mf6bmi
   use CharacterStringModule
   use MemoryManagerModule, only: mem_setptr, get_mem_elem_size, get_isize, &
                                  get_mem_rank, get_mem_shape, get_mem_type, &
-                                 memorystore
+                                 get_from_memorystore, memorystore
   use MemoryContainerIteratorModule, only: MemoryContainerIteratorType
   use MemoryTypeModule, only: MemoryType
   use MemoryHelperModule, only: create_mem_address
@@ -199,7 +199,8 @@ contains
 
   !> @brief Get the number of input variables in the simulation
   !!
-  !! This concerns all variables stored in the memory manager
+  !! Counts variables stored in the memory manager that are not marked
+  !! read-only, i.e. those an API consumer may write.
   !<
   function get_input_item_count(count) result(bmi_status) &
     bind(C, name="get_input_item_count")
@@ -207,8 +208,17 @@ contains
     ! -- dummy variables
     integer(kind=c_int), intent(out) :: count !< the number of input variables
     integer(kind=c_int) :: bmi_status !< BMI status code
+    ! -- local variables
+    type(MemoryContainerIteratorType), allocatable :: itr
+    type(MemoryType), pointer :: mt => null()
 
-    count = memorystore%count()
+    count = 0
+    itr = memorystore%iterator()
+    do while (itr%has_next())
+      call itr%next()
+      mt => itr%value()
+      if (.not. mt%readonly) count = count + 1
+    end do
 
     bmi_status = BMI_SUCCESS
 
@@ -216,7 +226,8 @@ contains
 
   !> @brief Get the number of output variables in the simulation
   !!
-  !! This concerns all variables stored in the memory manager
+  !! Counts variables stored in the memory manager that are marked
+  !! as output.
   !<
   function get_output_item_count(count) result(bmi_status) &
     bind(C, name="get_output_item_count")
@@ -224,8 +235,17 @@ contains
     ! -- dummy variables
     integer(kind=c_int), intent(out) :: count !< the number of output variables
     integer(kind=c_int) :: bmi_status !< BMI status code
+    ! -- local variables
+    type(MemoryContainerIteratorType), allocatable :: itr
+    type(MemoryType), pointer :: mt => null()
 
-    count = memorystore%count()
+    count = 0
+    itr = memorystore%iterator()
+    do while (itr%has_next())
+      call itr%next()
+      mt => itr%value()
+      if (mt%output) count = count + 1
+    end do
 
     bmi_status = BMI_SUCCESS
 
@@ -233,8 +253,9 @@ contains
 
   !> @brief Returns all input variables in the simulation
   !!
-  !! This functions returns the full address for all variables in the
-  !! memory manager
+  !! This function returns the full address for every variable in the
+  !! memory manager that is not marked read-only, i.e. those an API
+  !! consumer may write.
   !!
   !! The array @p c_names should be pre-allocated of proper size:
   !!
@@ -262,6 +283,7 @@ contains
     do while (itr%has_next())
       call itr%next()
       mt => itr%value()
+      if (mt%readonly) cycle
       var_address = create_mem_address(mt%path, mt%name)
       do i = 1, len(trim(var_address))
         c_names(start + i - 1) = var_address(i:i)
@@ -276,9 +298,9 @@ contains
 
   !> @brief Returns all output variables in the simulation
   !!
-  !! This function works analogously to get_input_var_names(),
-  !! and currently returns the same set of memory variables,
-  !! which is all of them!
+  !! This function works analogously to get_input_var_names(), but returns
+  !! the full address for every variable in the memory manager that is
+  !! marked as output.
   !<
   function get_output_var_names(c_names) result(bmi_status) &
     bind(C, name="get_output_var_names")
@@ -297,6 +319,7 @@ contains
     do while (itr%has_next())
       call itr%next()
       mt => itr%value()
+      if (.not. mt%output) cycle
       var_address = create_mem_address(mt%path, mt%name)
       do i = 1, len(trim(var_address))
         c_names(start + i - 1) = var_address(i:i)
@@ -913,6 +936,8 @@ contains
     character(len=LENMEMTYPE) :: mem_type
     character(len=LENVARNAME) :: var_name
     logical(LGP) :: valid
+    logical(LGP) :: found
+    type(MemoryType), pointer :: mt => null()
 
     bmi_status = BMI_SUCCESS
 
@@ -920,6 +945,16 @@ contains
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
+    end if
+
+    call get_from_memorystore(var_name, mem_path, mt, found, check=.false.)
+    if (found) then
+      if (mt%readonly) then
+        write (bmi_last_error, fmt_readonly_var) trim(var_name)
+        call report_bmi_error(bmi_last_error)
+        bmi_status = BMI_FAILURE
+        return
+      end if
     end if
 
     call get_mem_type(var_name, mem_path, mem_type)

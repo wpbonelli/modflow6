@@ -31,6 +31,7 @@ module MemoryManagerModule
   public :: mem_write_usage
   public :: mem_da
   public :: mem_set_print_option
+  public :: mem_set_attributes
   public :: get_from_memorystore
 
   public :: get_mem_type
@@ -327,6 +328,27 @@ contains
       end if
     end if
   end subroutine get_from_memorystore
+
+  !> @brief Set the readonly and/or output attributes on an existing memory entry
+  !!
+  !! Mutates attributes on an already-allocated MemoryType entry, looked up by name and
+  !! memory path. Omitted attributes are left unchanged. Intended to be called once, after
+  !! a variable has been allocated, to annotate it per the DFN memory catalog; it does not
+  !! itself allocate anything.
+  !<
+  subroutine mem_set_attributes(name, mem_path, readonly, output)
+    character(len=*), intent(in) :: name !< variable name
+    character(len=*), intent(in) :: mem_path !< path where the variable is stored
+    logical(LGP), intent(in), optional :: readonly !< when true, mark the variable read-only
+    logical(LGP), intent(in), optional :: output !< when true, mark the variable as output
+    ! -- local
+    type(MemoryType), pointer :: mt => null()
+    logical(LGP) :: found
+    ! -- code
+    call get_from_memorystore(name, mem_path, mt, found)
+    if (present(readonly)) mt%readonly = readonly
+    if (present(output)) mt%output = output
+  end subroutine mem_set_attributes
 
   !> @brief Issue allocation error message and stop program execution
   !<
