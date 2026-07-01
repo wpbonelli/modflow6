@@ -1047,7 +1047,7 @@ contains
     ! -- simvals is a computed, per-timestep budget term: not user-writable,
     !    and it's the canonical example of a pure output variable
     call mem_set_attributes('SIMVALS', this%memoryPath, readonly=.true., &
-                             output=.true.)
+                            output=.true.)
     if (this%imover == 1) then
       call mem_allocate(this%simtomvr, this%maxbound, 'SIMTOMVR', &
                         this%memoryPath)
