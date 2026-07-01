@@ -936,8 +936,6 @@ contains
     character(len=LENMEMTYPE) :: mem_type
     character(len=LENVARNAME) :: var_name
     logical(LGP) :: valid
-    logical(LGP) :: found
-    type(MemoryType), pointer :: mt => null()
 
     bmi_status = BMI_SUCCESS
 
@@ -945,16 +943,6 @@ contains
     if (.not. valid) then
       bmi_status = BMI_FAILURE
       return
-    end if
-
-    call get_from_memorystore(var_name, mem_path, mt, found, check=.false.)
-    if (found) then
-      if (mt%readonly) then
-        write (bmi_last_error, fmt_readonly_var) trim(var_name)
-        call report_bmi_error(bmi_last_error)
-        bmi_status = BMI_FAILURE
-        return
-      end if
     end if
 
     call get_mem_type(var_name, mem_path, mem_type)
@@ -973,6 +961,31 @@ contains
     end if
 
   end function set_value
+
+  !> @brief Set bmi_status to BMI_FAILURE and report a BMI error if the
+  !! variable is marked read-only
+  !!
+  !! Terminates the simulation if the variable does not exist, matching the
+  !! existing not-found behavior of get_mem_rank/get_mem_type. Called by each
+  !! of set_value_double/set_value_int/set_value_bool, since those (not
+  !! set_value, which just dispatches to one of them by type) are the actual
+  !! DLLEXPORT'd entry points a BMI consumer may call directly.
+  !<
+  subroutine check_not_readonly(var_name, mem_path, bmi_status)
+    character(len=*), intent(in) :: var_name !< variable name
+    character(len=*), intent(in) :: mem_path !< path where the variable is stored
+    integer(kind=c_int), intent(inout) :: bmi_status !< BMI status code
+    ! -- local variables
+    type(MemoryType), pointer :: mt => null()
+    logical(LGP) :: found
+
+    call get_from_memorystore(var_name, mem_path, mt, found)
+    if (mt%readonly) then
+      write (bmi_last_error, fmt_readonly_var) trim(var_name)
+      call report_bmi_error(bmi_last_error)
+      bmi_status = BMI_FAILURE
+    end if
+  end subroutine check_not_readonly
 
   !> @brief Set new values for a variable of type double
   !!
@@ -1007,6 +1020,9 @@ contains
       bmi_status = BMI_FAILURE
       return
     end if
+
+    call check_not_readonly(var_name, mem_path, bmi_status)
+    if (bmi_status == BMI_FAILURE) return
 
     ! convert pointer and copy, using loops to avoid stack overflow
     rank = -1
@@ -1081,6 +1097,9 @@ contains
       return
     end if
 
+    call check_not_readonly(var_name, mem_path, bmi_status)
+    if (bmi_status == BMI_FAILURE) return
+
     ! convert pointer and copy, using loops to avoid stack overflow
     rank = -1
     call get_mem_rank(var_name, mem_path, rank)
@@ -1150,6 +1169,9 @@ contains
       bmi_status = BMI_FAILURE
       return
     end if
+
+    call check_not_readonly(var_name, mem_path, bmi_status)
+    if (bmi_status == BMI_FAILURE) return
 
     rank = -1
     call get_mem_rank(var_name, mem_path, rank)
