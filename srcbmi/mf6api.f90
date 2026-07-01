@@ -42,7 +42,7 @@ contains
     !DIR$ ATTRIBUTES DLLEXPORT :: api_finish_retry
     ! -- dummy variables
     integer(kind=c_int) :: bmi_status !< BMI status code
-    logical(kind=c_bool) :: finish_retry
+    logical(kind=c_bool), intent(out) :: finish_retry
 
     finish_retry = Mf6FinishRetry()
 
