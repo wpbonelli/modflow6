@@ -342,7 +342,7 @@ contains
     ! -- local
     type(MemoryType), pointer :: mt => null()
     logical(LGP) :: found
-    
+
     call get_from_memorystore(name, mem_path, mt, found)
     if (present(readonly)) mt%readonly = readonly
     if (present(output)) mt%output = output
