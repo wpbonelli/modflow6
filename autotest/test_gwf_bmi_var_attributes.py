@@ -1,13 +1,9 @@
 """
 Test that the memory manager's readonly/output variable attributes are
-enforced uniformly through the BMI, not just by convention:
+interpreted/enforced through the BMI.
 
-- get_input_var_names()/get_output_var_names() are filtered on these
-  attributes rather than dumping the whole memory store.
-- a readonly variable (WEL's SIMVALS) cannot be written via set_value(),
-  regardless of which BMI entry point is used.
-- a variable that is both writable and output (the model's X/head array)
-  can legitimately appear in both lists and be written.
+- get_input_var_names()/get_output_var_names() are correctly filtered
+- a readonly variable cannot be written via set_value()
 """
 
 import flopy
@@ -28,7 +24,6 @@ wellq = -1.0
 
 @pytest.fixture
 def simple_sim(tmp_path):
-    """A trivial, linear, steady-state 1D column: CHD on one end, WEL on the other."""
     sim = flopy.mf6.MFSimulation(sim_name=name, sim_ws=str(tmp_path))
     flopy.mf6.ModflowTdis(sim, nper=1, perioddata=[(1.0, 1, 1.0)])
     flopy.mf6.ModflowIms(sim, outer_dvclose=1e-8, inner_dvclose=1e-8)
@@ -61,20 +56,18 @@ def test_var_attributes(simple_sim, targets):
     input_vars = mf6.get_input_var_names()
     output_vars = mf6.get_output_var_names()
 
-    # SIMVALS is readonly + output: input-excluded, output-included
+    # SIMVALS is readonly output
     assert simvals_addr not in input_vars
     assert simvals_addr in output_vars
 
-    # X is writable + output: appears in both
+    # X is writable (input) and output
     assert x_addr in input_vars
     assert x_addr in output_vars
 
-    # writing SIMVALS should be rejected uniformly, regardless of entry point
     simvals = mf6.get_value_ptr(simvals_addr)
     with pytest.raises(XMIError, match="read-only"):
         mf6.set_value(simvals_addr, np.zeros_like(simvals))
 
-    # writing X should succeed, since it's not readonly
     x = mf6.get_value_ptr(x_addr)
     new_x = np.full_like(x, 5.0)
     mf6.set_value(x_addr, new_x)
