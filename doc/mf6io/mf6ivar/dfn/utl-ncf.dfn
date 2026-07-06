@@ -60,8 +60,8 @@ name chunk_z
 type integer
 reader urword
 optional true
-longname chunking parameter for structured z
-description is the chunk size for the z dimension in a NETCDF\_STRUCTURED output file. Must be used in combination with the chunk\_time, chunk\_x, and chunk\_y parameters to have an effect.
+longname chunking parameter for the layer dimension
+description is the chunk size for the layer (vertical) dimension in a NETCDF\_STRUCTURED output file. Must be used in combination with the chunk\_time, chunk\_x, and chunk\_y parameters to have an effect.
 
 block options
 name chunk_y

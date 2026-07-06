@@ -785,7 +785,7 @@ contains
     ! Z dimension
     call nf_verify(nf90_def_dim(this%ncid, 'layer', this%dis%nlay, &
                                 this%dim_ids%z), this%nc_fname)
-    call nf_verify(nf90_def_var(this%ncid, 'layer', NF90_DOUBLE, this%dim_ids%z, &
+    call nf_verify(nf90_def_var(this%ncid, 'layer', NF90_INT, this%dim_ids%z, &
                                 this%var_ids%z), this%nc_fname)
     call nf_verify(nf90_put_att(this%ncid, this%var_ids%z, 'units', '1'), &
                    this%nc_fname)

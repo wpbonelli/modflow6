@@ -159,7 +159,7 @@ module UtlNcfInputModule
     'CHUNK_Z', & ! fortran variable
     'INTEGER', & ! type
     '', & ! shape
-    'chunking parameter for structured z', & ! longname
+    'chunking parameter for the layer dimension', & ! longname
     .false., & ! required
     .false., & ! developmode
     .false., & ! multi-record

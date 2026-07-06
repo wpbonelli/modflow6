@@ -280,6 +280,9 @@ def _check_layer_coord(ds, label=""):
     ctx = f" [{label}]" if label else ""
     assert "layer" in ds.variables, f"layer coordinate variable missing{ctx}"
     layer = ds.variables["layer"]
+    assert layer.dtype == "int32", (
+        f"layer must be stored as a 32-bit integer (NC_INT){ctx}, got {layer.dtype}"
+    )
     assert layer.getncattr("axis") == "Z", f"layer axis must be 'Z'{ctx}"
     assert layer.getncattr("positive") == "down", f"layer positive must be 'down'{ctx}"
     assert layer.getncattr("units") == "1", f"layer units must be '1'{ctx}"

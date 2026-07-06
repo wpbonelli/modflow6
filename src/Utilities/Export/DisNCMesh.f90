@@ -649,7 +649,10 @@ contains
                                     (/axis_dim/), var_id(1)), &
                        nc_fname)
 
-        ! NROW/NCOL shapes use default chunking
+        ! apply chunking for face-indexed variables; NROW/NCOL use default
+        if (axis_dim == dim_ids%nmesh_face) then
+          call ncvar_chunk(ncid, var_id(1), chunk_face, nc_fname)
+        end if
         call ncvar_deflate(ncid, var_id(1), deflate, shuffle, nc_fname)
 
         ! put attr
@@ -657,6 +660,11 @@ contains
                                     (/NF90_FILL_INT/)), nc_fname)
         call nf_verify(nf90_put_att(ncid, var_id(1), 'long_name', &
                                     longname), nc_fname)
+
+        ! add grid mapping for face-indexed variables
+        if (axis_dim == dim_ids%nmesh_face) then
+          call ncvar_gridmap(ncid, var_id(1), gridmap_name, nc_fname)
+        end if
 
         ! add mf6 attr
         call ncvar_mf6attr(ncid, var_id(1), 0, 0, nc_tag, nc_fname)
@@ -889,7 +897,7 @@ contains
     real(DP), dimension(:, :, :), pointer, contiguous :: dbl3d
     real(DP), dimension(:), pointer, contiguous :: dbl1d
     integer(I4B) :: axis_dim, nvals, k
-    integer(NF90_INT), dimension(:), allocatable :: var_id
+    integer(I4B), dimension(:), allocatable :: var_id
     character(len=LINELENGTH) :: longname, varname
 
     if (idt%shape == 'NROW' .or. &
@@ -923,7 +931,10 @@ contains
                                     (/axis_dim/), var_id(1)), &
                        nc_fname)
 
-        ! NROW/NCOL shapes use default chunking
+        ! apply chunking for face-indexed variables; NROW/NCOL use default
+        if (axis_dim == dim_ids%nmesh_face) then
+          call ncvar_chunk(ncid, var_id(1), chunk_face, nc_fname)
+        end if
         call ncvar_deflate(ncid, var_id(1), deflate, shuffle, nc_fname)
 
         ! put attr
@@ -931,6 +942,11 @@ contains
                                     (/NF90_FILL_DOUBLE/)), nc_fname)
         call nf_verify(nf90_put_att(ncid, var_id(1), 'long_name', &
                                     longname), nc_fname)
+
+        ! add grid mapping for face-indexed variables
+        if (axis_dim == dim_ids%nmesh_face) then
+          call ncvar_gridmap(ncid, var_id(1), gridmap_name, nc_fname)
+        end if
 
         ! add mf6 attr
         call ncvar_mf6attr(ncid, var_id(1), 0, iaux, nc_tag, nc_fname)
