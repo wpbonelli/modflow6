@@ -14,6 +14,16 @@ The retry loop for time stepping is exposed in the API through three functions:
 This test drives that loop manually and deliberately fails the very first solve
 attempt (by stopping after a single outer iteration) so that ATS reduces the
 time step and the step is retried until it converges.
+
+Two cases are tested:
+
+  - libmf6_api_retry       : a single model/solution
+  - libmf6_api_retry_multi : two models, each with its own solution, both in
+                              the same solution group. Only the first
+                              solution is deliberately failed, checking that
+                              a failed solve in one subcomponent still causes
+                              a retry even though a later subcomponent (in
+                              the same attempt) converges right away.
 """
 
 import os
@@ -24,7 +34,11 @@ import pytest
 from framework import TestFramework
 from modflow_devtools.markers import requires_pkg
 
-cases = ["libmf6_api_retry"]
+cases = ["libmf6_api_retry", "libmf6_api_retry_multi"]
+case_model_names = {
+    "libmf6_api_retry": ["model"],
+    "libmf6_api_retry_multi": ["model1", "model2"],
+}
 
 # ATS settings: dt0, dtmin, dtmax, dtadj, dtfailadj
 dt0 = 1.0
@@ -33,16 +47,16 @@ dtmax = 1.0
 dtadj = 2.0
 dtfailadj = 2.0
 
+# solver data
+nouter, ninner = 100, 300
+hclose, rclose = 10e-9, 1e-3
 
-def get_model(dir):
+
+def get_model(dir, model_names):
     # tdis
     nper = 1
     perlen = 1.0
     tdis_rc = [(perlen, 1, 1.0)]
-
-    # solver data
-    nouter, ninner = 100, 300
-    hclose, rclose = 10e-9, 1e-3
 
     # model spatial discretization
     nlay, nrow, ncol = 1, 1, 5
@@ -79,59 +93,65 @@ def get_model(dir):
         filename=ats_filerecord,
     )
 
-    ims = flopy.mf6.ModflowIms(
-        sim,
-        print_option="SUMMARY",
-        outer_dvclose=hclose,
-        outer_maximum=nouter,
-        inner_maximum=ninner,
-        inner_dvclose=hclose,
-        rcloserecord=rclose,
-        linear_acceleration="CG",
-    )
-
     chd_data = [[(0, 0, 0), h_left], [(0, 0, ncol - 1), h_right]]
     chd_spd = {0: chd_data}
 
-    gwf = flopy.mf6.ModflowGwf(sim, modelname="model", save_flows=True)
-    dis = flopy.mf6.ModflowGwfdis(
-        gwf,
-        nlay=nlay,
-        nrow=nrow,
-        ncol=ncol,
-        delr=delr,
-        delc=delc,
-        top=tops[0],
-        botm=tops[1:],
-    )
-    ic = flopy.mf6.ModflowGwfic(gwf, strt=h_start)
-    npf = flopy.mf6.ModflowGwfnpf(
-        gwf,
-        save_specific_discharge=True,
-        save_flows=True,
-        icelltype=0,
-        k=k11,
-    )
-    chd = flopy.mf6.ModflowGwfchd(gwf, stress_period_data=chd_spd)
-    oc = flopy.mf6.ModflowGwfoc(
-        gwf,
-        head_filerecord="model.hds",
-        budget_filerecord="model.cbc",
-        headprintrecord=[("COLUMNS", 10, "WIDTH", 15, "DIGITS", 6, "GENERAL")],
-        saverecord=[("HEAD", "LAST"), ("BUDGET", "LAST")],
-    )
+    # one or more models, each with its own solution, all in the same
+    # (only) solution group
+    for name in model_names:
+        gwf = flopy.mf6.ModflowGwf(sim, modelname=name, save_flows=True)
+        dis = flopy.mf6.ModflowGwfdis(
+            gwf,
+            nlay=nlay,
+            nrow=nrow,
+            ncol=ncol,
+            delr=delr,
+            delc=delc,
+            top=tops[0],
+            botm=tops[1:],
+        )
+        ic = flopy.mf6.ModflowGwfic(gwf, strt=h_start)
+        npf = flopy.mf6.ModflowGwfnpf(
+            gwf,
+            save_specific_discharge=True,
+            save_flows=True,
+            icelltype=0,
+            k=k11,
+        )
+        chd = flopy.mf6.ModflowGwfchd(gwf, stress_period_data=chd_spd)
+        oc = flopy.mf6.ModflowGwfoc(
+            gwf,
+            head_filerecord=f"{name}.hds",
+            budget_filerecord=f"{name}.cbc",
+            saverecord=[("HEAD", "LAST"), ("BUDGET", "LAST")],
+        )
+
+        ims = flopy.mf6.ModflowIms(
+            sim,
+            filename=f"{name}.ims",
+            print_option="SUMMARY",
+            outer_dvclose=hclose,
+            outer_maximum=nouter,
+            inner_maximum=ninner,
+            inner_dvclose=hclose,
+            rcloserecord=rclose,
+            linear_acceleration="CG",
+        )
+        sim.register_ims_package(ims, [name])
 
     return sim
 
 
 def build_models(idx, test):
+    model_names = case_model_names[cases[idx]]
+
     # build MODFLOW 6 files
     ws = test.workspace
-    sim = get_model(ws)
+    sim = get_model(ws, model_names)
 
     # build comparison model
     ws = os.path.join(test.workspace, "libmf6")
-    sim_compare = get_model(ws)
+    sim_compare = get_model(ws, model_names)
 
     return sim, sim_compare
 
@@ -161,8 +181,7 @@ def api_func(exe, idx, model_ws=None):
     version_str = mf6.get_version()
     print(f"Loaded {comp_str} with version {version_str}")
 
-    # maximum outer iterations
-    max_iter = mf6.get_value(mf6.get_var_address("MXITER", "SLN_1"))[0]
+    n_solutions = mf6.get_subcomponent_count()
 
     # time loop
     current_time = mf6.get_current_time()
@@ -170,6 +189,8 @@ def api_func(exe, idx, model_ws=None):
 
     # count how many time-step retries the ATS retry loop performed
     n_retries = 0
+    # force only the first subcomponent to fail, and only on the first
+    # attempt, so a case with a single solution behaves exactly as before
     force_failure = True
 
     while current_time < end_time:
@@ -187,24 +208,33 @@ def api_func(exe, idx, model_ws=None):
             # start of a (re)try, advances IDM when retrying
             mf6._execute_function(mf6.lib.start_retry)
 
-            mf6.prepare_solve()
+            # solve every subcomponent (solution) in turn, as a modflowapi
+            # user driving a multi-model simulation would; only the first
+            # subcomponent is deliberately failed, and only on the very
+            # first attempt, so ATS should still trigger a retry even
+            # though later subcomponents converge right away
+            for isub in range(1, n_solutions + 1):
+                mf6.prepare_solve(isub)
 
-            # deliberately fail the very first attempt by stopping after a
-            # single outer iteration so ATS reduces the time step and retries
-            kiter_max = 1 if force_failure else max_iter
+                # deliberately fail the very first attempt by stopping
+                # after a single outer iteration so ATS reduces the time
+                # step and retries
+                kiter_max = 1 if (isub == 1 and force_failure) else nouter
+
+                kiter = 0
+                has_converged = False
+                while kiter < kiter_max:
+                    has_converged = mf6.solve(isub)
+                    kiter += 1
+                    if has_converged:
+                        break
+
+                # finalize_solve flags a failed step (lastStepFailed) when
+                # the solution did not converge, which ATS uses to trigger
+                # a retry
+                mf6.finalize_solve(isub)
+
             force_failure = False
-
-            kiter = 0
-            has_converged = False
-            while kiter < kiter_max:
-                has_converged = mf6.solve()
-                kiter += 1
-                if has_converged:
-                    break
-
-            # finalize_solve flags a failed step (lastStepFailed) when the
-            # solution did not converge, which ATS uses to trigger a retry
-            mf6.finalize_solve()
 
             # check whether the time step is finished or must be retried
             finish_retry = c_bool(False)

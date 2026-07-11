@@ -223,7 +223,7 @@ contains
     ! -- modules
     use ListsModule, only: solutiongrouplist
     use BaseSolutionModule, only: BaseSolutionType
-    use SimVariablesModule, only: istdout, lastStepFailed
+    use SimVariablesModule, only: istdout
     ! -- dummy variables
     integer(kind=c_int) :: subcomponent_idx !< index of the subcomponent (i.e. Numerical Solution)
     integer(kind=c_int) :: bmi_status !< BMI status code
@@ -240,9 +240,6 @@ contains
 
     ! get the solution we are running
     bs => getSolution(subcomponent_idx)
-
-    ! reset flag for retries
-    lastStepFailed = 0
 
     ! *_ad (model, exg, sln)
     call bs%prepareSolve()

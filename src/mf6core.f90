@@ -667,11 +667,17 @@ contains
 
   end subroutine Mf6PrepareRetryLoop
 
-  !> @brief When retrying, this advances IDM
+  !> @brief Called at the start of each (re)try: resets the failed-step
+  !! flag for this attempt, and advances IDM when retrying
   !<
   subroutine Mf6StartRetry()
-    use SimVariablesModule, only: iFailedStepRetry
+    use SimVariablesModule, only: iFailedStepRetry, lastStepFailed
     use IdmLoadModule, only: idm_ts_advance
+
+    ! reset failed flag for this attempt; this must happen once per
+    ! attempt (not once per solution/subcomponent), so that a failure
+    ! in one subcomponent is not cleared by a later, converging one
+    lastStepFailed = 0
 
     if (iFailedStepRetry > 0) then
       ! advance IDM
