@@ -4,6 +4,7 @@ import platform
 import shutil
 import sys
 import textwrap
+import time
 from os import PathLike, environ
 from pathlib import Path
 from pprint import pprint
@@ -12,6 +13,7 @@ from typing import Optional
 from warnings import warn
 
 import pytest
+import requests
 from benchmark import run_benchmarks
 from modflow_devtools.build import meson_build
 from modflow_devtools.download import (
@@ -392,14 +394,33 @@ def fetch_examples_zip(
         download_and_unzip(asset["browser_download_url"], out_path, verbose=True)
 
 
-def fetch_usgs_pubs(out_path: PathLike, force: bool = False):
+def fetch_usgs_pubs(
+    out_path: PathLike, force: bool = False, retries: int = 3, timeout: int = 30
+):
+    # fetched directly with requests (rather than modflow_devtools'
+    # download_and_unzip) because that helper has no request timeout and,
+    # once its internal retry count is exhausted, spins retrying forever
+    # instead of raising -- fatal for a step that's expected to fail
+    # sometimes (pubs.usgs.gov blocks some requests from CI runners)
+    out_path = Path(out_path)
+    out_path.mkdir(exist_ok=True)
     for url in PUB_URLS:
         print(f"Downloading publication: {url}")
-        try:
-            download_and_unzip(url, path=out_path, delete_zip=False)
-            assert (out_path / url.rpartition("/")[2]).is_file()
-        except OSError as e:
-            warn(f"Failed to download publication {url}: {e}")
+        file_path = out_path / url.rpartition("/")[2]
+        for attempt in range(1, retries + 1):
+            try:
+                response = requests.get(url, timeout=timeout)
+                response.raise_for_status()
+                file_path.write_bytes(response.content)
+                break
+            except requests.RequestException as e:
+                if attempt < retries:
+                    warn(f"Publication download attempt {attempt} failed ({e}), retrying")
+                    time.sleep(2 * attempt)
+                else:
+                    # publications are supplementary; repeated fetch failures
+                    # shouldn't fail the whole documentation build
+                    warn(f"Failed to download publication {url}: {e}")
 
 
 def build_documentation(
