@@ -177,9 +177,6 @@ contains
   subroutine exg_ar(this)
     ! -- modules
     use MemoryManagerModule, only: mem_checkin
-    use DisModule, only: DisType
-    use DisvModule, only: DisvType
-    use DisuModule, only: DisuType
     ! -- dummy
     class(GwfPrtExchangeType) :: this
     ! -- local
@@ -192,12 +189,13 @@ contains
       & ',a,'.&
       &  GWF Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
       &  PRT Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
-      &  Ensure discretization packages, including IDOMAIN, are identical.')"
+      &  Ensure discretization packages have the same shape.')"
     character(len=*), parameter :: fmtidomerr = &
-      "('GWF and PRT Models do not have the same discretization for exchange&
-      & ',a,'.&
-      &  GWF Model and PRT Model have different IDOMAIN arrays.&
-      &  Ensure discretization packages, including IDOMAIN, are identical.')"
+      "('GWF and PRT Models do not have compatible discretizations for &
+      &exchange ',a,'.&
+      &  A cell that is inactive (IDOMAIN <= 0) in the GWF Model is active &
+      &in the PRT Model.&
+      &  The PRT active domain must be a subset of the GWF active domain.')"
     !
     ! -- set gwfmodel
     mb => GetBaseModelFromList(basemodellist, this%m1id)
@@ -213,9 +211,12 @@ contains
       prtmodel => mb
     end select
     !
-    ! -- Check to make sure sizes are identical
-    if (prtmodel%dis%nodes /= gwfmodel%dis%nodes .or. &
-        prtmodel%dis%nodesuser /= gwfmodel%dis%nodesuser) then
+    ! -- Check that the two models share the same underlying grid (same
+    !    number of user nodes). The number of *active* (reduced) nodes may
+    !    differ: the PRT active domain is allowed to be a subset of the
+    !    GWF active domain (i.e. PRT's IDOMAIN may mark inactive cells that
+    !    are active in GWF, but not the other way around).
+    if (prtmodel%dis%nodesuser /= gwfmodel%dis%nodesuser) then
       write (errmsg, fmtdiserr) trim(this%name), &
         gwfmodel%dis%nodesuser, &
         gwfmodel%dis%nodes, &
@@ -224,33 +225,11 @@ contains
       call store_error(errmsg, terminate=.TRUE.)
     end if
     !
-    ! -- Make sure idomains are identical
-    select type (gwfdis => gwfmodel%dis)
-    type is (DisType)
-      select type (prtdis => prtmodel%dis)
-      type is (DisType)
-        if (.not. all(gwfdis%idomain == prtdis%idomain)) then
-          write (errmsg, fmtidomerr) trim(this%name)
-          call store_error(errmsg, terminate=.TRUE.)
-        end if
-      end select
-    type is (DisvType)
-      select type (prtdis => prtmodel%dis)
-      type is (DisvType)
-        if (.not. all(gwfdis%idomain == prtdis%idomain)) then
-          write (errmsg, fmtidomerr) trim(this%name)
-          call store_error(errmsg, terminate=.TRUE.)
-        end if
-      end select
-    type is (DisuType)
-      select type (prtdis => prtmodel%dis)
-      type is (DisuType)
-        if (.not. all(gwfdis%idomain == prtdis%idomain)) then
-          write (errmsg, fmtidomerr) trim(this%name)
-          call store_error(errmsg, terminate=.TRUE.)
-        end if
-      end select
-    end select
+    ! -- Check that PRT's active domain is a subset of GWF's, and if the two
+    !    domains actually differ (i.e. some GWF-active cell is inactive in
+    !    PRT), build a node/connection map to translate between the two
+    !    models' reduced numbering.
+    call check_and_map_domains(this, gwfmodel, prtmodel, fmtidomerr)
     !
     ! -- setup pointers to gwf variables allocated in gwf_ar
     prtmodel%fmi%gwfhead => gwfmodel%x
@@ -293,6 +272,84 @@ contains
 
     ! -- todo connections
   end subroutine exg_ar
+
+  !> @brief Verify PRT's active domain is a subset of GWF's, and if the two
+  !! domains actually differ, build the node and connection maps needed to
+  !! translate between GWF's and PRT's reduced numbering.
+  !<
+  subroutine check_and_map_domains(this, gwfmodel, prtmodel, fmtidomerr)
+    ! -- modules
+    use MemoryManagerModule, only: mem_allocate
+    ! -- dummy
+    class(GwfPrtExchangeType) :: this
+    type(GwfModelType), pointer, intent(in) :: gwfmodel
+    type(PrtModelType), pointer, intent(in) :: prtmodel
+    character(len=*), intent(in) :: fmtidomerr
+    ! -- local
+    integer(I4B) :: nu, gn, pn, gm, pm, ipos, jpos
+    logical :: differs
+    !
+    ! -- PRT's active domain must be a subset of GWF's: every user node
+    !    active in PRT must also be active in GWF.
+    differs = (prtmodel%dis%nodes /= gwfmodel%dis%nodes)
+    do nu = 1, prtmodel%dis%nodesuser
+      if (prtmodel%dis%get_nodenumber(nu, 0) /= 0 .and. &
+          gwfmodel%dis%get_nodenumber(nu, 0) == 0) then
+        write (errmsg, fmtidomerr) trim(this%name)
+        call store_error(errmsg, terminate=.TRUE.)
+      end if
+    end do
+    !
+    ! -- If the domains are identical, GWF's and PRT's reduced numbering
+    !    coincide and no map is needed: leave fmi%gwf2loc/loc2gwf/loc2gwfja
+    !    unassociated so downstream code takes the (existing) direct-index
+    !    path.
+    if (.not. differs) return
+    !
+    ! -- Build the node maps
+    call mem_allocate(prtmodel%fmi%gwf2loc, gwfmodel%dis%nodes, &
+                      'GWF2LOC', prtmodel%fmi%memoryPath)
+    call mem_allocate(prtmodel%fmi%loc2gwf, prtmodel%dis%nodes, &
+                      'LOC2GWF', prtmodel%fmi%memoryPath)
+    do gn = 1, gwfmodel%dis%nodes
+      nu = gwfmodel%dis%get_nodeuser(gn)
+      prtmodel%fmi%gwf2loc(gn) = prtmodel%dis%get_nodenumber(nu, 0)
+    end do
+    do pn = 1, prtmodel%dis%nodes
+      nu = prtmodel%dis%get_nodeuser(pn)
+      prtmodel%fmi%loc2gwf(pn) = gwfmodel%dis%get_nodenumber(nu, 0)
+    end do
+    !
+    ! -- Build the connection map: for each PRT reduced connection position,
+    !    find the corresponding position in GWF's ia/ja. This relies on the
+    !    subset property just verified: every connection between two cells
+    !    active in PRT is also a connection between the same two cells (in
+    !    GWF's numbering) in GWF's larger active domain.
+    call mem_allocate(prtmodel%fmi%loc2gwfja, prtmodel%dis%con%nja, &
+                      'LOC2GWFJA', prtmodel%fmi%memoryPath)
+    do pn = 1, prtmodel%dis%nodes
+      gn = prtmodel%fmi%loc2gwf(pn)
+      ! -- diagonal position maps directly to GWF's diagonal position
+      prtmodel%fmi%loc2gwfja(prtmodel%dis%con%ia(pn)) = gwfmodel%dis%con%ia(gn)
+      do ipos = prtmodel%dis%con%ia(pn) + 1, prtmodel%dis%con%ia(pn + 1) - 1
+        pm = prtmodel%dis%con%ja(ipos)
+        gm = prtmodel%fmi%loc2gwf(pm)
+        prtmodel%fmi%loc2gwfja(ipos) = 0
+        do jpos = gwfmodel%dis%con%ia(gn) + 1, gwfmodel%dis%con%ia(gn + 1) - 1
+          if (gwfmodel%dis%con%ja(jpos) == gm) then
+            prtmodel%fmi%loc2gwfja(ipos) = jpos
+            exit
+          end if
+        end do
+        if (prtmodel%fmi%loc2gwfja(ipos) == 0) then
+          write (errmsg, '(a,a)') 'Programmer error: could not map a PRT &
+            &connection onto the corresponding GWF connection for &
+            &exchange ', trim(this%name)
+          call store_error(errmsg, terminate=.TRUE.)
+        end if
+      end do
+    end do
+  end subroutine check_and_map_domains
 
   ! todo subroutines: gwfconn2prtconn and link_connections
 

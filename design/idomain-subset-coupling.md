@@ -219,6 +219,72 @@ simply don't participate in the matrix or particle tracking at all.
 - Confirm runtime improves for a case with a large excluded region, as
   motivation for doing this over the zero-out workaround.
 
+## Prototype status (2026-08-18)
+
+A first working prototype of the PRT case is implemented on this branch:
+
+- `src/Exchange/exg-gwfprt.f90`: `exg_ar` now requires only that GWF and
+  PRT share `nodesuser` (same grid shape), then verifies the subset
+  property (no PRT-active cell may be GWF-inactive) via a new
+  `check_and_map_domains` subroutine. That subroutine also builds, only
+  when the two domains actually differ:
+  - `gwf2loc` (GWF reduced node → PRT reduced node, 0 if inactive in PRT)
+  - `loc2gwf` (PRT reduced node → GWF reduced node)
+  - `loc2gwfja` (PRT reduced connection position → GWF reduced connection
+    position), built via a neighbor search over each PRT connection's
+    corresponding GWF adjacency list
+  All three are built purely from `get_nodenumber`/`get_nodeuser`, which
+  turned out to already be generic across DIS/DISV/DISU on the base
+  `DisBaseType` — no `select type` needed for the mapping itself (only
+  the `nodesuser` check needed touching).
+- `src/Model/ParticleTracking/prt-fmi.f90` (`PrtFmiType`): gained the three
+  map arrays (public, null unless built) and now routes every per-node GWF
+  array access (`gwfhead`, `gwfsat`) and the storage-flow accumulation
+  (`gwfstrgss`/`gwfstrgsy`) through `loc2gwf` when it's associated, and
+  translates GWF boundary-package `nodelist` entries through `gwf2loc`
+  before using them to index PRT's own per-node arrays.
+- `src/Solution/ParticleTracker/Method/MethodDis.f90` and `MethodDisv.f90`:
+  the `gwfflowja` face-flow lookup now goes through `loc2gwfja` when set.
+- When the two domains are identical (the common case today), none of the
+  above maps are built and every access site takes the original direct-index
+  branch — zero behavior change for existing simulations.
+
+**Validation** (`design/prototype/smoke_test.py` — an ad hoc smoke test,
+not yet a proper autotest): three runs on the 10x10x1
+`FlopyReadmeCase` grid (existing PRT test fixture) sharing one GWF flow
+field:
+1. PRT idomain == GWF idomain (all active): runs to normal termination
+   (exercises the unmodified path).
+2. PRT idomain excludes one GWF-active cell mid-grid (subset case): runs to
+   normal termination. Of the 9 released particles, the 6 whose paths never
+   approach the excluded cell match case 1 bit-for-bit (validates the
+   node/connection maps against real, non-trivial index shifts — removing
+   one cell from the middle of the reduction order changes reduced node
+   numbers for most of the grid). The 3 particles whose paths do approach
+   the excluded cell terminate there with `istatus = TERM_NO_EXITS`, i.e.
+   PRT correctly treats the excluded-but-GWF-active cell as having no exit
+   face — exactly the ICBUND-like behavior discussion #2420 asked for.
+3. PRT active in a cell GWF marks inactive (violation of the subset rule):
+   rejected at `exg_ar` with the new, more specific error message.
+
+**Existing test to reconcile next:** `autotest/test_prt_exg.py` already has
+an `"idmu"` case built for exactly scenario 2 above (GWF fully active, PRT
+excludes one cell) and currently marks it `xfail`. That should flip to a
+real assertion once this lands; its `"idmn"` case (PRT active where GWF is
+inactive) should remain a rejection, now via the new error message. Running
+that test requires the full `TestFramework`/MODPATH 7 comparison
+scaffolding (`bin/mf6`, `bin/downloaded/mp7`, etc.) which wasn't set up in
+this pass — the ad hoc smoke test above substitutes for now.
+
+**Not yet done:**
+- GWE and GWT still hard-require identical IDOMAIN (unchanged).
+- `idomain < 0` (vertical pass-through) interaction with the subset check
+  is untested.
+- The `loc2gwfja` build does an O(connections-per-cell) neighbor search per
+  connection; fine for a prototype, could be tightened later if profiling
+  ever shows it matters (it's a one-time `exg_ar` cost, not per-timestep).
+- No unit tests for `check_and_map_domains` in isolation.
+
 ## Open questions for maintainers
 
 - Should `idomain < 0` (vertical pass-through) cells be treated as "active"

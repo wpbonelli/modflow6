@@ -37,6 +37,12 @@ module PrtFmiModule
       BoundaryFlows => null() !< cell boundary flows array
     integer(I4B), dimension(:), pointer, contiguous, public :: &
       BoundaryFaces => null() !< bitmask of assigned boundary faces
+    integer(I4B), dimension(:), pointer, contiguous, public :: &
+      gwf2loc => null() !< GWF reduced node number -> PRT reduced node number (0 if inactive in PRT); only set when PRT's active domain is a subset of GWF's
+    integer(I4B), dimension(:), pointer, contiguous, public :: &
+      loc2gwf => null() !< PRT reduced node number -> GWF reduced node number; only set when PRT's active domain is a subset of GWF's
+    integer(I4B), dimension(:), pointer, contiguous, public :: &
+      loc2gwfja => null() !< PRT reduced connection (ia/ja) position -> GWF reduced connection position; only set when PRT's active domain is a subset of GWF's
 
   contains
 
@@ -90,7 +96,7 @@ contains
     ! dummy
     class(PrtFmiType) :: this
     ! local
-    integer(I4B) :: n
+    integer(I4B) :: n, ng
     character(len=15) :: nodestr
     character(len=*), parameter :: fmtdry = &
      &"(/1X,'WARNING: DRY CELL ENCOUNTERED AT ',a,';  RESET AS INACTIVE')"
@@ -117,9 +123,17 @@ contains
 
     ! if flow cell is dry, then set this%ibound = 0
     do n = 1, this%dis%nodes
+      ! GWF and PRT node numbering coincide unless PRT's active domain is a
+      ! subset of GWF's, in which case gwf2loc/loc2gwf translate between them
+      if (associated(this%loc2gwf)) then
+        ng = this%loc2gwf(n)
+      else
+        ng = n
+      end if
+
       ! Calculate the ibound-like array that has 0 if saturation
       ! is zero and 1 otherwise
-      if (this%gwfsat(n) > DZERO) then
+      if (this%gwfsat(ng) > DZERO) then
         this%ibdgwfsat0(n) = 1
       else
         this%ibdgwfsat0(n) = 0
@@ -127,7 +141,7 @@ contains
 
       ! Check if active model cell is inactive for flow
       if (this%ibound(n) > 0) then
-        if (this%gwfhead(n) == DHDRY) then
+        if (this%gwfhead(ng) == DHDRY) then
           ! cell should be made inactive
           this%ibound(n) = 0
           call this%dis%noder_to_string(n, nodestr)
@@ -137,7 +151,7 @@ contains
 
       ! Convert dry model cell to active if flow has rewet
       if (this%ibound(n) == 0) then
-        if (this%gwfhead(n) /= DHDRY) then
+        if (this%gwfhead(ng) /= DHDRY) then
           ! cell is now wet
           this%ibound(n) = 1
           call this%dis%noder_to_string(n, nodestr)
@@ -210,6 +224,9 @@ contains
     call mem_deallocate(this%SinkFlows)
     call mem_deallocate(this%BoundaryFlows)
     call mem_deallocate(this%BoundaryFaces)
+    if (associated(this%gwf2loc)) call mem_deallocate(this%gwf2loc)
+    if (associated(this%loc2gwf)) call mem_deallocate(this%loc2gwf)
+    if (associated(this%loc2gwfja)) call mem_deallocate(this%loc2gwfja)
 
     call this%FlowModelInterfaceType%fmi_da()
 
@@ -220,17 +237,31 @@ contains
     ! dummy
     class(PrtFmiType) :: this
     ! local
-    integer(I4B) :: j, i, ip, ib
+    integer(I4B) :: j, i, ip, ib, n
     integer(I4B) :: iflowface, iauxiflowface, icellface
     real(DP) :: qbnd
     character(len=LENAUXNAME) :: auxname
     integer(I4B) :: naux
 
     this%StorageFlows = DZERO
-    if (this%igwfstrgss /= 0) &
-      this%StorageFlows = this%StorageFlows + this%gwfstrgss
-    if (this%igwfstrgsy /= 0) &
-      this%StorageFlows = this%StorageFlows + this%gwfstrgsy
+    if (associated(this%loc2gwf)) then
+      ! PRT's active domain is a subset of GWF's: gwfstrgss/gwfstrgsy are
+      ! sized to GWF's node numbering, so accumulate element-by-element
+      ! through the node map rather than as a whole-array operation
+      do n = 1, this%dis%nodes
+        if (this%igwfstrgss /= 0) &
+          this%StorageFlows(n) = this%StorageFlows(n) + &
+                                  this%gwfstrgss(this%loc2gwf(n))
+        if (this%igwfstrgsy /= 0) &
+          this%StorageFlows(n) = this%StorageFlows(n) + &
+                                  this%gwfstrgsy(this%loc2gwf(n))
+      end do
+    else
+      if (this%igwfstrgss /= 0) &
+        this%StorageFlows = this%StorageFlows + this%gwfstrgss
+      if (this%igwfstrgsy /= 0) &
+        this%StorageFlows = this%StorageFlows + this%gwfstrgsy
+    end if
 
     this%SourceFlows = DZERO
     this%SinkFlows = DZERO
@@ -250,6 +281,10 @@ contains
       end if
       do ib = 1, this%gwfpackages(ip)%nbound
         i = this%gwfpackages(ip)%nodelist(ib)
+        ! gwfpackages nodelists hold GWF's own reduced node numbers; if
+        ! PRT's active domain is a subset of GWF's, translate to PRT's
+        ! numbering (0 if this GWF cell is inactive in PRT)
+        if (associated(this%gwf2loc)) i = this%gwf2loc(i)
         if (i <= 0) cycle
         if (this%ibound(i) <= 0) cycle
         qbnd = this%gwfpackages(ip)%get_flow(ib)
