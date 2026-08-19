@@ -43,6 +43,28 @@ module TspFmiModule
     type(DataAdvancedPackageType), &
       dimension(:), pointer, contiguous :: datp => null()
     type(BudObjPtrArray), dimension(:), allocatable :: aptbudobj !< flow budget objects for the advanced packages
+    integer(I4B), dimension(:), pointer, contiguous :: &
+      gwf2loc => null() !< GWF reduced node number -> GWT reduced node number (0 if inactive in GWT); only set when GWT's active domain is a subset of GWF's
+    integer(I4B), dimension(:), pointer, contiguous :: &
+      loc2gwf => null() !< GWT reduced node number -> GWF reduced node number; only set when GWT's active domain is a subset of GWF's
+    integer(I4B), dimension(:), pointer, contiguous :: &
+      loc2gwfja => null() !< GWT reduced connection (ia/ja) position -> GWF reduced connection position; only set when GWT's active domain is a subset of GWF's
+    ! -- The following *_raw arrays are aliased directly into GWF's memory
+    !    (like gwfhead/gwfsat/etc. are when the domains are identical), but
+    !    are only used when GWT's active domain is a subset of GWF's: in
+    !    that case gwfhead/gwfsat/gwfspdis/gwfflowja/gwfstrgss/gwfstrgsy
+    !    become GWT-owned, GWT-sized arrays instead of aliases, refreshed
+    !    once per fmi_ad from these raw GWF-sized arrays via loc2gwf/
+    !    loc2gwfja (see translate_gwf_arrays). This keeps every existing
+    !    consumer of gwfhead/gwfsat/etc. (in gwt-mst, gwt-dsp, gwt-ist,
+    !    gwt-src, tsp-adv, ...) working unmodified, indexed by GWT's own
+    !    reduced node/connection numbering exactly as before.
+    real(DP), dimension(:), pointer, contiguous :: gwfhead_raw => null()
+    real(DP), dimension(:), pointer, contiguous :: gwfsat_raw => null()
+    real(DP), dimension(:, :), pointer, contiguous :: gwfspdis_raw => null()
+    real(DP), dimension(:), pointer, contiguous :: gwfflowja_raw => null()
+    real(DP), dimension(:), pointer, contiguous :: gwfstrgss_raw => null()
+    real(DP), dimension(:), pointer, contiguous :: gwfstrgsy_raw => null()
 
   contains
 
@@ -64,6 +86,7 @@ module TspFmiModule
     procedure :: set_aptbudobj_pointer
     procedure :: source_packagedata => gwtfmi_source_packagedata
     procedure :: set_active_status
+    procedure :: translate_gwf_arrays
 
   end type TspFmiType
 
@@ -176,11 +199,42 @@ contains
       end do
     end if
     !
+    ! -- If GWT's active domain is a subset of GWF's, refresh GWT's owned
+    !    gwfhead/gwfsat/gwfspdis/gwfflowja/gwfstrgss/gwfstrgsy copies from
+    !    the raw GWF-sized arrays before anything below reads them.
+    if (associated(this%loc2gwf)) then
+      call this%translate_gwf_arrays()
+    end if
+    !
     ! -- set inactive transport cell status
     if (this%idryinactive /= 0) then
       call this%set_active_status(cnew)
     end if
   end subroutine fmi_ad
+
+  !> @brief Refresh GWT's owned gwfhead/gwfsat/gwfspdis/gwfflowja/
+  !! gwfstrgss/gwfstrgsy arrays from the raw GWF-sized arrays, via the
+  !! node/connection maps built in exg-gwfgwt.f90 when GWT's active domain
+  !! is a subset of GWF's. Only called when this%loc2gwf is associated.
+  !<
+  subroutine translate_gwf_arrays(this)
+    ! -- dummy
+    class(TspFmiType) :: this
+    ! -- local
+    integer(I4B) :: n, ng, ipos
+    !
+    do n = 1, this%dis%nodes
+      ng = this%loc2gwf(n)
+      this%gwfhead(n) = this%gwfhead_raw(ng)
+      this%gwfsat(n) = this%gwfsat_raw(ng)
+      this%gwfspdis(:, n) = this%gwfspdis_raw(:, ng)
+      if (this%igwfstrgss /= 0) this%gwfstrgss(n) = this%gwfstrgss_raw(ng)
+      if (this%igwfstrgsy /= 0) this%gwfstrgsy(n) = this%gwfstrgsy_raw(ng)
+    end do
+    do ipos = 1, this%dis%con%nja
+      this%gwfflowja(ipos) = this%gwfflowja_raw(this%loc2gwfja(ipos))
+    end do
+  end subroutine translate_gwf_arrays
 
   !> @brief Calculate coefficients and fill matrix and rhs terms associated
   !! with FMI object
@@ -330,7 +384,7 @@ contains
     deallocate (this%aptbudobj)
     call mem_deallocate(this%flowcorrect)
     call mem_deallocate(this%ibdgwfsat0)
-    if (this%flows_from_file) then
+    if (this%flows_from_file .or. associated(this%loc2gwf)) then
       call mem_deallocate(this%gwfstrgss)
       call mem_deallocate(this%gwfstrgsy)
     end if
@@ -340,6 +394,19 @@ contains
     call mem_deallocate(this%gwfsat, 'GWFSAT', this%memoryPath)
     call mem_deallocate(this%gwfspdis, 'GWFSPDIS', this%memoryPath)
     call mem_deallocate(this%gwfflowja, 'GWFFLOWJA', this%memoryPath)
+    if (associated(this%gwf2loc)) call mem_deallocate(this%gwf2loc)
+    if (associated(this%loc2gwf)) call mem_deallocate(this%loc2gwf)
+    if (associated(this%loc2gwfja)) call mem_deallocate(this%loc2gwfja)
+    if (associated(this%gwfhead_raw)) &
+      call mem_deallocate(this%gwfhead_raw, 'GWFHEAD_RAW', this%memoryPath)
+    if (associated(this%gwfsat_raw)) &
+      call mem_deallocate(this%gwfsat_raw, 'GWFSAT_RAW', this%memoryPath)
+    if (associated(this%gwfspdis_raw)) &
+      call mem_deallocate(this%gwfspdis_raw, 'GWFSPDIS_RAW', this%memoryPath)
+    if (associated(this%gwfflowja_raw)) &
+      call mem_deallocate(this%gwfflowja_raw, 'GWFFLOWJA_RAW', this%memoryPath)
+    if (associated(this%gwfstrgss_raw)) call mem_deallocate(this%gwfstrgss_raw)
+    if (associated(this%gwfstrgsy_raw)) call mem_deallocate(this%gwfstrgsy_raw)
     !
     ! -- deallocate scalars
     call mem_deallocate(this%flows_from_file)

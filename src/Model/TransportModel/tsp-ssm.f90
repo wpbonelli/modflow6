@@ -227,6 +227,10 @@ contains
       if (this%fmi%iatp(ip) /= 0) cycle
       do i = 1, this%fmi%gwfpackages(ip)%nbound
         node = this%fmi%gwfpackages(ip)%nodelist(i)
+        ! nodelist holds GWF's own reduced node numbers; translate to GWT's
+        ! numbering if GWT's active domain is a subset of GWF's
+        if (associated(this%fmi%gwf2loc) .and. node > 0) &
+          node = this%fmi%gwf2loc(node)
         if (node > 0) then
           this%nbound = this%nbound + 1
         end if
@@ -280,6 +284,10 @@ contains
     qbnd = DZERO
     nbound_flow = this%fmi%gwfpackages(ipackage)%nbound
     n = this%fmi%gwfpackages(ipackage)%nodelist(ientry)
+    ! nodelist holds GWF's own reduced node numbers; translate to GWT's
+    ! numbering if GWT's active domain is a subset of GWF's (the caller is
+    ! expected to have already skipped entries where this comes out <= 0)
+    if (associated(this%fmi%gwf2loc) .and. n > 0) n = this%fmi%gwf2loc(n)
     !
     ! -- If cell is active (ibound > 0) then calculate values
     if (this%ibound(n) > 0) then
@@ -410,6 +418,9 @@ contains
       nbound = this%fmi%gwfpackages(ip)%nbound
       do i = 1, nbound
         n = this%fmi%gwfpackages(ip)%nodelist(i)
+        ! nodelist holds GWF's own reduced node numbers; translate to GWT's
+        ! numbering if GWT's active domain is a subset of GWF's
+        if (associated(this%fmi%gwf2loc) .and. n > 0) n = this%fmi%gwf2loc(n)
         if (n <= 0) cycle
         call this%ssm_term(ip, i, rhsval=rhsval, hcofval=hcofval)
         idiag = idxglo(this%dis%con%ia(n))
@@ -447,6 +458,9 @@ contains
       ! -- do for each boundary
       do i = 1, this%fmi%gwfpackages(ip)%nbound
         n = this%fmi%gwfpackages(ip)%nodelist(i)
+        ! nodelist holds GWF's own reduced node numbers; translate to GWT's
+        ! numbering if GWT's active domain is a subset of GWF's
+        if (associated(this%fmi%gwf2loc) .and. n > 0) n = this%fmi%gwf2loc(n)
         if (n <= 0) cycle
         call this%ssm_term(ip, i, rrate=rate)
         idiag = this%dis%con%ia(n)
@@ -493,6 +507,9 @@ contains
       ! -- do for each boundary
       do i = 1, this%fmi%gwfpackages(ip)%nbound
         n = this%fmi%gwfpackages(ip)%nodelist(i)
+        ! nodelist holds GWF's own reduced node numbers; translate to GWT's
+        ! numbering if GWT's active domain is a subset of GWF's
+        if (associated(this%fmi%gwf2loc) .and. n > 0) n = this%fmi%gwf2loc(n)
         if (n <= 0) cycle
         call this%ssm_term(ip, i, rrate=rate)
         if (rate < DZERO) then
@@ -555,6 +572,8 @@ contains
         ! -- do for each boundary
         do i = 1, this%fmi%gwfpackages(ip)%nbound
           node = this%fmi%gwfpackages(ip)%nodelist(i)
+          if (associated(this%fmi%gwf2loc) .and. node > 0) &
+            node = this%fmi%gwf2loc(node)
           if (node > 0) then
             maxrows = maxrows + 1
           end if
@@ -598,6 +617,8 @@ contains
           !
           ! -- Calculate rate for this entry
           node = this%fmi%gwfpackages(ip)%nodelist(i)
+          if (associated(this%fmi%gwf2loc) .and. node > 0) &
+            node = this%fmi%gwf2loc(node)
           if (node <= 0) cycle
           call this%ssm_term(ip, i, rrate=rrate, qssm=qssm, cssm=cssm)
           !

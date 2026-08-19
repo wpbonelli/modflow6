@@ -1,6 +1,8 @@
 # Design: per-model active domains for GWF-coupled models
 
-- Status: draft, pre-prototype
+- Status: PRT prototype validated; GWT prototype functional but has a known
+  numerical caveat at domain-subset boundaries (see "Prototype status:
+  GWT" below) -- not ready to propose upstream as-is.
 - Related: [discussion #2420](https://github.com/MODFLOW-ORG/modflow6/discussions/2420),
   [issue #1129](https://github.com/MODFLOW-ORG/modflow6/issues/1129)
 - Author: wpbonelli (drafted with Claude)
@@ -277,13 +279,115 @@ scaffolding (`bin/mf6`, `bin/downloaded/mp7`, etc.) which wasn't set up in
 this pass — the ad hoc smoke test above substitutes for now.
 
 **Not yet done:**
-- GWE and GWT still hard-require identical IDOMAIN (unchanged).
+- GWE still hard-requires identical IDOMAIN (unchanged); see GWT below for
+  why GWE needs its own careful look (dry-cell handling) before attempting
+  the same approach.
 - `idomain < 0` (vertical pass-through) interaction with the subset check
   is untested.
 - The `loc2gwfja` build does an O(connections-per-cell) neighbor search per
   connection; fine for a prototype, could be tightened later if profiling
   ever shows it matters (it's a one-time `exg_ar` cost, not per-timestep).
 - No unit tests for `check_and_map_domains` in isolation.
+
+## Prototype status: GWT (2026-08-18)
+
+Also implemented on this branch, reusing the PRT design's node-map/
+connection-map machinery, adapted for GWT:
+
+- `src/Exchange/exg-gwfgwt.f90`: same relaxed check + `check_and_map_domains`
+  as PRT (`gwf2loc`/`loc2gwf`/`loc2gwfja` on `gwtmodel%fmi`), plus a hard
+  rejection if GWF has BUY or VSC active alongside a subset GWT domain
+  (those packages read GWT's concentration/temperature using GWF's own
+  node numbering, in `gwf-buy.f90`/`gwf-vsc.f90`, which isn't mapped —
+  scoped out, see below).
+
+**Different mechanism than PRT, by necessity.** GWT has ~25 call sites
+across `gwt-mst.f90`, `gwt-dsp.f90`, `gwt-ist.f90`, `gwt-src.f90`, and
+`tsp-adv.f90` that read `this%fmi%gwfsat(n)` / `gwfhead(n)` / `gwfspdis(:,n)`
+/ `gwfstrgss(n)` / `gwfstrgsy(n)` directly (PRT only had a handful). Patching
+every call site the way PRT's prototype does would be large and easy to
+under-cover. Instead, `TspFmiType` (`src/Model/TransportModel/tsp-fmi.f90`)
+gained `gwfhead_raw`/`gwfsat_raw`/`gwfspdis_raw`/`gwfflowja_raw`/
+`gwfstrgss_raw`/`gwfstrgsy_raw` (aliased into GWF's arrays exactly as
+before) plus a new `translate_gwf_arrays` method that runs once per
+`fmi_ad` and repopulates the *public* `gwfhead`/`gwfsat`/`gwfspdis`/
+`gwfflowja`/`gwfstrgss`/`gwfstrgsy` -- now GWT-owned, GWT-sized arrays --
+via `loc2gwf`/`loc2gwfja`. Every existing consumer keeps reading those same
+field names, unmodified, and gets correctly-translated values. This only
+activates when the domains differ (`associated(this%loc2gwf)`); identical
+domains still take the original direct-alias path with zero added cost.
+
+This "translate once" approach does **not** work for `gwfpackages(ip)%
+nodelist` (used ~8 places across `tsp-ssm.f90` and one place in
+`tsp-mvt.f90` to look up which GWT/GWF cell a boundary-package entry
+applies to): that array is `mem_reassignptr`'d directly into the live GWF
+boundary package's own memory, so translating it in place would corrupt
+GWF's own copy. Those ~9 call sites were each patched individually instead,
+translating the fetched value through `gwf2loc` right after reading it and
+before the pre-existing `if (n <= 0) cycle` guards -- which already existed
+in every case, so 0 → "not part of GWT's domain" falls out for free.
+
+**A real numerical caveat was found, not just a scoping gap.** Ad hoc
+testing (`design/prototype/smoke_test_gwt.py`, a 10x10x1 grid with a
+diagonal CHD-driven flow field, mirroring the PRT smoke test) showed:
+baseline (identical domains) and subset (GWT excludes one GWF-active cell)
+both run to normal termination and report ~0% global mass-balance
+discrepancy, but the subset run's concentration at the cell bordering the
+exclusion **overshoots to ~7.3** against a source concentration of 1.0 --
+clearly unphysical for a conservative tracer with no dispersion.
+
+Root cause: unlike PRT (a particle simply terminates with `TERM_NO_EXITS`
+when its cell has no exit face -- an outcome PRT's algorithm already
+handles correctly, since it doesn't require water-balance closure), GWT's
+finite-volume advection scheme assumes each active cell's water balance
+closes over *its own* set of connections. When a GWT-active cell borders a
+cell that's active in GWF but excluded from GWT, the real, generally
+nonzero GWF flux across that face is currently just dropped (GWT's own
+`dis%con` simply has no connection there, by construction, since it's
+built from GWT's own IDOMAIN) rather than folded in as a boundary term.
+That breaks the per-cell balance GWT's scheme depends on and produces
+local artifacts. The aggregate mass balance still looked fine in this test
+because the discrepancy is a *local misallocation*, not a global leak.
+
+This is precisely the kind of model-specific "ramification" `aprovost-usgs`
+flagged in issue #1129 ("PRT is a simply different kind of animal that
+isn't solving a matrix equation") -- now concretely demonstrated rather
+than speculative.
+
+**What was done about it, given the scope of a real fix:** rather than
+attempt the proper fix (below) in this pass, `exg-gwfgwt.f90` now counts
+these "dropped boundary connections" (GWT-active cell ↔ GWF-active/
+GWT-excluded cell pairs) after building the maps, and if any exist, writes
+a `WARNING` to the listing file naming the exchange and the count, so a
+user isn't silently misled. It's a warning, not a hard error: a user
+excluding a genuinely low/no-flow region (the common ICBUND use case from
+discussion #2420) may see no practical effect, and there's no way to know
+the actual flux magnitude at `exg_ar` time (before the first solve).
+
+**What the real fix looks like:** for each GWT-active cell with one or more
+dropped connections, compute the net GWF flux across them at each `fmi_ad`
+(available via `gwfflowja_raw`, already resolved by the map-building code)
+and inject it into GWT's transport equation as an explicit boundary term --
+conceptually a weak sink/source at that cell, using the cell's own
+concentration on outflow (the same `omega` convention already used
+throughout `tsp-ssm.f90`'s `ssm_term`). That likely means: a new per-cell
+"dropped outflow" array built alongside `loc2gwfja`, consumed either in
+`tsp-adv.f90` alongside the existing face-flow terms, or as a synthetic
+SSM-like term. This needs real design attention (in particular, getting
+the sign/direction and inflow-concentration convention right) before it's
+attempted -- it's the actual blocking item for taking this past prototype
+stage for GWT.
+
+**Not yet done:**
+- The boundary-flux fix described above.
+- GWE (would need the same `TspFmiType` mechanism since it shares
+  `tsp-fmi.f90`, but its own exchange, `exg-gwfgwe.f90`, is untouched; it
+  would also need to resolve the boundary-flux issue, plus the dry-cell
+  wrinkle `aprovost-usgs` flagged).
+- `gwfconn2gwtconn` (linking to GWT-GWT/parallel-decomposition connections)
+  is untouched; like PRT's analogous TODO, multi-model domain decomposition
+  combined with a subset domain is unexplored.
+- No pytest-based regression test for GWT (only the ad hoc smoke test).
 
 ## Open questions for maintainers
 
@@ -300,3 +404,10 @@ this pass — the ad hoc smoke test above substitutes for now.
   error immediately, or should MF6 auto-correct by forcing those cells
   inactive with a warning? Proposal above assumes hard error for now,
   matching current behavior's strictness.
+- The big one, from the GWT prototype: should MF6 *block* a subset GWT
+  domain until the boundary-flux fix exists (i.e. today's warning becomes a
+  hard error), or is warn-and-proceed acceptable, given the primary use
+  case (ICBUND-style exclusion of a genuinely low/no-flow region) may see
+  no practical artifact? Needs a real answer — and probably a real test
+  with a non-trivial cross-boundary flux, not just the ad hoc smoke test
+  here — before this is proposed upstream.

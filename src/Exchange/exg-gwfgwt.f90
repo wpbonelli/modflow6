@@ -183,28 +183,31 @@ contains
   !<
   subroutine exg_ar(this)
     ! -- modules
-    use MemoryManagerModule, only: mem_checkin
-    use DisModule, only: DisType
-    use DisvModule, only: DisvType
-    use DisuModule, only: DisuType
+    use MemoryManagerModule, only: mem_checkin, mem_allocate
     ! -- dummy
     class(GwfGwtExchangeType) :: this
     ! -- local
     class(BaseModelType), pointer :: mb => null()
     type(GwfModelType), pointer :: gwfmodel => null()
     type(GwtModelType), pointer :: gwtmodel => null()
+    logical :: subset_domain
     ! -- formats
     character(len=*), parameter :: fmtdiserr = &
       "('GWF and GWT Models do not have the same discretization for exchange&
       & ',a,'.&
       &  GWF Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
       &  GWT Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
-      &  Ensure discretization packages, including IDOMAIN, are identical.')"
+      &  Ensure discretization packages have the same shape.')"
     character(len=*), parameter :: fmtidomerr = &
-      "('GWF and GWT Models do not have the same discretization for exchange&
-      & ',a,'.&
-      &  GWF Model and GWT Model have different IDOMAIN arrays.&
-      &  Ensure discretization packages, including IDOMAIN, are identical.')"
+      "('GWF and GWT Models do not have compatible discretizations for &
+      &exchange ',a,'.&
+      &  A cell that is inactive (IDOMAIN <= 0) in the GWF Model is active &
+      &in the GWT Model.&
+      &  The GWT active domain must be a subset of the GWF active domain.')"
+    character(len=*), parameter :: fmtbuyvscerr = &
+      "('GWF-GWT exchange ',a,': GWT''s active domain is a subset of &
+      &GWF''s, but the GWF model has BUY or VSC active.  Coupling BUY/VSC &
+      &to a GWT model with a smaller active domain is not yet supported.')"
     !
     ! -- set gwfmodel
     mb => GetBaseModelFromList(basemodellist, this%m1_idx)
@@ -220,9 +223,12 @@ contains
       gwtmodel => mb
     end select
     !
-    ! -- Check to make sure sizes are identical
-    if (gwtmodel%dis%nodes /= gwfmodel%dis%nodes .or. &
-        gwtmodel%dis%nodesuser /= gwfmodel%dis%nodesuser) then
+    ! -- Check that the two models share the same underlying grid (same
+    !    number of user nodes). The number of *active* (reduced) nodes may
+    !    differ: the GWT active domain is allowed to be a subset of the
+    !    GWF active domain (i.e. GWT's IDOMAIN may mark inactive cells that
+    !    are active in GWF, but not the other way around).
+    if (gwtmodel%dis%nodesuser /= gwfmodel%dis%nodesuser) then
       write (errmsg, fmtdiserr) trim(this%name), &
         gwfmodel%dis%nodesuser, &
         gwfmodel%dis%nodes, &
@@ -231,58 +237,89 @@ contains
       call store_error(errmsg, terminate=.TRUE.)
     end if
     !
-    ! -- Make sure idomains are identical
-    select type (gwfdis => gwfmodel%dis)
-    type is (DisType)
-      select type (gwtdis => gwtmodel%dis)
-      type is (DisType)
-        if (.not. all(gwfdis%idomain == gwtdis%idomain)) then
-          write (errmsg, fmtidomerr) trim(this%name)
-          call store_error(errmsg, terminate=.TRUE.)
-        end if
-      end select
-    type is (DisvType)
-      select type (gwtdis => gwtmodel%dis)
-      type is (DisvType)
-        if (.not. all(gwfdis%idomain == gwtdis%idomain)) then
-          write (errmsg, fmtidomerr) trim(this%name)
-          call store_error(errmsg, terminate=.TRUE.)
-        end if
-      end select
-    type is (DisuType)
-      select type (gwtdis => gwtmodel%dis)
-      type is (DisuType)
-        if (.not. all(gwfdis%idomain == gwtdis%idomain)) then
-          write (errmsg, fmtidomerr) trim(this%name)
-          call store_error(errmsg, terminate=.TRUE.)
-        end if
-      end select
-    end select
+    ! -- Check that GWT's active domain is a subset of GWF's, and if the
+    !    two domains actually differ, build a node/connection map to
+    !    translate between the two models' reduced numbering.
+    call check_and_map_domains(this, gwfmodel, gwtmodel, fmtidomerr, &
+                               subset_domain)
+    !
+    ! -- BUY/VSC read GWT's concentration/temperature using GWF's own node
+    !    numbering; that coupling isn't mapped yet, so reject it rather
+    !    than silently producing wrong buoyancy/viscosity effects.
+    if (subset_domain .and. &
+        (gwfmodel%inbuy > 0 .or. gwfmodel%invsc > 0)) then
+      write (errmsg, fmtbuyvscerr) trim(this%name)
+      call store_error(errmsg, terminate=.TRUE.)
+    end if
     !
     ! -- setup pointers to gwf variables allocated in gwf_ar
-    gwtmodel%fmi%gwfhead => gwfmodel%x
-    call mem_checkin(gwtmodel%fmi%gwfhead, &
-                     'GWFHEAD', gwtmodel%fmi%memoryPath, &
-                     'X', gwfmodel%memoryPath)
-    gwtmodel%fmi%gwfsat => gwfmodel%npf%sat
-    call mem_checkin(gwtmodel%fmi%gwfsat, &
-                     'GWFSAT', gwtmodel%fmi%memoryPath, &
-                     'SAT', gwfmodel%npf%memoryPath)
-    gwtmodel%fmi%gwfspdis => gwfmodel%npf%spdis
-    call mem_checkin(gwtmodel%fmi%gwfspdis, &
-                     'GWFSPDIS', gwtmodel%fmi%memoryPath, &
-                     'SPDIS', gwfmodel%npf%memoryPath)
+    if (subset_domain) then
+      ! -- gwfflowja was already aliased to gwfmodel%flowja and checked in
+      !    as 'GWFFLOWJA' in exg_df; that alias becomes the raw source, and
+      !    gwfflowja itself becomes an owned, GWT-sized array, refreshed
+      !    once per fmi_ad (see TspFmiType%translate_gwf_arrays)
+      gwtmodel%fmi%gwfflowja_raw => gwtmodel%fmi%gwfflowja
+      nullify (gwtmodel%fmi%gwfflowja)
+      call mem_allocate(gwtmodel%fmi%gwfflowja, gwtmodel%dis%con%nja, &
+                        'GWFFLOWJA_LOC', gwtmodel%fmi%memoryPath)
+      !
+      gwtmodel%fmi%gwfhead_raw => gwfmodel%x
+      call mem_checkin(gwtmodel%fmi%gwfhead_raw, &
+                       'GWFHEAD_RAW', gwtmodel%fmi%memoryPath, &
+                       'X', gwfmodel%memoryPath)
+      call mem_allocate(gwtmodel%fmi%gwfhead, gwtmodel%dis%nodes, &
+                        'GWFHEAD', gwtmodel%fmi%memoryPath)
+      !
+      gwtmodel%fmi%gwfsat_raw => gwfmodel%npf%sat
+      call mem_checkin(gwtmodel%fmi%gwfsat_raw, &
+                       'GWFSAT_RAW', gwtmodel%fmi%memoryPath, &
+                       'SAT', gwfmodel%npf%memoryPath)
+      call mem_allocate(gwtmodel%fmi%gwfsat, gwtmodel%dis%nodes, &
+                        'GWFSAT', gwtmodel%fmi%memoryPath)
+      !
+      gwtmodel%fmi%gwfspdis_raw => gwfmodel%npf%spdis
+      call mem_checkin(gwtmodel%fmi%gwfspdis_raw, &
+                       'GWFSPDIS_RAW', gwtmodel%fmi%memoryPath, &
+                       'SPDIS', gwfmodel%npf%memoryPath)
+      call mem_allocate(gwtmodel%fmi%gwfspdis, 3, gwtmodel%dis%nodes, &
+                        'GWFSPDIS', gwtmodel%fmi%memoryPath)
+    else
+      gwtmodel%fmi%gwfhead => gwfmodel%x
+      call mem_checkin(gwtmodel%fmi%gwfhead, &
+                       'GWFHEAD', gwtmodel%fmi%memoryPath, &
+                       'X', gwfmodel%memoryPath)
+      gwtmodel%fmi%gwfsat => gwfmodel%npf%sat
+      call mem_checkin(gwtmodel%fmi%gwfsat, &
+                       'GWFSAT', gwtmodel%fmi%memoryPath, &
+                       'SAT', gwfmodel%npf%memoryPath)
+      gwtmodel%fmi%gwfspdis => gwfmodel%npf%spdis
+      call mem_checkin(gwtmodel%fmi%gwfspdis, &
+                       'GWFSPDIS', gwtmodel%fmi%memoryPath, &
+                       'SPDIS', gwfmodel%npf%memoryPath)
+    end if
     gwtmodel%fmi%igwfspdis = gwfmodel%npf%icalcspdis
     !
     ! -- setup pointers to the flow storage rates. GWF strg arrays are
     !    available after the gwf_ar routine is called.
     if (gwtmodel%inmst > 0) then
       if (gwfmodel%insto > 0) then
-        gwtmodel%fmi%gwfstrgss => gwfmodel%sto%strgss
         gwtmodel%fmi%igwfstrgss = 1
+        if (subset_domain) then
+          gwtmodel%fmi%gwfstrgss_raw => gwfmodel%sto%strgss
+          call mem_allocate(gwtmodel%fmi%gwfstrgss, gwtmodel%dis%nodes, &
+                            'GWFSTRGSS', gwtmodel%fmi%memoryPath)
+        else
+          gwtmodel%fmi%gwfstrgss => gwfmodel%sto%strgss
+        end if
         if (gwfmodel%sto%iusesy == 1) then
-          gwtmodel%fmi%gwfstrgsy => gwfmodel%sto%strgsy
           gwtmodel%fmi%igwfstrgsy = 1
+          if (subset_domain) then
+            gwtmodel%fmi%gwfstrgsy_raw => gwfmodel%sto%strgsy
+            call mem_allocate(gwtmodel%fmi%gwfstrgsy, gwtmodel%dis%nodes, &
+                              'GWFSTRGSY', gwtmodel%fmi%memoryPath)
+          else
+            gwtmodel%fmi%gwfstrgsy => gwfmodel%sto%strgsy
+          end if
         end if
       end if
     end if
@@ -310,6 +347,132 @@ contains
     ! -- connect Connections
     call this%gwfconn2gwtconn(gwfmodel, gwtmodel)
   end subroutine exg_ar
+
+  !> @brief Verify GWT's active domain is a subset of GWF's, and if the two
+  !! domains actually differ, build the node and connection maps needed to
+  !! translate between GWF's and GWT's reduced numbering.
+  !<
+  subroutine check_and_map_domains(this, gwfmodel, gwtmodel, fmtidomerr, &
+                                   subset_domain)
+    ! -- modules
+    use MemoryManagerModule, only: mem_allocate
+    ! -- dummy
+    class(GwfGwtExchangeType) :: this
+    type(GwfModelType), pointer, intent(in) :: gwfmodel
+    type(GwtModelType), pointer, intent(in) :: gwtmodel
+    character(len=*), intent(in) :: fmtidomerr
+    logical, intent(out) :: subset_domain
+    ! -- local
+    integer(I4B) :: nu, gn, pn, gm, pm, ipos, jpos
+    !
+    ! -- GWT's active domain must be a subset of GWF's: every user node
+    !    active in GWT must also be active in GWF.
+    subset_domain = (gwtmodel%dis%nodes /= gwfmodel%dis%nodes)
+    do nu = 1, gwtmodel%dis%nodesuser
+      if (gwtmodel%dis%get_nodenumber(nu, 0) /= 0 .and. &
+          gwfmodel%dis%get_nodenumber(nu, 0) == 0) then
+        write (errmsg, fmtidomerr) trim(this%name)
+        call store_error(errmsg, terminate=.TRUE.)
+      end if
+    end do
+    !
+    ! -- If the domains are identical, GWF's and GWT's reduced numbering
+    !    coincide and no map is needed: leave fmi%gwf2loc/loc2gwf/loc2gwfja
+    !    unassociated so downstream code takes the (existing) direct-index
+    !    path.
+    if (.not. subset_domain) return
+    !
+    ! -- Build the node maps
+    call mem_allocate(gwtmodel%fmi%gwf2loc, gwfmodel%dis%nodes, &
+                      'GWF2LOC', gwtmodel%fmi%memoryPath)
+    call mem_allocate(gwtmodel%fmi%loc2gwf, gwtmodel%dis%nodes, &
+                      'LOC2GWF', gwtmodel%fmi%memoryPath)
+    do gn = 1, gwfmodel%dis%nodes
+      nu = gwfmodel%dis%get_nodeuser(gn)
+      gwtmodel%fmi%gwf2loc(gn) = gwtmodel%dis%get_nodenumber(nu, 0)
+    end do
+    do pn = 1, gwtmodel%dis%nodes
+      nu = gwtmodel%dis%get_nodeuser(pn)
+      gwtmodel%fmi%loc2gwf(pn) = gwfmodel%dis%get_nodenumber(nu, 0)
+    end do
+    !
+    ! -- Build the connection map: for each GWT reduced connection position,
+    !    find the corresponding position in GWF's ia/ja. This relies on the
+    !    subset property just verified: every connection between two cells
+    !    active in GWT is also a connection between the same two cells (in
+    !    GWF's numbering) in GWF's larger active domain.
+    call mem_allocate(gwtmodel%fmi%loc2gwfja, gwtmodel%dis%con%nja, &
+                      'LOC2GWFJA', gwtmodel%fmi%memoryPath)
+    do pn = 1, gwtmodel%dis%nodes
+      gn = gwtmodel%fmi%loc2gwf(pn)
+      ! -- diagonal position maps directly to GWF's diagonal position
+      gwtmodel%fmi%loc2gwfja(gwtmodel%dis%con%ia(pn)) = gwfmodel%dis%con%ia(gn)
+      do ipos = gwtmodel%dis%con%ia(pn) + 1, gwtmodel%dis%con%ia(pn + 1) - 1
+        pm = gwtmodel%dis%con%ja(ipos)
+        gm = gwtmodel%fmi%loc2gwf(pm)
+        gwtmodel%fmi%loc2gwfja(ipos) = 0
+        do jpos = gwfmodel%dis%con%ia(gn) + 1, gwfmodel%dis%con%ia(gn + 1) - 1
+          if (gwfmodel%dis%con%ja(jpos) == gm) then
+            gwtmodel%fmi%loc2gwfja(ipos) = jpos
+            exit
+          end if
+        end do
+        if (gwtmodel%fmi%loc2gwfja(ipos) == 0) then
+          write (errmsg, '(a,a)') 'Programmer error: could not map a GWT &
+            &connection onto the corresponding GWF connection for &
+            &exchange ', trim(this%name)
+          call store_error(errmsg, terminate=.TRUE.)
+        end if
+      end do
+    end do
+    !
+    ! -- Warn about a real numerical caveat: unlike PRT (where "no exit
+    !    face" at the edge of a subset domain is already a sound, existing
+    !    concept), GWT's advection scheme assumes each active cell's water
+    !    balance closes over its own connections. Where a GWT-active cell
+    !    borders a cell that's active in GWF but excluded from GWT, GWF's
+    !    real flux across that face is silently dropped rather than folded
+    !    in as a boundary term, which can break that per-cell balance and
+    !    produce local concentration artifacts (observed: unphysical
+    !    overshoot at such a boundary cell in ad hoc testing). Warn rather
+    !    than block, since a user excluding a genuinely low/no-flow region
+    !    (the common ICBUND use case) may see no ill effect in practice.
+    call warn_dropped_boundary_flux(this, gwfmodel, gwtmodel)
+  end subroutine check_and_map_domains
+
+  !> @brief Warn if any GWT-active cell borders a cell that's active in GWF
+  !! but excluded from GWT -- see the caveat noted in check_and_map_domains.
+  !<
+  subroutine warn_dropped_boundary_flux(this, gwfmodel, gwtmodel)
+    ! -- modules
+    use SimVariablesModule, only: iout
+    ! -- dummy
+    class(GwfGwtExchangeType) :: this
+    type(GwfModelType), pointer, intent(in) :: gwfmodel
+    type(GwtModelType), pointer, intent(in) :: gwtmodel
+    ! -- local
+    integer(I4B) :: gn, gm, ipos, ndropped
+    character(len=*), parameter :: fmtwarn = &
+      "(/1x,'WARNING: exchange ',a,': ',i0,' connection(s) between a GWT-&
+      &active cell and a cell active in GWF but excluded from GWT were &
+      &found. GWF flow across these connections is not represented in &
+      &GWT''s transport equation, which can produce local mass-balance &
+      &artifacts near the excluded region (concentrations outside the &
+      &physically expected range). This is most likely to matter where &
+      &GWF flow across the excluded boundary is not small.'/)"
+    !
+    ndropped = 0
+    do gn = 1, gwfmodel%dis%nodes
+      if (gwtmodel%fmi%gwf2loc(gn) <= 0) cycle
+      do ipos = gwfmodel%dis%con%ia(gn) + 1, gwfmodel%dis%con%ia(gn + 1) - 1
+        gm = gwfmodel%dis%con%ja(ipos)
+        if (gwtmodel%fmi%gwf2loc(gm) <= 0) ndropped = ndropped + 1
+      end do
+    end do
+    if (ndropped > 0) then
+      write (iout, fmtwarn) trim(this%name), ndropped
+    end if
+  end subroutine warn_dropped_boundary_flux
 
   !> @brief Link GWT connections to GWF connections or exchanges
   !<

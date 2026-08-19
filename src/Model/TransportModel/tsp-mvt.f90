@@ -295,6 +295,11 @@ contains
           cp = concpak(id1)
         else
           igwtnode = fmi_pr%gwfpackages(ipr)%nodelist(id1)
+          ! nodelist holds GWF's own reduced node numbers; translate to the
+          ! provider model's numbering if its active domain is a subset of
+          ! GWF's
+          if (associated(fmi_pr%gwf2loc) .and. igwtnode > 0) &
+            igwtnode = fmi_pr%gwf2loc(igwtnode)
           cp = cnew_pr(igwtnode)
         end if
 
