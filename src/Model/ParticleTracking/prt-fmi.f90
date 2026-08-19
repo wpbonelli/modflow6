@@ -240,7 +240,7 @@ contains
     ! dummy
     class(PrtFmiType) :: this
     ! local
-    integer(I4B) :: j, i, ip, ib, n
+    integer(I4B) :: j, i, ip, ib
     integer(I4B) :: iflowface, iauxiflowface, icellface
     real(DP) :: qbnd
     character(len=LENAUXNAME) :: auxname
@@ -248,17 +248,15 @@ contains
 
     this%StorageFlows = DZERO
     if (associated(this%noder_prt2gwf)) then
-      ! PRT's active domain is a strict subset of GWF's: gwfstrgss/gwfstrgsy are
-      ! sized to GWF's node numbering, so accumulate element-by-element
-      ! through the node map rather than as a whole-array operation
-      do n = 1, this%dis%nodes
-        if (this%igwfstrgss /= 0) &
-          this%StorageFlows(n) = this%StorageFlows(n) + &
-                                 this%gwfstrgss(this%noder_prt2gwf(n))
-        if (this%igwfstrgsy /= 0) &
-          this%StorageFlows(n) = this%StorageFlows(n) + &
-                                 this%gwfstrgsy(this%noder_prt2gwf(n))
-      end do
+      ! PRT's active domain is a strict subset of GWF's: gwfstrgss/gwfstrgsy
+      ! are sized to GWF's node numbering, so gather through the node map
+      ! (a vector subscript, still a whole-array operation)
+      if (this%igwfstrgss /= 0) &
+        this%StorageFlows = this%StorageFlows + &
+                            this%gwfstrgss(this%noder_prt2gwf)
+      if (this%igwfstrgsy /= 0) &
+        this%StorageFlows = this%StorageFlows + &
+                            this%gwfstrgsy(this%noder_prt2gwf)
     else
       if (this%igwfstrgss /= 0) &
         this%StorageFlows = this%StorageFlows + this%gwfstrgss
