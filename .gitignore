@@ -169,6 +169,3 @@ doc/ReleaseNotes/develop.tex
 agent
 # test-drive repo for pixi gcc-extended-build environment
 .test-drive/
-
-# local design docs / prototypes for the idomain-subset work (kept on disk, not versioned)
-design/
