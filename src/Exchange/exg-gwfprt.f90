@@ -287,37 +287,44 @@ contains
     character(len=*), intent(in) :: fmtidomerr
     ! -- local
     integer(I4B) :: nu, gn, pn, gm, pm, ipos, jpos
+    integer(I4B) :: prt_active, gwf_active
     logical :: differs
     !
     ! -- PRT's active domain must be a subset of GWF's: every user node
-    !    active in PRT must also be active in GWF.
-    differs = (prtmodel%dis%nodes /= gwfmodel%dis%nodes)
+    !    active in PRT must also be active in GWF. Determine "differs"
+    !    (whether the two active domains are the same set of user nodes,
+    !    not just the same size) directly from a per-node comparison,
+    !    rather than from dis%nodes counts: equal counts alone would not
+    !    rule out the domains being different sets of the same size.
+    differs = .false.
     do nu = 1, prtmodel%dis%nodesuser
-      if (prtmodel%dis%get_nodenumber(nu, 0) /= 0 .and. &
-          gwfmodel%dis%get_nodenumber(nu, 0) == 0) then
+      prt_active = prtmodel%dis%get_nodenumber(nu, 0)
+      gwf_active = gwfmodel%dis%get_nodenumber(nu, 0)
+      if (prt_active /= 0 .and. gwf_active == 0) then
         write (errmsg, fmtidomerr) trim(this%name)
         call store_error(errmsg, terminate=.TRUE.)
       end if
+      if ((prt_active == 0) .neqv. (gwf_active == 0)) differs = .true.
     end do
     !
     ! -- If the domains are identical, GWF's and PRT's reduced numbering
-    !    coincide and no map is needed: leave fmi%gwf2loc/loc2gwf/loc2gwfja
+    !    coincide and no map is needed: leave fmi%noder_gwf2prt/noder_prt2gwf/ipos_prt2gwf
     !    unassociated so downstream code takes the (existing) direct-index
     !    path.
     if (.not. differs) return
     !
     ! -- Build the node maps
-    call mem_allocate(prtmodel%fmi%gwf2loc, gwfmodel%dis%nodes, &
-                      'GWF2LOC', prtmodel%fmi%memoryPath)
-    call mem_allocate(prtmodel%fmi%loc2gwf, prtmodel%dis%nodes, &
-                      'LOC2GWF', prtmodel%fmi%memoryPath)
+    call mem_allocate(prtmodel%fmi%noder_gwf2prt, gwfmodel%dis%nodes, &
+                      'NODER_GWF2PRT', prtmodel%fmi%memoryPath)
+    call mem_allocate(prtmodel%fmi%noder_prt2gwf, prtmodel%dis%nodes, &
+                      'NODER_PRT2GWF', prtmodel%fmi%memoryPath)
     do gn = 1, gwfmodel%dis%nodes
       nu = gwfmodel%dis%get_nodeuser(gn)
-      prtmodel%fmi%gwf2loc(gn) = prtmodel%dis%get_nodenumber(nu, 0)
+      prtmodel%fmi%noder_gwf2prt(gn) = prtmodel%dis%get_nodenumber(nu, 0)
     end do
     do pn = 1, prtmodel%dis%nodes
       nu = prtmodel%dis%get_nodeuser(pn)
-      prtmodel%fmi%loc2gwf(pn) = gwfmodel%dis%get_nodenumber(nu, 0)
+      prtmodel%fmi%noder_prt2gwf(pn) = gwfmodel%dis%get_nodenumber(nu, 0)
     end do
     !
     ! -- Build the connection map: for each PRT reduced connection position,
@@ -325,23 +332,23 @@ contains
     !    subset property just verified: every connection between two cells
     !    active in PRT is also a connection between the same two cells (in
     !    GWF's numbering) in GWF's larger active domain.
-    call mem_allocate(prtmodel%fmi%loc2gwfja, prtmodel%dis%con%nja, &
-                      'LOC2GWFJA', prtmodel%fmi%memoryPath)
+    call mem_allocate(prtmodel%fmi%ipos_prt2gwf, prtmodel%dis%con%nja, &
+                      'IPOS_PRT2GWF', prtmodel%fmi%memoryPath)
     do pn = 1, prtmodel%dis%nodes
-      gn = prtmodel%fmi%loc2gwf(pn)
+      gn = prtmodel%fmi%noder_prt2gwf(pn)
       ! -- diagonal position maps directly to GWF's diagonal position
-      prtmodel%fmi%loc2gwfja(prtmodel%dis%con%ia(pn)) = gwfmodel%dis%con%ia(gn)
+      prtmodel%fmi%ipos_prt2gwf(prtmodel%dis%con%ia(pn)) = gwfmodel%dis%con%ia(gn)
       do ipos = prtmodel%dis%con%ia(pn) + 1, prtmodel%dis%con%ia(pn + 1) - 1
         pm = prtmodel%dis%con%ja(ipos)
-        gm = prtmodel%fmi%loc2gwf(pm)
-        prtmodel%fmi%loc2gwfja(ipos) = 0
+        gm = prtmodel%fmi%noder_prt2gwf(pm)
+        prtmodel%fmi%ipos_prt2gwf(ipos) = 0
         do jpos = gwfmodel%dis%con%ia(gn) + 1, gwfmodel%dis%con%ia(gn + 1) - 1
           if (gwfmodel%dis%con%ja(jpos) == gm) then
-            prtmodel%fmi%loc2gwfja(ipos) = jpos
+            prtmodel%fmi%ipos_prt2gwf(ipos) = jpos
             exit
           end if
         end do
-        if (prtmodel%fmi%loc2gwfja(ipos) == 0) then
+        if (prtmodel%fmi%ipos_prt2gwf(ipos) == 0) then
           write (errmsg, '(a,a)') 'Programmer error: could not map a PRT &
             &connection onto the corresponding GWF connection for &
             &exchange ', trim(this%name)

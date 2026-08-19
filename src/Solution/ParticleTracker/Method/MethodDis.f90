@@ -493,10 +493,7 @@ contains
       n = defn%facenbr(m)
       if (n > 0) then
         ipos = this%fmi%dis%con%ia(defn%icell) + n
-        ! translate to GWF's connection numbering if PRT's active domain
-        ! is a subset of GWF's (see PrtFmiType%loc2gwfja)
-        if (associated(this%fmi%loc2gwfja)) ipos = this%fmi%loc2gwfja(ipos)
-        q = this%fmi%gwfflowja(ipos)
+        q = this%fmi%get_gwfflowja(ipos)
         defn%faceflow(m) = defn%faceflow(m) + q
       end if
     end do
