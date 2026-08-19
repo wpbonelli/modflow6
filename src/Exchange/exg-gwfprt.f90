@@ -185,15 +185,15 @@ contains
     type(PrtModelType), pointer :: prtmodel => null()
     ! -- formats
     character(len=*), parameter :: fmtdiserr = &
-      "('GWF and PRT Models do not have the same discretization for exchange&
+      "('GWF and PRT Models have incompatible discretizations for exchange&
       & ',a,'.&
       &  GWF Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
       &  PRT Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
-      &  Ensure discretization packages are identical (except IDOMAIN).')"
+      &  Ensure grids are identical.')"
     character(len=*), parameter :: fmtidomerr = &
-      "('GWF and PRT Models do not have compatible discretizations for &
-      &exchange ',a,'.&
-      &  A cell that is inactive (IDOMAIN <= 0) in the GWF Model is active &
+      "('GWF and PRT Models have incompatible discretizations for exchange&
+      & ',a,'.&
+      &  An inactive cell (IDOMAIN <= 0) in the GWF Model is active &
       &in the PRT Model.&
       &  The PRT active domain must be a subset of the GWF active domain.')"
     !
@@ -212,10 +212,8 @@ contains
     end select
     !
     ! -- Check that the two models share the same underlying grid (same
-    !    number of user nodes). The number of *active* (reduced) nodes may
-    !    differ: the PRT active domain is allowed to be a subset of the
-    !    GWF active domain (i.e. PRT's IDOMAIN may mark inactive cells that
-    !    are active in GWF, but not the other way around).
+    !    number of user nodes). The number of reduced nodes may differ:
+    !    the PRT domain is allowed to be a subset of the GWF domain.
     if (prtmodel%dis%nodesuser /= gwfmodel%dis%nodesuser) then
       write (errmsg, fmtdiserr) trim(this%name), &
         gwfmodel%dis%nodesuser, &
@@ -225,10 +223,7 @@ contains
       call store_error(errmsg, terminate=.TRUE.)
     end if
     !
-    ! -- Check that PRT's active domain is a subset of GWF's, and if the two
-    !    domains actually differ (i.e. some GWF-active cell is inactive in
-    !    PRT), build a node/connection map to translate between the two
-    !    models' reduced numbering.
+    ! -- Check PRT active domain subsets GWF, build node map if not
     call check_and_map_domains(this, gwfmodel, prtmodel, fmtidomerr)
     !
     ! -- setup pointers to gwf variables allocated in gwf_ar
@@ -274,7 +269,7 @@ contains
   end subroutine exg_ar
 
   !> @brief Verify PRT's active domain is a subset of GWF's, and if the two
-  !! domains actually differ, build the node and connection maps needed to
+  !! domains differ, build the node and connection maps needed to
   !! translate between GWF's and PRT's reduced numbering.
   !<
   subroutine check_and_map_domains(this, gwfmodel, prtmodel, fmtidomerr)
@@ -290,11 +285,6 @@ contains
     integer(I4B) :: noder_prt, noder_gwf
     logical :: differs
     !
-    ! -- PRT's active domain must be a subset of GWF's: every user node
-    !    active in PRT must also be active in GWF. Determine "differs" from
-    !    a per-node comparison rather than from dis%nodes counts: equal
-    !    counts alone wouldn't rule out the domains being different sets
-    !    of the same size.
     differs = .false.
     do nu = 1, prtmodel%dis%nodesuser
       noder_prt = prtmodel%dis%get_nodenumber(nu, 0)
@@ -306,9 +296,6 @@ contains
       if ((noder_prt == 0) .neqv. (noder_gwf == 0)) differs = .true.
     end do
     !
-    ! -- If the domains are identical, GWF's and PRT's reduced numbering
-    !    coincide and no map is needed: leave fmi's map fields unassociated
-    !    so downstream code takes the (existing) direct-index path.
     if (.not. differs) return
     !
     ! -- Build the node maps
@@ -326,10 +313,8 @@ contains
     end do
     !
     ! -- Build the connection map: for each PRT reduced connection position,
-    !    find the corresponding position in GWF's ia/ja. This relies on the
-    !    subset property just verified: every connection between two cells
-    !    active in PRT is also a connection between the same two cells (in
-    !    GWF's numbering) in GWF's larger active domain.
+    !    find the corresponding position in GWF's ia/ja. Requires that PRT
+    !    active domain is a subset of GWF active domain.
     call mem_allocate(prtmodel%fmi%ipos_prt2gwf, prtmodel%dis%con%nja, &
                       'IPOS_PRT2GWF', prtmodel%fmi%memoryPath)
     do pn = 1, prtmodel%dis%nodes

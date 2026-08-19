@@ -38,8 +38,7 @@ module PrtFmiModule
     integer(I4B), dimension(:), pointer, contiguous, public :: &
       BoundaryFaces => null() !< bitmask of assigned boundary faces
     ! -- Node/connection maps to GWF's reduced numbering. Unassociated
-    !    unless PRT's active domain is a strict subset of GWF's (see
-    !    check_and_map_domains in exg-gwfprt.f90).
+    !    unless PRT's active domain is a strict subset of GWF's
     integer(I4B), dimension(:), pointer, contiguous, public :: &
       noder_gwf2prt => null() !< maps GWF noder to PRT noder (0 if PRT-inactive)
     integer(I4B), dimension(:), pointer, contiguous, public :: &
@@ -127,9 +126,8 @@ contains
 
     ! if flow cell is dry, then set this%ibound = 0
     do n = 1, this%dis%nodes
-      ! GWF and PRT node numbering coincide unless PRT's active domain is
-      ! a subset of GWF's, in which case noder_prt2gwf translates n to
-      ! GWF's numbering
+      ! noder_prt2gwf translates to GWF numbering if GWF and PRT
+      ! have different active domains
       if (associated(this%noder_prt2gwf)) then
         ng = this%noder_prt2gwf(n)
       else
@@ -286,9 +284,7 @@ contains
       end if
       do ib = 1, this%gwfpackages(ip)%nbound
         i = this%gwfpackages(ip)%nodelist(ib)
-        ! gwfpackages nodelists hold GWF's own reduced node numbers; if
-        ! PRT's active domain is a subset of GWF's, translate to PRT's
-        ! numbering (0 if this GWF cell is inactive in PRT)
+        ! translate to PRT node numbering if needed
         if (associated(this%noder_gwf2prt)) i = this%noder_gwf2prt(i)
         if (i <= 0) cycle
         if (this%ibound(i) <= 0) cycle
@@ -316,7 +312,7 @@ contains
 
   !> @brief Get the flow across connection ipos, given in this model's own
   !! reduced ia/ja numbering, translating through GWF's connection numbering
-  !! first if PRT's active domain is a subset of GWF's.
+  !! first if PRT's active domain is smaller than GWF's.
   function get_gwfflowja(this, ipos) result(q)
     class(PrtFmiType) :: this
     integer(I4B), intent(in) :: ipos !< connection position in PRT's dis%con
