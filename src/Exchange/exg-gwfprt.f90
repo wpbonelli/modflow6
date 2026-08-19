@@ -189,7 +189,7 @@ contains
       & ',a,'.&
       &  GWF Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
       &  PRT Model has ', i0, ' user nodes and ', i0, ' reduced nodes.&
-      &  Ensure discretization packages have the same shape.')"
+      &  Ensure discretization packages are identical (except IDOMAIN).')"
     character(len=*), parameter :: fmtidomerr = &
       "('GWF and PRT Models do not have compatible discretizations for &
       &exchange ',a,'.&
