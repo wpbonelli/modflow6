@@ -248,7 +248,7 @@ contains
 
     this%StorageFlows = DZERO
     if (associated(this%noder_prt2gwf)) then
-      ! PRT's active domain is a subset of GWF's: gwfstrgss/gwfstrgsy are
+      ! PRT's active domain is a strict subset of GWF's: gwfstrgss/gwfstrgsy are
       ! sized to GWF's node numbering, so accumulate element-by-element
       ! through the node map rather than as a whole-array operation
       do n = 1, this%dis%nodes
@@ -312,7 +312,7 @@ contains
 
   !> @brief Get the flow across connection ipos, given in this model's own
   !! reduced ia/ja numbering, translating through GWF's connection numbering
-  !! first if PRT's active domain is smaller than GWF's.
+  !! first if PRT's active domain is a strict subset of GWF's.
   function get_gwfflowja(this, ipos) result(q)
     class(PrtFmiType) :: this
     integer(I4B), intent(in) :: ipos !< connection position in PRT's dis%con
