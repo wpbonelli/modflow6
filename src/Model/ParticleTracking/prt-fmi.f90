@@ -37,12 +37,15 @@ module PrtFmiModule
       BoundaryFlows => null() !< cell boundary flows array
     integer(I4B), dimension(:), pointer, contiguous, public :: &
       BoundaryFaces => null() !< bitmask of assigned boundary faces
+    ! -- Node/connection maps to GWF's reduced numbering. Unassociated
+    !    unless PRT's active domain is a strict subset of GWF's (see
+    !    check_and_map_domains in exg-gwfprt.f90).
     integer(I4B), dimension(:), pointer, contiguous, public :: &
-      noder_gwf2prt => null() !< GWF reduced node number -> PRT reduced node number (0 if inactive in PRT); only set when PRT's active domain is a subset of GWF's
+      noder_gwf2prt => null() !< maps GWF noder to PRT noder (0 if PRT-inactive)
     integer(I4B), dimension(:), pointer, contiguous, public :: &
-      noder_prt2gwf => null() !< PRT reduced node number -> GWF reduced node number; only set when PRT's active domain is a subset of GWF's
+      noder_prt2gwf => null() !< maps PRT noder to GWF noder
     integer(I4B), dimension(:), pointer, contiguous, public :: &
-      ipos_prt2gwf => null() !< PRT reduced connection (ia/ja) position -> GWF reduced connection position; only set when PRT's active domain is a subset of GWF's
+      ipos_prt2gwf => null() !< maps PRT ia/ja position to GWF ia/ja position
 
   contains
 
@@ -124,8 +127,9 @@ contains
 
     ! if flow cell is dry, then set this%ibound = 0
     do n = 1, this%dis%nodes
-      ! GWF and PRT node numbering coincide unless PRT's active domain is a
-      ! subset of GWF's, in which case noder_gwf2prt/noder_prt2gwf translate between them
+      ! GWF and PRT node numbering coincide unless PRT's active domain is
+      ! a subset of GWF's, in which case noder_prt2gwf translates n to
+      ! GWF's numbering
       if (associated(this%noder_prt2gwf)) then
         ng = this%noder_prt2gwf(n)
       else

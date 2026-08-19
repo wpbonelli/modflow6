@@ -287,30 +287,28 @@ contains
     character(len=*), intent(in) :: fmtidomerr
     ! -- local
     integer(I4B) :: nu, gn, pn, gm, pm, ipos, jpos
-    integer(I4B) :: prt_active, gwf_active
+    integer(I4B) :: noder_prt, noder_gwf
     logical :: differs
     !
     ! -- PRT's active domain must be a subset of GWF's: every user node
-    !    active in PRT must also be active in GWF. Determine "differs"
-    !    (whether the two active domains are the same set of user nodes,
-    !    not just the same size) directly from a per-node comparison,
-    !    rather than from dis%nodes counts: equal counts alone would not
-    !    rule out the domains being different sets of the same size.
+    !    active in PRT must also be active in GWF. Determine "differs" from
+    !    a per-node comparison rather than from dis%nodes counts: equal
+    !    counts alone wouldn't rule out the domains being different sets
+    !    of the same size.
     differs = .false.
     do nu = 1, prtmodel%dis%nodesuser
-      prt_active = prtmodel%dis%get_nodenumber(nu, 0)
-      gwf_active = gwfmodel%dis%get_nodenumber(nu, 0)
-      if (prt_active /= 0 .and. gwf_active == 0) then
+      noder_prt = prtmodel%dis%get_nodenumber(nu, 0)
+      noder_gwf = gwfmodel%dis%get_nodenumber(nu, 0)
+      if (noder_prt /= 0 .and. noder_gwf == 0) then
         write (errmsg, fmtidomerr) trim(this%name)
         call store_error(errmsg, terminate=.TRUE.)
       end if
-      if ((prt_active == 0) .neqv. (gwf_active == 0)) differs = .true.
+      if ((noder_prt == 0) .neqv. (noder_gwf == 0)) differs = .true.
     end do
     !
     ! -- If the domains are identical, GWF's and PRT's reduced numbering
-    !    coincide and no map is needed: leave fmi%noder_gwf2prt/noder_prt2gwf/ipos_prt2gwf
-    !    unassociated so downstream code takes the (existing) direct-index
-    !    path.
+    !    coincide and no map is needed: leave fmi's map fields unassociated
+    !    so downstream code takes the (existing) direct-index path.
     if (.not. differs) return
     !
     ! -- Build the node maps

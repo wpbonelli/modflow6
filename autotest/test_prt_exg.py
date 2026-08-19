@@ -56,9 +56,8 @@ def build_mf6_sim(name, ws, mf6):
         # exclude one cell from PRT's idomain that's active in GWF
         idomain[-1, -1, -1] = 0
     if "idmn" in name:
-        # reactivate that cell in GWF, but deactivate a different one
-        # PRT is still active in -- PRT active where GWF is inactive
-        # is not allowed
+        # reactivate that cell in GWF, but deactivate (0, 0, 0), where
+        # PRT is still active: violates the subset requirement
         gwf_idomain = idomain.copy()
         gwf_idomain[-1, -1, -1] = 1
         gwf_idomain[0, 0, 0] = 0
