@@ -16,7 +16,15 @@ does not, and a final case in which flow and
 tracking model have different IDOMAIN arrays,
 both non-uniform, where the active region is
 the same size but consists of different cells.
-Both latter cases should be caught as errors.
+
+The tracking model's active domain is allowed to
+be a subset of the flow model's (the third case):
+cells inactive in PRT but active in GWF are simply
+excluded from tracking. But the tracking model may
+not be active where the flow model is inactive (the
+fourth case): that combination is still caught as
+an error, since PRT would have nowhere to get flow
+information for such cells.
 """
 
 from pathlib import Path
@@ -204,7 +212,19 @@ def check_output(idx, test):
     # extract model grid
     mg = gwf.modelgrid
 
-    if "idm" in name:
+    if "idmn" in name:
+        # PRT active where GWF is inactive: exg_ar should have rejected
+        # this simulation, so there's nothing further to check here.
+        return
+
+    if "idmu" in name:
+        # PRT's active domain is a subset of GWF's (uniformly active): the
+        # simulation should have run to completion and produced tracking
+        # output, even though we don't have an MP7 comparison for it.
+        prt_track_csv_file = f"{prt_name}.trk.csv"
+        assert (gwf_ws / prt_track_csv_file).is_file()
+        pls = pd.read_csv(gwf_ws / prt_track_csv_file)
+        assert len(pls) > 0
         return
 
     # check mf6 output files exist
@@ -391,6 +411,6 @@ def test_mf6model(idx, name, function_tmpdir, targets, plot):
         plot=lambda t: plot_output(idx, t) if plot else None,
         targets=targets,
         compare=None,
-        xfail="idm" in name,
+        xfail="idmn" in name,
     )
     test.run()
