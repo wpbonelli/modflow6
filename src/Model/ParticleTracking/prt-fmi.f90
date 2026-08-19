@@ -251,10 +251,10 @@ contains
       do n = 1, this%dis%nodes
         if (this%igwfstrgss /= 0) &
           this%StorageFlows(n) = this%StorageFlows(n) + &
-                                  this%gwfstrgss(this%loc2gwf(n))
+                                 this%gwfstrgss(this%loc2gwf(n))
         if (this%igwfstrgsy /= 0) &
           this%StorageFlows(n) = this%StorageFlows(n) + &
-                                  this%gwfstrgsy(this%loc2gwf(n))
+                                 this%gwfstrgsy(this%loc2gwf(n))
       end do
     else
       if (this%igwfstrgss /= 0) &
