@@ -278,7 +278,7 @@ contains
     ! -- dummy
     class(GwfPrtExchangeType) :: this
     type(GwfModelType), pointer, intent(in) :: gwfmodel
-    type(PrtModelType), pointer, intent(in) :: prtmodel
+    type(PrtModelType), pointer, intent(inout) :: prtmodel
     character(len=*), intent(in) :: fmtidomerr
     ! -- local
     integer(I4B) :: nu, gn, pn, gm, pm, ipos, jpos
