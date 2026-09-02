@@ -184,7 +184,11 @@ This is the approved USGS MODFLOW <semver> release.
 Visit the USGS "MODFLOW and Related Programs" site for information on MODFLOW 6 and related software: https://doi.org/10.5066/F76Q1VQV
 ```
 
-Update the DOI link in the citation if necessary. The DOI on the last line is the original and stays the same.
+The citation string can be rendered with `pixi run update-version -c`. Pass the
+release DOI link via `--doi` (`-d`), e.g.
+`pixi run update-version -c -d https://doi.org/10.5066/P1PGE9XW`; without it the
+umbrella MODFLOW software DOI is used. The DOI on the last line is the original
+and stays the same.
 
 Publish the release.
 
@@ -253,7 +257,7 @@ MODFLOW 6 version numbers follow the [semantic versioning](https://semver.org/) 
 
 The version string is stored in `version.txt` in the project root. The version string appears in several other files in the repository, as well as date and timestamp information.
 
-The `update_version.py` script synchronizes updates to `version.txt` and other files containing version information.
+The `update_version.py` script synchronizes updates to `version.txt` and other files containing version information. In release mode (`--releasemode`), the version string includes a release date, e.g. `6.5.0 04/29/2026`. In develop mode (default), the string includes a commit hash, e.g. `6.5.0.dev0+a7dcc8ba`.
 
 ```shell
 pixi run update-version -v 6.4.1

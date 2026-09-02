@@ -17,9 +17,14 @@ module VersionModule
   public
   ! -- modflow 6 version
   integer(I4B), parameter :: IDEVELOPMODE = 0
-  character(len=*), parameter :: VERSIONNUMBER = '6.7.0'
-  character(len=*), parameter :: VERSIONTAG = ' 02/06/2026'
-  character(len=40), parameter :: VERSION = VERSIONNUMBER//VERSIONTAG
+  character(len=*), parameter :: VERSIONNUMBER = '6.8.0'
+  character(len=*), parameter :: VERSIONVCSTAG = ""
+  character(len=*), parameter :: VERSIONTITLE = ' 09/02/2026'
+  character(len=*), parameter :: VERSION = VERSIONNUMBER//VERSIONVCSTAG
+  character(len=*), parameter :: FULLVERSION = &
+                                 VERSIONNUMBER// &
+                                 VERSIONVCSTAG// &
+                                 VERSIONTITLE
   character(len=2), parameter :: MFVNAM = ' 6'
   character(len=*), parameter :: MFTITLE = &
     &'U.S. GEOLOGICAL SURVEY MODULAR HYDROLOGIC MODEL'
@@ -131,7 +136,7 @@ contains
     end if
     !
     ! -- Write version
-    call write_message_centered(text='VERSION '//VERSION, &
+    call write_message_centered(text='VERSION '//FULLVERSION, &
                                 linelen=iheader_width, iunit=iout)
     !
     ! -- Write if develop mode

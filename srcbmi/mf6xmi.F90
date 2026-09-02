@@ -277,7 +277,7 @@ contains
 
     ! execute the nth iteration
     iterationCounter = iterationCounter + 1
-    call bs%solve(iterationCounter)
+    call bs%solve(iterationCounter, 0)
 
     ! the following check is equivalent to that in NumericalSolution%sln_ca
     select type (bs)
@@ -350,7 +350,8 @@ contains
     character(kind=c_char), intent(inout) :: mf_version(BMI_LENVERSION)
     integer(kind=c_int) :: bmi_status !< BMI status code
 
-    mf_version = string_to_char_array(VERSIONNUMBER, len_trim(VERSIONNUMBER))
+    mf_version(1:len_trim(VERSIONNUMBER) + 1) = &
+      string_to_char_array(VERSIONNUMBER, len_trim(VERSIONNUMBER))
     bmi_status = BMI_SUCCESS
 
   end function xmi_get_version

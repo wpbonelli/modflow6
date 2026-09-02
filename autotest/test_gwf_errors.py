@@ -10,6 +10,7 @@ import flopy
 import numpy as np
 import pytest
 from flopy.utils.gridutil import get_disu_kwargs
+from framework import DNODATA
 
 
 def run_mf6(argv, ws):
@@ -101,7 +102,10 @@ def get_minimal_gwf_simulation(
         disu = flopy.mf6.ModflowGwfdisu(gwf, **disukwargs)
     ic = flopy.mf6.ModflowGwfic(gwf, **ickwargs)
     npf = flopy.mf6.ModflowGwfnpf(gwf, **npfkwargs)
-    chd = flopy.mf6.modflow.mfgwfchd.ModflowGwfchd(gwf, **chdkwargs)
+    if "readarraygrid" in chdkwargs:
+        chd = flopy.mf6.modflow.mfgwfchdg.ModflowGwfchdg(gwf, **chdkwargs)
+    else:
+        chd = flopy.mf6.modflow.mfgwfchd.ModflowGwfchd(gwf, **chdkwargs)
     return sim
 
 
@@ -167,6 +171,27 @@ def test_sim_errors(function_tmpdir, targets):
         run_mf6_error(str(function_tmpdir), mf6, err_str)
 
 
+def test_sim_errors_grid(function_tmpdir, targets):
+    mf6 = targets["mf6"]
+
+    with pytest.raises(RuntimeError):
+        # verify that the correct number of errors are reported
+        chdkwargs = {}
+        head = np.full((5, 5, 5), DNODATA, dtype=float)
+        for i in range(5):
+            head[0, i, 0] = 2.0
+        chdkwargs["readarraygrid"] = True
+        chdkwargs["head"] = head
+        sim = get_minimal_gwf_simulation(
+            str(function_tmpdir), exe=mf6, chdkwargs=chdkwargs
+        )
+        test_model = sim.get_model("test")
+        chd2 = flopy.mf6.modflow.mfgwfchdg.ModflowGwfchdg(test_model, **chdkwargs)
+        sim.write_simulation()
+        err_str = ["1. Cell is already a constant head ((1,1,1))."]
+        run_mf6_error(str(function_tmpdir), mf6, err_str)
+
+
 def test_sim_maxerrors(function_tmpdir, targets):
     mf6 = targets["mf6"]
 
@@ -215,6 +240,142 @@ def test_disu_errors(function_tmpdir, targets):
             "UNIT ERROR REPORT:1. ERROR OCCURRED WHILE READING FILE './test.disu'",
         ]
         run_mf6_error(str(function_tmpdir), mf6, err_str)
+
+
+def test_drn_options_error_file(function_tmpdir, targets):
+    """Errors in DRN options are reported for the DRN input file."""
+    mf6 = targets["mf6"]
+
+    sim = get_minimal_gwf_simulation(str(function_tmpdir), exe=mf6)
+    gwf = sim.get_model("test")
+    flopy.mf6.ModflowGwfdrn(
+        gwf,
+        auxiliary=["depth"],
+        auxdepthname="not_an_aux",
+        stress_period_data={0: [[(0, 1, 1), 0.0, 1.0, 0.0]]},
+    )
+    # sourced after DRN; its file name was reported before the fix
+    flopy.mf6.ModflowGwfghb(
+        gwf,
+        stress_period_data={0: [[(0, 2, 2), 0.0, 1.0]]},
+    )
+    sim.write_simulation()
+
+    returncode, buff = run_mf6([mf6], str(function_tmpdir))
+    assert returncode != 0, "mf6 should have failed on an unknown AUXDEPTHNAME"
+
+    output = "\n".join(buff)
+    assert "AUXDEPTHNAME was specified as" in output
+    assert "ERROR OCCURRED WHILE READING FILE 'test.drn'" in output
+    assert "test.ghb" not in output
+
+
+def test_wel_options_error_file(function_tmpdir, targets):
+    """Errors in WEL options are reported for the WEL input file."""
+    mf6 = targets["mf6"]
+
+    sim = get_minimal_gwf_simulation(str(function_tmpdir), exe=mf6)
+    gwf = sim.get_model("test")
+    flopy.mf6.ModflowGwfwel(
+        gwf,
+        auxiliary=["afrlen"],
+        auto_flow_reduce=0.1,
+        stress_period_data={0: [[(0, 1, 1), -1.0, 0.5]]},
+    )
+    # sourced after WEL; its file name was reported before the fix
+    flopy.mf6.ModflowGwfghb(
+        gwf,
+        stress_period_data={0: [[(0, 2, 2), 0.0, 1.0]]},
+    )
+    sim.write_simulation()
+
+    # written by hand, AUTO_FLOW_REDUCE_AUXNAME is not in released flopy
+    with open(function_tmpdir / "test.wel", "w") as f:
+        f.write("BEGIN options\n")
+        f.write("  AUXILIARY  afrlen\n")
+        f.write("  AUTO_FLOW_REDUCE  0.1\n")
+        f.write("  AUTO_FLOW_REDUCE_AUXNAME  not_an_aux\n")
+        f.write("END options\n\n")
+        f.write("BEGIN dimensions\n")
+        f.write("  MAXBOUND  1\n")
+        f.write("END dimensions\n\n")
+        f.write("BEGIN period  1\n")
+        f.write("  1 2 2 -1.0 0.5\n")
+        f.write("END period  1\n")
+
+    returncode, buff = run_mf6([mf6], str(function_tmpdir))
+    assert returncode != 0, (
+        "mf6 should have failed on an unknown AUTO_FLOW_REDUCE_AUXNAME"
+    )
+
+    output = "\n".join(buff)
+    assert "AUTO_FLOW_REDUCE_AUXNAME was specified as" in output
+    assert "ERROR OCCURRED WHILE READING FILE 'test.wel'" in output
+    assert "test.ghb" not in output
+
+
+def test_lak_packagedata_bad_aux_error_no_crash(function_tmpdir, targets):
+    """A LAK PACKAGEDATA aux value that is neither numeric nor a defined
+    time-series name must be reported as a normal input error, not crash.
+
+    read_value_or_time_series_adv() falls back to treating a non-numeric
+    aux token as a time-series name and looks it up via
+    TimeSeriesManager%get_time_series(). That function's BndTsHashTable is
+    only allocated when the simulation has at least one TS6 file
+    (tsmanager_df() calls HashBndTimeSeries() only if numtsfiles > 0), so
+    with none present here, the hash table pointer stays unassociated. Before
+    the fix, get_time_series() dereferenced it unconditionally and crashed
+    with SIGSEGV instead of falling through to the intended
+    "Expected numeric value or time-series name" error.
+
+    A caller ending up with a non-numeric aux value like this is easy in
+    practice: e.g. mis-ordering a packagedata row so a boundname lands in
+    the aux position (aux is written before boundname in PACKAGEDATA).
+    """
+    mf6 = targets["mf6"]
+
+    sim = get_minimal_gwf_simulation(str(function_tmpdir), exe=mf6)
+    gwf = sim.get_model("test")
+    flopy.mf6.ModflowGwflak(
+        gwf,
+        auxiliary=["concentration"],
+        boundnames=True,
+        nlakes=1,
+        noutlets=0,
+        packagedata=[(0, -0.4, 1, 0.0, "mylake")],
+        connectiondata=[(0, 0, (0, 0, 1), "VERTICAL", 0.0, 10.0, 10.0, 0.5, 0.5)],
+    )
+    sim.write_simulation()
+
+    # rewrite the PACKAGEDATA row with aux and boundname swapped -- "mylake"
+    # (not numeric, not a TS6 name) ends up in the aux column. No TS6 files
+    # are referenced anywhere in this simulation, so BndTsHashTable is never
+    # allocated.
+    lak_file = function_tmpdir / "test.lak"
+    lines = lak_file.read_text().splitlines(keepends=True)
+    in_packagedata = False
+    for i, line in enumerate(lines):
+        stripped = line.strip().lower()
+        if stripped.startswith("begin packagedata"):
+            in_packagedata = True
+            continue
+        if stripped.startswith("end packagedata"):
+            break
+        if in_packagedata and stripped:
+            lines[i] = "  1  -0.4  1  mylake  100.0\n"
+    lak_file.write_text("".join(lines))
+
+    returncode, buff = run_mf6([mf6], str(function_tmpdir))
+    output = "\n".join(buff)
+
+    assert returncode != 0, "mf6 should have failed on a non-numeric LAK aux value"
+    assert "SIGSEGV" not in output, (
+        f"mf6 crashed instead of reporting an error:\n{output}"
+    )
+    # mf6 wraps this message across lines, so check the two halves separately
+    assert "Expected numeric value or time-series name, but" in output, output
+    assert "found 'mylake'." in output, output
+    assert "Error occurred while reading file 'test.lak'" in output
 
 
 def test_solver_fail(function_tmpdir, targets):

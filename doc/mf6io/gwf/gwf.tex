@@ -8,6 +8,8 @@ The GWF Model is designed to permit input to be gathered, as it is needed, from 
 
 The GWF Model reads a file called the Name File, which specifies most of the files that will be used in a simulation. Several files are always required whereas other files are optional depending on the simulation. The Output Control Package receives instructions from the user to control the amount and frequency of output.  Details about the Name File and the Output Control Package are described in this section.
 
+The GWF Model must be solved by an Iterative Model Solution (IMS) package.
+
 \subsection{Information for Existing MODFLOW Users}
 \input{gwf/info_existing_users.tex}
 
@@ -112,31 +114,51 @@ Cell-by-cell stress flows are flow rates into or out of the model, at a particul
 \input{gwf/vsc}
 
 \newpage
-\subsection{Constant-Head (CHD) Package}
+\subsection{Constant-Head (CHD) Package -- List-Based Input}
 \input{gwf/chd}
 
 \newpage
-\subsection{Well (WEL) Package}
+\subsection{Constant-Head (CHD) Package -- Grid Array-Based Input}
+\input{gwf/chdg}
+
+\newpage
+\subsection{Well (WEL) Package -- List-Based Input}
 \input{gwf/wel}
 
 \newpage
-\subsection{Drain (DRN) Package}
+\subsection{Well (WEL) Package -- Grid Array-Based Input}
+\input{gwf/welg}
+
+\newpage
+\subsection{Drain (DRN) Package -- List-Based Input}
 \input{gwf/drn}
 
 \newpage
-\subsection{River (RIV) Package}
+\subsection{Drain (DRN) Package -- Grid Array-Based Input}
+\input{gwf/drng}
+
+\newpage
+\subsection{River (RIV) Package -- List-Based Input}
 \input{gwf/riv}
 
 \newpage
-\subsection{General-Head Boundary (GHB) Package}
+\subsection{River (RIV) Package -- Grid Array-Based Input}
+\input{gwf/rivg}
+
+\newpage
+\subsection{General-Head Boundary (GHB) Package -- List-Based Input}
 \input{gwf/ghb}
+
+\newpage
+\subsection{General-Head Boundary (GHB) Package -- Grid Array-Based Input}
+\input{gwf/ghbg}
 
 \newpage
 \subsection{Recharge (RCH) Package -- List-Based Input}
 \input{gwf/rch}
 
 \newpage
-\subsection{Recharge (RCH) Package -- Array-Based Input}
+\subsection{Recharge (RCH) Package -- Layer Array-Based Input}
 \input{gwf/rcha}
 
 \newpage
@@ -144,7 +166,7 @@ Cell-by-cell stress flows are flow rates into or out of the model, at a particul
 \input{gwf/evt}
 
 \newpage
-\subsection{Evapotranspiration (EVT) Package -- Array-Based Input}
+\subsection{Evapotranspiration (EVT) Package -- Layer Array-Based Input}
 \input{gwf/evta}
 
 \newpage

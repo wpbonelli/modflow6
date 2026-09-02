@@ -2,6 +2,7 @@
 features = "NEW FUNCTIONALITY"
 fixes = "BUG FIXES AND OTHER CHANGES TO EXISTING FUNCTIONALITY"
 examples = "EXAMPLES"
+documentation = "DOCUMENTATION"
 
 [subsections]
 basic = "BASIC FUNCTIONALITY"
@@ -16,161 +17,276 @@ netcdf = "NETCDF"
 
 [[items]]
 section = "features"
-subsection = "model"
-description = "Added an optional new COORDINATE\\_CHECK\\_METHOD option to the PRT model's Particle Release Point Package, accepting values EAGER (default) or NONE. NONE disables release-time verification that release point coordinates and release point cell IDs match, which can significantly reduce runtime when releasing many particles."
-
-[[items]]
-section = "features"
-subsection = "model"
-description = "Add DEPENDENT\\_VARIABLE\\_SCALING option to scale the dependent variable and the right-hand side to avoid very large positive or negative values in the GWT and GWE models. Specified outer and inner DVCLOSE values in the model IMS package will be relative closure criteria. This option applies the same scaling approach used in the MT3DMS GCG package."
+subsection = "advanced"
+description = "Added a new IMPLICIT option to the Lake (LAK) Package that solves each lake stage as an additional unknown in the groundwater flow matrix instead of by the default substitution-iteration solver. The implicit formulation typically converges in far fewer outer iterations and can solve problems for which the default formulation fails to converge, while giving equivalent results. It makes the coefficient matrix asymmetric and therefore requires the BICGSTAB linear acceleration in the Iterative Model Solution (IMS). A lake that is too poorly conditioned to solve as a matrix unknown is automatically solved by the default substitution solver instead, so the option is as robust as the default formulation."
 
 [[items]]
 section = "features"
 subsection = "stress"
-description = "Added HIGHEST\\_SATURATED option to the GWT SRC package. When activated, the HIGHEST\\_SATURATED option will apply a mass source loading rate to the specified CELLID or the highest underlying cell with a non-zero cell saturation. The HIGHEST\\_SATURATED option has an additional complication for certain types of grids specified using the DISU Package. When the DISU Package is used, a cell may have more than one cell underlying it. If the overlying cell were to become inactive, there is no straightforward method for determining how to apportion the mass source loading rate to the underlying cells. In this case, the approach described by \\cite{modflowusg} is used. The mass source loading rate is assigned to the first active cell encountered (determined by searching through the underlying cell numbers from the lowest number to the highest number). In this manner, the total mass source loading rate is conserved; however, the spatial distribution of the applied mass source loading rate may not be maintained as layers become dry or wet during a simulation."
-
-[[items]]
-section = "fixes"
-subsection = "internal"
-description = "Fixed the DEWATERED VARIABLECV option. Previously, the saturation and vertical hydraulic conductivity of the underlying cell were included in the vertical conductance calculation when the water level in the underlying cell was below the top of the cell. This is not what is described in \\citet[][equation 4-44]{modflow6gwf}. The code has been modified to only include the saturation and vertical hydraulic conductivity of the overlying cell when calculating the vertical conductance when the water-level in the underlying cell is below the top of the cell."
+description = "Added a new AUTO\\_FLOW\\_REDUCE\\_AUXNAME option to the Well (WEL) Package. When AUTO\\_FLOW\\_REDUCE is active, the pumping rate of a well is smoothly reduced as the cell head drops toward the cell bottom, using a single global turnoff threshold for all wells in the package. The new AUTO\\_FLOW\\_REDUCE\\_AUXNAME option names an auxiliary variable whose value sets the turnoff threshold for each well individually, so different wells in the same package can begin reducing their pumping at different heads. The per-well auxiliary value overrides the global AUTO\\_FLOW\\_REDUCE value and is interpreted the same way: as a length above the cell bottom when FLOW\\_REDUCTION\\_LENGTH is specified, or otherwise as a fraction of the cell thickness. If AUTO\\_FLOW\\_REDUCE\\_AUXNAME is specified without AUTO\\_FLOW\\_REDUCE the option is ignored with a warning, and an error is reported if the named auxiliary variable does not exist."
 
 [[items]]
 section = "features"
-subsection = "internal"
-description = "Add HIGHEST\\_CELL\\_SATURATION option that changes how the saturation used to calculate the flow between two horizontally connected cell. The HIGHEST\\_CELL\\_SATURATION option uses the maximum cell bottom to calculate the saturation used to calculate the horizontal conductance between cells. This option is intended to prevent flow from leaving a dry cell. This option is only applied when the Newton-Raphson formulation is used, A warning will be issued if this option is specified and the Newton-Raphson formulation is not specified in the GWF name file. This option, in combination with the AMT-HMK ALTERNATIVE\\_CELL\\_AVERAGING option, can be used to calculate the same horizontal conductance as MODFLOW-USG when upstream weighting is used (LAYCON=4)."
+subsection = "advanced"
+description = "A TVD (Total Variation Diminishing) kinematic-wave routing scheme has been added to the SFR Package. The option is activated by specifying the ATS\\_COURANT parameter in the OPTIONS block, which also enables adaptive time stepping to maintain a target Courant number. The TVD scheme applies a van Leer flux limiter to reduce numerical diffusion, with the largest reductions at Courant numbers approaching unity, and computes reach storage by direct volume balance, guaranteeing exact budget closure at every reach and every time step. The TVD scheme is most appropriate when exact mass conservation is required, such as when simulated streamflows will be used as input to a solute transport model; because the explicit formulation targets Courant numbers at or below unity, it typically requires sub-daily time steps. The standard kinematic-wave scheme (STORAGE keyword) is sufficient for most stream-routing applications and accommodates Courant numbers from about 0.5 to 2. A Courant number summary table is written to the GWF model listing file when ATS\\_COURANT is specified."
+
+[[items]]
+section = "documentation"
+subsection = "advanced"
+description = "A new chapter describing the SFR Package kinematic-wave routing options has been added to the Supplemental Technical Information document. The chapter describes the kinematic wave approximation, the four-point implicit finite-difference discretization, the standard (STORAGE keyword) and TVD (ATS\\_COURANT keyword) routing schemes, example comparisons against exact kinematic-wave solutions for a two-reach MODFLOW 6 model at Courant numbers ranging from 0.5 to 2.0, and practical guidance for selecting a suitable time step."
+
+[[items]]
+section = "documentation"
+subsection = "advanced"
+description = "A new chapter describing recent changes to the MAW Package that facilitates non-vertical wells has been added to the Supplemental Technical Information document.  The chapter describes the use of the NON\\_VERTICAL\\_WELLS option.  Specifically, it provides details on how the in-cell conductance between the aquifer and a tilted MAW feature is calculated using the screen top, screen bottom, well radius, a tilt angle, and the saturated conductance."
+
+[[items]]
+section = "documentation"
+subsection = "advanced"
+description = "A new chapter describing the IMPLICIT option in the LAK Package has been added to the Supplemental Technical Information document.  The new option treats lake stage as an additional unknown in the groundwater matrix, solving it simultaneously with groundwater heads and assembling seepage as conductance couplings between lake and cell rows (in the matrix). Non-seepage budget terms are linearized and incorporated into the matrix. Newton under-relaxation is recommended for lakes that may dry to prevent stage from dropping below the lake bottom. The implicit approach eliminates stage lag, greatly accelerates convergence for strongly coupled lakes, and reliably solves cases where the default method may struggle. Ultimately, both formulations should yield equivalent water balances and results at convergence, the new option may offer speedier solutions in some cases."
 
 [[items]]
 section = "fixes"
-subsection = "internal"
-description = "Fixed HFB behavior when a hydraulic flow barrier is configured for a cell pair that includes an inactive cell. Previously the connection was excluded but not adjusted for in the defined number of hydraulic flow barriers, which can lead to a segmentation fault. A workaround is to only define hydraulic flow barriers for active cells. New behavior excludes the connection and adds a warning when an exclusion applies, and also adjusts the number of hydraulic flow barriers accordingly."
+subsection = "stress"
+description = "The default values for DENSITY\\_WATER, HEAT\\_CAPACITY\\_WATER, LATENT\\_HEAT\\_VAPORIZATION specified in the OPTIONS block were not set as indicated in the MF6IO guide.  Defaults for these three variables now set as documented in the MF6IO guide."
+
+[[items]]
+section = "fixes"
+subsection = "stress"
+description = "For the Well (WEL) Package, when AUTO\\_FLOW\\_REDUCE is active and FLOW\\_REDUCTION\\_LENGTH is specified, the Newton-Raphson linearization incorrectly used the cell thickness instead of the unit length (1.0) when computing the turnoff threshold. This produced an incorrect Jacobian term and inconsistent behavior between the standard and Newton formulations. The thickness calculation in the Newton code path now respects the FLOW\\_REDUCTION\\_LENGTH option, consistent with the non-Newton code path."
+
+[[items]]
+section = "fixes"
+subsection = "stress"
+description = "Errors detected while reading the OPTIONS block of the Drain (DRN) and Well (WEL) Packages, such as an AUXDEPTHNAME or AUTO\\_FLOW\\_REDUCE\\_AUXNAME that names an auxiliary variable that does not exist, were reported for the input file of the next package read rather than for the file that contained the error. These errors are now reported for the DRN or WEL input file."
 
 [[items]]
 section = "fixes"
 subsection = "solution"
-description = "Setting PRECONDITIONER\\_DROP\\_TOLERANCE in the IMS Linear block to a positive value in cases where the level of fill (PRECONDITIONER\\_LEVELS) equals 0, erroneously activated the (M)ILUT preconditioner. Now, in such cases a warning is written, the (M)ILU preconditioner is selected, and the configured drop tolerance will be ignored."
+description = "A time step length submitted to the adaptive time stepping (ATS) Package by a package that needs to limit the step for its own stability was discarded whenever DTADJ for that period was zero or one.  DTADJ is the multiplier ATS applies when it lengthens or shortens the step in response to the solver iteration count, and the documentation states that a value of zero or one means it has no effect on the simulation.  In that case, the step lengths submitted by packages should be honored.  Three packages submit a step this way: the ADV Package of the GWT and GWE models submits the advective Courant limit, and the SFR Package of the GWF model submits the kinematic wave limit.  With DTADJ set to zero or one those limits had no effect at all, in either direction, so the time step was neither raised nor lowered toward the stable value.  In particular the ATS\\_PERCEL option of the ADV Package, which limits the fraction of a cell that may be traversed in one time step, was accepted without complaint and then ignored.  The test that discards the submitted length now applies only where DTADJ is actually used."
 
 [[items]]
 section = "fixes"
-subsection = "model"
-description = "Balanced the PRT model mass budget with a new term to accumulate mass of terminated particles. Previously particle mass remained in storage regardless of particle status, leaving the particle mass budget unbalanced at the end of the simulation. Also, report cell-by-cell mass storage in the binary budget file; only cumulative mass storage was reported in the list file previously."
-
-[[items]]
-section = "fixes"
-subsection = "stress"
-description = "The OPTIONS block in the Energy Source Loading (ESL) Package accepted the AUXILIARY and AUXMULTNAME keywords; however, they had no effect on the GWE solution.  The ESL code was fixed such that when the AUXMULTCOL keyword is invoked, the user-specified amount of energy added or removed from cells will be multiplied by whatever value the user supplies in the corresponding AUXILIARY column." 
-
-[[items]]
-section = "fixes"
-subsection = "stress"
-description = "The OPTIONS block in the Mass Source Loading (SRC) Package accepted the AUXILIARY and AUXMULTNAME keywords; however, they had no effect on the GWT solution.  The SRC package was fixed such that when the AUXMULTCOL keyword is invoked, the user-specified amount of energy added or removed from cells will be multiplied by the value supplied by the user in the corresponding AUXILIARY column." 
-
-[[items]]
-section = "fixes"
-subsection = "model"
-description = "Setting the PRT model's Particle Release Point (PRP) package option EXIT\\_SOLVE\\_TOLERANCE too high can cause the generalized (DISV) tracking method to produce invalid/meaningless results, as the algorithm considers every lateral subcell exit solution equally valid. Add a warning for tolerances above 0.01. The variable being solved varies from 0 to 1, so in most cases the tolerance should be much less than 1, but appropriate values will vary by model and desired performance (models run faster with higher tolerance)."
-
-[[items]]
-section = "fixes"
-subsection = "parallel"
-description = "Fixed the case where a simulation with GWF-GWF Exchanges containing water movers is run in parallel such that some Exchange Movers operate between different processes while others operate within the same process. In such cases a MPI communication error could occur (Internal error: Unknown error class) leading to a premature termination of the simulation run."
-
-[[items]]
-section = "fixes"
-subsection = "model"
-description = "In Newton models with local z release coordinates configured via LOCAL\\_Z, invalid negative particle tracking times could be produced when the head in the release-point cell is above the cell top or below the cell bottom. This was caused by an incorrect conversion of local release point vertical coordinates to model coordinates, erroneously placing particles above or below the vertical extent of the release cell. To correct this, take into account whether the cell is convertible or confined. The release point is interpolated vertically between the effective top of the cell and the cell bottom. If the cell is convertible, the effective top is determined by the head in the cell and is constrained to be no higher than the geometric top of the cell and no lower than the cell bottom. If the cell is confined, the effective top is the geometric top. So that convertible and confined cells can be distinguished at particle release time, the user must now specify a binary grid file entry (GWFGRID) to the PRT FMI package if release coordinates are configured with LOCAL\\_Z and the PRT model is running in a separate simulation from the GWF model. A binary grid file entry is not required in the PRT FMI package if the GWF and PRT models run in the same simulation."
-
-[[items]]
-section = "fixes"
-subsection = "model"
-description = "PRT docs and error messages previously failed to distinguish between cells excluded from the model grid with IDOMAIN and cells merely inactive due e.g. to drying. These two concepts are distinct and should not be confused: PRT will not permit a particle to be released into a cell with IDOMAIN = 0 (excluded from the simulation) or -1 (vertical pass through), but it will permit release into an inactive cell. Behavior in this case is determined by factors such as whether the DRAPE option is activated, whether the flow model uses the Newton formulation, and (if so) which DRY\\_TRACKING\\_METHOD is configured."
-
-[[items]]
-section = "fixes"
-subsection = "advanced"
-description = "The storage term for SFT was not consistent with the standard SFR flow approach (steady-state). Prior to this change, the reach volume for the previous timestep was calculated using the current storage flow rate, which is zero for SFR even though there can be a calculated change in stage. The SFT storage term is now calculated using the current and previous reach water volumes. This change may affect SFT results for existing models."
-
-[[items]]
-section = "fixes"
-subsection = "advanced"
-description = "The storage term for SFE, like SFT, was not consistent with the standard SFR flow approach (steady-state). Prior to this change, the reach volume for the previous timestep was calculated using the current storage flow rate, which is zero for SFR even though there can be a calculated change in stage. The SFE storage term is now calculated using the current and previous reach water volumes. This change may affect SFE results for existing models."
-
-[[items]]
-section = "features"
-subsection = "stress"
-description = "Added the FLOW\\_REDUCTION\\_LENGTH option to WEL package that indicates the AUTO\\_FLOW\\_REDUCE value is a length instead of a fraction of the cell thickness. A warning will be issued if the FLOW\\_REDUCTION\\_LENGTH option is specified but the AUTO\\_FLOW\\_REDUCE option is not specified in the options block. The program will terminate with an error if the FLOW\\_REDUCTION\\_LENGTH option is specified and the AUTO\\_FLOW\\_REDUCE value specified in the options block is less than or equal to zero."
-
-[[items]]
-section = "fixes"
-subsection = "model"
-description = "Numerical error in the iterative subcell exit solution can leave a particle slightly outside the cell or subcell it is supposedly entering.  Although logic had been implemented to correct for this and ensure that the particle lay within the expected cell or subcell before further tracking commences, this logic was insufficient and could in some cases result in negative tracking times, which terminated the simulation with an error.  The logic has been updated to correctly account for all possible cases."
-
-[[items]]
-section = "fixes"
-subsection = "model"
-description = "The PRT PRP package previously failed to correctly load release settings configured by period block. This could prevent particles from being released as configured. It could also cause excess particles to be released, as empty period blocks intended to stop fill-forward at a certain period were not properly recognized. The package has been updated to correctly load period block release settings."
-
-[[items]]
-section = "fixes"
-subsection = "model"
-description = "PRT previously reported events occurring exactly on a boundary between time steps as occurring during the preceding step. This properly 'credited' the event to the flow conditions responsible for the particle's trajectory up to that time. However, this reporting logic was inappropriately applied to events such as particle releases, as well, which caused the stress period and time step to be reported incorrectly for some events. Instead of altering stress period and time step post hoc, PRT now reports each event as occurring in the stress period and time step in which the event is triggered. This means simultaneous releases can be credited to different time steps. For example, a particle release scheduled using an explicit time specification that falls on the boundary between two time steps occurs at the first opportunity, i.e., at the end of the earlier time step. On the other hand, if a period block is used to schedule a particle release at the beginning of the later time step, the release occurs in that time step, not the previous one."
-
-[[items]]
-section = "fixes"
-subsection = "basic"
-description = "Fixed a bug where the internal profiler caused certain (multi-species) simulations to stop with an error."
-
-[[items]]
-section = "features"
 subsection = "internal"
-description = "Added support for barriers to vertical flow in the HFB package. Also modified the name of the HFB package in the 'MODFLOW 6 Description of Input and Output' document from 'Horizontal Flow Barrier' to 'Hydraulic Flow Barrier'."
+description = "Resolved mass-balance errors in the Central and UTVD numerical schemes caused by inconsistent interpretation of cell-to-interface distances (cl1/cl2)."
 
 [[items]]
 section = "fixes"
 subsection = "exchanges"
-description = "Fixed a bug that crashed the program during initialization when GWT or GWE models were connected through an Exchange and at least one model has grid type DISU and does not have the (currently optional) CELL2D information specified in its input. It could have happened for GWF models in a similar manner, though only when running in parallel mode."
-
-
-[[items]]
-section = "fixes"
-subsection = "netcdf"
-description = "Previously, gridded parameters read from ascii input files could be written to configured NetCDF files with the package EXPORT\\_ARRAY\\_NETCDF option in both regular and validate simulation mode. This capability will now only be supported in validate mode and is primarily intended to support generating NetCDF files that can serve as model inputs in subsequent simulation runs. Furthermore, the time dimension in these generated NetCDF input files, when defined, has been updated from NSTP to NPER, and the MODFLOW 6 NetCDF input load interfaces have been updated to reflect that change."
+description = "When a MVR connection was included as part of an exchange between two models, it was possible to list a model name in the PACKAGES block of the MVR input file that is not one of the two models included in the exchange.  A check was added that reports an error message stating that a model name listed in the exchange MVR input file is not one of the two models connected by the exchange."
 
 [[items]]
 section = "fixes"
 subsection = "model"
-description = "Fixed vertex ordering used internally by PRT for cells with quad-refined faces. The ordering was incorrect if the cell2D block entry for a cell listed a mid-face vertex first, which could result in anomalous tracking behavior."
+description = "The Flow Model Interface (FMI) package for transport and tracking models conducts TDIS compatibility checks during each stress period to ensure that the model's time discretization is compatible with that of the flow model. In particular, if a flow model stress period has just one time step, the transport or tracking model may have any number of time steps. However, if a flow model stress period has more than one time step, the transport or tracking model must have the same number of time steps. Simulations would previously stop with an error if the transport or tracking model violated this rule for any stress periods up to the simulation's last, but would not raise an error for the last stress period. The compatibility check was updated to include the last stress period. Simulations will now stop with an error if the transport or tracking model violates this rule for any stress period in the simulation."
 
 [[items]]
 section = "fixes"
-subsection = "model"
-description = "Fixed particle status checking logic in the PRT subcell tracking method, which in some circumstances could cause the simulation to fail with an error."
-
-[[items]]
-section = "fixes"
-subsection = "model"
-description = "Simplified the PRT model's logic determining whether to terminate particles upon entering a subcell with no exit face. Previously particles encountering this situation in the simulation's final time step, with extended tracking on, would terminate with status code 10 (timeout) if flow in the subcell was stationary. A particle in a subcell with no exit face will now terminate with status code 9 (no exit face from subcell) regardless of circumstance."
+subsection = "internal"
+description = "When a horizontal flow barrier is placed between two cells, MODFLOW checks to ensure that the cells are adjacent.  This check did not function correctly for DISU grids, in some cases, if the IDOMAIN functionality was used to remove cells.  The check for two adjacent DISU cells was corrected to work for IDOMAIN functionality."
 
 [[items]]
 section = "fixes"
 subsection = "parallel"
-description = "The parameter CELL\\_AVERAGING in the GWF-GWF Exchange OPTIONS block was ignored for parallel runs. The cell averaging method was set to the value configured in the NPF package of the model instead. This has been fixed such that the behavior now follows the documentation."
+description = "The adaptive time stepping algorithm (ATS) was not working correctly in parallel mode. This applies to GWT and GWE models, when the model time step derived from the ATS\\_PERCEL parameter is not uniform across processes. In such a case, a deadlock occurred and the simulation was stalled. This fix ensures that the actual calculation time steps are synchronized across all processes such that they remain in lockstep."
 
 [[items]]
-section = "features"
-subsection = "internal"
-description = "The advection package (ADV) in the GWE and GWT models has been extended with a new 'total variation diminishing' scheme called UTVD. This scheme typically improves accuracy and reduces numerical dispersion more than the existing TVD scheme when simulating advective transport either on unstructured grids, or when the dominant flow direction is poorly aligned with the grid."
+section = "fixes"
+subsection = "parallel"
+description = "Mover (MVR) Package connections across two or more models running in parallel were previously supported for flow but not for solute or energy transport.  GWT-GWT or GWE-GWE exchanges that also include MVT or MVE connections, respectively, is now supported for simulations run in parallel mode."
 
 [[items]]
-section = "examples"
-subsection = "internal"
-description = "An example was added to demonstrate the new UTVD capability in the ADV packages of the GWT and GWE models."
+section = "fixes"
+subsection = "exchanges"
+description = "Avoids an unhandled and unnecessary exception in cases where a GWF-GWF exchange is configured with a MVR package, but the corresponding GWT-GWT exchange does not have a MVT package enabled."
+
+[[items]]
+section = "fixes"
+subsection = "netcdf"
+description = "Fixed an indexing issue in structured NetCDF export where READASARRAYS packages (RCHA, EVTA) with time-varying per-period arrays would crash with a NetCDF edge-exceeds-bound error when writing any stress period after the first."
+
+[[items]]
+section = "fixes"
+subsection = "basic"
+description = "Stop with an informative error if a discretization package is missing after loading the model input file's PACKAGES block."
 
 [[items]]
 section = "fixes"
 subsection = "model"
-description = "PRT maintains a transformation for each particle between the model coordinate system and coordinates local to the particle's current tracking domain. When a submethod hands control of a particle back to a delegating method, its corresponding transform is inverted to restore the delegating method's coordinate system. Up to now, this inverse operation unconditionally applied a rotation, whether or not the corresponding forward transform included a rotation. On rotated DISV grid cells, this could produce invalid particle coordinates, without substantially disturbing the remainder of the affected particle's pathline. The inverse coordinate transform has been corrected such that particle positions are reported correctly for rotated DISV grid cells."
+description = "Fixed the PRT PRP package's DRAPE option's behavior. A draped particle's release was previously reported in the original release position, followed by a DROPPED (ireason=6) event due to the particle reaching the water table at tracking time as a result of the default DRY\\_TRACKING\\_METHOD setting DROP. This is inconsistent with the intent of the DRAPE option: DRAPE is applied before release to control a particle's release position. Draped particles will now be released in the highest active cell, at the water table if the cell is convertible or at the geometric top if the cell is confined, and no DROPPED event will be reported."
+
+[[items]]
+section = "fixes"
+subsection = "basic"
+description = "Previously, GWF model output files could only be referenced by a single coupled model's FMI package. This might be necessary for certain configurations where multiple transport models or particle tracking models in the same simulation need flow information from a previous GWF simulation. Referencing the same GWF output files from multiple coupled models would cause a crash. Fixed file-opening logic to allow multiple coupled models to refer to the same GWF model's output files."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "PRT was described as configuring a single release at the beginning of the simulation by default, but a release was in fact scheduled for the first time step of every stress period. Fixed the default release behavior so a single release occurs at the beginning of the simulation."
+
+[[items]]
+section = "fixes"
+subsection = "basic"
+description = "The BMI interface's get\\_grid\\_model\\_type function worked only for numerical model types such as GWF, GWT, and GWE, but would crash for PRT models. Fixed the function's implementation to work with all model types."
+
+[[items]]
+section = "features"
+subsection = "model"
+description = "Previously PRT model particle events were written to output file(s) immediately. By default, PRT will now buffer events in memory before writing them to disk. Introduced a new option for the PRT Output Control (OC) package, SCRATCH\\_BUFFER, which enables buffering events in scratch files instead of memory. This can avoid out-of-memory errors at the price of increased file IO and runtime."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "A PRT model coupled by an exchange to a GWF model that uses adaptive time stepping (ATS) would erroneously produce output for discarded/retried time step solve attempts. PRT output would also be erroneously produced for discarded Picard iterations. This has been fixed such that PRT will only produce output for successful solve attempts when used with an ATS flow model, and only for the final Picard iteration when MXITER > 1."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "In MF6.7.0, the PRT model began to require binary grid (GRB) files provided to the Flow Model Interface (FMI) package to contain ICELLTYPE when any Particle Release Point (PRP) package used LOCAL\\_Z release coordinates, so PRT could distinguish confined from convertible cells when converting local z to model z coordinates. This requirement is unnecessary and has been removed. A single formula $z = bot + localz \\cdot sat \\cdot (top - bot)$ works correctly for both cell types, since $sat = 1$ for confined cells, and for convertible cells $sat = (head - bot) / (top - bot)$ clamped to $[0, 1]$. Particle z coordinates near the cell top or bottom may differ slightly from before, since saturation is smoothed near the top and bottom."
+
+[[items]]
+section = "fixes"
+subsection = "stress"
+description = "Reverts a 6.4.3 change that reset auxiliary variable arrays to zero each stress period in READASARRAYS packages (RCHA, EVTA). The earlier change had the consequence of zeroing the AUXMULTNAME multiplier array when not re-specified in a period block, effectively eliminating recharge or ET in subsequent stress periods. This behavior now is consistent across Grid Array and Layer Array package types. GWF models that use RCHA or EVTA and the AUXMULTNAME option may give different answers depending on how auxiliary variables were specified."
+
+[[items]]
+section = "features"
+subsection = "advanced"
+description = "The Multi-Aquifer Well (MAW) Package now supports non-vertical (slanted or horizontal) well connections. When the NON\\_VERTICAL\\_WELLS option is specified, an ANGLEDATA block can be used to assign a tilt angle (deviation from vertical) to individual well connections. The saturated conductance for those connections is scaled by the in-cell screen length, which is calculated from the screen top, screen bottom, well radius, and tilt angle (or specified directly with an optional connection length), instead of the vertical screen thickness. A connection length must be specified for horizontal connections, and the MEAN conductance equation is recommended for horizontal connections. A warning is issued if the horizontal distance spanned by a connection is greater than the maximum horizontal extent of the connected cell, which indicates that the tilt angle or specified connection length should be reduced, or that the connection should be specified as a separate connection to each cell that it passes through."
+
+[[items]]
+section = "features"
+subsection = "stress"
+description = "Grid array-based input (READARRAYGRID) is now available for the CHD, WEL, DRN, RIV, and GHB stress packages.  Grid array-based input allows stress package data to be specified as full-grid arrays using the DNODATA value (3.0E+30) to identify inactive cells.  Auxiliary variable arrays persist across stress periods if not re-specified, and CONSTANT array input is supported for any array after the first in a period block."
 
 [[items]]
 section = "fixes"
 subsection = "internal"
-description = "Fixed Newton-Raphson under-relaxation so that it is not applied to cells where the lower-most cell in a vertical stack is not convertible (ICELLTYPE=0). Vertical stacks of cells with non-convertible cells at the bottom of the stack are not evaluated since it is valid for the water-level in a non-convertible cell to be below the bottom of the cell. This approach is consistent with the approach used in previous versions of MODFLOW."
+description = "Fixed a bug in the GWT DSP Package and GWE CND Package affecting the rotation of the velocity-dependent dispersion tensor. The horizontal rotation angle did not preserve the sign of the y-component of flow, which could incorrectly orient the longitudinal and transverse dispersion directions for some flow directions, especially flow with a negative y-component. This could cause excessive apparent transverse plume spreading or insufficient longitudinal spreading. Results may change for transport models using velocity-dependent dispersion in affected flow-direction cases."
+
+[[items]]
+section = "features"
+subsection = "basic"
+description = "The CRS option, which specifies a real-world coordinate reference system (CRS) for a model grid, for example an EPSG code, authority string, or Open Geospatial Consortium Well-Known Text (WKT) specification, is supported for all discretization package types. When CRS is specified, the simulation writes a version 2 binary grid (GRB) file so that the CRS can be included, allowing postprocessors to locate the grid in space."
+
+[[items]]
+section = "features"
+subsection = "netcdf"
+description = "Improved CF-1.11 and UGRID-1.0 compliance for NetCDF output. A new ``crs\\_wkt`` option in the NCF utility package accepts a WKT2 (ISO 19162:2019) string for the projection variable; ``grid\\_mapping\\_name`` is now derived and written automatically. The vertical dimension is renamed from ``z`` to ``layer`` with standard CF axis attributes. UGRID face variables now carry ``mesh``, ``location``, and ``coordinates`` unconditionally."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "When the Streamflow Routing (SFR) Package STORAGE option was active, a dry reach that was gaining (groundwater head above the streambed top) with little or no inflow could remain dry and receive no groundwater discharge, instead of rewetting from groundwater as it does when the STORAGE option is not used. This has been fixed so that a dry gaining reach rewets and receives groundwater discharge."
+
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "The Multi-Aquifer Well (MAW) Package now damps well-head oscillations under the NEWTON UNDER\\_RELAXATION option, so wells with a single connection to a low hydraulic conductivity cell that could previously oscillate between outer iterations and fail to converge are able to settle. Convergence is also withheld until a damped well's pumping rate stops changing, so a model does not converge while a well is still adjusting. Models that do not use NEWTON UNDER\\_RELAXATION are unaffected."
+
+[[items]]
+section = "features"
+subsection = "advanced"
+description = "When a simulation fails to converge, the Multi-Aquifer Well (MAW) Package now warns for any active extraction well whose requested rate exceeds the maximum the connected aquifer can supply with the well head drawn down to the bottom of the well. The warning names the well, reports the requested and maximum available rates, and suggests reducing the rate, using RATE\\_SCALING, or reviewing the connection conductance."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "The Multi-Aquifer Well (MAW) Package well storage term previously held water even when the well head dropped below the bottom of the well. Storage now smoothly goes to zero as the well head approaches the well bottom, removing this unphysical storage; results are unchanged while the well head remains above the well bottom."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "For the Multi-Aquifer Well (MAW) Package, the Newton-Raphson formulation added a nonzero saturation-derivative matrix term for connections to confined (non-convertible) cells, where the saturation is constant and the derivative should be zero. This term is now set to zero, making the Newton matrix consistent with the calculated flow and improving convergence when a confined cell's head drops into the well screen interval; converged results are unaffected."
+
+[[items]]
+section = "fixes"
+subsection = "basic"
+description = "Trap duplicate model names and show an informative error message. Previously duplicate model names would cause a simulation to fail with an unrelated error."
+
+[[items]]
+section = "fixes"
+subsection = "internal"
+description = "A new ELASTIC\\_INELASTIC\\_SMOOTHING option was added to the Skeletal Storage, Compaction, and Subsidence (CSUB) Package. In the Newton-Raphson formulation the skeletal specific storage of a delay interbed cell switched abruptly from the elastic to the inelastic value when the effective stress exceeded the preconsolidation stress, so a delay cell held near the preconsolidation stress could oscillate between the two values from one outer iteration to the next and fail to converge. The new option smooths the elastic to inelastic transition over a small effective-stress window and adds the corresponding term to the Newton formulation, improving convergence. Across the smoothing window the reported elastic and inelastic storage and compaction components are partitioned by the smoothing weight so they blend continuously rather than switching abruptly; the total is unchanged. The option is disabled by default, so existing results are unchanged."
+
+[[items]]
+section = "features"
+subsection = "advanced"
+description = "The Skeletal Storage, Compaction, and Subsidence (CSUB) Package previously terminated when the calculated effective stress became small or negative in the effective-stress formulation, where the skeletal specific storage varies as the inverse of the effective stress and is unbounded as the effective stress approaches zero. The effective stress used to calculate the specific storage is now not allowed to fall below a small fraction (0.001) of the geostatic stress, which bounds the specific storage and allows the simulation to continue. The active behavior is reported in the CSUB package settings. A note is written to the model listing file for each time step with a negative effective stress, and a warning reporting the total number of affected time steps is written at the end of the simulation. Negative effective stress typically occurs in uppermost cells where simulated water levels rise above land surface. The head-based formulation is unaffected. The deprecated STRICT\\_EFFECTIVE\\_STRESS option restores the previous terminate-on-negative-stress behavior."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "The Skeletal Storage, Compaction, and Subsidence (CSUB) Package terminated when the summed interbed thickness in a cell exceeded the cell thickness, even when the difference was a numerical-roundoff artifact of the input precision. When the excess is within a small fraction (1e-5) of the cell thickness, the interbed thicknesses in the cell are now proportionally scaled to fit and the simulation continues. A larger excess is still an error."
+
+[[items]]
+section = "fixes"
+subsection = "basic"
+description = "The BMI get\\_version, get\\_component\\_name, and get\\_grid\\_type functions assigned the converted C string to a character array longer than the string itself. The assignment is not conforming, which left the amount of the caller's buffer that is written up to the compiler. The assignments were corrected to write only the string and its null terminator."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "In the Unsaturated Zone Flow (UZF) Package, when the water content behind the leading wave is already at or below the value implied by the applied infiltration rate, the trailing-wave routine indexed the wave arrays with the array holding the wave count of every UZF cell, instead of with the wave count of the cell being solved. In Fortran this is a vector subscript rather than a single element, so wave depth, water content, and flux were reset at wave positions belonging to other cells, corrupting the wave train of the cell being solved. The routine now indexes the cell being solved. The branch is reached whenever the applied infiltration rate decreases, so simulated recharge, unsaturated zone evapotranspiration, water content, and unsaturated zone storage can change in any transient simulation. The corrupted wave train created spurious unsaturated zone storage: in one of the UZF test problems the largest UZF budget percent discrepancy falls from 4.9e-3 to 4e-6 percent. Simulated heads change very little in that problem, but models in which the number of waves differs between UZF cells, which is typical where infiltration varies in space, are affected more than models in which it does not."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "The Unsaturated Zone Flow (UZF) Package wave speed routine assigned its working variable only when the water content behind the wave exceeded the residual water content, and then read that variable regardless. Where the water content was at the residual value, which occurs wherever a wave is reset, the wave speed was computed from whatever the variable happened to contain. Simulated results were therefore dependent on the compiler and on the state of memory, and were not necessarily reproducible between builds of the same program. The variable is now initialized before use."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "The Unsaturated Zone Flow (UZF) Package evapotranspiration routine created a new wave one position beyond the current number of waves and only then compared the number of waves with the number allocated, which is NTRAILWAVES multiplied by NWAVESETS. A cell that was already at capacity therefore wrote past the end of its wave storage and into the wave storage of the next UZF cell before the error was detected. The capacity is now checked before the wave is created, so the condition is reported as an error asking for NWAVESETS to be increased, as intended."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "The Unsaturated Zone Flow (UZF) Package reset only the first six waves of a UZF cell that no longer contains an unsaturated zone. Any waves beyond the sixth kept the water content, depth, flux, and speed they had before the water table rose above the top of the cell, and were reused if an unsaturated zone formed again. All waves in the cell are now reset. Simulated results can change for cells that carry more than six waves."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "The Unsaturated Zone Flow (UZF) Package accepted NTRAILWAVES of 1, which caused a division by zero when trailing waves were created. NTRAILWAVES is now required to be greater than 1, and the error message recommends a value of 7."
+
+[[items]]
+section = "fixes"
+subsection = "solution"
+description = "Six Iterative Model Solution (IMS) input variables that were deprecated in version 6.1.1 have been removed. In the OPTIONS block, CSV\\_OUTPUT has been removed; use CSV\\_OUTER\\_OUTPUT, which writes the same outer iteration information. In the NONLINEAR block, OUTER\\_HCLOSE has been removed; use OUTER\\_DVCLOSE, which it was being copied into. OUTER\\_RCLOSEBND has been removed; it had no effect, because package convergence has been evaluated using OUTER\\_DVCLOSE since version 6.1.1. In the LINEAR block, INNER\\_HCLOSE has been removed; use INNER\\_DVCLOSE, which it was being copied into. A simulation that specifies any of these now stops with an unknown keyword error instead of a deprecation warning."
+
+[[items]]
+section = "fixes"
+subsection = "basic"
+description = "The script that builds the table of deprecations and removals for the release notes accumulated the deprecated and removed versions of a variable under two different keys, so a variable carrying both attributes lost its deprecation version and was reported as having been deprecated in the version in which it was removed. The table was correct until now only because every previous removal was made in the same version as its deprecation."
+
+[[items]]
+section = "fixes"
+subsection = "advanced"
+description = "The groundwater cell number written to the binary budget file for the GWF flow term of the advanced transport and energy transport packages, and for the lakebed and well-aquifer conduction terms of the Lake (LKE) and Multi-Aquifer Well (MWE) Energy Transport Packages, was only evaluated for features with an ACTIVE status. A feature with an INACTIVE status was written with the cell number left over from the last active feature, or with an undefined value if no feature had been active since the package was set up, which was the case when every feature was inactive in the first stress period. Budget entries for inactive features were therefore attributed to the wrong groundwater cell, and an undefined value could terminate the simulation with an out-of-bounds error in a model with a reduced node numbering, or be dropped from the budget file entirely. The cell number is now evaluated for every feature regardless of its status; the flow rate written for an inactive feature is zero, as before."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "The PRT model's Particle Release Point (PRP) package performs release point validation using a point-in-polygon test that compares raw coordinates for exact floating point equality. This could incorrectly flag points close to a cell boundary as outside the cell, especially for rotated cells or cells with very large coordinate values. Added a small tolerance to the containment check, scaled to the cell's extent, to reduce the odds that a point will fail the check due to numerical inexactness."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "The PRT model did not consistently clamp particle coordinates to the extent of the cell before applying the tracking method. This could cause an incorrect exit face or travel time solution, for example due to roundoff in the coordinate transformations computed as the particle moves between cells. This has been corrected; coordinates will now be clamped to the cell boundary in all dimensions. Results may change slightly for models with particle positions lying close to cell boundaries."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "The PRT model could encounter a floating point exception and crash while applying the tracking algorithm if any PRP package set STOPTIME prior to any of its release times. Terminate particles whose STOPTIME precedes release time immediately with status code 8 (unreleased), and show a warning."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "The PRT model previously accumulated mass for particles only from the first Particle Release Point (PRP) package, producing a budget discrepancy for any PRT model with more than one PRP package. Mass is now correctly accumulated to balance the budget."
+
+[[items]]
+section = "fixes"
+subsection = "model"
+description = "The PRT model could report particle coordinates incorrectly on rotated grids with quad refinement. The cumulative coordinate transformation applied by the tracking method was not correctly reversed before coordinates were reported, adding an offset that grows with the grid rotation angle (and with cell size). The overall path was not affected. Reported coordinates on affected models may change slightly."

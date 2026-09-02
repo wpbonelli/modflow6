@@ -4,28 +4,31 @@ module PrtModule
   use InputOutputModule, only: ParseLine, upcase, lowcase
   use ConstantsModule, only: LENFTYPE, LENMEMPATH, DZERO, DONE, &
                              LENPAKLOC, LENPACKAGETYPE, LENBUDTXT, MNORMAL, &
-                             LINELENGTH, LENAUXNAME
+                             LINELENGTH, LENAUXNAME, LENPACKAGENAME
   use VersionModule, only: write_listfile_header
-  use NumericalModelModule, only: NumericalModelType
+  use ExplicitModelModule, only: ExplicitModelType
   use BaseModelModule, only: BaseModelType
   use BndModule, only: BndType, AddBndToList, GetBndFromList
   use DisModule, only: DisType, dis_cr
   use DisvModule, only: DisvType, disv_cr
   use DisuModule, only: DisuType, disu_cr
-  use PrtPrpModule, only: PrtPrpType
+  use PrtPrpModule, only: PrtPrpType, prp_create
   use PrtFmiModule, only: PrtFmiType
   use PrtMipModule, only: PrtMipType
   use PrtOcModule, only: PrtOcType
   use BudgetModule, only: BudgetType
   use ListModule, only: ListType
   use ParticleModule, only: ParticleType, create_particle, ACTIVE, TERM_UNRELEASED
-  use ParticleEventsModule, only: ParticleEventDispatcherType, &
-                                  ParticleEventConsumerType
+  use ParticleEventsModule, only: ParticleEventDispatcherType, handle_event
   use ParticleTracksModule, only: ParticleTracksType, &
-                                  ParticleTrackFileType
-  use SimModule, only: count_errors, store_error, store_error_filename
+                                  ParticleTrackFileType, &
+                                  add_particle_event
+  use SimModule, only: count_errors, store_error, store_error_filename, &
+                       store_warning
   use MemoryManagerModule, only: mem_allocate
   use MethodModule, only: MethodType, LEVEL_FEATURE
+  use MethodDisModule, only: MethodDisType, create_method_dis
+  use MethodDisvModule, only: MethodDisvType, create_method_disv
   use HashTableModule, only: HashTableType, hash_table_cr, hash_table_da
   use ArrayHandlersModule, only: ExpandArray
 
@@ -42,14 +45,16 @@ module PrtModule
   data budtxt/'         STORAGE', '     TERMINATION'/
 
   !> @brief Particle tracking (PRT) model
-  type, extends(NumericalModelType) :: PrtModelType
+  type, extends(ExplicitModelType) :: PrtModelType
     type(PrtFmiType), pointer :: fmi => null() ! flow model interface
     type(PrtMipType), pointer :: mip => null() ! model input package
     type(PrtOcType), pointer :: oc => null() ! output control package
     type(BudgetType), pointer :: budget => null() ! budget object
     class(MethodType), pointer :: method => null() ! tracking method
+    type(MethodDisType), pointer :: method_dis => null() ! DIS tracking method
+    type(MethodDisvType), pointer :: method_disv => null() ! DISV tracking method
     type(ParticleEventDispatcherType), pointer :: events => null() ! event dispatcher
-    class(ParticleTracksType), pointer :: tracks ! track output manager
+    type(ParticleTracksType), pointer :: tracks ! track output manager
     integer(I4B), pointer :: infmi => null() ! unit number FMI
     integer(I4B), pointer :: inmip => null() ! unit number MIP
     integer(I4B), pointer :: inmvt => null() ! unit number MVT
@@ -90,6 +95,7 @@ module PrtModule
     procedure, private :: prt_cq_budterms
     procedure, private :: create_packages
     procedure, private :: create_bndpkgs
+    procedure, private :: create_exg_prp
     procedure, private :: log_namfile_options
 
   end type PrtModelType
@@ -242,12 +248,12 @@ contains
     use ConstantsModule, only: DHNOFLO
     use PrtPrpModule, only: PrtPrpType
     use PrtMipModule, only: PrtMipType
-    use MethodPoolModule, only: method_dis, method_disv
     ! dummy
     class(PrtModelType) :: this
     ! locals
     integer(I4B) :: ip, nprp
     class(BndType), pointer :: packobj
+    class(*), pointer :: p
 
     ! Set up basic packages
     call this%fmi%fmi_ar(this%ibound)
@@ -256,6 +262,9 @@ contains
     ! Set up output control and budget
     call this%oc%oc_ar(this%dis, DHNOFLO)
     call this%budget%set_ibudcsv(this%oc%ibudcsv)
+
+    ! Initialize the event buffer (memory or scratch file per OC option)
+    call this%tracks%init_buffer(this%oc%scratch_buffer)
 
     ! Select tracking events
     call this%tracks%select_events( &
@@ -300,10 +309,10 @@ contains
     if (this%oc%itrkcsv > 0) &
       call this%tracks%init_file(this%oc%itrkcsv, csv=.true.)
 
-    ! Set up the tracking method
+    ! Initialize and select the tracking method based on discretization
     select type (dis => this%dis)
     type is (DisType)
-      call method_dis%init( &
+      call this%method_dis%init( &
         fmi=this%fmi, &
         events=this%events, &
         izone=this%mip%izone, &
@@ -311,9 +320,9 @@ contains
         porosity=this%mip%porosity, &
         retfactor=this%mip%retfactor, &
         tracktimes=this%oc%tracktimes)
-      this%method => method_dis
+      this%method => this%method_dis
     type is (DisvType)
-      call method_disv%init( &
+      call this%method_disv%init( &
         fmi=this%fmi, &
         events=this%events, &
         izone=this%mip%izone, &
@@ -321,11 +330,12 @@ contains
         porosity=this%mip%porosity, &
         retfactor=this%mip%retfactor, &
         tracktimes=this%oc%tracktimes)
-      this%method => method_disv
+      this%method => this%method_disv
     end select
 
-    ! Subscribe track output manager to events
-    call this%events%subscribe(this%tracks)
+    ! Subscribe particle track output manager to events
+    p => this%tracks
+    call this%events%subscribe(add_particle_event, p)
 
     ! Set verbose tracing if requested
     if (this%oc%dump_event_trace) this%tracks%iout = 0
@@ -354,17 +364,22 @@ contains
   !> @brief Time step advance (calls package advance subroutines)
   subroutine prt_ad(this)
     ! modules
-    use SimVariablesModule, only: isimcheck, iFailedStepRetry
+    use SimVariablesModule, only: isimcheck
     ! dummy
     class(PrtModelType) :: this
     class(BndType), pointer :: packobj
     ! local
-    integer(I4B) :: irestore
     integer(I4B) :: ip, n, i
 
-    ! Reset state variable
-    irestore = 0
-    if (iFailedStepRetry > 0) irestore = 1
+    ! Discard buffered events from previous time step solve attempts.
+    ! prt_advance() is called on every sln_ca(): once per ATS retry,
+    ! once per Picard iteration, and once for the post-Picard output
+    ! rerun if mxiter > 1. Tracking is skipped during Picard iterations
+    ! (isuppress_output=1) in prt_solve, so the buffer is empty here on
+    ! Picard calls and the discard is a no-op. On the output rerun
+    ! (isuppress_output=0), tracking runs once and the buffer is cleared
+    ! before it is filled, so only events from that run reach disk.
+    call this%tracks%discard_buffer()
 
     ! Update look-behind mass
     do n = 1, this%dis%nodes
@@ -374,15 +389,14 @@ contains
     ! Advance fmi
     call this%fmi%fmi_ad()
 
-    ! Advance
+    ! Advance release packages
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_ad()
-      if (isimcheck > 0) then
+      if (isimcheck > 0) &
         call packobj%bnd_ck()
-      end if
     end do
-    !
+
     ! Initialize the flowja array.  Flowja is calculated each time,
     ! even if output is suppressed.  (Flowja represents flow of particle
     ! mass and is positive into a cell.  Currently, each particle is assigned
@@ -480,18 +494,19 @@ contains
       packobj => GetBndFromList(this%bndlist, ip)
       select type (packobj)
       type is (PrtPrpType)
+        iprp = iprp + 1
         do np = 1, packobj%nparticles
-          call packobj%particles%get(particle, this%id, iprp, np)
-          istatus = packobj%particles%istatus(np)
+          call packobj%particles_staging%get(particle, this%id, iprp, np)
+          istatus = packobj%particles_staging%istatus(np)
           particle_id = particle%get_id()
           if (istatus == ACTIVE) then
             ! calculate storage mass
-            n = packobj%particles%itrdomain(np, LEVEL_FEATURE)
+            n = packobj%particles_staging%itrdomain(np, LEVEL_FEATURE)
             this%masssto(n) = this%masssto(n) + DONE ! unit mass
           else if (istatus > ACTIVE) then
             if (this%trm_ids%get(particle_id) /= 0) cycle
             ! calculate terminating mass
-            n = packobj%particles%itrdomain(np, LEVEL_FEATURE)
+            n = packobj%particles_staging%itrdomain(np, LEVEL_FEATURE)
             this%masstrm(n) = this%masstrm(n) + DONE ! unit mass
             call this%trm_ids%add(particle_id, 1) ! mark id terminated
           end if
@@ -557,6 +572,7 @@ contains
   !> @brief Print and/or save model output
   subroutine prt_ot(this)
     use TdisModule, only: tdis_ot, endofperiod
+    use PrtPrpModule, only: PrtPrpType
     ! dummy
     class(PrtModelType) :: this
     ! local
@@ -566,8 +582,20 @@ contains
     integer(I4B) :: icbcun
     integer(I4B) :: ibudfl
     integer(I4B) :: ipflag
+    integer(I4B) :: ip
+    class(BndType), pointer :: packobj
 
-    ! Note: particle tracking output is handled elsewhere
+    ! Flush buffered events to disk
+    call this%tracks%flush_buffer()
+
+    ! Commit each PRP's staged state
+    do ip = 1, this%bndlist%Count()
+      packobj => GetBndFromList(this%bndlist, ip)
+      select type (packobj)
+      type is (PrtPrpType)
+        call packobj%prp_commit()
+      end select
+    end do
 
     ! Set write and print flags
     idvsave = 0
@@ -822,9 +850,6 @@ contains
     use MemoryManagerModule, only: mem_deallocate
     use MemoryManagerExtModule, only: memorystore_remove
     use SimVariablesModule, only: idm_context
-    use MethodPoolModule, only: destroy_method_pool
-    use MethodCellPoolModule, only: destroy_method_cell_pool
-    use MethodSubcellPoolModule, only: destroy_method_subcell_pool
     ! dummy
     class(PrtModelType) :: this
     ! local
@@ -848,9 +873,10 @@ contains
     deallocate (this%oc)
 
     ! Method objects
-    call destroy_method_subcell_pool()
-    call destroy_method_cell_pool()
-    call destroy_method_pool()
+    call this%method_dis%deallocate()
+    deallocate (this%method_dis)
+    call this%method_disv%deallocate()
+    deallocate (this%method_disv)
 
     ! Boundary packages
     do ip = 1, this%bndlist%Count()
@@ -880,7 +906,7 @@ contains
     deallocate (this%events)
     deallocate (this%tracks)
 
-    call this%NumericalModelType%model_da()
+    call this%ExplicitModelType%model_da()
   end subroutine prt_da
 
   !> @brief Allocate memory for scalars
@@ -890,7 +916,7 @@ contains
     character(len=*), intent(in) :: modelname
 
     ! allocate members from parent class
-    call this%NumericalModelType%allocate_scalars(modelname)
+    call this%ExplicitModelType%allocate_scalars(modelname)
 
     ! allocate members that are part of model class
     call mem_allocate(this%infmi, 'INFMI', this%memoryPath)
@@ -918,11 +944,10 @@ contains
     class(PrtModelType) :: this
     integer(I4B) :: n
 
-    ! Allocate arrays in parent type
-    this%nja = this%dis%nja
-    call this%NumericalModelType%allocate_arrays()
+    ! Allocate arrays in parent type (ibound, flowja, nja)
+    call this%ExplicitModelType%allocate_arrays()
 
-    ! Allocate and initialize arrays
+    ! Allocate and initialize PRT-specific arrays
     call mem_allocate(this%masssto, this%dis%nodes, &
                       'MASSSTO', this%memoryPath)
     call mem_allocate(this%massstoold, this%dis%nodes, &
@@ -933,19 +958,12 @@ contains
                       'MASSTRM', this%memoryPath)
     call mem_allocate(this%ratetrm, this%dis%nodes, &
                       'RATETRM', this%memoryPath)
-    ! explicit model, so these must be manually allocated
-    call mem_allocate(this%x, this%dis%nodes, 'X', this%memoryPath)
-    call mem_allocate(this%rhs, this%dis%nodes, 'RHS', this%memoryPath)
-    call mem_allocate(this%ibound, this%dis%nodes, 'IBOUND', this%memoryPath)
     do n = 1, this%dis%nodes
       this%masssto(n) = DZERO
       this%massstoold(n) = DZERO
       this%ratesto(n) = DZERO
       this%masstrm(n) = DZERO
       this%ratetrm(n) = DZERO
-      this%x(n) = DZERO
-      this%rhs(n) = DZERO
-      this%ibound(n) = 1
     end do
   end subroutine allocate_arrays
 
@@ -954,7 +972,6 @@ contains
                             inunit, iout)
     ! modules
     use ConstantsModule, only: LINELENGTH
-    use PrtPrpModule, only: prp_create
     use ApiModule, only: api_create
     ! dummy
     class(PrtModelType) :: this
@@ -975,7 +992,7 @@ contains
     select case (filtyp)
     case ('PRP6')
       call prp_create(packobj, ipakid, ipaknum, inunit, iout, &
-                      this%name, pakname, mempath, this%fmi)
+                      this%name, pakname, this%fmi, mempath)
     case ('API6')
       call api_create(packobj, ipakid, ipaknum, inunit, iout, &
                       this%name, pakname, mempath)
@@ -1026,19 +1043,26 @@ contains
   end subroutine ftype_check
 
   !> @brief Solve the model
-  subroutine prt_solve(this)
+  subroutine prt_solve(this, isuppress_output)
     use TdisModule, only: totimc, delt, endofsimulation
     use PrtPrpModule, only: PrtPrpType
     use ParticleModule, only: ACTIVE, TERM_UNRELEASED, TERM_TIMEOUT
     use ParticleEventModule, only: RELEASE, TERMINATE
+    use SimVariablesModule, only: warnmsg
     ! dummy
     class(PrtModelType) :: this
+    integer(I4B), intent(in) :: isuppress_output
     ! local
     integer(I4B) :: np, ip
     class(BndType), pointer :: packobj
     type(ParticleType), pointer :: particle
     real(DP) :: tmax
     integer(I4B) :: iprp
+
+    ! Skip tracking during Picard iterations: PRT doesn't affect the flow
+    ! solution, so tracking is only needed once on the final output rerun
+    ! (or on the single call when mxiter=1, which also has isuppress_output=0).
+    if (isuppress_output /= 0) return
 
     ! A single particle is reused in the tracking loops
     ! to avoid allocating and deallocating it each time.
@@ -1052,8 +1076,8 @@ contains
       type is (PrtPrpType)
         iprp = iprp + 1
         do np = 1, packobj%nparticles
-          ! Get the particle from the store
-          call packobj%particles%get(particle, this%id, iprp, np)
+          ! Get the particle from the staging store
+          call packobj%particles_staging%get(particle, this%id, iprp, np)
           ! If particle is permanently unreleased, cycle.
           ! Raise a termination event if we haven't yet.
           ! TODO: when we have generic dynamic vectors,
@@ -1063,36 +1087,65 @@ contains
           ! is not yet recorded, status 8 it has been.
           if (particle%istatus == (-1 * TERM_UNRELEASED)) then
             call this%method%terminate(particle, status=TERM_UNRELEASED)
-            call packobj%particles%put(particle, np)
+            call packobj%particles_staging%put(particle, np)
           end if
           if (particle%istatus > ACTIVE) cycle ! Skip terminated particles
           particle%istatus = ACTIVE ! Set active status in case of release
-          ! If the particle was released this time step, emit a release event
-          if (particle%trelease >= totimc) call this%method%release(particle)
-          ! Maximum time is the end of the time step or the particle
-          ! stop time, whichever comes first, unless it's the final
-          ! time step and the extend option is on, in which case
-          ! it's just the particle stop time.
-          if (endofsimulation .and. particle%extend) then
-            tmax = particle%tstop
-          else
-            tmax = min(totimc + delt, particle%tstop)
+          if (particle%trelease >= totimc) then
+            if (particle%trelease > particle%tstop) then
+              ! The package's stop time is earlier than the release time.
+              ! Terminate it permanently unreleased and show a warning.
+              write (warnmsg, '(a,g0,a,g0,a,g0,a)') &
+                'Particle release point ', particle%irpt, ' has &
+                &release time ', particle%trelease, ' after package &
+                &stop time ', particle%tstop, '; particle will not &
+                &be released.'
+              call store_warning(warnmsg)
+              call this%method%terminate(particle, status=TERM_UNRELEASED)
+            else
+              ! The particle was released this time step; emit a
+              ! release event.
+              call this%method%release(particle)
+            end if
           end if
-          ! Apply the tracking method until the maximum time.
-          call this%method%apply(particle, tmax)
-          ! If the particle timed out, terminate it.
-          ! "Timed out" means it's still active but
-          !   - it reached its stop time, or
-          !   - the simulation is over.
-          ! We can't detect timeout within the tracking
-          ! method because the method just receives the
-          ! maximum time with no context on what it is.
-          ! TODO maybe think about changing that?
-          if (particle%istatus <= ACTIVE .and. &
-              (particle%ttrack == particle%tstop .or. endofsimulation)) &
-            call this%method%terminate(particle, status=TERM_TIMEOUT)
-          ! Return the particle to the store
-          call packobj%particles%put(particle, np)
+          if (particle%istatus <= ACTIVE) then
+            ! Maximum time is the end of the time step or the particle
+            ! stop time, whichever comes first, unless it's the final
+            ! time step and the extend option is on, in which case
+            ! it's just the particle stop time.
+            if (endofsimulation .and. particle%extend) then
+              tmax = particle%tstop
+            else
+              tmax = min(totimc + delt, particle%tstop)
+            end if
+            ! tmax should never be less than the particle's current
+            ! tracked time: ttrack can't get ahead of totimc, the
+            ! smaller of the two terms tmax is drawn from, and a
+            ! release whose time precedes the stop time was already
+            ! caught above and never reaches this point. If it
+            ! happens anyway, that's a programmer error: tracking
+            ! methods assume a nonnegative time interval, and calling
+            ! apply() with tmax < ttrack sends them a negative one,
+            ! which corrupts the tracking method.
+            if (tmax < particle%ttrack) &
+              call pstop(1, 'Programmer error: PRT tracking tmax &
+                &precedes particle%ttrack.')
+            ! Apply the tracking method until the maximum time.
+            call this%method%apply(particle, tmax)
+            ! If the particle timed out, terminate it.
+            ! "Timed out" means it's still active but
+            !   - it reached its stop time, or
+            !   - the simulation is over.
+            ! We can't detect timeout within the tracking
+            ! method because the method just receives the
+            ! maximum time with no context on what it is.
+            ! TODO maybe think about changing that?
+            if (particle%istatus <= ACTIVE .and. &
+                (particle%ttrack == particle%tstop .or. endofsimulation)) &
+              call this%method%terminate(particle, status=TERM_TIMEOUT)
+          end if
+          ! Return the particle to the staging store
+          call packobj%particles_staging%put(particle, np)
         end do
       end select
     end do
@@ -1162,9 +1215,6 @@ contains
     use MemoryHelperModule, only: create_mem_path
     use SimVariablesModule, only: idm_context
     use BudgetModule, only: budget_cr
-    use MethodPoolModule, only: create_method_pool
-    use MethodCellPoolModule, only: create_method_cell_pool
-    use MethodSubcellPoolModule, only: create_method_subcell_pool
     use PrtMipModule, only: mip_cr
     use PrtFmiModule, only: fmi_cr
     use PrtOcModule, only: oc_cr
@@ -1200,14 +1250,14 @@ contains
     call mem_setptr(mempaths, 'MEMPATHS', model_mempath)
     call mem_setptr(inunits, 'INUNITS', model_mempath)
 
+    ! determine which packages we have. create
+    ! dis up front as the others depend on it.
     do n = 1, size(pkgtypes)
-      ! attributes for this input package
       pkgtype = pkgtypes(n)
       pkgname = pkgnames(n)
       mempath = mempaths(n)
       inunit => inunits(n)
 
-      ! create dis package first as it is a prerequisite for other packages
       select case (pkgtype)
       case ('DIS6')
         indis = 1
@@ -1238,22 +1288,43 @@ contains
     ! Create budget manager
     call budget_cr(this%budget, this%name)
 
-    ! Create tracking method pools
-    call create_method_pool()
-    call create_method_cell_pool()
-    call create_method_subcell_pool()
+    ! Create tracking methods
+    call create_method_dis(this%method_dis)
+    call create_method_disv(this%method_disv)
 
-    ! Create packages that are tied directly to model
+    ! Create non-boundary packages
     call mip_cr(this%mip, this%name, mempathmip, this%inmip, this%iout, this%dis)
     call fmi_cr(this%fmi, this%name, mempathfmi, this%infmi, this%iout)
     call oc_cr(this%oc, this%name, mempathoc, this%inoc, this%iout)
 
-    ! Check to make sure that required ftype's have been specified
+    ! Check required input files
     call this%ftype_check(indis)
 
     ! Create boundary packages
     call this%create_bndpkgs(bndpkgs, pkgtypes, pkgnames, mempaths, inunits)
+    call this%create_exg_prp()
   end subroutine create_packages
+
+  !> @brief Create an exchange PRP package for particles
+  !! entering this model from other model.
+  subroutine create_exg_prp(this)
+    class(PrtModelType) :: this
+    ! local
+    class(BndType), pointer :: packobj
+    character(len=LENPACKAGENAME) :: exgprp_name
+
+    exgprp_name = 'EXGPRP'
+
+    call prp_create(packobj, &
+                    id=0, &
+                    ibcnum=0, &
+                    inunit=-1, &
+                    iout=this%iout, &
+                    namemodel=this%name, &
+                    pakname=exgprp_name, &
+                    fmi=this%fmi)
+    call AddBndToList(this%bndlist, packobj)
+  end subroutine create_exg_prp
 
   !> @brief Write model namfile options to list file
   subroutine log_namfile_options(this, found)

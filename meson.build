@@ -1,15 +1,23 @@
 project(
   'MODFLOW 6',
   'fortran',
-  version: '6.7.0',
+  version: '6.8.0',
   license: 'CC0',
-  meson_version: '>= 1.3.1',
+  meson_version: '>= 1.7.0',
   default_options : [
     'b_vscrt=static_from_buildtype', # Link runtime libraries statically on Windows
     'buildtype=release',
     'debug=false',
     'fortran_std=f2018',
 ])
+
+version_f90 = vcs_tag(
+    command: ['python3', 'distribution/vcs_tag_suffix.py'],
+    input:  'src/Utilities/version.f90.in',
+    output: 'version.f90',
+    replace_string: '@VCS_TAG@',
+    fallback: '',
+  )
 
 if get_option('buildtype') == 'release'
   profile = 'release'
@@ -47,6 +55,13 @@ if fc_id == 'gcc'
     compile_args += '-D__linux__'
   elif system == 'darwin'
     compile_args += '-D__APPLE__'
+    # gfortran on macOS has a bug at optimization > 1 that produces incorrect
+    # PRT results; cap to -O1 unless the user already chose a lower level.
+    opt = get_option('optimization')
+    if opt == '2' or opt == '3' or opt == 's'
+      warning('macOS gfortran: capping optimization to -O1 to avoid a compiler bug affecting PRT results')
+      compile_args += '-O1'
+    endif
   elif system == 'windows'
     compile_args += '-D_WIN32'
   endif

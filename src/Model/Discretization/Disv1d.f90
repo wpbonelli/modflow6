@@ -5,7 +5,7 @@ module Disv1dModule
   use SimVariablesModule, only: errmsg, warnmsg
   use MemoryHelperModule, only: create_mem_path
   use MemoryManagerModule, only: mem_allocate, mem_setptr
-  use MemoryManagerExtModule, only: mem_set_value
+  use MemoryManagerExtModule, only: mem_set_value, memorystore_release
   use SimModule, only: count_errors, store_error, store_warning, &
                        store_error_filename
   use InputOutputModule, only: urword
@@ -525,6 +525,8 @@ contains
       write (this%iout, '(1x,a)') 'Setting Discretization Vertices'
       write (this%iout, '(1x,a,/)') 'End setting discretization vertices'
     end if
+    call memorystore_release('XV', idmMemoryPath)
+    call memorystore_release('YV', idmMemoryPath)
   end subroutine source_vertices
 
   !> @brief Copy cell1d information from input data context
@@ -887,7 +889,7 @@ contains
     write (txthdr, '(a)') 'GRID DISV1D'
     txthdr(50:50) = new_line('a')
     write (iunit) txthdr
-    write (txthdr, '(a)') 'VERSION 1'
+    write (txthdr, '(a, i0)') 'VERSION ', version
     txthdr(50:50) = new_line('a')
     write (iunit) txthdr
     write (txthdr, '(a, i0)') 'NTXT ', ntxt

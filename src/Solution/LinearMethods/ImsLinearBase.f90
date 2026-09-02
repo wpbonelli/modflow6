@@ -13,6 +13,7 @@ MODULE IMSLinearBaseModule
   use BlockParserModule, only: BlockParserType
   use IMSReorderingModule, only: ims_odrv
   use ConvergenceSummaryModule
+  use ImsLinearSettingsModule, only: IPC_ILU0, IPC_MILU0, IPC_ILUT, IPC_MILUT
 
   IMPLICIT NONE
 
@@ -105,11 +106,11 @@ contains
       SELECT CASE (IPC)
         !
         ! -- ILU0 AND MILU0
-      CASE (1, 2)
+      CASE (IPC_ILU0, IPC_MILU0)
         CALL ims_base_ilu0a(NJA, NEQ, APC, IAPC, JAPC, D, Z)
         !
         ! -- ILUT AND MILUT
-      CASE (3, 4)
+      CASE (IPC_ILUT, IPC_MILUT)
         CALL lusol(NEQ, D, Z, APC, JLU, IW)
       END SELECT
       rho = ddot(NEQ, D, 1, Z, 1)
@@ -358,11 +359,11 @@ contains
       SELECT CASE (IPC)
         !
         ! -- ILU0 AND MILU0
-      CASE (1, 2)
+      CASE (IPC_ILU0, IPC_MILU0)
         CALL ims_base_ilu0a(NJA, NEQ, APC, IAPC, JAPC, P, PHAT)
         !
         ! -- ILUT AND MILUT
-      CASE (3, 4)
+      CASE (IPC_ILUT, IPC_MILUT)
         CALL lusol(NEQ, P, PHAT, APC, JLU, IW)
       END SELECT
       !
@@ -409,11 +410,11 @@ contains
       SELECT CASE (IPC)
         !
         ! -- ILU0 AND MILU0
-      CASE (1, 2)
+      CASE (IPC_ILU0, IPC_MILU0)
         CALL ims_base_ilu0a(NJA, NEQ, APC, IAPC, JAPC, Q, QHAT)
         !
         ! -- ILUT AND MILUT
-      CASE (3, 4)
+      CASE (IPC_ILUT, IPC_MILUT)
         CALL lusol(NEQ, Q, QHAT, APC, JLU, IW)
       END SELECT
       !
@@ -769,7 +770,7 @@ contains
     integer(I4B), INTENT(IN) :: NEQ !< number of equations
     integer(I4B), INTENT(IN) :: NIAPC !< preconditioner number of rows
     integer(I4B), INTENT(IN) :: NJAPC !< preconditioner number of non-zero entries
-    integer(I4B), INTENT(IN) :: IPC !< precoditioner (1) ILU0 (2) MILU0 (3) ILUT (4) MILUT
+    integer(I4B), INTENT(IN) :: IPC !< preconditioner (1) ILU0 (2) MILU0 (3) ILUT (4) MILUT
     real(DP), INTENT(IN) :: RELAX !< preconditioner relaxation factor for MILU0 and MILUT
     real(DP), DIMENSION(NJA), INTENT(IN) :: AMAT !< coefficient matrix
     integer(I4B), DIMENSION(NEQ + 1), INTENT(IN) :: IA !< CRS row pointers
@@ -777,7 +778,7 @@ contains
     real(DP), DIMENSION(NJAPC), INTENT(INOUT) :: APC !< preconditioner matrix
     integer(I4B), DIMENSION(NIAPC + 1), INTENT(INOUT) :: IAPC !< preconditioner CRS row pointers
     integer(I4B), DIMENSION(NJAPC), INTENT(INOUT) :: JAPC !< preconditioner CRS column pointers
-    integer(I4B), DIMENSION(NIAPC), INTENT(INOUT) :: IW !< preconditioner integed work vector
+    integer(I4B), DIMENSION(NIAPC), INTENT(INOUT) :: IW !< preconditioner integer work vector
     real(DP), DIMENSION(NIAPC), INTENT(INOUT) :: W !< preconditioner work vector
     ! -- ILUT dummy variables
     integer(I4B), INTENT(IN) :: LEVEL !< number of levels of fill for ILUT and MILUT
@@ -813,13 +814,13 @@ contains
       SELECT CASE (IPC)
         !
         ! -- ILU0 AND MILU0
-      CASE (1, 2)
+      CASE (IPC_ILU0, IPC_MILU0)
         CALL ims_base_pcilu0(NJA, NEQ, AMAT, IA, JA, &
                              APC, IAPC, JAPC, IW, W, &
                              RELAX, ipcflag, delta)
         !
         ! -- ILUT AND MILUT
-      CASE (3, 4)
+      CASE (IPC_ILUT, IPC_MILUT)
         ierr = 0
         CALL ilut(NEQ, AMAT, JA, IA, LEVEL, DROPTOL, &
                   APC, JLU, IW, NJAPC, WLU, JW, ierr, &

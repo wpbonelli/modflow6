@@ -64,7 +64,7 @@ jobs:
       patch: ${{ steps.set_patch.outputs.patch }}
     steps:
       - name: Checkout modflow6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/modflow6
           ref: ${{ github.ref }}
@@ -192,13 +192,13 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout modflow6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/modflow6
           ref: ${{ github.ref }}
 
       - name: Setup Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: environment.yml
           cache-downloads: true
@@ -252,20 +252,20 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout modflow6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/modflow6
           path: modflow6
 
       - name: Setup Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: modflow6/environment.yml
           cache-downloads: true
           cache-environment: true
 
       - name: Download artifacts
-        uses: dawidd6/action-download-artifact@v14
+        uses: dawidd6/action-download-artifact@v24
 
       - name: Draft release
         working-directory: modflow6

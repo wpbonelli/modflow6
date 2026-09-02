@@ -13,7 +13,8 @@ module DisuModule
   use BaseDisModule, only: DisBaseType
   use MemoryManagerModule, only: mem_allocate, mem_deallocate, &
                                  mem_reallocate, mem_setptr
-  use MemoryManagerExtModule, only: mem_set_value, memorystore_remove
+  use MemoryManagerExtModule, only: mem_set_value, memorystore_remove, &
+                                    memorystore_release
   use TdisModule, only: kstp, kper, pertim, totim, delt
   use DisvGeom, only: line_unit_vector
 
@@ -64,6 +65,9 @@ module DisuModule
     procedure :: connection_vector
     procedure :: supports_layers
     procedure :: get_ncpl
+    procedure :: get_polyverts
+    procedure :: get_npolyverts
+    procedure :: get_max_npolyverts
     procedure, public :: record_array
     procedure, public :: record_srcdst_list_header
     ! -- private
@@ -813,6 +817,8 @@ contains
       write (this%iout, '(1x,a)') 'Discretization Vertex data loaded'
     end if
     !
+    call memorystore_release('XV', this%input_mempath)
+    call memorystore_release('YV', this%input_mempath)
   end subroutine source_vertices
 
   !> @brief Build data structures to hold cell vertex info
@@ -901,6 +907,11 @@ contains
       write (this%iout, '(1x,a)') 'Discretization Cell2d data loaded'
     end if
     !
+    call memorystore_release('ICELL2D', this%input_mempath)
+    call memorystore_release('NCVERT', this%input_mempath)
+    call memorystore_release('ICVERT', this%input_mempath)
+    call memorystore_release('XC', this%input_mempath)
+    call memorystore_release('YC', this%input_mempath)
   end subroutine source_cell2d
 
   !> @brief Write a binary grid file
@@ -949,7 +960,7 @@ contains
     write (txthdr, '(a)') 'GRID DISU'
     txthdr(50:50) = new_line('a')
     write (iunit) txthdr
-    write (txthdr, '(a)') 'VERSION 1'
+    write (txthdr, '(a, i0)') 'VERSION ', version
     txthdr(50:50) = new_line('a')
     write (iunit) txthdr
     write (txthdr, '(a, i0)') 'NTXT ', ntxt
@@ -1064,10 +1075,10 @@ contains
     integer(I4B) :: nodenumber
     !
     if (icheck /= 0) then
-      if (nodeu < 1 .or. nodeu > this%nodes) then
+      if (nodeu < 1 .or. nodeu > this%nodesuser) then
         write (errmsg, '(a,i0,a,i0,a)') &
           'Node number (', nodeu, ') is less than 1 or greater than nodes (', &
-          this%nodes, ').'
+          this%nodesuser, ').'
         call store_error(errmsg)
       end if
     end if
@@ -1623,6 +1634,92 @@ contains
 
   !> @brief Cast base to DISU
   !<
+  !> @brief Get a 2D array of polygon vertices, listed in
+  !!
+  !! clockwise order beginning with the lower left corner.
+  !! The array is empty if the optional cell vertices were
+  !! not provided.
+  !<
+  subroutine get_polyverts(this, ic, polyverts, closed)
+    ! -- dummy
+    class(DisuType), intent(inout) :: this
+    integer(I4B), intent(in) :: ic !< cell number (reduced)
+    real(DP), allocatable, intent(out) :: polyverts(:, :) !< polygon vertices (column-major indexing)
+    logical(LGP), intent(in), optional :: closed !< whether to close the polygon, duplicating a vertex
+    ! -- local
+    integer(I4B) :: icu, iavert, nverts, m, j
+    logical(LGP) :: lclosed
+
+    ! count vertices
+    nverts = this%get_npolyverts(ic)
+    if (nverts == 0) then
+      allocate (polyverts(2, 0))
+      return
+    end if
+
+    ! check closed option
+    if (.not. (present(closed))) then
+      lclosed = .false.
+    else
+      lclosed = closed
+    end if
+
+    ! allocate vertices array
+    if (lclosed) then
+      allocate (polyverts(2, nverts + 1))
+    else
+      allocate (polyverts(2, nverts))
+    end if
+
+    ! set vertices
+    icu = this%get_nodeuser(ic)
+    iavert = this%iavert(icu)
+    do m = 1, nverts
+      j = this%javert(iavert - 1 + m)
+      polyverts(:, m) = (/this%vertices(1, j), this%vertices(2, j)/)
+    end do
+
+    ! close if enabled
+    if (lclosed) &
+      polyverts(:, nverts + 1) = polyverts(:, 1)
+
+  end subroutine
+
+  !> @brief Get the number of cell polygon vertices, 0 if none are defined.
+  function get_npolyverts(this, ic, closed) result(npolyverts)
+    class(DisuType), intent(inout) :: this
+    integer(I4B), intent(in) :: ic !< cell number (reduced)
+    logical(LGP), intent(in), optional :: closed !< whether to close the polygon, duplicating a vertex
+    integer(I4B) :: npolyverts
+    ! local
+    integer(I4B) :: icu
+
+    ! the vertices and cell2d blocks are optional
+    if (this%nvert < 1) then
+      npolyverts = 0
+      return
+    end if
+
+    icu = this%get_nodeuser(ic)
+    npolyverts = this%iavert(icu + 1) - this%iavert(icu) - 1
+    if (present(closed)) then
+      if (closed) npolyverts = npolyverts + 1
+    end if
+  end function get_npolyverts
+
+  !> @brief Get the maximum number of cell polygon vertices.
+  function get_max_npolyverts(this, closed) result(max_npolyverts)
+    class(DisuType), intent(inout) :: this
+    logical(LGP), intent(in), optional :: closed !< whether to close the polygon, duplicating a vertex
+    integer(I4B) :: max_npolyverts
+    integer(I4B) :: ic
+
+    max_npolyverts = 0
+    do ic = 1, this%nodes
+      max_npolyverts = max(max_npolyverts, this%get_npolyverts(ic, closed))
+    end do
+  end function get_max_npolyverts
+
   function CastAsDisuType(dis) result(disu)
     ! -- dummy
     class(*), pointer :: dis !< base pointer to DISU object

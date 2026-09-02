@@ -26,6 +26,24 @@ module SwfDfwModule
   private
   public :: SwfDfwType, dfw_cr
 
+  !> @brief flags indicating which DFW options were found in the input
+  type :: DfwOptionsFoundType
+    logical(LGP) :: icentral = .false.
+    logical(LGP) :: iswrcond = .false.
+    logical(LGP) :: lengthconv = .false.
+    logical(LGP) :: timeconv = .false.
+    logical(LGP) :: iprflow = .false.
+    logical(LGP) :: ipakcb = .false.
+    logical(LGP) :: isavvelocity = .false.
+    logical(LGP) :: obs6_filename = .false.
+  end type DfwOptionsFoundType
+
+  !> @brief flags indicating which DFW griddata were found in the input
+  type :: DfwGriddataFoundType
+    logical(LGP) :: manningsn = .false.
+    logical(LGP) :: idcxs = .false.
+  end type DfwGriddataFoundType
+
   type, extends(NumericalPackageType) :: SwfDfwType
 
     ! user-provided input
@@ -292,14 +310,13 @@ contains
     ! modules
     use KindModule, only: LGP
     use InputOutputModule, only: getunit, openfile
-    use MemoryManagerExtModule, only: mem_set_value
+    use MemoryManagerExtModule, only: mem_set_value, memorystore_release
     use CharacterStringModule, only: CharacterStringType
-    use SwfDfwInputModule, only: SwfDfwParamFoundType
     ! dummy
     class(SwfDfwType) :: this !< this instance
     ! locals
     integer(I4B) :: isize
-    type(SwfDfwParamFoundType) :: found
+    type(DfwOptionsFoundType) :: found
     type(CharacterStringType), dimension(:), pointer, &
       contiguous :: obs6_fnames
 
@@ -351,6 +368,8 @@ contains
       call openfile(this%inobspkg, this%iout, this%obs%inputFilename, 'OBS')
       call this%obs%obs_df(this%iout, this%packName, this%filtyp, this%dis)
       call this%dfw_df_obs()
+
+      call memorystore_release('OBS6_FILENAME', this%input_mempath)
     end if
 
     ! log values to list file
@@ -363,9 +382,8 @@ contains
   !> @brief Write user options to list file
   !<
   subroutine log_options(this, found)
-    use SwfDfwInputModule, only: SwfDfwParamFoundType
     class(SwfDfwType) :: this !< this instance
-    type(SwfDfwParamFoundType), intent(in) :: found
+    type(DfwOptionsFoundType), intent(in) :: found
 
     write (this%iout, '(1x,a)') 'Setting DFW Options'
 
@@ -421,12 +439,11 @@ contains
     use MemoryHelperModule, only: create_mem_path
     use MemoryManagerExtModule, only: mem_set_value
     use SimVariablesModule, only: idm_context
-    use SwfDfwInputModule, only: SwfDfwParamFoundType
     ! dummy
     class(SwfDfwType) :: this !< this instance
     ! locals
     character(len=LENMEMPATH) :: idmMemoryPath
-    type(SwfDfwParamFoundType) :: found
+    type(DfwGriddataFoundType) :: found
     integer(I4B), dimension(:), pointer, contiguous :: map
 
     ! set memory path
@@ -461,9 +478,8 @@ contains
   !> @brief log griddata to list file
   !<
   subroutine log_griddata(this, found)
-    use SwfDfwInputModule, only: SwfDfwParamFoundType
     class(SwfDfwType) :: this !< this instance
-    type(SwfDfwParamFoundType), intent(in) :: found
+    type(DfwGriddataFoundType), intent(in) :: found
 
     write (this%iout, '(1x,a)') 'Setting DFW Griddata'
 

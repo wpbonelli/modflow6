@@ -21,7 +21,6 @@ module MethodModule
   use CellDefnModule, only: CellDefnType
   use TimeSelectModule, only: TimeSelectType
   use MathUtilModule, only: is_close
-  use DomainModule, only: DomainType
   use ExitSolutionModule, only: ExitSolutionType
   use ListModule, only: ListType
   implicit none
@@ -76,8 +75,6 @@ module MethodModule
     ! Overridden in subtypes that delegate
     procedure :: pass !< pass the particle to the next subdomain
     procedure :: load !< load the subdomain tracking method
-    procedure :: find_exits !< find domain exit solutions
-    procedure :: pick_exit
     ! Implemented here
     procedure :: init
     procedure :: track
@@ -210,34 +207,13 @@ contains
     call pstop(1, "pass must be overridden")
   end subroutine pass
 
-  !> @brief Compute candidate exit solutions.
-  subroutine find_exits(this, particle, domain)
-    class(MethodType), intent(inout) :: this
-    type(ParticleType), pointer, intent(inout) :: particle
-    class(DomainType), intent(in) :: domain
-    if (.not. this%delegates) &
-      call pstop(1, "find_exits called on non-delegating method")
-    call pstop(1, "find_exits must be overridden in delegating methods")
-  end subroutine find_exits
-
-  !> @brief Choose an exit solution among candidates.
-  function pick_exit(this, particle) result(exit_soln)
-    class(MethodType), intent(inout) :: this
-    type(ParticleType), pointer, intent(inout) :: particle
-    integer(I4B) :: exit_soln
-    exit_soln = 0 ! suppress compiler warning
-    if (.not. this%delegates) &
-      call pstop(1, "pick_exit called on non-delegating method")
-    call pstop(1, "pick_exit must be overridden in delegating methods")
-  end function pick_exit
-
   !> @brief A particle is released.
   subroutine release(this, particle)
     class(MethodType), intent(inout) :: this
     type(ParticleType), pointer, intent(inout) :: particle
     class(ParticleEventType), pointer :: event
     allocate (ReleaseEventType :: event)
-    call this%events%dispatch(particle, event)
+    call this%events%broadcast(particle, event)
     deallocate (event)
   end subroutine release
 
@@ -250,7 +226,7 @@ contains
     particle%advancing = .false.
     if (present(status)) particle%istatus = status
     allocate (TerminationEventType :: event)
-    call this%events%dispatch(particle, event)
+    call this%events%broadcast(particle, event)
     deallocate (event)
   end subroutine terminate
 
@@ -260,7 +236,7 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     class(ParticleEventType), pointer :: event
     allocate (TimeStepEventType :: event)
-    call this%events%dispatch(particle, event)
+    call this%events%broadcast(particle, event)
     deallocate (event)
   end subroutine timestep
 
@@ -270,7 +246,7 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     class(ParticleEventType), pointer :: event
     allocate (WeakSinkEventType :: event)
-    call this%events%dispatch(particle, event)
+    call this%events%broadcast(particle, event)
     deallocate (event)
   end subroutine weaksink
 
@@ -280,7 +256,7 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     class(ParticleEventType), pointer :: event
     allocate (UserTimeEventType :: event)
-    call this%events%dispatch(particle, event)
+    call this%events%broadcast(particle, event)
     deallocate (event)
   end subroutine usertime
 
@@ -290,7 +266,7 @@ contains
     type(ParticleType), pointer, intent(inout) :: particle
     class(ParticleEventType), pointer :: event
     allocate (DroppedEventType :: event)
-    call this%events%dispatch(particle, event)
+    call this%events%broadcast(particle, event)
     deallocate (event)
   end subroutine dropped
 

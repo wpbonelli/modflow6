@@ -12,7 +12,9 @@ PROJ_ROOT = Path(__file__).parents[2]
 
 # exclude these directories from checks
 excludedirs = [
+    PROJ_ROOT / ".claude",
     PROJ_ROOT / ".pixi",
+    PROJ_ROOT / ".test-drive",
     PROJ_ROOT / "src" / "Utilities" / "Libraries" / "blas",
     PROJ_ROOT / "src" / "Utilities" / "Libraries" / "daglib",
     PROJ_ROOT / "src" / "Utilities" / "Libraries" / "rcm",
@@ -24,11 +26,7 @@ excludedirs = [
 ]
 
 # exclude these files from checks
-excludefiles = [
-    PROJ_ROOT / "src" / "Idm" / "gwf-csubidm.f90",
-    PROJ_ROOT / "src" / "Idm" / "gwf-stoidm.f90",
-    PROJ_ROOT / "src" / "Idm" / "gwf-vscidm.f90",
-]
+excludefiles = []
 
 # commands
 fprettify = "fprettify -c .fprettify.yaml"

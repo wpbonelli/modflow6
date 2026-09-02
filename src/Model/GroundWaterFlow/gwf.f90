@@ -79,6 +79,7 @@ module GwfModule
     procedure :: model_cq => gwf_cq
     procedure :: model_bd => gwf_bd
     procedure :: model_ot => gwf_ot
+    procedure :: model_dt => gwf_dt
     procedure :: model_fp => gwf_fp
     procedure :: model_da => gwf_da
     procedure :: model_bdentry => gwf_bdentry
@@ -381,6 +382,7 @@ contains
     do ip = 1, this%bndlist%Count()
       packobj => GetBndFromList(this%bndlist, ip)
       call packobj%bnd_rp()
+      call packobj%bnd_rp_log()
       call packobj%bnd_rp_obs()
     end do
     !
@@ -1023,18 +1025,40 @@ contains
 
   end subroutine gwf_ot_bdsummary
 
-  !> @brief Final processing
+  !> @brief Submit boundary-package ATS time step requests
   !<
+  subroutine gwf_dt(this)
+    ! -- dummy
+    class(GwfModelType) :: this
+    ! -- local
+    integer(I4B) :: ip
+    class(BndType), pointer :: packobj => null()
+    !
+    ! -- boundary package time step submission
+    do ip = 1, this%bndlist%Count()
+      packobj => GetBndFromList(this%bndlist, ip)
+      call packobj%bnd_dt()
+    end do
+  end subroutine gwf_dt
+
   subroutine gwf_fp(this)
     ! -- modules
     ! -- dummy
     class(GwfModelType) :: this
     ! -- local
+    integer(I4B) :: ip
+    class(BndType), pointer :: packobj => null()
     !
     ! -- csub final processing
     if (this%incsub > 0) then
       call this%csub%csub_fp()
     end if
+    !
+    ! -- boundary package final processing
+    do ip = 1, this%bndlist%Count()
+      packobj => GetBndFromList(this%bndlist, ip)
+      call packobj%bnd_fp()
+    end do
   end subroutine gwf_fp
 
   !> @brief Deallocate
@@ -1582,14 +1606,13 @@ contains
   !<
   subroutine steady_period_check(this)
     ! -- modules
-    use TdisModule, only: kper
-    use AdaptiveTimeStepModule, only: isAdaptivePeriod
+    use TdisModule, only: kper, ats
     use SimVariablesModule, only: warnmsg
     use SimModule, only: store_warning
     ! -- dummy
     class(GwfModelType) :: this
     if (this%iss == 1) then
-      if (isAdaptivePeriod(kper)) then
+      if (ats%isAdaptivePeriod(kper)) then
         write (warnmsg, '(a,a,a,i0,a)') &
           'GWF Model (', trim(this%name), ') is steady state for period ', &
           kper, ' and adaptive time stepping is active.  Adaptive time &

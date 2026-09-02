@@ -32,7 +32,7 @@ jobs:
       # cache oneapi and petsc for mf6 parallel
       - name: Checkout modflow6
         if: matrix.compiler == 'intel' && matrix.version == '2024.0'
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: modflow6
       - name: Cache oneAPI and PETSc
@@ -56,20 +56,20 @@ jobs:
         uses: jlumbroso/free-disk-space@main
 
       - name: Checkout modflow6
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           path: modflow6
 
       - name: Checkout large test models
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-largetestmodels
           path: modflow6-largetestmodels
 
       - name: Setup pixi
-        uses: prefix-dev/setup-pixi@v0.9.4
+        uses: prefix-dev/setup-pixi@v0.10.2
         with:
-          pixi-version: v0.41.4
+          pixi-version: v0.70.1
           manifest-path: "modflow6/pixi.toml"
 
       - name: Custom pixi install
@@ -106,7 +106,7 @@ jobs:
       
       - name: Upload failed test output
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: failed-${{ runner.os }}-${{ matrix.compiler }}-${{ matrix.version }}
           path: modflow6/autotest/.failed

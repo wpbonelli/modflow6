@@ -40,6 +40,7 @@ module PrtOcInputModule
     logical :: track_timesfile = .false.
     logical :: timesfile = .false.
     logical :: dev_dump_evtrace = .false.
+    logical :: scratch_buffer = .false.
     logical :: ntracktimes = .false.
     logical :: time = .false.
     logical :: saverecord = .false.
@@ -47,7 +48,6 @@ module PrtOcInputModule
     logical :: printrecord = .false.
     logical :: print = .false.
     logical :: rtype = .false.
-    logical :: ocsetting = .false.
     logical :: all = .false.
     logical :: first = .false.
     logical :: last = .false.
@@ -596,6 +596,25 @@ module PrtOcInputModule
     )
 
   type(InputParamDefinitionType), parameter :: &
+    prtoc_scratch_buffer = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'OC', & ! subcomponent
+    'OPTIONS', & ! block
+    'SCRATCH_BUFFER', & ! tag name
+    'SCRATCH_BUFFER', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'buffer track events in scratch file instead of memory', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
     prtoc_ntracktimes = InputParamDefinitionType &
     ( &
     'PRT', & ! component
@@ -720,25 +739,6 @@ module PrtOcInputModule
     'STRING', & ! type
     '', & ! shape
     'record type', & ! longname
-    .true., & ! required
-    .false., & ! developmode
-    .true., & ! multi-record
-    .false., & ! preserve case
-    .false., & ! layered
-    .false. & ! timeseries
-    )
-
-  type(InputParamDefinitionType), parameter :: &
-    prtoc_ocsetting = InputParamDefinitionType &
-    ( &
-    'PRT', & ! component
-    'OC', & ! subcomponent
-    'PERIOD', & ! block
-    'OCSETTING', & ! tag name
-    'OCSETTING', & ! fortran variable
-    'KEYSTRING ALL FIRST LAST FREQUENCY STEPS', & ! type
-    '', & ! shape
-    '', & ! longname
     .true., & ! required
     .false., & ! developmode
     .true., & ! multi-record
@@ -873,6 +873,7 @@ module PrtOcInputModule
     prtoc_track_timesfile, &
     prtoc_timesfile, &
     prtoc_dev_dump_evtrace, &
+    prtoc_scratch_buffer, &
     prtoc_ntracktimes, &
     prtoc_time, &
     prtoc_saverecord, &
@@ -880,7 +881,6 @@ module PrtOcInputModule
     prtoc_printrecord, &
     prtoc_print, &
     prtoc_rtype, &
-    prtoc_ocsetting, &
     prtoc_all, &
     prtoc_first, &
     prtoc_last, &
@@ -908,9 +908,29 @@ module PrtOcInputModule
     )
 
   type(InputParamDefinitionType), parameter :: &
+    prtoc_ocsetting = InputParamDefinitionType &
+    ( &
+    'PRT', & ! component
+    'OC', & ! subcomponent
+    'PERIOD', & ! block
+    'OCSETTING', & ! tag name
+    'OCSETTING', & ! fortran variable
+    'KEYSTRING ALL FIRST LAST FREQUENCY STEPS', & ! type
+    '', & ! shape
+    '', & ! longname
+    .true., & ! required
+    .false., & ! developmode
+    .true., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
     prt_oc_aggregate_definitions(*) = &
     [ &
-    prtoc_tracktimes &
+    prtoc_tracktimes, &
+    prtoc_ocsetting &
     ]
 
   type(InputBlockDefinitionType), parameter :: &
@@ -936,8 +956,8 @@ module PrtOcInputModule
     ), &
     InputBlockDefinitionType( &
     'PERIOD', & ! blockname
-    .false., & ! required
-    .false., & ! aggregate
+    .true., & ! required
+    .true., & ! aggregate
     .true. & ! block_variable
     ) &
     ]

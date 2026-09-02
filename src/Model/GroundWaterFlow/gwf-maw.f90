@@ -5,7 +5,8 @@ module MawModule
                              LENBUDTXT, DZERO, DEM9, DEM6, DEM4, DEM2, DQUARTER, &
                              DHALF, DP7, DP9, DONE, DTWO, DPI, DTWOPI, DEIGHT, &
                              DHUNDRED, DEP20, NAMEDBOUNDFLAG, LENPACKAGENAME, &
-                             LENAUXNAME, LENFTYPE, DHNOFLO, DHDRY, DNODATA, &
+                             LENAUXNAME, LENFTYPE, LENPAKLOC, DHNOFLO, DHDRY, &
+                             DNODATA, &
                              MAXCHARLEN, TABLEFT, TABCENTER, TABRIGHT, &
                              TABSTRING, TABUCSTRING, TABINTEGER, TABREAL
   use SmoothingModule, only: sQuadraticSaturation, sQSaturation, &
@@ -41,6 +42,8 @@ module MawModule
 
   private
   public :: maw_create
+  public :: maw_damp_weight
+  public :: maw_screen_length
   !
   type, extends(BndType) :: MawType
     !
@@ -68,6 +71,7 @@ module MawModule
     integer(I4B), pointer :: check_attr => NULL()
     integer(I4B), pointer :: ishutoffcnt => NULL()
     integer(I4B), pointer :: ieffradopt => NULL()
+    integer(I4B), pointer :: inonvert => NULL() !< flag indicating that non-vertical (slanted) well connections are simulated
     integer(I4B), pointer :: ioutredflowcsv => NULL() !< unit number for CSV output file containing MAWs with reduced extraction/injection rates
     real(DP), pointer :: satomega => null()
     !
@@ -87,6 +91,7 @@ module MawModule
     real(DP), dimension(:), pointer, contiguous :: pumpelev => null()
     real(DP), dimension(:), pointer, contiguous :: bot => null()
     real(DP), dimension(:), pointer, contiguous :: ratesim => null()
+    real(DP), dimension(:), pointer, contiguous :: qsim0 => null() !well rate from the previous outer iteration (rate convergence check)
     real(DP), dimension(:), pointer, contiguous :: reduction_length => null()
     real(DP), dimension(:), pointer, contiguous :: fwelev => null()
     real(DP), dimension(:), pointer, contiguous :: fwcond => null()
@@ -100,6 +105,8 @@ module MawModule
     real(DP), dimension(:), pointer, contiguous :: shutoffweight => null()
     real(DP), dimension(:), pointer, contiguous :: shutoffdq => null()
     real(DP), dimension(:), pointer, contiguous :: shutoffqold => null()
+    real(DP), dimension(:), pointer, contiguous :: nurdxold => null() !well head change applied in the previous outer iteration
+    real(DP), dimension(:), pointer, contiguous :: nurweight => null() !how much each well head change is cut back to stop it from oscillating
     character(len=LENBOUNDNAME), dimension(:), pointer, &
       contiguous :: cmawname => null()
     !
@@ -119,6 +126,10 @@ module MawModule
     real(DP), dimension(:), pointer, contiguous :: simcond => NULL()
     real(DP), dimension(:), pointer, contiguous :: topscrn => NULL()
     real(DP), dimension(:), pointer, contiguous :: botscrn => NULL()
+    real(DP), dimension(:), pointer, contiguous :: angle => NULL() !< tilt angle of a non-vertical connection, in degrees from vertical (0.0 = vertical)
+    real(DP), dimension(:), pointer, contiguous :: connlen => NULL() !< user-specified in-cell screen length for a non-vertical connection (<= 0.0 = derive from angle and screen elevations)
+    real(DP), dimension(:), pointer, contiguous :: usrtopscrn => NULL() !< user-specified screen top, retained so a non-vertical SPECIFIED connection can honor it
+    real(DP), dimension(:), pointer, contiguous :: usrbotscrn => NULL() !< user-specified screen bottom, retained so a non-vertical SPECIFIED connection can honor it
     !
     ! -- imap vector
     integer(I4B), dimension(:), pointer, contiguous :: imap => null()
@@ -183,6 +194,7 @@ module MawModule
     procedure :: bnd_fc => maw_fc
     procedure :: bnd_fn => maw_fn
     procedure :: bnd_nur => maw_nur
+    procedure :: bnd_cc => maw_cc
     procedure :: bnd_cq => maw_cq
     procedure :: bnd_ot_model_flows => maw_ot_model_flows
     procedure :: bnd_ot_package_flows => maw_ot_package_flows
@@ -198,6 +210,9 @@ module MawModule
     ! -- private procedures
     procedure, private :: maw_read_wells
     procedure, private :: maw_read_well_connections
+    procedure, private :: maw_read_angledata
+    procedure, private :: maw_cell_extent
+    procedure, private :: maw_calc_lcorr
     procedure, private :: maw_check_attributes
     procedure, private :: maw_set_stressperiod
     procedure, private :: maw_set_attribute_error
@@ -289,6 +304,7 @@ contains
     call mem_allocate(this%check_attr, 'CHECK_ATTR', this%memoryPath)
     call mem_allocate(this%ishutoffcnt, 'ISHUTOFFCNT', this%memoryPath)
     call mem_allocate(this%ieffradopt, 'IEFFRADOPT', this%memoryPath)
+    call mem_allocate(this%inonvert, 'INONVERT', this%memoryPath)
     call mem_allocate(this%ioutredflowcsv, 'IOUTREDFLOWCSV', this%memoryPath) !for writing reduced MAW flows to csv file
     call mem_allocate(this%satomega, 'SATOMEGA', this%memoryPath)
     call mem_allocate(this%bditems, 'BDITEMS', this%memoryPath)
@@ -308,6 +324,7 @@ contains
     this%imawiss = 0
     this%imawissopt = 0
     this%ieffradopt = 0
+    this%inonvert = 0
     this%ioutredflowcsv = 0
     this%satomega = DZERO
     this%bditems = 8
@@ -362,6 +379,7 @@ contains
     call mem_allocate(this%pumpelev, this%nmawwells, 'PUMPELEV', this%memoryPath)
     call mem_allocate(this%bot, this%nmawwells, 'BOT', this%memoryPath)
     call mem_allocate(this%ratesim, this%nmawwells, 'RATESIM', this%memoryPath)
+    call mem_allocate(this%qsim0, this%nmawwells, 'QSIM0', this%memoryPath)
     call mem_allocate(this%reduction_length, this%nmawwells, 'REDUCTION_LENGTH', &
                       this%memoryPath)
     call mem_allocate(this%fwelev, this%nmawwells, 'FWELEV', this%memoryPath)
@@ -382,6 +400,10 @@ contains
     call mem_allocate(this%shutoffdq, this%nmawwells, 'SHUTOFFDQ', &
                       this%memoryPath)
     call mem_allocate(this%shutoffqold, this%nmawwells, 'SHUTOFFQOLD', &
+                      this%memoryPath)
+    call mem_allocate(this%nurdxold, this%nmawwells, 'NURDXOLD', &
+                      this%memoryPath)
+    call mem_allocate(this%nurweight, this%nmawwells, 'NURWEIGHT', &
                       this%memoryPath)
     !
     ! -- timeseries aware variables
@@ -417,6 +439,12 @@ contains
     call mem_allocate(this%simcond, this%maxbound, 'SIMCOND', this%memoryPath)
     call mem_allocate(this%topscrn, this%maxbound, 'TOPSCRN', this%memoryPath)
     call mem_allocate(this%botscrn, this%maxbound, 'BOTSCRN', this%memoryPath)
+    call mem_allocate(this%angle, this%maxbound, 'ANGLE', this%memoryPath)
+    call mem_allocate(this%connlen, this%maxbound, 'CONNLEN', this%memoryPath)
+    call mem_allocate(this%usrtopscrn, this%maxbound, 'USRTOPSCRN', &
+                      this%memoryPath)
+    call mem_allocate(this%usrbotscrn, this%maxbound, 'USRBOTSCRN', &
+                      this%memoryPath)
     !
     ! -- allocate qleak
     call mem_allocate(this%qleak, this%maxbound, 'QLEAK', this%memoryPath)
@@ -434,6 +462,7 @@ contains
       this%pumpelev(n) = DEP20
       this%bot(n) = DEP20
       this%ratesim(n) = DZERO
+      this%qsim0(n) = DZERO
       this%reduction_length(n) = DEP20
       this%fwelev(n) = DZERO
       this%fwcond(n) = DZERO
@@ -447,6 +476,8 @@ contains
       this%shutoffweight(n) = DONE
       this%shutoffdq(n) = DONE
       this%shutoffqold(n) = DONE
+      this%nurdxold(n) = DZERO
+      this%nurweight(n) = DONE
       !
       ! -- timeseries aware variables
       this%rate(n) = DZERO
@@ -505,6 +536,10 @@ contains
       this%simcond(j) = DZERO
       this%topscrn(j) = DZERO
       this%botscrn(j) = DZERO
+      this%angle(j) = DZERO
+      this%connlen(j) = DZERO
+      this%usrtopscrn(j) = DZERO
+      this%usrbotscrn(j) = DZERO
       this%qleak(j) = DZERO
     end do
     !
@@ -886,6 +921,9 @@ contains
         !
         ! -- top of screen
         rval = this%parser%GetDouble()
+        ! -- retain the user-specified screen top so a non-vertical SPECIFIED
+        !    connection can honor it (it is otherwise reset to the cell top)
+        this%usrtopscrn(jpos) = rval
         if (this%ieqn(n) /= 4) then
           rval = topnn
         else
@@ -898,6 +936,9 @@ contains
         !
         ! -- bottom of screen
         rval = this%parser%GetDouble()
+        ! -- retain the user-specified screen bottom so a non-vertical SPECIFIED
+        !    connection can honor it (it is otherwise reset to the cell bottom)
+        this%usrbotscrn(jpos) = rval
         if (this%ieqn(n) /= 4) then
           rval = botnn
         else
@@ -1031,6 +1072,408 @@ contains
     end if
   end subroutine maw_read_well_connections
 
+  !> @brief Read the optional ANGLEDATA block for non-vertical (slanted) MAW
+  !! well connections
+  !!
+  !! Each row identifies a non-vertical multi-aquifer well connection and the
+  !! tilt angle (deviation from vertical, in degrees) used to calculate the
+  !! in-cell screen length. An optional connection length can be specified to
+  !! set the in-cell screen length directly; the connection length is required
+  !! for horizontal connections (angle close to 90 degrees). Connections that
+  !! are not listed in the ANGLEDATA block are assumed to be vertical.
+  !<
+  subroutine maw_read_angledata(this)
+    use ConstantsModule, only: LINELENGTH, DZERO, DEM6, DTWO, DPIO180
+    use MathUtilModule, only: is_close
+    ! -- dummy
+    class(MawType), intent(inout) :: this
+    ! -- local
+    logical :: isfound
+    logical :: endOfBlock
+    logical(LGP) :: success
+    integer(I4B) :: ierr
+    integer(I4B) :: ival
+    integer(I4B) :: n
+    integer(I4B) :: j
+    integer(I4B) :: jpos
+    integer(I4B) :: ipos
+    integer(I4B) :: node
+    real(DP) :: angle
+    real(DP) :: conn_len
+    real(DP) :: dz
+    real(DP) :: omega
+    real(DP) :: lw
+    real(DP) :: hlen
+    real(DP) :: extent
+    real(DP) :: topexp
+    character(len=LINELENGTH) :: cndmsg
+    character(len=LINELENGTH) :: extmsg
+    logical(LGP) :: estimated
+    integer(I4B), dimension(:), pointer, contiguous :: nboundchk
+    integer(I4B), dimension(:), pointer, contiguous :: iachk
+    ! -- minimum cosine of the tilt angle for which the in-cell screen length
+    !    can be derived from the screen elevations (i.e., the connection is not
+    !    treated as horizontal); connections steeper than this require a
+    !    connection length to be specified.
+    real(DP), parameter :: coszero = DEM6
+    ! -- maximum tilt angle (degrees from vertical)
+    real(DP), parameter :: dninety = 9.0d1
+    !
+    ! -- get angledata block
+    call this%parser%GetBlock('ANGLEDATA', isfound, ierr, &
+                              supportOpenClose=.true., blockRequired=.false.)
+    !
+    ! -- parse angledata block if detected
+    if (isfound) then
+      !
+      ! -- the angledata block is only valid when the NON_VERTICAL_WELLS option
+      !    has been specified
+      if (this%inonvert == 0) then
+        call store_error('An ANGLEDATA block was specified but the '// &
+                         'NON_VERTICAL_WELLS option was not specified in the '// &
+                         'OPTIONS block.')
+        call this%parser%StoreErrorUnit()
+      end if
+      !
+      ! -- allocate and initialize local storage used to check for duplicate
+      !    connection entries
+      allocate (iachk(this%nmawwells + 1))
+      iachk(1) = 1
+      do n = 1, this%nmawwells
+        iachk(n + 1) = iachk(n) + this%ngwfnodes(n)
+      end do
+      allocate (nboundchk(this%maxbound))
+      do n = 1, this%maxbound
+        nboundchk(n) = 0
+      end do
+      !
+      write (this%iout, '(/1x,a)') 'PROCESSING '//trim(adjustl(this%text))// &
+        ' ANGLEDATA'
+      do
+        call this%parser%GetNextLine(endOfBlock)
+        if (endOfBlock) exit
+        !
+        ! -- well number
+        ival = this%parser%GetInteger()
+        n = ival
+        if (n < 1 .or. n > this%nmawwells) then
+          write (errmsg, '(a,1x,i0,a)') &
+            'IFNO must be greater than 0 and less than or equal to ', &
+            this%nmawwells, '.'
+          call store_error(errmsg)
+          cycle
+        end if
+        !
+        ! -- connection number
+        ival = this%parser%GetInteger()
+        if (ival < 1 .or. ival > this%ngwfnodes(n)) then
+          write (errmsg, '(a,1x,i0,1x,a,1x,i0,a)') &
+            'ICON for well ', n, &
+            'must be greater than 0 and less than or equal to ', &
+            this%ngwfnodes(n), '.'
+          call store_error(errmsg)
+          cycle
+        end if
+        j = ival
+        jpos = this%get_jpos(n, j)
+        !
+        ! -- check for duplicate entries
+        ipos = iachk(n) + j - 1
+        nboundchk(ipos) = nboundchk(ipos) + 1
+        if (nboundchk(ipos) > 1) then
+          write (errmsg, '(a,1x,i0,1x,a,1x,i0,1x,a)') &
+            'ANGLEDATA for maw well', n, 'connection', j, &
+            'is specified more than once.'
+          call store_error(errmsg)
+        end if
+        !
+        ! -- tilt angle (degrees from vertical)
+        angle = this%parser%GetDouble()
+        !
+        ! -- optional in-cell screen length
+        call this%parser%TryGetDouble(conn_len, success)
+        if (.not. success) then
+          conn_len = DZERO
+        end if
+        !
+        ! -- store the angle and connection length
+        this%angle(jpos) = angle
+        this%connlen(jpos) = conn_len
+        !
+        ! -- the tilt angle must be between 0 and 90 degrees
+        if (angle < DZERO .or. angle > DNINETY) then
+          write (errmsg, '(a,1x,i0,1x,a,1x,i0,1x,a,g0,a)') &
+            'ANGLE for maw well', n, 'connection', j, '(', angle, &
+            ') must be greater than or equal to 0.0 and less than or '// &
+            'equal to 90.0 degrees.'
+          call store_error(errmsg)
+          cycle
+        end if
+        !
+        node = this%get_gwfnode(n, j)
+        !
+        ! -- a SPECIFIED connection provides the saturated conductance directly,
+        !    so the length correction is not applied; the user-specified screen
+        !    elevations (which are otherwise reset to the cell top and bottom)
+        !    are restored here, clamped to the cell, so the connection
+        !    saturation is calculated over the correct interval. It is the
+        !    user's responsibility to calculate the correct conductance.
+        if (this%ieqn(n) == 0) then
+          this%topscrn(jpos) = min(this%usrtopscrn(jpos), this%dis%top(node))
+          this%botscrn(jpos) = max(this%usrbotscrn(jpos), this%dis%bot(node))
+        end if
+        !
+        ! -- screen thickness (vertical extent of the connection)
+        dz = this%topscrn(jpos) - this%botscrn(jpos)
+        if (dz <= DZERO) then
+          write (errmsg, '(a,1x,i0,1x,a,1x,i0,1x,a)') &
+            'The screen top must be greater than the screen bottom for maw '// &
+            'well', n, 'connection', j, 'listed in the ANGLEDATA block.'
+          call store_error(errmsg)
+          cycle
+        end if
+        !
+        omega = angle * DPIO180
+        !
+        ! -- the in-cell screen length is specified directly or derived from
+        !    the screen elevations, well radius, and tilt angle; it cannot be
+        !    derived for a (near) horizontal connection
+        if (conn_len > DZERO) then
+          lw = conn_len
+        else if (cos(omega) > coszero) then
+          lw = maw_screen_length(dz, this%radius(n), omega)
+        else
+          lw = DZERO
+        end if
+        !
+        ! -- the in-cell screen length is used only by the conductance
+        !    equations calculated by the program (it is not used by the
+        !    SPECIFIED equation). For those equations a (near) horizontal
+        !    connection requires a connection length, because the length cannot
+        !    be derived from the screen elevations, and the calculated length
+        !    must be positive.
+        if (this%ieqn(n) /= 0) then
+          if (cos(omega) <= coszero .and. conn_len <= DZERO) then
+            write (errmsg, '(a,1x,i0,1x,a,1x,i0,1x,a)') &
+              'A connection length must be specified for the (near) '// &
+              'horizontal maw well', n, 'connection', j, &
+              'listed in the ANGLEDATA block.'
+            call store_error(errmsg)
+            cycle
+          end if
+          if (lw <= DZERO) then
+            write (errmsg, '(a,1x,i0,1x,a,1x,i0,1x,a,g0,a)') &
+              'The calculated in-cell screen length for maw well', n, &
+              'connection', j, '(', lw, &
+              ') is not greater than zero. Specify a connection length in '// &
+              'the ANGLEDATA block.'
+            call store_error(errmsg)
+            cycle
+          end if
+        end if
+        !
+        ! -- a connection spans a horizontal distance of lw * sin(omega), which
+        !    cannot exceed the horizontal extent of the connected cell
+        if (lw > DZERO) then
+          hlen = lw * sin(omega)
+          extent = this%maw_cell_extent(node, estimated)
+          if (hlen > extent) then
+            !
+            ! -- the extent is estimated from the cell area where the cell
+            !    vertices are not defined
+            if (estimated) then
+              extmsg = 'estimated maximum horizontal extent'
+            else
+              extmsg = 'maximum horizontal extent'
+            end if
+            !
+            ! -- the length correction is not applied to a SPECIFIED
+            !    connection, so the conductance of one is not the program's
+            !    to describe as too large
+            if (this%ieqn(n) == 0) then
+              cndmsg = 'The specified saturated conductance is applied to a '// &
+                       'screen that is longer than the cell.'
+            else
+              cndmsg = 'The calculated saturated conductance is '// &
+                       'correspondingly too large.'
+            end if
+            write (warnmsg, '(a,1x,i0,1x,a,1x,i0,1x,a,g0,a,g0,a)') &
+              'The horizontal distance spanned by maw well', n, 'connection', &
+              j, '(', hlen, &
+              ') is greater than the '//trim(extmsg)//' of the '// &
+              'connected cell (', extent, &
+              '), so the screen extends beyond the cell it is connected '// &
+              'to. '//trim(cndmsg)//' Reduce ANGLE or CONN_LENGTH, or '// &
+              'specify a separate connection to each cell the connection '// &
+              'passes through.'
+            call store_warning(warnmsg)
+          end if
+        end if
+        !
+        ! -- the radial (THIEM, SKIN, and CUMULATIVE) conductance equations use
+        !    the horizontal-plane flow geometry, so a (near) horizontal
+        !    connection is an approximation; recommend the MEAN equation
+        if (cos(omega) <= coszero .and. &
+            this%ieqn(n) /= 4 .and. this%ieqn(n) /= 0) then
+          write (warnmsg, '(a,1x,i0,1x,a,1x,i0,1x,a)') &
+            'The (near) horizontal maw well', n, 'connection', j, &
+            'uses a radial conductance equation (THIEM, SKIN, or '// &
+            'CUMULATIVE). The calculated conductance is an approximation '// &
+            'for horizontal connections; the MEAN conductance equation is '// &
+            'recommended for horizontal connections.'
+          call store_warning(warnmsg)
+        end if
+        !
+        ! -- for a (near) horizontal connection using the MEAN or SPECIFIED
+        !    conductance equation, the vertical screen extent (SCRN_TOP -
+        !    SCRN_BOT) should equal the well diameter (2 * RADIUS) because it is
+        !    used to determine the saturation of the connection. Snap the screen
+        !    top to the well diameter if the specified extent is essentially
+        !    equal to it; otherwise warn the user.
+        if (cos(omega) <= coszero .and. &
+            (this%ieqn(n) == 4 .or. this%ieqn(n) == 0)) then
+          topexp = this%botscrn(jpos) + DTWO * this%radius(n)
+          if (is_close(this%topscrn(jpos), topexp)) then
+            this%topscrn(jpos) = topexp
+          else
+            write (warnmsg, '(a,1x,i0,1x,a,1x,i0,1x,a,g0,a)') &
+              'The vertical screen extent (SCRN_TOP - SCRN_BOT) for the '// &
+              '(near) horizontal maw well', n, 'connection', j, &
+              'is not equal to the well diameter (2 * RADIUS = ', &
+              DTWO * this%radius(n), &
+              '). The vertical screen extent is used to determine the '// &
+              'saturation of a connection and should equal the well '// &
+              'diameter for a horizontal connection.'
+            call store_warning(warnmsg)
+          end if
+        end if
+      end do
+      write (this%iout, '(1x,a)') &
+        'END OF '//trim(adjustl(this%text))//' ANGLEDATA'
+      !
+      ! -- deallocate local storage
+      deallocate (iachk)
+      deallocate (nboundchk)
+    else
+      !
+      ! -- the NON_VERTICAL_WELLS option was specified but no ANGLEDATA block
+      !    was found; warn that all connections will be treated as vertical
+      if (this%inonvert /= 0) then
+        write (warnmsg, '(a)') &
+          'The NON_VERTICAL_WELLS option was specified but an ANGLEDATA '// &
+          'block was not found. All multi-aquifer well connections will be '// &
+          'treated as vertical.'
+        call store_warning(warnmsg)
+      end if
+    end if
+    !
+    ! -- terminate if errors were encountered in the angledata block
+    if (count_errors() > 0) then
+      call this%parser%StoreErrorUnit()
+    end if
+  end subroutine maw_read_angledata
+
+  !> @brief In-cell screen length of a non-vertical well connection
+  !!
+  !! The length is derived from the vertical screen extent, the well radius,
+  !! and the tilt angle, and grows without bound as the connection approaches
+  !! horizontal.
+  !<
+  pure function maw_screen_length(dz, radius, omega) result(lw)
+    ! -- dummy
+    real(DP), intent(in) :: dz !< vertical screen extent
+    real(DP), intent(in) :: radius !< well radius
+    real(DP), intent(in) :: omega !< tilt angle from vertical, in radians
+    ! -- return
+    real(DP) :: lw
+    !
+    lw = (dz - DTWO * radius * sin(omega)) / cos(omega)
+  end function maw_screen_length
+
+  !> @brief Maximum horizontal extent of a cell
+  !!
+  !! The extent is the largest distance between two cell vertices where they
+  !! are defined, and is estimated as the diagonal of a square with the same
+  !! area where they are not.
+  !<
+  function maw_cell_extent(this, node, estimated) result(extent)
+    use ConstantsModule, only: DIS, DISV, DISU, DTWO
+    use GeomUtilModule, only: polygon_extent
+    ! -- dummy
+    class(MawType), intent(inout) :: this
+    integer(I4B), intent(in) :: node !< reduced node number of the connected cell
+    logical(LGP), intent(out) :: estimated !< extent is estimated from the cell area
+    ! -- return
+    real(DP) :: extent
+    ! -- local
+    real(DP), allocatable, dimension(:, :) :: polyverts
+    integer(I4B) :: nverts
+    !
+    ! -- the vertices are optional for a disu grid and are not defined for
+    !    grids that have no cell polygons
+    nverts = 0
+    select case (this%dis%get_dis_enum())
+    case (DIS, DISV, DISU)
+      nverts = this%dis%get_npolyverts(node)
+    end select
+    !
+    estimated = nverts == 0
+    if (estimated) then
+      extent = sqrt(DTWO * this%dis%area(node))
+    else
+      call this%dis%get_polyverts(node, polyverts)
+      extent = polygon_extent(polyverts(1, :), polyverts(2, :))
+      deallocate (polyverts)
+    end if
+  end function maw_cell_extent
+
+  !> @brief Calculate the length correction factor for a multi-aquifer well
+  !! connection
+  !!
+  !! The saturated conductance of a non-vertical (slanted) connection is scaled
+  !! by the ratio of the in-cell screen length to the vertical screen thickness.
+  !! The factor is 1.0 for vertical connections (angle = 0 and no connection
+  !! length specified). The in-cell screen length is either specified directly
+  !! (CONNLEN > 0) or derived from the screen elevations and the tilt angle,
+  !! accounting for the vertical band occupied by the finite-radius borehole.
+  !<
+  function maw_calc_lcorr(this, i, jpos) result(lcorr)
+    use ConstantsModule, only: DZERO, DONE, DTWO, DPIO180
+    ! -- dummy
+    class(MawType), intent(inout) :: this
+    integer(I4B), intent(in) :: i !< well number
+    integer(I4B), intent(in) :: jpos !< connection position
+    ! -- return
+    real(DP) :: lcorr
+    ! -- local
+    real(DP) :: dz
+    real(DP) :: omega
+    real(DP) :: lw
+    !
+    ! -- default to no correction (vertical connection)
+    lcorr = DONE
+    if (this%angle(jpos) == DZERO .and. this%connlen(jpos) <= DZERO) then
+      return
+    end if
+    !
+    ! -- vertical screen thickness
+    dz = this%topscrn(jpos) - this%botscrn(jpos)
+    if (dz <= DZERO) then
+      return
+    end if
+    !
+    ! -- in-cell screen length: specified directly or derived from the screen
+    !    elevations and the tilt angle
+    if (this%connlen(jpos) > DZERO) then
+      lw = this%connlen(jpos)
+    else
+      omega = this%angle(jpos) * DPIO180
+      lw = maw_screen_length(dz, this%radius(i), omega)
+    end if
+    !
+    lcorr = lw / dz
+  end function maw_calc_lcorr
+
   !> @brief Read the dimensions for this package
   !<
   subroutine maw_read_dimensions(this)
@@ -1092,6 +1535,9 @@ contains
     !
     ! -- read well_connections block
     call this%maw_read_well_connections()
+    !
+    ! -- read optional angledata block (non-vertical well connections)
+    call this%maw_read_angledata()
     !
     ! -- Call define_listlabel to construct the list label that is written
     !    when PRINT_INPUT option is used.
@@ -1254,6 +1700,9 @@ contains
     ! -- write well connection data
     if (this%iprpak /= 0) then
       ntabcols = 10
+      if (this%inonvert /= 0) then
+        ntabcols = ntabcols + 1
+      end if
       title = trim(adjustl(this%text))//' PACKAGE ('// &
               trim(adjustl(this%packName))//') STATIC WELL CONNECTION DATA'
       call table_cr(this%inputtab, this%packName, title)
@@ -1278,6 +1727,10 @@ contains
       call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
       text = 'SATURATED WELL CONDUCT.'
       call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
+      if (this%inonvert /= 0) then
+        text = 'ANGLE (DEG)'
+        call this%inputtab%initialize_column(text, 10, alignment=TABCENTER)
+      end if
       !
       ! -- write the data to the table
       do n = 1, this%nmawwells
@@ -1315,6 +1768,9 @@ contains
             call this%inputtab%add_term(' ')
           end if
           call this%inputtab%add_term(this%satcond(jpos))
+          if (this%inonvert /= 0) then
+            call this%inputtab%add_term(this%angle(jpos))
+          end if
         end do
       end do
     end if
@@ -1730,6 +2186,12 @@ contains
     case ('NO_WELL_STORAGE')
       this%imawissopt = 1
       write (this%iout, fmtnostoragewells)
+    case ('NON_VERTICAL_WELLS')
+      this%inonvert = 1
+      write (this%iout, '(4x,a)') &
+        'NON-VERTICAL (SLANTED) MULTI-AQUIFER WELL CONNECTIONS WILL BE '// &
+        'SIMULATED. SCREEN LENGTHS FOR CONNECTIONS LISTED IN THE ANGLEDATA '// &
+        'BLOCK WILL BE USED TO CALCULATE THE SATURATED CONDUCTANCE.'
     case ('FLOW_CORRECTION')
       this%correct_flow = .TRUE.
       write (this%iout, '(4x,a,/,4x,a)') &
@@ -2116,6 +2578,12 @@ contains
       if (this%iboundpak(n) < 0) then
         this%xnewpak(n) = this%well_head(n)
       end if
+      !
+      ! -- start each time step with damping turned off. Clearing the weight
+      !    and the previous head change stops a leftover value from the last
+      !    time step from triggering damping on the first iteration.
+      this%nurdxold(n) = DZERO
+      this%nurweight(n) = DONE
     end do
     !
     !--use the appropriate xoldsto if initial heads are above the
@@ -2194,6 +2662,10 @@ contains
     real(DP) :: rate
     real(DP) :: ratefw
     real(DP) :: flow
+    real(DP) :: tled
+    real(DP) :: sd
+    real(DP) :: ss
+    real(DP) :: ssold
     !
     ! -- pakmvrobj fc
     if (this%imover == 1) then
@@ -2204,6 +2676,10 @@ contains
     idx = 1
     do n = 1, this%nmawwells
       iloc = this%idxlocnode(n)
+      !
+      ! -- save the well rate from the previous outer iteration before it is
+      !    recalculated below, for the rate convergence check in maw_cc
+      this%qsim0(n) = this%ratesim(n)
       !
       ! -- update head value for constant head maw wells
       if (this%iboundpak(n) < 0) then
@@ -2246,8 +2722,18 @@ contains
         ! -- add maw storage changes
         if (this%imawiss /= 1) then
           if (this%ifwdischarge(n) /= 1) then
-            call matrix_sln%add_value_pos(iposd, -this%area(n) / delt)
-            rhs(iloc) = rhs(iloc) - (this%area(n) * this%xoldsto(n) / delt)
+            ! -- well storage. The storage water level is not allowed to drop
+            !    below the bottom of the well: ss is a smooth version of
+            !    max(hmaw, well bottom). The storage release then fades out as
+            !    the well empties instead of drawing water from below the well
+            !    bottom. While the head is above the bottom this is the original
+            !    term (sd = 1, ss = hmaw, giving -area/delt).
+            tled = this%area(n) / delt
+            sd = sQuadratic0spDerivative(hmaw, this%bot(n), this%satomega)
+            ss = sQuadratic0sp(hmaw, this%bot(n), this%satomega)
+            ssold = sQuadratic0sp(this%xoldsto(n), this%bot(n), this%satomega)
+            call matrix_sln%add_value_pos(iposd, -tled * sd)
+            rhs(iloc) = rhs(iloc) - tled * (sd * hmaw - ss + ssold)
           else
             cterm = this%xoldsto(n) - this%fwelev(n)
             rhs(iloc) = rhs(iloc) - (this%area(n) * cterm / delt)
@@ -2471,8 +2957,17 @@ contains
     end do
   end subroutine maw_fn
 
-  !> @brief Calculate under-relaxation of groundwater flow model MAW Package heads
-  !! for current outer iteration using the well bottom
+  !> @brief Apply Newton under-relaxation to the MAW Package well heads.
+  !!
+  !! Two corrections are applied to each well head, in order:
+  !!   1. Oscillation damping. If the well head change reverses direction and is
+  !!      not getting smaller, it is cut back by a per-well weight. The weight
+  !!      shrinks while the head oscillates and grows back when the head moves
+  !!      steadily in one direction. This settles poorly connected wells (for
+  !!      example a low-K cell or a single connection) whose full Newton step is
+  !!      too large.
+  !!   2. Bottom limit. If the head is still below the well bottom, it is moved
+  !!      back up toward the well bottom (the original behavior).
   !<
   subroutine maw_nur(this, neqpak, x, xtemp, dx, inewtonur, dxmax, locmax)
     ! -- dummy
@@ -2489,14 +2984,47 @@ contains
     real(DP) :: botw
     real(DP) :: xx
     real(DP) :: dxx
+    real(DP) :: dxprop
+    real(DP) :: weight
+    ! -- parameters
+    real(DP), parameter :: damptheta = DP7 !factor the weight is cut by when the head oscillates
+    real(DP), parameter :: damptol = DHALF !only damp if the change is at least this fraction of the last one
+    real(DP), parameter :: weightmin = DEM2 !smallest allowed weight
+    real(DP), parameter :: recover = 0.2_DP !amount the weight grows back each iteration
     !
     ! -- Newton-Raphson under-relaxation
     do n = 1, this%nmawwells
       if (this%iboundpak(n) < 1) cycle
       botw = this%bot(n)
       !
-      ! -- only apply Newton-Raphson under-relaxation if
-      !    solution head is below the bottom of the well
+      ! -- full Newton head change proposed for this outer iteration
+      dxprop = x(n) - xtemp(n)
+      !
+      ! -- oscillation damping. Cut the weight only when the head change flips
+      !    direction and is not already shrinking on its own (it is still at
+      !    least damptol times the previous change). Otherwise let the weight
+      !    grow back toward one, so a normal, converging well is not slowed
+      !    down. This catches oscillations above the well bottom, which the
+      !    bottom limit below cannot.
+      weight = maw_damp_weight(dxprop, this%nurdxold(n), this%nurweight(n), &
+                               damptheta, damptol, weightmin, recover)
+      this%nurweight(n) = weight
+      !
+      ! -- apply the reduced step when damping is turned on
+      if (weight < DONE) then
+        inewtonur = 1
+        xx = xtemp(n) + weight * dxprop
+        dxx = x(n) - xx
+        if (abs(dxx) > abs(dxmax)) then
+          locmax = n
+          dxmax = dxx
+        end if
+        x(n) = xx
+        dx(n) = weight * dxprop
+      end if
+      !
+      ! -- bottom limit: if the (reduced) head is still below the bottom of the
+      !    well, move it back up toward the well bottom
       if (x(n) < botw) then
         inewtonur = 1
         xx = xtemp(n) * (DONE - DP9) + botw * DP9
@@ -2508,8 +3036,173 @@ contains
         x(n) = xx
         dx(n) = DZERO
       end if
+      !
+      ! -- save the head change actually applied this iteration (after damping
+      !    and the bottom limit). Saving it after the bottom limit lets the
+      !    next iteration see the downward push from the limit, so the upward
+      !    swing that follows can be damped.
+      this%nurdxold(n) = x(n) - xtemp(n)
     end do
   end subroutine maw_nur
+
+  !> @brief Update the oscillation-damping weight for a single MAW well head.
+  !!
+  !! This is the decision used by maw_nur. The weight is cut back (multiplied by
+  !! damptheta, but never below weightmin) only when the proposed head change
+  !! reversed direction and is not already getting smaller (its size is at least
+  !! damptol times the previous change). Otherwise the weight grows back toward
+  !! one by recover. It is a pure function so the logic can be unit tested.
+  !<
+  pure function maw_damp_weight(dxprop, dxold, weight, damptheta, damptol, &
+                                weightmin, recover) result(new_weight)
+    ! -- dummy
+    real(DP), intent(in) :: dxprop !proposed well head change this outer iteration
+    real(DP), intent(in) :: dxold !well head change applied last outer iteration
+    real(DP), intent(in) :: weight !current damping weight
+    real(DP), intent(in) :: damptheta !factor the weight is cut by when oscillating
+    real(DP), intent(in) :: damptol !smallest |dxprop|/|dxold| ratio that is damped
+    real(DP), intent(in) :: weightmin !smallest allowed weight
+    real(DP), intent(in) :: recover !amount the weight grows back each iteration
+    ! -- return
+    real(DP) :: new_weight
+    !
+    if (dxprop * dxold < DZERO .and. abs(dxprop) > damptol * abs(dxold)) then
+      new_weight = max(damptheta * weight, weightmin)
+    else
+      new_weight = min(weight + recover, DONE)
+    end if
+  end function maw_damp_weight
+
+  !> @brief Extra convergence check for the MAW package.
+  !!
+  !! This does two things:
+  !!   1. While a well is being damped by Newton under-relaxation, it keeps the
+  !!      model from converging until the well rate has also stopped changing
+  !!      (reported through dpak). Wells that are not being damped, and models
+  !!      that do not use Newton under-relaxation, are not affected.
+  !!   2. When the model fails to converge, it warns about any pumping well that
+  !!      is asking for more water than the aquifer can supply, a likely reason
+  !!      for the failure.
+  !<
+  subroutine maw_cc(this, innertot, kiter, iend, icnvgmod, cpak, ipak, dpak)
+    ! -- modules
+    use TdisModule, only: delt
+    ! -- dummy
+    class(MawType), intent(inout) :: this
+    integer(I4B), intent(in) :: innertot
+    integer(I4B), intent(in) :: kiter
+    integer(I4B), intent(in) :: iend
+    integer(I4B), intent(in) :: icnvgmod
+    character(len=LENPAKLOC), intent(inout) :: cpak
+    integer(I4B), intent(inout) :: ipak
+    real(DP), intent(inout) :: dpak
+    ! -- local
+    integer(I4B) :: n
+    integer(I4B) :: j
+    integer(I4B) :: jpos
+    integer(I4B) :: igwfnode
+    integer(I4B) :: locdpak
+    real(DP) :: botw
+    real(DP) :: bmaw
+    real(DP) :: hgwf
+    real(DP) :: hv
+    real(DP) :: sat
+    real(DP) :: cmaw
+    real(DP) :: qmax
+    real(DP) :: qreq
+    real(DP) :: qtolfact
+    real(DP) :: dq
+    real(DP) :: dpakmax
+    character(len=LENPAKLOC) :: cloc
+    ! -- parameters
+    real(DP), parameter :: qtol = 1.001_DP !the request must exceed supply by this factor to warn
+    ! -- formats
+    character(len=*), parameter :: fmtwarn = &
+      "('MAW well ', a, ' requests an extraction rate (', g0.5, &
+      &') larger than the maximum rate (', g0.5, ') the aquifer can supply &
+      &with the well head at its bottom. This may be preventing convergence. &
+      &Consider reducing the requested rate, applying or widening RATE_SCALING, &
+      &or reviewing the connection conductance (e.g. aquifer K).')"
+    !
+    ! -- rate convergence check. While a well is being damped (nurweight < 1)
+    !    its head barely moves, so also require the well rate to stop changing
+    !    before the model is allowed to converge. The rate change is turned
+    !    into an equivalent head change (using the well area and time step) so
+    !    it can be compared with the solver tolerance, and is passed back in
+    !    dpak. Wells that are not being damped are left unchanged.
+    dpakmax = DZERO
+    locdpak = 0
+    do n = 1, this%nmawwells
+      if (this%iboundpak(n) < 1) cycle
+      if (this%nurweight(n) >= DONE) cycle
+      if (this%area(n) > DZERO) then
+        qtolfact = delt / this%area(n)
+      else
+        qtolfact = DZERO
+      end if
+      ! -- qsim0 and ratesim both come from maw_fc (before the solve), so dq is
+      !    the rate change from the previous outer iteration -- one step behind
+      !    the newest heads. That is fine here: a lagged rate can only delay
+      !    convergence, never accept a bad answer, because the solver already
+      !    checks the heads and steady heads mean a steady rate. The up-to-date
+      !    rate is not used because recomputing it would change the well's
+      !    shutoff and RATE_SCALING state.
+      dq = (this%qsim0(n) - this%ratesim(n)) * qtolfact
+      if (abs(dq) > abs(dpakmax)) then
+        dpakmax = dq
+        locdpak = n
+      end if
+    end do
+    if (locdpak > 0 .and. abs(dpakmax) > abs(dpak)) then
+      ipak = locdpak
+      dpak = dpakmax
+      write (cloc, "(a,'-',a)") trim(this%packName), 'rate'
+      cpak = trim(cloc)
+    end if
+    !
+    ! -- the over-demand warning is only written on the last outer iteration of
+    !    a model that did not converge
+    if (iend == 0) return
+    if (icnvgmod /= 0) return
+    !
+    ! -- look at each active pumping (extraction) well
+    do n = 1, this%nmawwells
+      if (this%iboundpak(n) < 1) cycle
+      if (this%rate(n) >= DZERO) cycle
+      botw = this%bot(n)
+      !
+      ! -- largest rate the aquifer could supply if the well head dropped all
+      !    the way to the bottom of the well
+      qmax = DZERO
+      do j = 1, this%ngwfnodes(n)
+        jpos = this%get_jpos(n, j)
+        igwfnode = this%get_gwfnode(n, j)
+        hgwf = this%xnew(igwfnode)
+        bmaw = this%botscrn(jpos)
+        hv = max(botw, bmaw)
+        !
+        ! -- connection saturation evaluated with the well head at the bottom of
+        !    the well (hv), consistent with this maximum-supply estimate, rather
+        !    than at the current well head
+        call this%maw_calculate_saturation(n, j, igwfnode, sat, hv)
+        cmaw = this%satcond(jpos) * sat
+        !
+        ! -- only count connections that can supply water. A connection whose
+        !    aquifer head is below the well bottom would take water in, so skip
+        !    it instead of letting it lower the maximum supply.
+        qmax = qmax + cmaw * max(hgwf - hv, DZERO)
+      end do
+      !
+      ! -- warn if the well is asking for more than the aquifer can supply
+      qreq = -this%rate(n)
+      if (qmax >= DZERO .and. qreq > qtol * qmax) then
+        write (cloc, '(a, a, a, a, i0, a, i0, a)') trim(this%name_model), '-(', &
+          trim(this%filtyp), '_', this%ibcnum, '-', n, ')'
+        write (warnmsg, fmtwarn) trim(cloc), qreq, qmax
+        call store_warning(warnmsg)
+      end if
+    end do
+  end subroutine maw_cc
 
   !> @brief Calculate flows
   !<
@@ -2525,6 +3218,8 @@ contains
     integer(I4B), optional, intent(in) :: iadv
     ! -- local
     real(DP) :: rrate
+    real(DP) :: ss
+    real(DP) :: ssold
     ! -- for budget
     integer(I4B) :: j
     integer(I4B) :: n
@@ -2569,7 +3264,12 @@ contains
       if (this%iflowingwells > 0) then
         if (this%fwcond(n) > DZERO) then
           cfw = this%fwcondsim(n)
-          this%xsto(n) = this%fwelev(n)
+          ! -- only raise the storage level to the flowing-well elevation when
+          !    the well is actually discharging (ifwdischarge == 1), matching
+          !    the storage term assembled in maw_fc
+          if (this%ifwdischarge(n) == 1) then
+            this%xsto(n) = this%fwelev(n)
+          end if
           rrate = cfw * (this%fwelev(n) - hmaw)
           this%qfw(n) = rrate
           !
@@ -2578,9 +3278,20 @@ contains
         end if
       end if
       !
-      ! -- Calculate qsto
+      ! -- Calculate qsto so it matches the storage term built in maw_fc. A
+      !    flowing well that is actively discharging (ifwdischarge == 1) uses
+      !    the flowing-well elevation (xsto = fwelev). Otherwise the storage
+      !    water level is not allowed to drop below the bottom of the well.
+      !    Testing ifwdischarge (not fwcond) keeps the budget in step with the
+      !    matrix when a flowing well is at or below its discharge elevation.
       if (this%imawiss /= 1) then
-        rrate = -this%area(n) * (this%xsto(n) - this%xoldsto(n)) / delt
+        if (this%iflowingwells > 0 .and. this%ifwdischarge(n) == 1) then
+          rrate = -this%area(n) * (this%xsto(n) - this%xoldsto(n)) / delt
+        else
+          ss = sQuadratic0sp(hmaw, this%bot(n), this%satomega)
+          ssold = sQuadratic0sp(this%xoldsto(n), this%bot(n), this%satomega)
+          rrate = -this%area(n) * (ss - ssold) / delt
+        end if
         this%qsto(n) = rrate
       end if
     end do
@@ -2775,6 +3486,7 @@ contains
     call mem_deallocate(this%pumpelev)
     call mem_deallocate(this%bot)
     call mem_deallocate(this%ratesim)
+    call mem_deallocate(this%qsim0)
     call mem_deallocate(this%reduction_length)
     call mem_deallocate(this%fwelev)
     call mem_deallocate(this%fwcond)
@@ -2788,6 +3500,8 @@ contains
     call mem_deallocate(this%shutoffweight)
     call mem_deallocate(this%shutoffdq)
     call mem_deallocate(this%shutoffqold)
+    call mem_deallocate(this%nurdxold)
+    call mem_deallocate(this%nurweight)
     !
     ! -- timeseries aware variables
     call mem_deallocate(this%mauxvar)
@@ -2803,6 +3517,10 @@ contains
     call mem_deallocate(this%simcond)
     call mem_deallocate(this%topscrn)
     call mem_deallocate(this%botscrn)
+    call mem_deallocate(this%angle)
+    call mem_deallocate(this%connlen)
+    call mem_deallocate(this%usrtopscrn)
+    call mem_deallocate(this%usrbotscrn)
     !
     ! -- imap vector
     call mem_deallocate(this%imap)
@@ -2839,6 +3557,7 @@ contains
     call mem_deallocate(this%check_attr)
     call mem_deallocate(this%ishutoffcnt)
     call mem_deallocate(this%ieffradopt)
+    call mem_deallocate(this%inonvert)
     call mem_deallocate(this%ioutredflowcsv)
     call mem_deallocate(this%satomega)
     call mem_deallocate(this%bditems)
@@ -3518,19 +4237,27 @@ contains
       call store_error(errmsg)
     end if
     !
+    ! -- scale the saturated conductance by the length correction factor for
+    !    non-vertical (slanted) connections. The factor is 1.0 for vertical
+    !    connections, so this has no effect unless an ANGLEDATA block was read.
+    if (this%inonvert /= 0) then
+      c = c * this%maw_calc_lcorr(i, jpos)
+    end if
+    !
     ! -- set saturated conductance
     this%satcond(jpos) = c
   end subroutine maw_calculate_satcond
 
   !> @brief Calculate the saturation between the aquifer maw well_head
   !<
-  subroutine maw_calculate_saturation(this, n, j, node, sat)
+  subroutine maw_calculate_saturation(this, n, j, node, sat, hwell_in)
     ! -- dummy
     class(MawType), intent(inout) :: this
     integer(I4B), intent(in) :: n
     integer(I4B), intent(in) :: j
     integer(I4B), intent(in) :: node
     real(DP), intent(inout) :: sat
+    real(DP), intent(in), optional :: hwell_in !well head to use instead of the current well head
     ! -- local
     integer(I4B) :: jpos
     real(DP) :: h_temp
@@ -3545,8 +4272,11 @@ contains
     ! -- calculate current saturation for convertible cells
     if (this%icelltype(node) /= 0) then
       !
-      ! -- set hwell
+      ! -- set hwell (use the caller-supplied head if provided)
       hwell = this%xnewpak(n)
+      if (present(hwell_in)) then
+        hwell = hwell_in
+      end if
       !
       ! -- set connection position
       jpos = this%get_jpos(n, j)
@@ -3664,8 +4394,15 @@ contains
         hups = hgwf
       end if
       !
-      ! -- calculate the derivative of saturation
-      drterm = sQuadraticSaturationDerivative(tmaw, bmaw, hups, this%satomega)
+      ! -- slope of the saturation with head. In a confined (non-convertible)
+      !    cell the saturation is always one and does not change with head, so
+      !    this slope must be zero. Otherwise the matrix terms would not match
+      !    the flow that is actually calculated for the well.
+      if (this%icelltype(igwfnode) /= 0) then
+        drterm = sQuadraticSaturationDerivative(tmaw, bmaw, hups, this%satomega)
+      else
+        drterm = DZERO
+      end if
     else
       term = cmaw
     end if
@@ -3778,7 +4515,7 @@ contains
         dq = q - this%shutoffqold(n)
         weight = this%shutoffweight(n)
         !
-        ! -- for flip-flop condition, decrease factor
+        ! -- for oscillating condition, decrease factor
         if (this%shutoffdq(n) * dq < DZERO) then
           weight = this%theta * this%shutoffweight(n)
           !
@@ -3868,7 +4605,7 @@ contains
         dq = q - this%shutoffqold(n)
         weight = this%shutoffweight(n)
         !
-        ! -- for flip-flop condition, decrease factor
+        ! -- for oscillating condition, decrease factor
         if (this%shutoffdq(n) * dq < DZERO) then
           weight = this%theta * this%shutoffweight(n)
           !

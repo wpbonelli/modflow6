@@ -24,8 +24,7 @@ def run_makefile(target):
     base_target = os.path.basename(target)
     base_message = (
         f" Rerunning {os.path.basename(__file__)} in the distribution "
-        "directory and recomitting modified makefiles will likely resolve "
-        "CI failures."
+        "directory will likely resolve CI failures."
     )
 
     # clean prior to make
@@ -43,8 +42,10 @@ def run_makefile(target):
 def build_mf6_makefile():
     target = "mf6"
     excludefiles = str(PROJ_ROOT_PATH / "pymake" / "excludefiles.txt")
+    make_path = PROJ_ROOT_PATH / "make"
+    make_path.mkdir(exist_ok=True)
     print(f"Creating makefile for {target}")
-    with set_dir(PROJ_ROOT_PATH / "make"):
+    with set_dir(make_path):
         pymake.main(
             srcdir=str(PROJ_ROOT_PATH / "src"),
             target=target,
@@ -54,13 +55,13 @@ def build_mf6_makefile():
             inplace=True,
             dryrun=True,
             makefile=True,
-            networkx=True,
         )
 
 
 def build_zbud6_makefile():
     target = "zbud6"
     util_path = PROJ_ROOT_PATH / "utils" / "zonebudget"
+    (util_path / "make").mkdir(exist_ok=True)
     print(f"Creating makefile for {target}")
     with set_dir(util_path / "make"):
         returncode = pymake.main(
@@ -72,7 +73,6 @@ def build_zbud6_makefile():
             include_subdirs=True,
             makefile=True,
             dryrun=True,
-            networkx=True,
         )
 
         assert returncode == 0, f"Failed to create makefile for '{target}'"
@@ -81,6 +81,7 @@ def build_zbud6_makefile():
 def build_mf5to6_makefile():
     target = "mf5to6"
     util_path = PROJ_ROOT_PATH / "utils" / "mf5to6"
+    (util_path / "make").mkdir(exist_ok=True)
     print(f"Creating makefile for {target}")
     with set_dir(util_path / "make"):
         extrafiles = str(util_path / "pymake" / "extrafiles.txt")
@@ -95,7 +96,6 @@ def build_mf5to6_makefile():
             inplace=True,
             dryrun=True,
             makefile=True,
-            networkx=True,
             fflags=["-fall-intrinsics"],
         )
 
@@ -110,17 +110,13 @@ def test_build_mf6_makefile():
         PROJ_ROOT_PATH / "make" / "makefile",
         PROJ_ROOT_PATH / "make" / "makedefaults",
     ]
-    makefile_mtimes = [p.stat().st_mtime for p in makefile_paths]
-
     try:
         build_mf6_makefile()
-
-        # check files were modified
-        for p, t in zip(makefile_paths, makefile_mtimes):
-            assert p.stat().st_mtime > t
+        for p in makefile_paths:
+            assert p.is_file()
     finally:
         for p in makefile_paths:
-            os.system(f"git restore {p}")
+            p.unlink(missing_ok=True)
 
 
 @flaky
@@ -132,17 +128,13 @@ def test_build_zbud6_makefile():
         util_path / "make" / "makefile",
         util_path / "make" / "makedefaults",
     ]
-    makefile_mtimes = [p.stat().st_mtime for p in makefile_paths]
-
     try:
         build_zbud6_makefile()
-
-        # check files were modified
-        for p, t in zip(makefile_paths, makefile_mtimes):
-            assert p.stat().st_mtime > t
+        for p in makefile_paths:
+            assert p.is_file()
     finally:
         for p in makefile_paths:
-            os.system(f"git restore {p}")
+            p.unlink(missing_ok=True)
 
 
 @flaky
@@ -154,17 +146,13 @@ def test_build_mf5to6_makefile():
         util_path / "make" / "makefile",
         util_path / "make" / "makedefaults",
     ]
-    makefile_mtimes = [p.stat().st_mtime for p in makefile_paths]
-
     try:
         build_mf5to6_makefile()
-
-        # check files were modified
-        for p, t in zip(makefile_paths, makefile_mtimes):
-            assert p.stat().st_mtime > t
+        for p in makefile_paths:
+            assert p.is_file()
     finally:
         for p in makefile_paths:
-            os.system(f"git restore {p}")
+            p.unlink(missing_ok=True)
 
 
 @flaky
@@ -173,18 +161,24 @@ def test_build_mf5to6_makefile():
 @pytest.mark.skipif(FC == "ifort", reason=FC_REASON)
 def test_build_mf6_with_make():
     target = PROJ_ROOT_PATH / "bin" / f"mf6{EXE_EXT}"
+    makefile_paths = [
+        PROJ_ROOT_PATH / "make" / "makefile",
+        PROJ_ROOT_PATH / "make" / "makedefaults",
+    ]
     mtime = get_modified_time(target)
 
     try:
+        build_mf6_makefile()
         with set_dir(PROJ_ROOT_PATH / "make"):
             run_makefile(target)
 
         # check executable was modified
         assert target.stat().st_mtime > mtime
     finally:
-        # clean after successful make
         print(f"clean {target} with makefile")
         os.system("make clean")
+        for p in makefile_paths:
+            p.unlink(missing_ok=True)
 
 
 @flaky
@@ -194,9 +188,14 @@ def test_build_mf6_with_make():
 def test_build_zbud6_with_make():
     target = PROJ_ROOT_PATH / "bin" / f"zbud6{EXE_EXT}"
     util_path = PROJ_ROOT_PATH / "utils" / "zonebudget"
+    makefile_paths = [
+        util_path / "make" / "makefile",
+        util_path / "make" / "makedefaults",
+    ]
     mtime = get_modified_time(target)
 
     try:
+        build_zbud6_makefile()
         with set_dir(util_path / "make"):
             run_makefile(target)
 
@@ -205,6 +204,8 @@ def test_build_zbud6_with_make():
     finally:
         print(f"clean {target} with makefile")
         os.system("make clean")
+        for p in makefile_paths:
+            p.unlink(missing_ok=True)
 
 
 @flaky
@@ -214,9 +215,14 @@ def test_build_zbud6_with_make():
 def test_build_mf5to6_with_make():
     target = PROJ_ROOT_PATH / "bin" / f"mf5to6{EXE_EXT}"
     util_path = PROJ_ROOT_PATH / "utils" / "mf5to6"
+    makefile_paths = [
+        util_path / "make" / "makefile",
+        util_path / "make" / "makedefaults",
+    ]
     mtime = get_modified_time(target)
 
     try:
+        build_mf5to6_makefile()
         with set_dir(util_path / "make"):
             run_makefile(target)
 
@@ -225,6 +231,8 @@ def test_build_mf5to6_with_make():
     finally:
         print(f"clean {target} with makefile")
         os.system("make clean")
+        for p in makefile_paths:
+            p.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

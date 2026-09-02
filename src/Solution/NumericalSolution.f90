@@ -543,7 +543,6 @@ contains
     ! -- local variables
     class(NumericalModelType), pointer :: mp => null()
     class(NumericalExchangeType), pointer :: cp => null()
-    character(len=linelength) :: warnmsg
     character(len=linelength) :: keyword
     character(len=linelength) :: fname
     character(len=linelength) :: msg
@@ -675,29 +674,6 @@ contains
             &OF OUTER MAXIMUM USED TO INCREASE OR DECREASE TIME STEP SIZE IS ',&
             &this%atsfrac
           !
-          ! -- DEPRECATED OPTIONS
-        case ('CSV_OUTPUT')
-          call this%parser%GetStringCaps(keyword)
-          if (keyword == 'FILEOUT') then
-            call this%parser%GetString(fname)
-            this%icsvouterout = getunit()
-            call openfile(this%icsvouterout, iout, fname, 'CSV_OUTPUT', &
-                          filstat_opt='REPLACE')
-            write (iout, fmtcsvout) trim(fname), this%icsvouterout
-            !
-            ! -- create warning message
-            write (warnmsg, '(a)') &
-              'OUTER ITERATION INFORMATION WILL BE SAVED TO '//trim(fname)
-            !
-            ! -- create deprecation warning
-            call deprecation_warning('OPTIONS', 'CSV_OUTPUT', '6.1.1', &
-                                     warnmsg, this%parser%GetUnit())
-          else
-            write (errmsg, '(a)') 'Optional CSV_OUTPUT '// &
-              'keyword must be followed by FILEOUT'
-            call store_error(errmsg)
-          end if
-          !
           ! -- right now these are options that are only available in the
           !    development version and are not included in the documentation.
           !    These options are only available when IDEVELOPMODE in
@@ -734,7 +710,7 @@ contains
         case ('DEV_PTC_EXPONENT')
           call this%parser%DevOpt()
           rval = this%parser%GetDouble()
-          if (rval < DZERO) then
+          if (rval <= DZERO) then
             write (errmsg, '(a)') 'PTC_EXPONENT must be > 0.'
             call store_error(errmsg)
           else
@@ -746,7 +722,7 @@ contains
         case ('DEV_PTC_DEL0')
           call this%parser%DevOpt()
           rval = this%parser%GetDouble()
-          if (rval < DZERO) then
+          if (rval <= DZERO) then
             write (errmsg, '(a)') 'IMS sln_ar: PTC_DEL0 must be > 0.'
             call store_error(errmsg)
           else
@@ -840,27 +816,6 @@ contains
           this%breduc = this%parser%GetDouble()
         case ('BACKTRACKING_RESIDUAL_LIMIT')
           this%res_lim = this%parser%GetDouble()
-          !
-          ! -- deprecated variables
-        case ('OUTER_HCLOSE')
-          this%dvclose = this%parser%GetDouble()
-          !
-          ! -- create warning message
-          write (warnmsg, '(a)') &
-            'SETTING OUTER_DVCLOSE TO OUTER_HCLOSE VALUE'
-          !
-          ! -- create deprecation warning
-          call deprecation_warning('NONLINEAR', 'OUTER_HCLOSE', '6.1.1', &
-                                   warnmsg, this%parser%GetUnit())
-        case ('OUTER_RCLOSEBND')
-          !
-          ! -- create warning message
-          write (warnmsg, '(a)') &
-            'OUTER_DVCLOSE IS USED TO EVALUATE PACKAGE CONVERGENCE'
-          !
-          ! -- create deprecation warning
-          call deprecation_warning('NONLINEAR', 'OUTER_RCLOSEBND', '6.1.1', &
-                                   warnmsg, this%parser%GetUnit())
         case default
           write (errmsg, '(3a)') &
             'Unknown IMS NONLINEAR keyword (', trim(keyword), ').'
@@ -1098,8 +1053,7 @@ contains
   !<
   subroutine sln_dt(this)
     ! -- modules
-    use TdisModule, only: kstp, kper, delt
-    use AdaptiveTimeStepModule, only: ats_submit_delt
+    use TdisModule, only: kstp, kper, delt, ats
     use ConstantsModule, only: DTWO, DTHREE
     ! -- dummy variables
     class(NumericalSolutionType) :: this !< NumericalSolutionType instance
@@ -1129,7 +1083,8 @@ contains
       end if
       !
       ! -- submit stable dt for upcoming step
-      call ats_submit_delt(kstp, kper, delt_temp, this%memory_path, idir=idir)
+      call ats%ats_submit_delt(kstp, kper, delt_temp, &
+                               this%memory_path, idir=idir)
     end if
   end subroutine sln_dt
 
@@ -1343,7 +1298,7 @@ contains
       outerloop: do kiter = 1, this%mxiter
 
         ! perform a single iteration
-        call this%solve(kiter)
+        call this%solve(kiter, isuppress_output)
 
         ! exit if converged
         if (this%icnvg == 1) then
@@ -1510,12 +1465,13 @@ contains
   !! and (10) underrelaxation
   !!
   !<
-  subroutine solve(this, kiter)
+  subroutine solve(this, kiter, isuppress_output)
     ! -- modules
     use TdisModule, only: kstp, kper, totim
     ! -- dummy variables
     class(NumericalSolutionType) :: this !< NumericalSolutionType instance
     integer(I4B), intent(in) :: kiter !< Picard iteration number
+    integer(I4B), intent(in) :: isuppress_output !< flag for suppressing output
     ! -- local variables
     class(NumericalModelType), pointer :: mp => null()
     class(NumericalExchangeType), pointer :: cp => null()

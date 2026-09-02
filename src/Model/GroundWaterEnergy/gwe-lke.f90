@@ -685,8 +685,8 @@ contains
     do j = 1, this%flowbudptr%budterm(this%idxbudlbcd)%nlist
       q = DZERO
       n1 = this%flowbudptr%budterm(this%idxbudlbcd)%id1(j)
+      igwfnode = this%flowbudptr%budterm(this%idxbudlbcd)%id2(j)
       if (this%iboundpak(n1) /= 0) then
-        igwfnode = this%flowbudptr%budterm(this%idxbudlbcd)%id2(j)
         auxpos = this%flowbudptr%budterm(this%idxbudgwf)%naux ! for now there is only 1 aux variable under 'GWF'
         wa = this%flowbudptr%budterm(this%idxbudgwf)%auxvar(auxpos, j)
         ktf = this%ktf(n1)
@@ -1329,7 +1329,8 @@ contains
       ! -- check for duplicate or missing lakes
       do n = 1, this%ncv
         if (nboundchk(n) == 0) then
-          write (errmsg, '(a,1x,i0)') 'No data specified for feature', n
+          write (errmsg, '(a,1x,i0,1x,a)') 'No data specified for feature', n, &
+            'in LKE PACKAGEDATA block'
           call store_error(errmsg)
         else if (nboundchk(n) > 1) then
           write (errmsg, '(a,1x,i0,1x,a,1x,i0,1x,a)') &

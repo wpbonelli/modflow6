@@ -131,6 +131,8 @@ module BndModule
     procedure :: bnd_ot_package_flows
     procedure :: bnd_ot_dv
     procedure :: bnd_ot_bdsummary
+    procedure :: bnd_dt
+    procedure :: bnd_fp
     procedure :: bnd_da
 
     procedure :: allocate_scalars
@@ -153,6 +155,7 @@ module BndModule
     procedure, public :: bnd_bd_obs
     procedure, public :: bnd_ot_obs
     procedure, public :: bnd_rp_obs
+    procedure, public :: bnd_rp_log
     !
     ! -- procedure to support time series
     procedure, public :: bnd_rp_ts
@@ -828,6 +831,20 @@ contains
                                   this%inamedbound, this%boundname)
     end if
   end subroutine bnd_ot_model_flows
+
+  !> @brief Submit an ATS time step request (no-op by default)
+  !<
+  subroutine bnd_dt(this)
+    ! -- dummy
+    class(BndType) :: this !< BndType object
+  end subroutine bnd_dt
+
+  !> @brief Final processing at end of simulation (no-op by default)
+  !<
+  subroutine bnd_fp(this)
+    ! -- dummy
+    class(BndType) :: this !< BndType object
+  end subroutine bnd_fp
 
   !> @ brief Deallocate package memory
   !!
@@ -1687,6 +1704,16 @@ contains
     ! -- dummy
     class(BndType), intent(inout) :: this
   end subroutine bnd_rp_ts
+
+  !> @brief Log period input for a boundary package
+  !!
+  !! Write stress period input to the listing file if requested. This
+  !! default implementation is a no-op; BndExtType overrides it.
+  !<
+  subroutine bnd_rp_log(this)
+    ! -- dummy
+    class(BndType), intent(inout) :: this
+  end subroutine bnd_rp_log
 
   ! -- Procedures related to casting
 
