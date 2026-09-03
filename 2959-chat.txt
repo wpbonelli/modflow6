@@ -1,0 +1,106 @@
+ ▐▛███▛█   Claude Code v2.1.259
+▝▜██████▀  Sonnet 5 · Claude Pro
+  ▝▝ ▝▝    ~/dev/modflow6
+
+
+❯ Have a look at https://github.com/MODFLOW-ORG/modflow6/discussions/2959 and   
+  speculate on what might be going on, factoring in all relevant expertise on   
+  transport modeling with MF6.                                                  
+
+● Fetch(https://github.com/MODFLOW-ORG/modflow6/discussions/2959)
+  ⎿  Received 304.9KB (200 OK)
+
+  Ran 1 shell command (ctrl+o to expand)
+
+● Pulled the full thread (OP by thomgraf1974, one question from aprovost-usgs,
+  two clarifying replies). Here's my read.
+
+  What's most likely going on
+
+  Everything points to the near-boundary velocity / specific-discharge 
+  reconstruction, not to the transport solver or the heterogeneity as a physical
+  effect:
+
+  - The GWF flow field is identical in both runs (only the GWT source location
+    moved), so the difference is entirely in how the transport side uses the
+    flows in the left column.
+  - MF6 reconstructs a cell-centered velocity vector in each cell from face
+    flows plus boundary flows. In a CHD cell this reconstruction is known to be 
+    unreliable (it's called out in the NPF docs for SAVE_SPECIFIC_DISCHARGE:
+    values "in constant-head cells and cells adjacent to constant-head cells may
+    be inaccurate"). The CHD boundary flow has to be smeared back onto faces,
+    and the least-squares/averaging step degrades badly when neighboring K
+    differs.
+  - That reconstructed velocity is exactly what drives mechanical dispersion (D
+    ≈ αL·|v|, αT·|v|) in the Eulerian GWT, or the interpolated particle velocity
+    if this is a random-walk / MODPATH-style run (the "number of particles"
+    comment suggests it might be). Either way, a corrupted |v| and its gradient
+    in the boundary column mis-scales spreading. Provost's observation that the
+    bad result "looks like much lower dispersion" is consistent with the
+    boundary-cell |v| being underestimated.
+
+  So: put the constant-concentration source in the CHD column and the plume
+  forms in the one place where the velocity is least trustworthy → unphysical.
+  Move it one column in and the source sits in an interior cell with a clean
+  velocity → looks fine. Make the domain homogeneous and the boundary-cell
+  reconstruction collapses to the uniform regional flow → the co-located case
+  also works.
+
+  Why co-locating CNC + CHD makes it worse
+
+  Beyond the bad velocity, two things stack on top when the cells coincide:
+
+  1. SSM skips constant-concentration cells (ibound <= 0). When the source CHD
+     cells are also CNC, the CHD inflow mixing term is not assembled there — the
+     mass instead enters only as the CNC "constant-concentration flow." That's
+     mathematically fine for the pinned cell, but it means the boundary inflow
+     no longer participates in the local advective balance in the column,
+     changing how the pinned value couples to column 2.
+  2. Cross-dispersion at a pinned boundary node. With the standard (non-XT3D)
+     dispersion formulation, cross terms are lagged/RHS-treated. A sharp fixed
+     concentration gradient sitting on top of a distorted velocity field at the
+     boundary is a recipe for over/undershoot and blotchy patterns — "weird and
+     unphysical."
+
+  Why a 1% K change (9.9 vs 10) is enough
+
+  Because it's not a physical-heterogeneity effect — it's the reconstruction
+  switching from "trivially exact by symmetry" to "approximate." Any K contrast
+  touching the boundary source cells tilts the reconstructed velocity vector
+  (adds a spurious transverse component, changes |v|), and that immediately
+  perturbs the dispersion coefficients / particle displacements right where the
+  source is. The magnitude of the contrast barely matters; its presence does.
+
+  Is it a bug?
+
+  I'd call it a known accuracy limitation rather than a defect, but it's worth
+  having them post the input files so someone can check the calc_spdis path for
+  CHD cells adjacent to K contrasts, and confirm whether XT3D changes it. If
+  specific discharge in those cells is visibly wrong, that's the smoking gun.
+
+  What to suggest to the user
+
+  - Keep the source one cell inside the CHD boundary — their working
+    configuration. This is generally recommended practice; MF6 examples
+    typically place the solute inlet just inside the flow boundary for exactly
+    this reason.
+  - Turn on SAVE_SPECIFIC_DISCHARGE and plot the q-vectors in the left column
+    for the 9.9 vs 10.0 cases — this should directly show the artifact.
+  - Try XT3D (in NPF, and it propagates to dispersion) — better velocity and
+    cross-dispersion reconstruction near the heterogeneity; likely reduces or
+    removes the discrepancy.
+  - As an alternative to CNC at the boundary, impose the inlet concentration via
+    CHD AUXILIARY + SSM so the mass enters with the water rather than being
+    pinned in the worst-velocity cell.
+  - Check the GWT mass budget (LST) for both configs — an oversized or
+    oscillating CONSTANT CONC term in the co-located case confirms the CNC is
+    fighting a bad local flow field.
+  - Refine the grid near the boundary; if it's reconstruction sensitivity,
+    refinement should shrink it.
+  - Clarify GWT (finite-volume) vs a particle method — the "particles" wording
+    is ambiguous and the exact fix differs (XT3D/dispersion vs
+    velocity-interpolation scheme near boundaries).
+
+✻ Baked for 3m 19s · done 8:31 AM
+
+※ recap: We analyzed GitHub discussion 2959: a MF6 transport user gets unphysical plumes when constant-concentration cells overlap constant-head cells in a heterogeneous domain. I delivered a speculative diagnosis pointing to unreliable near-boundary velocity reconstruction. Next: refine or post the reply if you want. (disable recaps in /config)
