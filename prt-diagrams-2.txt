@@ -1,0 +1,287 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.259
+           Sonnet 5 · Claude Pro
+  ▘▘ ▝▝    ~/dev/modflow6
+
+
+❯ Have a look at the release notes since release 6.6.0, in context of the       
+  vertical/dry behavior described in the 6.6.0 PRT migration guide. Inspect the 
+  git log as well and enumerate how vertical tracking behavior in dry           
+  conditions has changed since 6.6.0.                                           
+
+  Searched for 3 patterns, read 2 files, listed 2 directories, ran 21 shell commands (ctrl+o to expand)
+
+⏺ I dug through the 6.6.0 PRT migration guide, the release notes for 6.6.1 →
+  6.8.0, and the PRT commits touching the tracking methods. Here's what changed
+  in dry/vertical behavior relative to the 6.6.0 baseline.
+
+  6.6.0 baseline (from the migration guide)
+
+  - DRY_TRACKING_METHOD introduced with DROP (default), STOP, STAY; DROP = pass
+    the particle instantly and vertically to the water table (partially
+    saturated cell) or cell bottom (fully dry cell), repeating through layers
+    until it reaches water, terminating at the grid bottom if the whole column
+    is dry.
+  - Lack of an exit face no longer trumps saturation: a particle in a dry cell
+    with no outflow now gets the DROP pass-to-bottom treatment instead of
+    terminating (as it did in 6.5).
+  - New ad-hoc rule: no backtracking between a vertically adjacent pair of cells
+    within one time step (to stop infinite drop/re-enter loops, e.g. under a
+    pumping well).
+  - gfortran divide-by-zero on a particle entering a dry structured cell fixed.
+  - DRAPE (release-time only): if the release cell is inactive, drop to the
+    topmost active cell below, else terminate unreleased (status 8). No effect
+    for dry-but-active cells.
+
+  6.6.1
+
+  - Generalized/ternary (DISV) method: local z now constrained to the unit
+    interval before the vertical travel-time calculation, fixing a
+    floating-point exception on entry into dry/partly-saturated DISV cells
+    (#2183). Related FPE fixes in the centroid calc (#2119) and ternary
+    local-coordinate conversion (#2122).
+  - New status code 10 (timeout: reached STOPTIME/STOPTRAVELTIME or the
+    simulation end time).
+  - Time-step-end event reporting fixed for DRY_TRACKING_METHOD DROP and STAY
+    (Newton models only).
+  - Release times outside the TDIS window are skipped with a warning instead of
+    producing undefined behavior.
+
+  6.6.2
+
+  - DISV/ternary subcell method: fixed the logic that decides whether a particle
+    leaves through a lateral vs. a vertical (top/bottom) subcell face — a
+    regression had let particles that should exit top/bottom exit through a side
+    instead. Also fixed a bad unit-interval clamp on relative z that was
+    abruptly snapping already-in-range particles to the cell bottom (#2281).
+
+  6.6.3 (the major water-table rework)
+
+  - Water table is now distinguished from the geometric cell top. Cells
+    containing a water table are "capped" at zero upward flow unless the top
+    face is an assigned boundary (IFLOWFACE). This stops particles from riding
+    numerically-insignificant Newton upward flows out the top of a partially
+    saturated cell and cycling with the dry cell above (#2478 → #2496 → #2503).
+    This replaced and allowed removal of the 6.6.0 ad-hoc "no vertical
+    backtracking" trap.
+  - Net effect on semantics: a particle that reaches a water table from below
+    now terminates (consistent with MODPATH 7). DRY_TRACKING_METHOD is now
+    interpreted as applying only to particles that are dry after the flow
+    solution — i.e. the water table dropped below them, or they were released
+    above the water table into a Newton system — not to particles obtaining an
+    upward exit solution through a water table.
+  - Particles exiting through an assigned boundary face (internal or external)
+    now terminate, fixing infinite loops where adjacent cells disagreed on
+    shared-face flow (#2475); refined so termination happens only when net
+    boundary flow through the face is outward (#2492).
+  - DROP now emits a dedicated "dropped to water table" event, reason code 6
+    (previously reported as a generic cell-exit, reason code 1) (#2502).
+  - Structured (Pollock) method: a stationary particle in an active no-flow cell
+    on the final time step with EXTEND_TRACKING now terminates with code 10
+    instead of not terminating (#2369, plus the 6.6.3 note about "beginning the
+    final timestep in a stationary cell").
+  - Subcell-scale exit events split out from cell exit events and made opt-in
+    (TRACK_SUBFEATURE_EXIT).
+
+  6.7.0
+
+  - LOCAL_Z release into Newton cells fixed. Previously produced invalid
+    negative tracking times when head was above the cell top or below the cell
+    bottom. The release point is now interpolated between the effective top
+    (head, clamped to [bottom, geometric top], for convertible cells; geometric
+    top for confined cells) and the bottom (#2624, #2631). This introduced a
+    requirement to supply a GWFGRID entry to the FMI package (to know cell type
+    at release time) when PRT runs as a separate simulation.
+  - Subcell-with-no-exit-face termination simplified: such a particle now always
+    terminates with status code 9, regardless of
+    endofsimulation/extend/stationary flow (a corner case previously gave
+    code 10) (#2646).
+  - Ternary method: completed the "nudge particle into subcell" logic so
+    particles aren't left just outside a triangular subcell (#2643).
+  - Docs: IDOMAIN = 0 / -1 cells (don't exist in the simulation; no release
+    permitted; -1 = vertical pass-through) explicitly distinguished from merely
+    inactive cells (release permitted, governed by DRAPE / Newton /
+    DRY_TRACKING_METHOD) (#2625).
+
+  6.8.0
+
+  - DRAPE behavior fixed. A draped particle is now genuinely released in the
+    highest active cell — at the water table if that cell is convertible, at the
+    geometric top if confined — instead of being "released" at the original
+    inactive-cell position and then immediately generating a reason-6 dropped
+    event via the default DROP. The spurious dropped event is gone; pathlines
+    are otherwise essentially unchanged (#2824). (Note: this diverges from MP7,
+    which applies the local z unconditionally so a draped particle can start
+    below the water table.)
+  - GWFGRID/ICELLTYPE requirement from 6.7.0 removed. A single formula z = bot +
+    localz · sat · (top − bot) is used for both convertible and confined cells
+    (sat = 1 when confined; sat = (head − bot)/(top − bot) clamped to [0,1] when
+    convertible), with saturation smoothed near the top/bottom — so LOCAL_Z
+    particle elevations near a cell top or bottom can shift slightly (#2854).
+  - Particle coordinates are now clamped to cell/subcell bounds in all 
+    dimensions (including vertical) before the tracking method runs, preventing
+    bad exit-face/travel-time solutions caused by coordinate-transform roundoff
+    as particles move between cells (#2926); a scaled tolerance was also added
+    to the point-in-cell containment check (#2927).
+  - Dev-mode cycle detection extended to trap cycles between subcells, not just
+    repeated cell-face exits (#2802) — relevant because vertical drop/re-enter
+    cycles were the original motivation.
+  - A particle whose STOPTIME precedes its release time now terminates
+    immediately unreleased (status 8) with a warning, instead of hitting an
+    FPE/crash inside the tracking algorithm (#2953).
+  - Default release timing fixed (was releasing at the first step of every
+    stress period rather than once at simulation start) (#2847) — changes when
+    dry logic first gets exercised, not the logic itself.
+
+✻ Cooked for 4m 40s · done Thursday 11:49 AM
+
+※ recap: Goal: enumerate how PRT vertical/dry tracking behavior changed since MODFLOW 6 release 6.6.0. I researched the migration guides, release notes for 6.6.1 through 6.8.0, and PRT commits, then delivered a per-release enumeration. Task complete; no next action pending unless you want more depth. (disable recaps in /config)
+
+❯ Excellent. Do any of these changes require changes to the flowcharts in the   
+  6.6.0 migration guide?                                                        
+
+  Ran 1 shell command (ctrl+o to expand)
+
+⏺ Short answer: the release‑time flowchart is still essentially correct; the
+  tracking‑time flowchart is not — the 6.6.3 water‑table rework broke it in a
+  couple of places.
+
+  Release‑time flowchart — no required changes
+
+  Cell active? ──No──> DRAPE? ──No──> Terminate (8)
+                              └─Yes─> Active under? ──Yes──> Drape to active
+  cell
+                                                     └─No──> Terminate
+  Cell active? ──Yes─> Release in specified cell
+
+  - 6.8.0 DRAPE fix (#2824) did not invalidate this chart — it made the code
+    finally match it. The chart always showed a draped particle being released
+    in the active cell ("Drape to active cell"); the bug (release at the
+    original point, then a spurious reason‑6 drop) was never depicted. Reality
+    now agrees with the diagram.
+  - IDOMAIN 0/‑1 vs. merely inactive (6.7.0, #2625) is a distinction in why a
+    cell isn't active, not in outcome: both still route down the DRAPE branch,
+    and release into a dry‑but‑active cell is still "Cell active? → Yes." The
+    binary holds.
+  - Optional refinements only: label the drape target as "highest active cell —
+    water table if convertible, geometric top if confined," and add the new
+    STOPTIME < release time → terminate unreleased (8) pre‑check from 6.8.0
+    (#2953).
+
+  Tracking‑time flowchart — needs updating
+
+  Cell active? ──No──> Terminate (7)
+               └─Yes─> Particle dry? ──No──> Track normally
+                                     └─Yes─> DRY_TRACKING_METHOD
+                                              STOP → Terminate
+                                              DROP → Cell dry? Yes→bottom /
+  No→water table → Track
+                                              STAY → Stationary
+
+  Problems introduced since 6.6.0:
+
+  1. Missing terminal outcome: particle reaching a water table from below. In
+     6.6.0 such a (wet) particle went down "Particle dry? → No → Track normally"
+     and could exit through the cell top on negligible Newton flows. Since
+     6.6.3 (#2478 → #2496 → #2503) a cell containing a water table is capped at 
+     zero upward flow unless its top face is an assigned boundary, so the
+     particle terminates at the water table (MP7‑consistent) instead of
+     continuing. That branch and endpoint don't exist on the chart.
+  2. "Particle dry?" is now over‑broad. The chart implies any mid‑track dry
+     condition funnels into DRY_TRACKING_METHOD. Post‑6.6.3, DRY_TRACKING_METHOD
+     governs only particles left dry by a falling water table, or released
+     above the water table in a Newton system — not a particle approaching a
+     water table from below. The node needs that qualifier, and ideally a
+     preceding "top face an assigned boundary?" decision to capture the cap
+     exception (and the 6.6.3 terminate at assigned boundary face with net 
+     outflow outcome, #2492).
+  3. "Pass to water table" node should be annotated with the dedicated dropped 
+     event, reason code 6 (6.6.3, #2502) — it was a generic cell‑exit (reason 1)
+     in 6.6.0. Cosmetic, not structural.
+  4. No‑exit‑face handling was already absent from the 6.6.0 chart (the guide's
+     own closing note discusses it in prose). 6.7.0 (#2646) then made "subcell
+     with no exit face → always terminate, status 9" unconditional. If the chart
+     is refreshed, this is worth showing since it's the direct counterpart to
+     the DROP "pass to bottom" path.
+
+  Also prose, not diagram: the 6.6.0 guide's note about "prohibit backtracking
+  between vertically adjacent cells within a time step" — that ad‑hoc trap was
+  removed in 6.6.3 (#2478), superseded by the zero‑upward‑flow cap.
+
+  Where the fix belongs
+
+  The 6.6.0 migration guide is a frozen 6.5→6.6.0 document (last content change
+  Dec 2024); leaving it as a historical record is defensible. But the diagrams
+  live only there, and doc/mf6io/prt/prt.tex — which is supposed to carry the
+  same prose "sans diagrams" — is also stale (it still describes only
+  DROP/STOP/STAY, with nothing about the water‑table cap or reach‑from‑below
+  termination). The 6.7.0 migration guide has no vertical‑tracking section at
+  all. So the real gap is that the 6.6.3 water‑table behavior was never written
+  into prt.tex or a migration guide, and the corrected tracking‑time flowchart
+  should land in prt.tex/a 6.8.0 guide rather than as an edit to the 6.6.0 one.
+
+✻ Cooked for 2m 26s · done Thursday 11:59 AM
+
+※ recap: We're assessing whether PRT dry/vertical tracking changes since 6.6.0 require updating the migration guide flowcharts. Conclusion delivered: the release-time flowchart is fine, but the tracking-time flowchart needs updating for the 6.6.3 water-table rework. Next: decide whether to draft those edits. (disable recaps in /config)
+
+❯ So it sounds like what you've found would make these diagrams fully describe  
+  vertical tracking behavior. When they were made, I think the intent was only  
+  to describe how DRAPE interacted with DRY_TRACKING_METHOD. Or maybe they were 
+  always too narrowly scoped. What do you think?                                
+
+⏺ I think the diagrams were fine for what they were built to do, and the
+  mismatch is with the prose wrapped around them, not the diagrams themselves.
+
+  What they actually are. They're not one "DRAPE × DRY_TRACKING_METHOD" tree —
+  they're two phase-specific option trees with a single documented handoff. The
+  release-time diagram is DRAPE + cell activity (it never mentions
+  DRY_TRACKING_METHOD). The tracking-time diagram is DRY_TRACKING_METHOD (it
+  never mentions DRAPE, correctly, since DRAPE is release-only). The only thing
+  linking them is the sentence "for a dry-but-active cell the DRAPE option has
+  no effect... its subsequent behavior can be configured using
+  DRY_TRACKING_METHOD." So the intent was closer to "document the two
+  dry-handling options and where one hands off to the other" than a full
+  interaction matrix.
+
+  Were they too narrow? I'd say appropriately scoped but mislabeled. A
+  migration-guide diagram's job is to show what changed and what the new knobs
+  do — it doesn't owe the reader a complete behavioral spec. Under that lens
+  they were correct in 6.6.0. What over-promises is the section framing: "the
+  approach PRT takes to vertical particle motion" / "This section describes the
+  approach PRT takes to vertical particle motion" reads as a complete model, and
+  the diagrams deliver "what DRAPE and DRY_TRACKING_METHOD do." The problem is
+  that since 6.6.0 those diagrams have been treated as the canonical
+  vertical-tracking reference (they're the only diagrams), and the prose invited
+  that.
+
+  They already aren't "pure user options." The legend explicitly distinguishes
+  program decisions (thin lines) from user decisions (thick lines), and the
+  diagrams already contain program decisions — "cell active?", "particle dry?",
+  "cell dry?". They just stopped at the program decisions that are preconditions
+  for the options to make sense, and didn't reach program decisions that
+  terminate or redirect a particle independent of the options.
+
+  Consequence for the fixes. This distinction actually shrinks what's strictly
+  required. Under the narrow scope:
+
+  - The tracking-time diagram mainly needs a definitional tightening of
+    "particle dry?" — post-6.6.3 that means "dry because the water table fell
+    below it, or released above the water table in a Newton system," not
+    "particle is anywhere above the water table." A particle moving up toward a
+    water table is now ordinary wet tracking that terminates at the
+    zero-upward-flow cap; it never was a DRY_TRACKING_METHOD case, but a 6.6.0
+    reader would reasonably have assumed it was. Plus the reason-6 annotation on
+    "pass to water table."
+  - The new terminal branches I listed before — reach-water-table-from-below,
+    assigned-boundary-face, no-exit-face — only belong if you deliberately
+    broaden the scope to "everything that happens to a particle vertically."
+
+  What I'd do. Leave the 6.6.0 migration guide as the historical artifact it is,
+  but when this content moves into prt.tex (which today has neither the
+  diagrams nor the 6.6.3 water-table prose), decide the scope explicitly. Either
+  keep it "behavior of the DRAPE and DRY_TRACKING_METHOD options" and retitle
+  accordingly — in which case you only owe the definitional tightening — or
+  commit to a real vertical-motion model with the extra branches and an owner to
+  keep it current. The living doc is the place where the broader version earns
+  its maintenance cost; the migration guide isn't.
+
+✻ Worked for 57s · done Thursday 12:10 PM

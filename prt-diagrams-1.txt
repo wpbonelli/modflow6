@@ -1,0 +1,689 @@
+▗ ▗   ▖ ▖  Claude Code v2.1.259
+           Sonnet 5 · Claude Pro
+  ▘▘ ▝▝    ~/dev/modflow6
+
+
+❯ Have a look at the release- and tracking-time flow diagrams in the MF6.6.0    
+  PRT migration guide, then consider whether they're still accurate given the   
+  git history. We've tweaked/fixed some things since 6.6.0, quite a few likely  
+
+  Searched for 2 patterns, ran 1 shell command (ctrl+o to expand)
+
+⏺ Good, it's actually tracked in git. Let me read the migration guide.
+
+  Searched for 10 patterns, read 4 files, listed 1 directory, ran 9 shell commands (ctrl+o to expand)
+
+⏺ I dug through the git history for src/Model/ParticleTracking/ and
+  src/Solution/ParticleTracker/ since the 6.6.0 tag, and cross-checked the
+  current source against .build_rtd_docs/mf6_6_0_prt_migration_guide.md's two
+  flowcharts (release-time and tracking-time). Both are now noticeably out of
+  date. Here's what I found, with commits:
+
+  Release-time diagram (DRAPE decision)
+  - The diagram/text is mostly still directionally correct, but it papers over a
+    distinction the docs team later added deliberately: docs(prt): distinguish 
+    nonexistent from inactive cells (a3005e4a, #2625) clarified that a release
+    point in an IDOMAIN <= 0 cell errors out at load time / terminates
+    unreleased unconditionally — it never reaches the runtime "Cell active? →
+    DRAPE" decision the diagram shows. That decision only ever applies to cells
+    made inactive by drying (ibound == 0, standard formulation), confirmed in
+    prt-prp.f90's initialize_particle (the IDOMAIN<=0 case is rejected earlier,
+    at rptnode setup, around line 1168). The migration guide's diagram conflates
+    these two cases under one "Cell active?" diamond.
+  - Separately, fix(prt): fix drape behavior (0d5e7431, #2824) fixed an actual
+    bug where draped particles were reported as released at the original point
+    then "dropped" to the water table on the next time step — inconsistent with
+    the described intent. This is now fixed to match the guide's text, so the
+    prose is accurate again, it just wasn't for a while.
+
+  Tracking-time diagram (DRY_TRACKING_METHOD decision) — this one has drifted
+  more:
+  - Status code 7 is described as "particle finds itself in an inactive cell."
+    That's no longer true. In current code (MethodCell.f90), TERM_INACTIVE
+    (status 7) is only raised from the two DRY_TRACKING_METHOD = STOP branches.
+    A particle that actually walks into an IDOMAIN = 0 neighbor now terminates
+    via TERM_BOUNDARY (status 2) instead, because such faces are now explicitly
+    treated as outer/assigned boundary faces (documented in the same a3005e4a
+    doc update, and implemented via is_net_out_boundary_face in prt-fmi.f90).
+    Confirmed both TERM_INACTIVE call sites postdate 6.6.0 (introduced in
+    0bc5c4af/16d4e0d6, Feb 2025, after the Dec 2024 6.6.0 tag).
+  - IDOMAIN = -1 vertical pass-through cells (documented in
+    doc/mf6io/prt/prt.tex line 56) aren't represented at all in the diagram's
+    binary "Cell active?" diamond — a third category with distinct (transparent)
+    behavior.
+  - The guide's closing Note about prohibiting backtracking between vertically
+    adjacent cells to avoid infinite loops describes machinery that was removed:
+    fix(prt): prevent top exits from partially saturated cells (0ead0bcd,
+    #2478) explicitly says "this fix allows removing the old ad hoc trap for
+    cycles between vertical faces." That whole saga (0ead0bcd → 2b793e41 #2492 →
+    d059d35e #2495 → 159e60d4 #2496) was itself superseded again by fix(prt): 
+    ignore non-boundary upwards flow thru water table (6c695a94, #2503), which
+    fixed the cyclic-pathline issue at the flow-field level (capping spurious
+    upward flow at the water table) instead of adding tracking-method special
+    cases. So the diagram's implicit "no special-casing needed at the top of
+    partially saturated cells" picture is fine again today, but for entirely
+    different reasons than the guide describes, and the specific
+    backtracking-prevention note is just stale.
+  - A real, unconditional cycle-prevention mechanism does exist today, but it's
+    the opt-in ICYCWIN developer option (feat(prt): add developer option for 
+    cycle detection, e02a56c8, #2435), off by default (icycwin = 0), and when
+    triggered it hard-aborts the whole run (pstop) rather than silently
+    terminating the one particle — a very different behavior than "prohibit
+    backtracking."
+  - Minor: subcell no-exit-face termination (status 9) was simplified by
+    89908cd9 (#2646) to always fire regardless of
+    end-of-simulation/extended-tracking/stationary-flow circumstance, slightly
+    changing the nuance in the guide's note about "lack of an exit face taking
+    precedence."
+
+  So: the release-time diagram needs one clarifying branch (IDOMAIN≤0
+  short-circuits before the DRAPE decision); the tracking-time diagram and its
+  accompanying note need more substantial revision — the status-7/status-2
+  mapping is wrong, IDOMAIN=-1 pass-through is missing, and the backtracking
+  note describes removed machinery.
+
+⏺ User answered Claude's questions:
+  ⎿  · How would you like to handle this? → Let's write a new markdown doc 
+     containing updated mermaid. Go ahead and do the release-time diagram fix. 
+     Then walk me through what the tracking-time problem is: I don't see where's
+     there a status 2 to 7 mapping anywhere in the diagram. Forget the 
+     backtracking note, just focus on the diagrams.
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ Write(prt-vertical-tracking-diagrams-update.md)
+  ⎿  Wrote 75 lines to prt-vertical-tracking-diagrams-update.md
+       1 # PRT vertical tracking diagrams — update from 6.6.0
+       2 
+       3 This revises the release-time and tracking-time flowcharts from
+         vior on
+       5 `develop`, incorporating fixes/clarifications made since the 6.6
+         .0 release.
+       6 
+       8 
+       9 * Stadium-shaped boxes represent steps or processes.
+      10 * Square boxes represent outcomes.
+     … +91 lines (ctrl+o to expand)
+
+⏺ Release-time diagram is done. Now the tracking-time problem:
+
+  You're right that there's no explicit "status 2 → 7" label anywhere — that's 
+  exactly the bug. Look at the original mermaid again:
+
+  ACTIVE{Cell active?} --> |No| TERMINATE{Terminate}
+  ...
+  DRY_TRACKING_METHOD ==> |STOP| TERMINATE[Terminate]:::terminate
+
+  Both edges point to the same node id, TERMINATE. Mermaid collapses that into
+  one box in the rendered diagram — so "cell inactive" and
+  "DRY_TRACKING_METHOD=STOP" visually merge into a single outcome. At 6.6.0 that
+  merge was accurate: both paths raised the same status code, 7
+  (TERM_INACTIVE).
+
+  That's no longer true. I checked the current tracking source
+  (src/Solution/ParticleTracker/Method/MethodCell.f90) and there is zero ibound 
+  reference anywhere in the tracking-method code — I grepped for it. The "Cell
+  active?" diamond doesn't correspond to any runtime check that still exists
+  during tracking. What actually happens now:
+
+  - Entering/crossing into an excluded neighbor (IDOMAIN <= 0, or a genuinely
+    dry-and-deactivated cell) is handled before the particle ever leaves its
+    current cell: try_pass checks whether the face it's about to cross is a
+    net-outflow boundary face (is_net_out_boundary_face), and if so raises
+    TERM_BOUNDARY — status code 2, not 7.
+  - TERM_INACTIVE (status 7) is now raised only from the two DRY_TRACKING_METHOD
+    = STOP branches (dry cell, or dry particle in a partially-saturated cell).
+    Both call sites postdate 6.6.0 (introduced Feb 2025 in #2191/#2203).
+
+  So the diagram's top-level split used to be "one condition → one status," and
+  is now "two unrelated mechanisms → two different statuses that happen to look
+  identical in the chart because they share a node id." A reader today would
+  come away thinking a particle that wanders into an inactive/excluded cell gets
+  status 7, when it actually gets status 2 — and the diagram doesn't even have
+  a decision point that models the real check (a boundary-face-crossing test on
+  the current, still-active cell), since "is this cell active" isn't asked at
+  all anymore.
+
+  There's also the IDOMAIN = -1 pass-through case, which isn't represented at
+  all — such a cell is transparent to the particle (no decision, no
+  termination), a third outcome the binary "Cell active?" diamond can't express.
+
+  Given that, I'd restructure the tracking diagram to drop the "Cell active?"
+  diamond entirely and replace it with the two real checks: a
+  boundary-face-crossing test (→ TERM_BOUNDARY, status 2) and the
+  dry-particle/DRY_TRACKING_METHOD block (whose STOP branch → TERM_INACTIVE,
+  status 7), as two distinct outcome nodes instead of one merged node. Want me
+  to draw that up in the doc now?
+
+✻ Cogitated for 6m 40s · done Thursday 9:58 AM
+
+❯ Got it. I understand, but I also wonder, is this info relevant to this        
+  diagram? It's meant to explain the vertical behavior, right? Or could it be   
+  easily updated to reflect overall behavior?                                   
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Good catch, and you've found the actual flaw in my analysis. The status 2/7
+  boundary-face stuff I raised (IDOMAIN <= 0 exclusion, IDOMAIN = -1
+  pass-through, net-outflow boundary faces) is not a vertical-tracking concern —
+  it applies uniformly to any face in any direction (lateral WEL/RIV boundaries
+  included), and it doesn't belong in a diagram scoped to
+  dry-particle/DRY_TRACKING_METHOD behavior. That was a tangent from chasing the
+  vestigial "Cell active?" diamond down the wrong hole.
+
+  Once I scoped the question back to "what does this diamond actually mean for
+  vertical motion," I found something more relevant and better-targeted. In
+  MethodCell.f90::load_cell_saturation_status (MethodModel.f90), a cell is
+  flagged SATURATION_DRY when ibdgwfsat0(ic) == 0 — and that flag is set the
+  same way whether the cell is dry-and-fully-deactivated (standard formulation,
+  IBOUND = 0) or dry-but-active with zero saturation (Newton formulation). Both
+  cases collapse into the single dry_cell check in assess(), and both now flow 
+  through DRY_TRACKING_METHOD — including the DROP default, which passes a
+  particle sitting in a genuinely inactive cell down to that cell's bottom, same
+  as a dry-but-active Newton cell.
+
+  That's the real, in-scope change: the 6.6.0 diagram draws two separate
+  branches with different consequences —
+
+  - "Cell active? → No → unconditional Terminate" (status 7)
+  - "Particle dry? → Yes → DRY_TRACKING_METHOD-dependent" behavior
+
+  but current code merges them into one branch: a particle in a fully inactive
+  cell is no longer unconditionally terminated — it's treated exactly like a
+  dry-but-active cell and respects DRY_TRACKING_METHOD (DROP by default, so it
+  gets passed to the cell's bottom rather than terminating). Only if
+  DRY_TRACKING_METHOD = STOP does it terminate, status 7. The guide's own prose
+  backs this up implicitly — it already says dry-but-active/partially-saturated
+  particles "need not terminate," but never extends that to fully-inactive
+  cells, and the diagram explicitly forecloses it.
+
+  So the fix to the tracking diagram is to remove the standalone "Cell active? →
+  Terminate" branch and instead have "Cell inactive OR dry?" feed into the same
+  DRY_TRACKING_METHOD decision the dry-particle path uses. Want me to draw that
+  up?
+
+✻ Baked for 1m 35s · done Thursday 10:02 AM
+
+※ recap: We're auditing whether the PRT 6.6.0 migration guide's vertical-tracking diagrams still match current behavior, and just fixed the release-time diagram. Next: redraw the tracking-time diagram so "cell inactive" and "dry particle" merge into one DRY_TRACKING_METHOD branch. (disable recaps in /config)
+
+❯ Wait, this might be a bug. Was this explicitly intended, from your reading of 
+  the git history and the release notes? The changing of inactive cell          
+  handling to include drop behavior?                                            
+
+  Searched for 1 pattern, read 1 file, ran 12 shell commands (ctrl+o to expand)
+
+⏺ Based on the git history, I don't think this was intentional — I think it's a
+  genuine bug that's been latent since 6.6.0's introduction of
+  DRY_TRACKING_METHOD, and here's the evidence chain:
+
+  The commit that introduced DRY_TRACKING_METHOD is 3045d44b — fix(prt): rework 
+  vertical tracking approach (#2066), merged Dec 14, 2024, just 5 days before
+  the 6.6.0 tag. This one commit shipped the code, the dev design notes, and the
+  release notes text. All three should agree with each other, and two of them
+  do — but the code doesn't match either.
+
+  1. The dev notes (src/Solution/ParticleTracker/vertical.md, added by this same
+     commit, later deleted) contain the exact prose and diagram that ended up
+     in the 6.6.0 migration guide, including: "A particle which finds itself in
+     an inactive cell will terminate with status code 7." The diagram draws
+     "Cell active? → No → unconditional Terminate" as a separate branch from
+     "Particle dry? → DRY_TRACKING_METHOD."
+  2. The release notes, added in the same commit (doc/ReleaseNotes/develop.tex),
+     are even more explicit and unambiguous:
+  ▎ "This option is relevant only when the Newton formulation is used, in which 
+  case dry cells remain active; otherwise, dry cells are inactive and particles 
+  will terminate."
+
+     That's a direct statement of intent: DRY_TRACKING_METHOD should only ever
+     come into play for Newton dry-but-active cells. Under standard (non-Newton)
+     formulation, an inactive dry cell should unconditionally terminate the
+     particle, regardless of DRY_TRACKING_METHOD.
+  3. The code, in that same commit and unchanged in every refactor since
+     (through today's MethodCell.f90), does not implement that distinction at
+     all. dry_cell is set from ibdgwfsat0(icell) == 0 — literally "saturation is
+     zero" — with no Newton/non-Newton branch anywhere:
+  if (this%gwfsat(n) > DZERO) then
+    this%ibdgwfsat0(n) = 1
+  else
+    this%ibdgwfsat0(n) = 0   ! true for a fully dry cell, Newton or not
+  end if
+     And in assess(), dry_cell feeds straight into the same idrymeth switch as
+     the Newton dry-but-active case. With the default DROP, a non-Newton cell
+     that's gone fully dry and deactivated falls through to pass-to-bottom — it
+     does not terminate, contradicting "dry cells are inactive and particles
+     will terminate" from the release notes.
+
+  So all three artifacts were authored together, but the design doc and release
+  notes describe a Newton-gated behavior that the implementation never actually
+  enforced. Every subsequent refactor (0bc5c4af, the MethodCell.f90 extraction,
+  etc.) faithfully preserved the code's behavior, so the bug rode along
+  untouched while nobody cross-checked it against the release notes' claim.
+
+  I'd flag this as a real correctness bug worth a GitHub issue (a non-Newton
+  user relying on "dry cells always terminate" is silently getting
+  DROP/pass-to-bottom instead), separate from the docs cleanup — want me to
+  draft an issue, or would you rather investigate/confirm with a quick test case
+  first?
+
+✻ Baked for 2m 37s · done Thursday 11:08 AM
+
+❯ Write this problem up in a document in the project root, so we can come back  
+  to it and write a test case later. I want to focus on the flowcharts. How     
+  should they be updated to reflect the correct intended behavior, what we have 
+  described but the code has failed to implement?                               
+
+  Searched for 1 pattern, listed 1 directory, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Good, a build exists. Let me run just the base prtdry case to check the actual
+  status codes produced.
+
+  Searched for 3 patterns, ran 2 shell commands (ctrl+o to expand)
+
+⏺ Write(prt-dry-cell-termination-bug.md)
+  ⎿  Wrote 165 lines to prt-dry-cell-termination-bug.md
+      1 # PRT: dry-cell tracking-time termination doesn't distinguish New
+        ton from standard formulation
+      3 ## Summary
+      4 
+      5 Since `DRY_TRACKING_METHOD` was introduced (PR #2066, `3045d44b`,
+      6 Dec 14 2024 — 5 days before the `6.6.0` tag), the documented/inte
+        nded
+      7 behavior and the shipped implementation disagree about what happe
+      8 a particle occupies a cell that has gone completely dry under the
+      9 **standard** (non-Newton) formulation.
+     … +200 lines (ctrl+o to expand)
+
+⏺ Now let me update the diagrams doc's tracking-time section.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(prt-vertical-tracking-diagrams-update.md)
+  ⎿  Added 59 lines, removed 1 line
+       72  
+       73  ## Tracking time
+       74  
+       75 -*(pending revision)*                                          
+       75 +**Note**: this diagram reflects *intended* behavior — what the
+          + design                                                       
+       76 +notes and 6.6.0 release notes describe — not what the code on 
+          +`develop`                                                     
+       77 +currently does. See `prt-dry-cell-termination-bug.md` for a pr
+          +obable bug                                                    
+       78 +where the implementation fails to distinguish the two branches
+          + below,                                                       
+       79 +routing both through `DRY_TRACKING_METHOD`. Once that's fixed 
+          +(or                                                           
+       80 +confirmed not to be a bug), this diagram should match actual b
+          +ehavior;                                                      
+       81 +until then, treat the left-hand branch as aspirational.       
+       82 +                                                              
+       83 +During tracking, the fate of a particle depends on whether the
+          + cell it                                                      
+       84 +occupies is active, whether the particle is in a wet or dry pa
+          +rt of the                                                     
+       85 +cell, and the `DRY_TRACKING_METHOD` option.                   
+       86 +                                                              
+       87 +A "dry" cell is either an inactive cell under the standard for
+          +mulation                                                      
+       88 +(the water table has dropped below it and it has been deactiva
+          +ted), or                                                      
+       89 +an active-but-dry cell under the Newton formulation (Newton ke
+          +eps dry                                                       
+       90 +cells active). These are different outcomes and must be distin
+          +guished by                                                    
+       91 +whatever check occupies the "Cell active?" diamond below:     
+       92 +                                                              
+       93 +* If the cell is **inactive** (standard formulation, deactivat
+          +ed), the                                                      
+       94 +  particle terminates unconditionally with status code 7.     
+       95 +  `DRY_TRACKING_METHOD` plays no role here — this is consisten
+          +t with                                                        
+       96 +  MODPATH 7.                                                  
+       97 +* If the cell is **active** but the particle is dry — a Newton
+       98 +  dry-but-active cell, or the dry portion of a partially satur
+          +ated cell —                                                   
+       99 +  the particle's fate is governed by `DRY_TRACKING_METHOD`: `D
+          +ROP`                                                          
+      100 +  (default) passes it to the cell bottom or to the water table
+          + and                                                          
+      101 +  tracking continues; `STOP` terminates it (status 7); `STAY` 
+          +holds it in                                                   
+      102 +  place until the water table rises, the particle's stop time/
+          +travel time                                                   
+      103 +  is reached, or the simulation ends.                         
+      104 +                                                              
+      105 +```mermaid                                                    
+      106 +flowchart LR                                                  
+      107 +    ACTIVE{Cell active?<br/>i.e. not deactivated<br/>under sta
+          +ndard formulation} --> |No| TERM_INACTIVE[Terminate]:::termina
+          +te                                                            
+      108 +    ACTIVE --> |Yes| PARTICLE_DRY{Particle dry?<br/>Newton dry
+          +-but-active cell,<br/>or above water table}                   
+      109 +    PARTICLE_DRY --> |Yes| DRY_TRACKING_METHOD(DRY_TRACKING_ME
+          +THOD)                                                         
+      110 +    DRY_TRACKING_METHOD ==> |STOP| TERM_STOP[Terminate]:::term
+          +inate                                                         
+      111 +    DRY_TRACKING_METHOD ==> |DROP| CELL_DRY{Cell dry?}        
+      112 +    CELL_DRY --> |Yes| DROP_BOTTOM[Pass to cell bottom]:::trac
+          +k                                                             
+      113 +    CELL_DRY --> |No| DROP_TABLE([Pass to water table])       
+      114 +    DRY_TRACKING_METHOD ==> |STAY| STAY[Stationary]:::track   
+      115 +    DROP_TABLE --> TRACK:::track                              
+      116 +    PARTICLE_DRY --> |No| TRACK[Track normally]               
+      117 +                                                              
+      118 +    classDef track stroke:#98fb98                             
+      119 +    classDef terminate stroke:#f08080                         
+      120 +```                                                           
+      121 +                                                              
+      122 +Changes from the 6.6.0 diagram: none structurally — the 6.6.0 
+          +diagram's                                                     
+      123 +shape (two independent decisions: cell-active and particle-dry
+          +, only the                                                    
+      124 +latter subject to `DRY_TRACKING_METHOD`) already matches the d
+          +ocumented                                                     
+      125 +intent. What's added here is explicit labeling of what "Cell a
+          +ctive?"                                                       
+      126 +and "Particle dry?" mean in terms of formulation (standard vs.
+          + Newton),                                                     
+      127 +since that ambiguity is exactly what let the implementation dr
+          +ift from                                                      
+      128 +the design without anyone noticing — the code merged both diam
+          +onds into                                                     
+      129 +one saturation-only check with no formulation awareness. The `
+          +TERMINATE`                                                    
+      130 +node is also split into two (`TERM_INACTIVE`, `TERM_STOP`) ins
+          +tead of                                                       
+      131 +reusing one node id, since although both currently map to stat
+          +us code 7,                                                    
+      132 +they are conceptually distinct outcomes and shouldn't visually
+          + collapse                                                     
+      133 +into "the same" termination.                                  
+
+⏺ I've written both documents at the project root:
+
+  - prt-dry-cell-termination-bug.md — the bug writeup: the design notes and
+    release notes from PR #2066 (the commit that introduced DRY_TRACKING_METHOD,
+    shipped in 6.6.0) explicitly state that under the standard formulation, an
+    inactive dry cell should unconditionally terminate a particle (status 7),
+    and DRY_TRACKING_METHOD should only apply to Newton dry-but-active cells.
+    The code never implemented that distinction — dry_cell is derived purely
+    from saturation (ibdgwfsat0/isatstat), with no Newton/ibound check anywhere
+    in MethodCell.f90::assess. I also found that the one existing test that
+    looks relevant (test_prt_dry.py's base prtdry case) actually tests a
+    release-time scenario (status 8) despite its comment claiming status 7 at
+    tracking time — so this specific tracking-time path has no test coverage at
+    all. The doc ends with a to-do list for writing the confirming test and the
+    suggested fix direction (use fmi%ibound instead of saturation alone to gate
+    the two branches).
+  - prt-vertical-tracking-diagrams-update.md — tracking-time section now filled
+    in with the diagram reflecting intended behavior. Structurally it's the same
+    as the original 6.6.0 diagram (two independent decisions — cell-active and
+    particle-dry, only the latter subject to DRY_TRACKING_METHOD) since that
+    shape was already correct; I clarified the "Cell active?" and "Particle
+    dry?" labels to spell out the standard-vs-Newton distinction explicitly, and
+    split the merged TERMINATE node into two distinctly-named outcomes so the
+    diagram doesn't visually imply they're one path. It's flagged as
+    aspirational pending the bug fix, with a pointer back to the bug doc.
+
+✻ Brewed for 3m 21s · done Thursday 11:14 AM
+
+※ recap: We're auditing the 6.6.0 PRT migration guide's diagrams against current code and found a likely bug in dry-cell tracking termination, now written up in two root-level docs. Next: decide whether to write the confirming test case for the bug. (disable recaps in /config)
+
+❯ A few thoughts on the diagrams. I think we should merge the terminate nodes   
+  unless we also show the status to differentiate them. And I don't think the   
+  diagram is the place for explication of what active and dry mean.             
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(prt-vertical-tracking-diagrams-update.md)
+  ⎿  Added 3 lines, removed 3 lines
+      104  
+      105  ```mermaid
+      106  flowchart LR
+      107 -    ACTIVE{Cell active?<br/>i.e. not deactivated<br/>under sta
+          -ndard formulation} --> |No| TERM_INACTIVE[Terminate]:::termina
+          -te                                                            
+      108 -    ACTIVE --> |Yes| PARTICLE_DRY{Particle dry?<br/>Newton dry
+          --but-active cell,<br/>or above water table}                   
+      107 +    ACTIVE{Cell active?} --> |No| TERMINATE{Terminate}        
+      108 +    ACTIVE --> |Yes| PARTICLE_DRY{Particle dry?}              
+      109      PARTICLE_DRY --> |Yes| DRY_TRACKING_METHOD(DRY_TRACKING_ME
+           THOD)
+      110 -    DRY_TRACKING_METHOD ==> |STOP| TERM_STOP[Terminate]:::term
+          -inate                                                         
+      110 +    DRY_TRACKING_METHOD ==> |STOP| TERMINATE[Terminate]:::term
+          +inate                                                         
+      111      DRY_TRACKING_METHOD ==> |DROP| CELL_DRY{Cell dry?}
+      112      CELL_DRY --> |Yes| DROP_BOTTOM[Pass to cell bottom]:::trac
+           k
+      113      CELL_DRY --> |No| DROP_TABLE([Pass to water table])
+⏺ Now the trailing "Changes from 6.6.0" note, which still refers to splitting
+  the terminate node — let me fix that.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(prt-vertical-tracking-diagrams-update.md)
+  ⎿  Added 7 lines, removed 11 lines
+      119      classDef terminate stroke:#f08080
+      120  ```
+      121  
+      122 -Changes from the 6.6.0 diagram: none structurally — the 6.6.0 
+          -diagram's                                                     
+      123 -shape (two independent decisions: cell-active and particle-dry
+          -, only the                                                    
+      122 +Changes from the 6.6.0 diagram: none — it's reproduced verbati
+          +m. Its                                                        
+      123 +shape (two independent decisions, cell-active and particle-dry
+          +, only the                                                    
+      124  latter subject to `DRY_TRACKING_METHOD`) already matches the d
+           ocumented
+      125 -intent. What's added here is explicit labeling of what "Cell a
+          -ctive?"                                                       
+      126 -and "Particle dry?" mean in terms of formulation (standard vs.
+          - Newton),                                                     
+      127 -since that ambiguity is exactly what let the implementation dr
+          -ift from                                                      
+      128 -the design without anyone noticing — the code merged both diam
+          -onds into                                                     
+      129 -one saturation-only check with no formulation awareness. The `
+          -TERMINATE`                                                    
+      130 -node is also split into two (`TERM_INACTIVE`, `TERM_STOP`) ins
+          -tead of                                                       
+      131 -reusing one node id, since although both currently map to stat
+          -us code 7,                                                    
+      132 -they are conceptually distinct outcomes and shouldn't visually
+          - collapse                                                     
+      133 -into "the same" termination.                                  
+      125 +intent, and both termination paths map to the same status code
+          + (7), so                                                      
+      126 +they correctly share one `TERMINATE` node. What needed fixing 
+          +wasn't the                                                    
+      127 +diagram but the surrounding prose (above) making explicit what
+          + "Cell                                                        
+      128 +active?" depends on — that ambiguity is exactly what let the  
+      129 +implementation drift from the design without anyone noticing. 
+
+⏺ Updated. The tracking-time diagram is now byte-for-byte the same as the 6.6.0
+  original — merged TERMINATE node (both paths are status 7, so no need to
+  split), no inline explanatory sub-labels on the diamonds. The
+  active/dry/Newton distinctions now live only in the prose paragraphs above the
+  diagram, where they belong.
+
+✻ Crunched for 41s · done Thursday 11:38 AM
+
+❯ Got it. So really the only change is to the release-time diagram, the IDOMAIN 
+  check?                                                                        
+
+⏺ Right. Summarizing where things landed:
+
+  - Release-time diagram: one real change — added the IDOMAIN <= 0 short-circuit
+    ahead of DRAPE (since that case terminates unreleased before the
+    DRAPE/active-cell decision is ever reached), plus a label tweak ("Drape to
+    highest active cell") to match the fixed behavior from #2824. This is the
+    only diagram with an actual topology change from 6.6.0.
+  - Tracking-time diagram: unchanged, verbatim from 6.6.0 — it was already
+    correct in shape. The problem there isn't the diagram, it's that the
+    implementation doesn't match it (the dry-cell bug write-up).
+
+  So yes — the only diagram edit is the release-time IDOMAIN check.
+
+✻ Cogitated for 9s · done Thursday 11:40 AM
+
+※ recap: We're auditing the PRT vertical-tracking diagrams from the 6.6.0 migration guide against current code; only the release-time diagram needed a real fix (IDOMAIN check), tracking-time was already correct. Next: decide whether to write the test case for the dry-cell termination bug we found. (disable recaps in /config)
+
+❯ And you're absolutely sure we haven't changed dry/vertical tracking behavior  
+  in other ways since 6.6.0?                                                    
+
+⏺ Good pushback — let me actually check rather than assert. My earlier commit
+  survey only covered src/Model/ParticleTracking/ (the PRT package layer); I
+  never did a full pass over src/Solution/ParticleTracker/ (the actual tracking
+  engine where MethodCell.f90/MethodModel.f90 live), which is where dry/vertical
+  logic actually executes. Let me close that gap.
+
+  Ran 5 shell commands (ctrl+o to expand)
+
+⏺ Good call catching that — I was not, in fact, absolutely sure, and checking
+  just now turned up a gap: my earlier survey only covered
+  src/Model/ParticleTracking/ (the PRT package layer). I never ran the
+  equivalent search over src/Solution/ParticleTracker/, which is where
+  MethodCell.f90/MethodModel.f90 actually live and where the dry/vertical
+  decisions execute. That directory has 58 commits since 6.6.0, most of which I
+  hadn't looked at. I just went through them.
+
+  For the specific decision logic the two diagrams draw (DRAPE at release time;
+  Cell active? / Particle dry? / DRY_TRACKING_METHOD at tracking time), I don't
+  find anything beyond what we've already covered. But there's a fair amount of
+  other dry/vertical-adjacent churn that doesn't change the diagrams' shape but
+  is worth knowing about:
+
+  - Boundary-face termination was introduced and reworked across a chain of
+    commits (#2475 → #2492 → #2495 → #2496 → #2503) — a particle exiting through
+    an assigned boundary face (which can include the top of a
+    partially-saturated cell) now terminates. This interacts with vertical
+    behavior but is a boundary-face concept, not a DRY_TRACKING_METHOD one —
+    consistent with your earlier call to keep boundary-face stuff out of these
+    two diagrams.
+  - The "no exit face" termination criterion (status 5 at the cell level, 9 at
+    the subcell level) was touched three separate times (#2369, its follow-up
+    fix in #2379, and #2646) — simplified over time but same status codes, and
+    it's only ever been in the migration guide's closing prose note, never drawn
+    as a diagram node.
+  - Several geometry/precision fixes to the vertical exit-face solve (#2281 "fix
+    vertical ternary method", #2183, #2119, #2122, #2131, #2926) — these fix
+    incorrect exit-time/exit-face selection or coordinate clamping near cell
+    boundaries. Real vertical-tracking bugs, but they fix how an exit is
+    computed, not which decision branch fires — no diagram-shape impact.
+  - A dev-only cycle-detection option (#2435) was later extended to catch
+    subcell cycles too (#2802) — still off by default, no effect on the
+    diagrammed default behavior.
+
+  So: nothing here adds or removes a branch from either diagram. I'll stand
+  behind "the diagrams are unaffected beyond the release-time IDOMAIN fix and
+  the tracking-time bug we already wrote up" — but not behind a blanket "nothing
+  else changed," because plenty else did change in the surrounding machinery.
+  Want me to add a short "known related changes, out of diagram scope" appendix
+  to the diagrams doc so this survey isn't lost?
+
+✻ Cogitated for 2m 15s · done Thursday 11:48 AM
+
+※ recap: We're refreshing the PRT vertical-tracking diagrams and found a likely dry-cell termination bug along the way; docs are written up in two root-level files. Next: decide whether to add an appendix noting other post-6.6.0 changes that don't affect the diagrams.
+
+❯ Gotcha. How does the boundary-face termination stuff interact with vertical   
+  behavior? How exactly has the no exit face criterion changed?                 
+
+  Searched for 2 patterns, ran 3 shell commands (ctrl+o to expand)
+
+⏺ Both of these turn out to be more precise than the commit messages alone
+  suggested — I dug into the actual diffs.
+
+  1. Boundary-face termination × vertical behavior
+
+  The interaction happens through a specific exemption in the water-table
+  flow-capping fix. Recall 6c695a94's fix for the water-table cycling bug lives
+  in MethodModel.f90::cap_cell_wt_flow:
+
+  itopface = this%fmi%max_faces
+  if (this%fmi%is_boundary_face(defn%icell, itopface)) return   ! <-- exemption
+  if (defn%isatstat == SATURATION_WATERTABLE) then
+    itopface = defn%npolyverts + 3
+    defn%faceflow(itopface) = max(DZERO, defn%faceflow(itopface))  ! clamp 
+  upward flow to 0
+  end if
+
+  For a partially-saturated cell, any tiny positive (upward) flow through the
+  top face gets clamped to zero — that's what kills the spurious cycling. But it
+  bails out first if the top face has an assigned IFLOWFACE (is_boundary_face).
+  So if a stress package (e.g. EVT) is explicitly assigned to that cell's top,
+  its real upward flow is left alone, uncapped.
+
+  That means a particle at the water table in such a cell can still get a
+  genuine upward exit solution. When it does, MethodCell.f90::try_pass checks it
+  against is_net_out_boundary_face (prt-fmi.f90: boundary face and
+  BoundaryFlows(ic, icellface) < 0, i.e. net outflow) and terminates it with
+  TERM_BOUNDARY (status 2) if so.
+
+  So the two mechanisms divide the work cleanly: is_boundary_face decides
+  whether the water-table safety cap applies (protects against numerical noise,
+  not real fluxes); is_net_out_boundary_face decides whether a real exit through
+  that boundary terminates the particle. Without boundary-face awareness, the
+  capping fix would have to choose between suppressing all upward water-table
+  exits uniformly (wrongly killing legitimate EVT-driven exits) or none
+  (reintroducing the cycling bug) — boundary-face awareness is what makes the
+  surgical version possible.
+
+  Worth noting: the earlier, abandoned design in this same saga (0ead0bcd #2478,
+  revised by 159e60d4 #2496) tried to bake this distinction directly into the
+  tracking-method decision tree — "if a particle exits upward through the water
+  table, check whether the top is an assigned boundary, then decide to
+  terminate/immobilize based on that plus DRY_TRACKING_METHOD." That version
+  would have needed a new diagram branch. It was scrapped in favor of fixing the
+  flow field upstream (6c695a94), which is exactly why the final state doesn't
+  touch either diagram.
+
+  2. Exact evolution of the "no exit face" criterion
+
+  This only affects the subcell-level criterion (status 9, TERM_NO_EXITS_SUB, in
+  MethodSubcellPollock.f90/MethodSubcellTernary.f90). The cell-level criterion
+  (status 5, TERM_NO_EXITS, in MethodCell.f90::assess) is untouched since 6.6.0
+  — same structure I found in the pre-refactor Method.f90::check.
+
+  Timeline for the subcell criterion:
+
+  - At 6.6.0: only a literal "no outflow in any of the 3 dimensions"
+    (NO_EXIT_NO_OUTFLOW in all of x/y/z) terminated immediately, status 9. A
+    separate case — velocity solved but stationary (zero derivative, not
+    literally zero outflow) — wasn't specially handled; it fell through to
+    ordinary exit-time logic, which (since no finite exit time existed) left the
+    particle ACTIVE at tmax and let it carry into the next time step.
+  - 8a339ab8 (#2369, Jun 2025): added a second, distinct check — all 3
+    dimensions "stationary" and end of simulation → terminate with status 10
+    (TERM_TIMEOUT) instead of hanging forever under extended tracking. Bug: this
+    fired even when extended tracking was off.
+  - 20d60fae (#2379, Jul 2025): narrowed that new check to require
+    particle%iextend > 0 (extended tracking on) in addition to
+    end-of-simulation.
+  - 89908cd9 (#2646, Jan 2026): removed both special cases entirely and replaced
+    them with a single, unconditional check performed after attempting to pick
+    an exit: if (all(exit_solutions%status >= NO_EXIT_STATIONARY)) → terminate,
+    status 9. NO_EXIT_STATIONARY = 2 and NO_EXIT_NO_OUTFLOW = 3, so >= catches
+    both. Status 10 is no longer reachable from this path at all.
+
+  Net effect of that last change: a subcell where the particle's velocity has
+  gone to zero in every dimension now terminates it immediately with status 9,
+  in any time step, whether or not extended tracking is on and whether or not
+  it's the last time step — not just "no outflow" as at 6.6.0, and not gated to
+  end-of-simulation as in the intermediate #2369/#2379 versions. The commit's
+  own words — "MP7 is more nuanced... we simply terminate and sidestep the
+  complexity" — mean PRT deliberately gave up matching MP7's
+  steady-state/transient-aware leniency here.
+
+  Neither of these belongs in the two diagrams (they're subcell-level and
+  boundary-level respectively, not decisions the cell-level release/tracking
+  diagrams draw), but they're real, non-trivial changes since 6.6.0 that the
+  migration guide's closing "no exit face" note doesn't reflect. Want them
+  folded into the "known related changes, out of diagram scope" appendix you
+  suggested earlier?
+
+✻ Churned for 2m 0s · done Thursday 11:55 AM
+
+※ recap: We're auditing the PRT 6.6.0 migration guide's vertical-tracking diagrams against current behavior and wrote up a related dry-cell termination bug. Next: decide whether to add a short "related changes, out of scope" appendix to the diagrams doc covering the boundary-face and no-exit-face findings.
