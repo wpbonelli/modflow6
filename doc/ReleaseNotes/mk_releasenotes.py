@@ -54,8 +54,9 @@ def render(
 ) -> bool:
     """Render a release notes TOML file to a LaTeX file.
 
-    Returns True if a file was written, False if there was nothing to render
-    (no TOML file, or no items after any --patch filtering).
+    Returns True if notes were rendered, False if there was nothing to render
+    (no TOML file, or no items after any --patch filtering). In the latter case
+    an empty LaTeX file is still written so downstream document builds succeed.
     """
     if not toml_path.is_file():
         warn(f"Release notes TOML file not found: {toml_path}")
@@ -83,6 +84,8 @@ def render(
             item["subsection"] = ""
     if not any(items):
         warn("No release notes found, aborting")
+        # still leave an empty file behind
+        tex_path.write_text("")
         return False
 
     loader = FileSystemLoader(notes_dir)
