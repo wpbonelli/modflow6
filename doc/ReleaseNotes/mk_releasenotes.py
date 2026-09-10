@@ -128,6 +128,8 @@ if __name__ == "__main__":
             item["subsection"] = ""
     if not any(items):
         warn("No release notes found, aborting")
+        # still leave an empty file behind so downstream document builds succeed
+        tex_path.write_text("")
         sys.exit(0)
 
     loader = FileSystemLoader(Path(__file__).parent)
