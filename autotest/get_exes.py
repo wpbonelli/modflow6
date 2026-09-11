@@ -8,7 +8,7 @@ from conftest import project_root_path
 from flaky import flaky
 from modflow_devtools.build import meson_build
 from modflow_devtools.download import download_and_unzip, get_release
-from modflow_devtools.misc import get_ostag
+from modflow_devtools.ostags import get_ostag
 
 repository = "MODFLOW-ORG/modflow6"
 top_bin_path = project_root_path / "bin"
@@ -26,6 +26,7 @@ def find_release_asset(release: dict) -> dict | None:
     assets = release["assets"]
     version = release["tag_name"].lstrip("v")
     ostag = get_ostag()
+<<<<<<< Updated upstream
     names = [f"mf{version}_{ostag}.zip"]
     if ostag == "mac":
         names.append(f"mf{version}_macarm.zip")
@@ -34,6 +35,10 @@ def find_release_asset(release: dict) -> dict | None:
         if asset is not None:
             return asset
     return None
+=======
+    prefix = asset["name"].rpartition("_")[0]
+    return f"{prefix}_{ostag}.zip"
+>>>>>>> Stashed changes
 
 
 @pytest.fixture
@@ -50,11 +55,19 @@ def downloaded_bin_path() -> Path:
 def test_rebuild_release(rebuilt_bin_path: Path):
     print(f"Rebuilding and installing last release to: {rebuilt_bin_path}")
     release = get_release(repository)
+<<<<<<< Updated upstream
     asset = find_release_asset(release)
     assert asset is not None, (
         f"Couldn't find a distribution asset for OS {get_ostag()}, available "
         f"assets:\n{[a['name'] for a in release['assets']]}"
     )
+=======
+    assets = release["assets"]
+    asset = next(iter([a for a in assets if a["name"] == get_asset_name(a)]), None)
+    if not asset:
+        warn(f"Couldn't find asset for OS {get_ostag()}, available assets:\n{assets}")
+        pytest.skip(f"No release asset found for OS {get_ostag()}")
+>>>>>>> Stashed changes
 
     with TemporaryDirectory() as td:
         # download the release
