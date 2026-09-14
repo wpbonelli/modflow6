@@ -1,17 +1,10 @@
 """
-No suffix for release builds. For development builds, suffix '+shortsha[.dirty]'.
+Suffix for development builds: '+shortsha[.dirty]', or '' if HEAD is
+an exact tag match. Release builds resolve @VCS_TAG@ in update_version.py
+instead, so this script's output is irrelevant for those.
 """
 
-import re
 import subprocess
-import sys
-
-
-def is_release_build(input_path):
-    with open(input_path) as f:
-        content = f.read()
-    match = re.search(r"IDEVELOPMODE\s*=\s*(\d)", content)
-    return match is not None and match.group(1) == "0"
 
 
 def get_suffix():
@@ -43,15 +36,4 @@ def get_suffix():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (1, 3):
-        print(f"usage: {sys.argv[0]} [input output]", file=sys.stderr)
-        sys.exit(1)
-    if len(sys.argv) == 3:
-        input_path, output_path = sys.argv[1], sys.argv[2]
-        suffix = "" if is_release_build(input_path) else get_suffix()
-        with open(input_path) as f:
-            content = f.read().replace("@VCS_TAG@", suffix)
-        with open(output_path, "w") as f:
-            f.write(content)
-    else:
-        print(get_suffix(), end="")
+    print(get_suffix(), end="")
