@@ -2,9 +2,7 @@
 Computes the @VCS_TAG@ suffix meson substitutes into version.f90 at
 build time. This only ever applies to development builds - anything
 not built via `update_version.py --releasemode`, which sets
-@VCS_TAG@ to "" itself before meson ever runs, since a release build
-happens before the release commit/tag exists and so can't be
-inferred from git.
+@VCS_TAG@ to "" itself before meson ever runs.
 
 For a development build, the suffix is '+shortsha[.dirty]', or ''
 if HEAD is an exact tag match.
