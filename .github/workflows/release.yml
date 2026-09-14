@@ -815,8 +815,6 @@ jobs:
             unzip $distfile -d $checkdir
           fi
 
-          # absolute path: the check-dist task's cwd is modflow6/distribution,
-          # not this step's, so a relative path here resolves in the wrong place
           cmd="pixi run --manifest-path modflow6/pixi.toml check-dist --path $(pwd)/$checkdir/$distname"
           if [[ "${{ inputs.releasemode }}" == "true" ]]; then
             cmd="$cmd --releasemode"
