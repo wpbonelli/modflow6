@@ -260,6 +260,10 @@ def update_version_f90(
             )
         elif ":: VERSIONNUMBER =" in line:
             line = line.rpartition("::")[0] + f":: VERSIONNUMBER = '{version_num}'"
+        elif ":: VERSIONVCSTAG =" in line and not developmode:
+            # release builds run before the release commit/tag exists,
+            # so set an empty tag here rather than rely on meson at build time
+            line = line.replace("@VCS_TAG@", "")
         elif ":: VERSIONTITLE =" in line:
             line = line.rpartition("::")[0] + f":: VERSIONTITLE = '{new_title}'"
         elif ":: FMTDISCLAIMER =" in line:

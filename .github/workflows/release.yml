@@ -815,7 +815,7 @@ jobs:
             unzip $distfile -d $checkdir
           fi
 
-          cmd="pixi run --manifest-path modflow6/pixi.toml check-dist --path $checkdir/$distname"
+          cmd="pixi run --manifest-path modflow6/pixi.toml check-dist --path $(pwd)/$checkdir/$distname"
           if [[ "${{ inputs.releasemode }}" == "true" ]]; then
             cmd="$cmd --releasemode"
           fi
