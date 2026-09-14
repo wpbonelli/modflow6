@@ -9,6 +9,7 @@ module UtlTvkInputModule
   public utl_tvk_block_definitions
   public UtlTvkParamFoundType
   public utl_tvk_multi_package
+  public utl_tvk_is_advanced
   public utl_tvk_subpackages
 
   type UtlTvkParamFoundType
@@ -24,6 +25,7 @@ module UtlTvkInputModule
   end type UtlTvkParamFoundType
 
   logical :: utl_tvk_multi_package = .false.
+  logical :: utl_tvk_is_advanced = .false.
 
   character(len=16), parameter :: &
     utl_tvk_subpackages(*) = &
