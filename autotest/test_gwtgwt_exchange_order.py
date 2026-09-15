@@ -22,7 +22,7 @@ Case:
   - gwtgwtorder : mismatched GWT-GWT exchange; expect the match to fail.
 """
 
-import os
+from pathlib import Path
 
 import flopy
 import pytest
@@ -199,15 +199,18 @@ def build_models(idx, test):
 
 
 def check_output(idx, test):
-    with open(os.path.join(test.workspace, "mfsim.lst")) as f:
-        text = " ".join(f.read().split())
+    # serial writes mfsim.lst; parallel writes one mfsim.p{rank}.lst per
+    # process, and either rank may be the one that reports the error
+    lst_files = sorted(Path(test.workspace).glob("mfsim*.lst"))
+    assert lst_files, f"no mfsim*.lst found in {test.workspace}"
+    text = " ".join(" ".join(fpth.read_text().split()) for fpth in lst_files)
     srch = "Cannot find GWF-GWF exchange"
     assert srch in text, (
         "expected the mismatched GWT-GWT exchange (row 1 does not connect "
         "the same cells as the GWF-GWF exchange) to be rejected, but no "
-        f"'{srch}' error was reported -- the GWT-GWT exchange was likely "
-        "linked to the GWF-GWF exchange without its connections actually "
-        "being compared"
+        f"'{srch}' error was reported in {[f.name for f in lst_files]} -- "
+        "the GWT-GWT exchange was likely linked to the GWF-GWF exchange "
+        "without its connections actually being compared"
     )
 
 
