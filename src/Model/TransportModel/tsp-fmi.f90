@@ -336,9 +336,18 @@ contains
     deallocate (this%aptbudobj)
     call mem_deallocate(this%flowcorrect)
     call mem_deallocate(this%ibdgwfsat0)
-    if (this%flows_from_file) then
+    if (this%flows_from_file .or. this%igwfmapped /= 0) then
       call mem_deallocate(this%gwfstrgss)
       call mem_deallocate(this%gwfstrgsy)
+    end if
+    !
+    ! -- deallocate the flow model grid maps
+    if (this%igwfmapped /= 0) then
+      call mem_deallocate(this%gwfnodemap)
+      call mem_deallocate(this%gwfnodeinv)
+      call mem_deallocate(this%gwfjamap)
+      call mem_deallocate(this%gwfdropia)
+      call mem_deallocate(this%gwfdropja)
     end if
     !
     ! -- special treatment, these could be from mem_checkin
@@ -353,6 +362,7 @@ contains
     call mem_deallocate(this%iflowerr)
     call mem_deallocate(this%igwfstrgss)
     call mem_deallocate(this%igwfstrgsy)
+    call mem_deallocate(this%igwfmapped)
     call mem_deallocate(this%iubud)
     call mem_deallocate(this%iuhds)
     call mem_deallocate(this%iumvr)
