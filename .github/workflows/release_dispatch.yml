@@ -48,6 +48,10 @@ on:
         required: false
         type: boolean
         default: false
+      doi:
+        description: 'DOI link of the release, e.g. https://doi.org/10.5066/P1PGE9XW, for the release history in the release notes. Required for a new minor or major release unless its release history row was already added to the release branch. Patch releases reuse the DOI of the previous release with the same major and minor version.'
+        required: false
+        type: string
 jobs:
   set_options:
     name: Set release options
@@ -177,6 +181,9 @@ jobs:
       run_tests: ${{ (github.event_name == 'workflow_dispatch' && inputs.run_tests == true) || github.event_name != 'workflow_dispatch' }}
       version: ${{ needs.set_options.outputs.version }}
       patch: ${{ (github.event_name == 'workflow_dispatch' && inputs.patch == true) || (github.event_name != 'workflow_dispatch' && needs.set_options.outputs.patch == 'true') }}
+      # If triggered by pushing a release branch there is no input. A patch release reuses the previous DOI,
+      # and for a new minor release the release history row must already be on the branch.
+      doi: ${{ inputs.doi }}
   pr:
     name: Draft release PR
     if: ${{ github.ref_name != 'master' && ((github.event_name == 'workflow_dispatch' && inputs.releasemode == true) || (github.event_name != 'workflow_dispatch' && !contains(github.ref_name, 'rc'))) }}
@@ -206,17 +213,24 @@ jobs:
 
       - name: Update version
         working-directory: distribution
+        env:
+          # empty if workflow was triggered by pushing a release branch
+          DOI: ${{ inputs.doi }}
         run: |
           # update version files
           ver="${{ needs.set_options.outputs.version }}"
+          args=(-v "$ver")
           # approve will be empty if workflow was triggered by pushing a release branch
           # todo: pull approve into set_options job/output?
           if [[ ("${{ inputs.releasemode }}" == "true") || ("${{ inputs.releasemode }}" == "") ]]; then
-            python update_version.py -v "$ver" --releasemode
-          else
-            python update_version.py -v "$ver"
+            args+=(--releasemode)
           fi
-          
+          # release history DOI, if provided
+          if [[ -n "$DOI" ]]; then
+            args+=(--doi "$DOI")
+          fi
+          python update_version.py "${args[@]}"
+
           # lint version.f90
           fprettify -c ../.fprettify.yaml ../src/Utilities/version.f90
           

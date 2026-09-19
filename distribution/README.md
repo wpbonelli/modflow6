@@ -145,7 +145,7 @@ Double-check release notes in `doc/ReleaseNotes/develop.toml` with the authors o
 
 For hotfix releases, `develop.toml` must be trimmed manually on the release branch. For patch releases made from `develop`, release notes are automatically filtered to include only fixes.
 
-**Note**: A line providing the version number, date and DOI of the release, e.g. `6.4.4 & February 13, 2024 & \url{https://doi.org/10.5066/P9FL1JCC}`, is added to the Release History section of `ReleaseNotes.tex` automatically when the release workflow updates the version (see `update_version.py`). The date is the date the workflow runs. DOIs are updated with minor releases and remain the same for patch releases, so patch releases reuse the DOI of the minor release they patch. For a new minor (or major) release, add the line manually on the release branch before pushing it, with the new DOI. To override the date of a patch release, do the same. An existing line for the release is left as is.
+**Note**: A line providing the version number, date and DOI of the release, e.g. `6.4.4 & February 13, 2024 & \url{https://doi.org/10.5066/P9FL1JCC}`, is added to the Release History section of `ReleaseNotes.tex` automatically when the release workflow updates the version (see `update_version.py`). The date is the date the workflow runs. DOIs are updated with minor releases and remain the same for patch releases, so patch releases reuse the DOI of the minor release they patch. For a new minor (or major) release, provide the new DOI via the `doi` input if starting the release with `workflow_dispatch`, or add the line manually on the release branch before pushing it. An existing line for the release is left as is.
 
 ### Release examples repo
 
