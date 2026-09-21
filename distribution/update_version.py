@@ -31,6 +31,11 @@ and src/Utilities/version.f90. Otherwise, IDEVELOPMODE is set to 1.
 if --releasemode is provided, the disclaimer in src/Utilities/version.f90.in and the
 README/DISCLAIMER markdown files is modified to reflect review and approval.
 Otherwise the language reflects preliminary/provisional status.
+
+Timestamps use the current date, or --date if provided, so all steps of a release can
+agree on a date. Use ../doc/ReleaseNotes/release_history.py to add the release to the
+release history in the release notes. The date and DOI of a release in the release
+history are used in the software citation rendered with --citation.
 """
 
 import argparse
@@ -39,7 +44,7 @@ import os
 import sys
 import textwrap
 from collections import OrderedDict
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -67,6 +72,9 @@ touched_file_paths = [
     project_root_path / "src" / "Utilities" / "version.f90",
 ]
 
+# the release history is managed by a script alongside the release notes
+sys.path.insert(0, str(project_root_path / "doc" / "ReleaseNotes"))
+from release_history import find_release  # noqa: E402
 
 _approved_fmtdisclaimer = '''  character(len=*), parameter :: FMTDISCLAIMER = &
     "(/,&
@@ -493,10 +501,15 @@ version.
 Use `--releasemode` to control whether IDEVELOPMODE is set to 0 instead
 of 1, and to alter mf6's output and disclaimer text reflecting approval.
 
-Use `--citation` (`-c`) to render the current software citation. Pass the
-release DOI link via `--doi` (`-d`), e.g.
-`--doi https://doi.org/10.5066/P1PGE9XW`; if omitted, the umbrella MODFLOW
-software DOI is used.
+Use `--date` (`YYYY-MM-DD`) to give the date used in timestamps instead of
+the current date, so all steps of a release can use the same date.
+
+Use `--citation` (`-c`) to render the current software citation. The
+citation's date and DOI are those in the release history row for the version
+in ReleaseNotes.tex, see doc/ReleaseNotes/release_history.py. Without a row,
+the current date and the umbrella MODFLOW software DOI are used. Pass `--date`
+or the release DOI link via `--doi` (`-d`), e.g.
+`--doi https://doi.org/10.5066/P1PGE9XW`, to override them.
             """
         ),
     )
@@ -518,10 +531,20 @@ software DOI is used.
         "-d",
         "--doi",
         required=False,
-        default=_default_doi,
+        default=None,
         help="DOI link (e.g. https://doi.org/10.5066/P1PGE9XW) to substitute "
         "into the software citation rendered by --citation. Defaults to the "
-        f"umbrella MODFLOW software DOI ({_default_doi}).",
+        "DOI in the release history row for the version, or if there is none "
+        f"the umbrella MODFLOW software DOI ({_default_doi}).",
+    )
+    parser.add_argument(
+        "--date",
+        required=False,
+        type=date.fromisoformat,
+        default=None,
+        help="Date (YYYY-MM-DD) to use in timestamps, and in the citation "
+        "rendered by --citation. Defaults to the date in the release history "
+        "row for the version if rendering the citation, otherwise today.",
     )
     parser.add_argument(
         "-a",
@@ -575,12 +598,26 @@ software DOI is used.
     else:
         version = _current_version
 
+    now = datetime.now()
+    timestamp = datetime.combine(args.date, now.time()) if args.date else now
+
     if citation:
+        # a release's date and DOI are those in its release history row
+        release = find_release(version.base_version)
+        if release is None:
+            print(
+                f"No release history row for {version}, using the current date "
+                "and umbrella DOI unless --date and --doi are provided",
+                file=sys.stderr,
+            )
+        elif not args.date:
+            timestamp = datetime.combine(release[0], now.time())
+        doi = args.doi or (release[1] if release else _default_doi)
         print(
             get_software_citation(
-                timestamp=datetime.now(),
+                timestamp=timestamp,
                 version=version,
-                doi=args.doi,
+                doi=doi,
                 developmode=developmode,
             )
         )
@@ -589,7 +626,5 @@ software DOI is used.
     else:
         mode = "develop" if developmode else "release"
         print(f"Updating to version {version} in {mode} mode", file=sys.stderr)
-        update_version(
-            version=version, timestamp=datetime.now(), developmode=developmode
-        )
+        update_version(version=version, timestamp=timestamp, developmode=developmode)
         print(version)
