@@ -9,6 +9,7 @@ module UtlSpcInputModule
   public utl_spc_block_definitions
   public UtlSpcParamFoundType
   public utl_spc_multi_package
+  public utl_spc_is_advanced
   public utl_spc_subpackages
 
   type UtlSpcParamFoundType
@@ -24,6 +25,7 @@ module UtlSpcInputModule
   end type UtlSpcParamFoundType
 
   logical :: utl_spc_multi_package = .true.
+  logical :: utl_spc_is_advanced = .false.
 
   character(len=16), parameter :: &
     utl_spc_subpackages(*) = &

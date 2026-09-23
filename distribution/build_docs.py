@@ -8,7 +8,6 @@ from os import PathLike, environ
 from pathlib import Path
 from pprint import pprint
 from tempfile import TemporaryDirectory
-from typing import Optional
 from warnings import warn
 
 import pytest
@@ -66,7 +65,7 @@ PUB_URLS = [
 
 
 @pytest.fixture
-def github_user() -> Optional[str]:
+def github_user() -> str | None:
     return environ.get("GITHUB_USER", None)
 
 
@@ -508,7 +507,8 @@ only what it can't find. Use the --force (-f) flag to regenerate existing artifa
         default=False,
         action="store_true",
         help="Filter content from release notes for a patch release: "
-        "include only items in the 'fixes' section in release notes. "
+        "include only items in the 'fixes' and 'examples' sections in "
+        "release notes. "
         "Defaults to false.",
     )
     parser.add_argument(

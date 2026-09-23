@@ -9,6 +9,7 @@ module UtlTvsInputModule
   public utl_tvs_block_definitions
   public UtlTvsParamFoundType
   public utl_tvs_multi_package
+  public utl_tvs_is_advanced
   public utl_tvs_subpackages
 
   type UtlTvsParamFoundType
@@ -24,6 +25,7 @@ module UtlTvsInputModule
   end type UtlTvsParamFoundType
 
   logical :: utl_tvs_multi_package = .false.
+  logical :: utl_tvs_is_advanced = .false.
 
   character(len=16), parameter :: &
     utl_tvs_subpackages(*) = &
