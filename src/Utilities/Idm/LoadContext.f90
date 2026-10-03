@@ -526,6 +526,9 @@ contains
       if (tagname == 'MIXED') in_scope = .true.
     case ('SPC', 'SPCA')
       in_scope = .true.
+    case ('SFRTAB')
+      ! MANFRACTION present only when NCOL=3 (2 base columns otherwise)
+      if (tagname == 'MANFRACTION') in_scope = this%option_check('NCOL', 2)
     case default
       ! unrecognized subcomponent with an optional param not handled
       ! above is a development error -- abort so the gap is visible
