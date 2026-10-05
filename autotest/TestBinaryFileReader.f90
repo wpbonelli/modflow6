@@ -22,7 +22,11 @@ contains
                 new_unittest("budget_file_beyond_2gib", &
                              test_budget_file_beyond_2gib), &
                 new_unittest("head_file_beyond_2gib", &
-                             test_head_file_beyond_2gib) &
+                             test_head_file_beyond_2gib), &
+                new_unittest("budget_file_index", &
+                             test_budget_file_index), &
+                new_unittest("budget_file_index_beyond_2gib", &
+                             test_budget_file_index_beyond_2gib) &
                 ]
   end subroutine collect_binaryfilereader
 
@@ -137,5 +141,154 @@ contains
 
 100 close (iu)
   end subroutine test_head_file_beyond_2gib
+
+  !> @brief Index budget records and seek to them by index
+  subroutine test_budget_file_index(error)
+    type(error_type), allocatable, intent(out) :: error
+    integer(I4B), parameter :: nrec = 3, nval = 4
+    character(len=16), parameter :: budtxt(nrec) = [ &
+                                    '          STO-SS', &
+                                    '          STO-SY', &
+                                    '             WEL']
+    type(BudgetFileReaderType) :: bfr
+    real(DP) :: flow(nval, nrec)
+    integer(I8B) :: expected(nrec)
+    integer(I4B) :: iu, i, k
+    logical(LGP) :: success
+
+    flow = reshape([(real(i, DP), i=1, nval * nrec)], [nval, nrec])
+
+    ! write records from the start of the file, saving their positions
+    open (newunit=iu, access='stream', form='unformatted', status='scratch')
+    do k = 1, nrec
+      inquire (unit=iu, pos=expected(k))
+      write (iu) 1, 1, budtxt(k), nval, 1, -1
+      write (iu) 1, 1.0_DP, 1.0_DP, 1.0_DP
+      write (iu) flow(:, k)
+    end do
+
+    bfr%inunit = iu
+    call bfr%build_index()
+    call check(error, bfr%indexed, 'file not indexed')
+    if (allocated(error)) goto 100
+    call check(error, bfr%nrecords == nrec, 'wrong number of records')
+    if (allocated(error)) goto 100
+    call check(error, all(bfr%record_positions == expected), &
+               'wrong record positions')
+    if (allocated(error)) goto 100
+
+    ! seek to the second record and read it
+    call bfr%seek_to_index(2)
+    call check(error,.not. bfr%endoffile, 'end of file after seek')
+    if (allocated(error)) goto 100
+    call bfr%read_record(success)
+    call check(error, success, 'failed to read second record')
+    if (allocated(error)) goto 100
+    call check(error, bfr%header%pos == expected(2), &
+               'wrong second record position')
+    if (allocated(error)) goto 100
+    select type (h => bfr%header)
+    type is (BudgetFileHeaderType)
+      call check(error, h%budtxt == budtxt(2), 'wrong budget text')
+      if (allocated(error)) goto 100
+    end select
+    call check(error, all(bfr%flow == flow(:, 2)), 'wrong second record values')
+    if (allocated(error)) goto 100
+
+    ! read the last record, reaching end of file, then seek back to the first
+    call bfr%seek_to_index(nrec)
+    call bfr%read_record(success)
+    call check(error, success, 'failed to read last record')
+    if (allocated(error)) goto 100
+    call check(error, bfr%endoffile, 'end of file not detected')
+    if (allocated(error)) goto 100
+    call bfr%seek_to_index(1)
+    call check(error,.not. bfr%endoffile, 'end of file after seek')
+    if (allocated(error)) goto 100
+    call bfr%read_record(success)
+    call check(error, success, 'failed to read first record after end of file')
+    if (allocated(error)) goto 100
+    call check(error, bfr%header%pos == expected(1), &
+               'wrong first record position')
+    if (allocated(error)) goto 100
+    call check(error, all(bfr%flow == flow(:, 1)), 'wrong first record values')
+    if (allocated(error)) goto 100
+
+    ! seeking past the last record signals end of file
+    call bfr%seek_to_index(nrec + 1)
+    call check(error, bfr%endoffile, 'end of file not signaled')
+
+100 close (iu)
+  end subroutine test_budget_file_index
+
+  !> @brief Index budget records located beyond the 2 GiB offset
+  !!
+  !! The first record holds 2 GiB of FLOW-JA-FACE data. Only its header is
+  !! written, so the data region is sparse on most file systems, but indexing
+  !! reads it twice and allocates it in memory.
+  subroutine test_budget_file_index_beyond_2gib(error)
+    type(error_type), allocatable, intent(out) :: error
+    integer(I4B), parameter :: nja = 2**28
+    integer(I4B), parameter :: nrec = 3, nval = 4
+    character(len=16), parameter :: budtxt(nrec) = [ &
+                                    '    FLOW-JA-FACE', &
+                                    '          STO-SS', &
+                                    '             WEL']
+    type(BudgetFileReaderType) :: bfr
+    real(DP) :: flow(nval, 2:nrec)
+    integer(I8B) :: expected(nrec), pos
+    integer(I4B) :: iu, i
+    logical(LGP) :: success
+
+    flow = reshape([(real(i, DP), i=1, nval * (nrec - 1))], [nval, nrec - 1])
+
+    ! write the first record's header, then skip past its 2 GiB of data
+    open (newunit=iu, access='stream', form='unformatted', status='scratch')
+    inquire (unit=iu, pos=expected(1))
+    write (iu) 1, 1, budtxt(1), nja, 1, -1
+    write (iu) 1, 1.0_DP, 1.0_DP, 1.0_DP
+    inquire (unit=iu, pos=pos)
+    pos = pos + int(nja, I8B) * int(storage_size(1.0_DP) / 8, I8B)
+
+    ! write the remaining records after the skipped data
+    expected(2) = pos
+    write (iu, pos=pos) 1, 1, budtxt(2), nval, 1, -1
+    write (iu) 1, 1.0_DP, 1.0_DP, 1.0_DP
+    write (iu) flow(:, 2)
+    inquire (unit=iu, pos=expected(3))
+    write (iu) 1, 1, budtxt(3), nval, 1, -1
+    write (iu) 1, 1.0_DP, 1.0_DP, 1.0_DP
+    write (iu) flow(:, 3)
+
+    bfr%inunit = iu
+    call bfr%build_index()
+    call check(error, bfr%nrecords == nrec, 'wrong number of records')
+    if (allocated(error)) goto 100
+    call check(error, all(bfr%record_positions == expected), &
+               'wrong record positions')
+    if (allocated(error)) goto 100
+    call check(error, all(bfr%record_positions(2:) > 2_I8B**31), &
+               'records not beyond 2 GiB')
+    if (allocated(error)) goto 100
+
+    ! seek to the last record and read it
+    call bfr%seek_to_index(nrec)
+    call bfr%read_record(success)
+    call check(error, success, 'failed to read last record')
+    if (allocated(error)) goto 100
+    call check(error, bfr%header%pos == expected(nrec), &
+               'wrong last record position')
+    if (allocated(error)) goto 100
+    select type (h => bfr%header)
+    type is (BudgetFileHeaderType)
+      call check(error, h%budtxt == budtxt(nrec), 'wrong budget text')
+      if (allocated(error)) goto 100
+    end select
+    call check(error, all(bfr%flow == flow(:, nrec)), 'wrong last record values')
+    if (allocated(error)) goto 100
+    call check(error, bfr%endoffile, 'end of file not detected')
+
+100 close (iu)
+  end subroutine test_budget_file_index_beyond_2gib
 
 end module TestBinaryFileReader
