@@ -641,7 +641,7 @@ numeric_index true
 block connectiondata
 name ic
 type integer
-shape (:)
+shape (ncon(ifno))
 tagged false
 in_record true
 reader urword
