@@ -145,7 +145,7 @@ Double-check release notes in `doc/ReleaseNotes/items/` with the authors of any 
 
 For hotfix releases, files for features not included in the hotfix must be removed manually on the release branch. For patch releases made from `develop`, release notes are automatically filtered to include only fixes and examples.
 
-**Note**: A line providing the version number, date and DOI of the release, e.g. `6.4.4 & February 13, 2024 & \url{https://doi.org/10.5066/P9FL1JCC}`, is added to the Release History section of `ReleaseNotes.tex` automatically by the release workflow, using `doc/ReleaseNotes/release_history.py` (`pixi run add-release-history`). The date is the date the workflow starts, which is also used for build timestamps and the software citation. DOIs are updated with minor releases and remain the same for patch releases, so patch releases reuse the DOI of the minor release they patch.
+**Note**: A line providing the version number, date and DOI of the release, e.g. `6.4.4 & February 13, 2024 & \url{https://doi.org/10.5066/P9FL1JCC}`, is added to the Release History section of `ReleaseNotes.tex` automatically, using `doc/ReleaseNotes/release_history.py` (`pixi run add-release-history`). This happens once, in the `prepare` job, before anything is built (see [Build assets/distributions](#build-assetsdistributions)). The date is the date the workflow starts, which is also used for build timestamps and the software citation. If the line already exists, because the release is being retried or the line was added by hand, its date is updated and its DOI kept, so a release retried on a later day is dated by the build that ships. DOIs are updated with minor releases and remain the same for patch releases, so patch releases reuse the DOI of the minor release they patch.
 
 A new minor (or major) release needs its DOI provided. Pushing a `vX.Y.0` branch does not trigger the release workflow, since a push can't take input. Start the release with `workflow_dispatch` and the `doi` input instead (see [Workflow triggers](#workflow-triggers)). The DOI may be given bare (`10.5066/P1PGE9XW`) or as a link. As a safeguard, a release started without a DOI, or with an invalid one, fails immediately, before anything is built, unless the release branch already has a line for the release with the DOI. The date and DOI in the release history are also used in the software citation in the drafted GitHub release.
 
@@ -168,9 +168,9 @@ Pushing a `vX.Y.Z` branch triggers the release workflow for patch releases (`Z` 
 
 ### Build assets/distributions
 
-GitHub actions runs the release workflow and builds binaries, documentation and distribution archives for supported platforms.
+A `prepare` job runs first: it applies the version and release history metadata (`update_version.py`, `release_history.py`, `fprettify`) once, commits it to the release branch, and pushes. The build, docs and dist jobs then check out that exact commit by SHA rather than the branch tip, and don't reapply the metadata themselves &mdash; so the binaries, documentation and distribution archives are all built from precisely the commit that later gets merged to `master`. If a build fails and the release is retried, `prepare` applies the metadata again with that run's date. A retry on the same day regenerates the same files, so no new commit is made; a retry on a later day commits the new date, since it's a new build.
 
-Once the build completes, the workflow drafts a pull request against the `master` branch. Nothing is released until that pull request is merged, so to abandon a release (e.g. if the distributions fail inspection), close the pull request and delete the release branch.
+Once the build completes, the workflow drafts a pull request against the `master` branch from the release branch, whose tip is the commit `prepare` pushed. Nothing is released until that pull request is merged, so to abandon a release (e.g. if the distributions fail inspection), close the pull request and delete the release branch.
 
 ### Merge release branch to master
 
