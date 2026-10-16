@@ -174,7 +174,7 @@ jobs:
 
           # commit, and bundle the commit for the other jobs (and the caller) to
           # fetch. the bundle only holds the new commit; recipients need BASE
-          git switch -c prepared
+          git switch -C prepared
           git commit -m "ci(release): update version to $VERSION"
           git bundle create ../prepared.bundle "$BASE..prepared"
           sha=$(git rev-parse HEAD)
