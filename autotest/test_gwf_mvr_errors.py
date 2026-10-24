@@ -3,12 +3,12 @@ Test that a package listed more than once in the PACKAGES block of a
 model mover or an exchange mover is reported as an input error, and
 that packages with the same name in different models are accepted.
 The simulations are borrowed from test_gwf_mvr01 (model mover) and
-test_gwf_exgmvr01 (exchange mover, which lists sfr packages in two
-models).
+test_gwf_exgmvr01 (exchange mover).
 """
 
 import subprocess
 
+import flopy
 import pytest
 from test_gwf_exgmvr01 import build_simulation
 from test_gwf_mvr01 import get_model
@@ -24,6 +24,20 @@ def build_model_mvr(ws):
 def build_exchange_mvr(ws):
     sim = build_simulation(0, ws, sim_type="split")
     exg = next(iter(sim.exchange_files))
+    # add a package with the same name to both models: these are
+    # different packages, so the exchange mover must accept both
+    packages = [tuple(row) for row in exg.mvr.packages.get_data()]
+    for name in ("left", "right"):
+        gwf = sim.get_model(name)
+        flopy.mf6.ModflowGwfdrn(
+            gwf,
+            mover=True,
+            pname="drn",
+            stress_period_data=[[(0, 0, 0), 1.0, 1.0]],
+        )
+        packages.append((name, "drn"))
+    exg.mvr.packages.set_data(packages)
+    exg.mvr.maxpackages.set_data(len(packages))
     return sim, exg.mvr
 
 
