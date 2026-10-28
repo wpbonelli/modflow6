@@ -220,6 +220,13 @@ module LakModule
     logical(LGP), dimension(:), pointer, contiguous :: outlet_width_set => null()
     logical(LGP), dimension(:), pointer, contiguous :: outlet_rough_set => null()
     logical(LGP), dimension(:), pointer, contiguous :: outlet_slope_set => null()
+    ! -- OUTLETS block values last copied into outinvert/outwidth/outrough/
+    !    outslope; lak_ad copies again only when a time series changes
+    !    them, so values written through the API persist
+    real(DP), dimension(:), pointer, contiguous :: outlet_invert_synced => null()
+    real(DP), dimension(:), pointer, contiguous :: outlet_width_synced => null()
+    real(DP), dimension(:), pointer, contiguous :: outlet_rough_synced => null()
+    real(DP), dimension(:), pointer, contiguous :: outlet_slope_synced => null()
     !
     ! -- lake output data
     real(DP), dimension(:), pointer, contiguous :: qauxcbc => null()
@@ -1487,6 +1494,14 @@ contains
     this%outlet_width_set = .false.
     this%outlet_rough_set = .false.
     this%outlet_slope_set = .false.
+    call mem_allocate(this%outlet_invert_synced, this%noutlets, &
+                      'INVERT_SYNCED', this%memoryPath)
+    call mem_allocate(this%outlet_width_synced, this%noutlets, &
+                      'WIDTH_SYNCED', this%memoryPath)
+    call mem_allocate(this%outlet_rough_synced, this%noutlets, &
+                      'ROUGH_SYNCED', this%memoryPath)
+    call mem_allocate(this%outlet_slope_synced, this%noutlets, &
+                      'SLOPE_SYNCED', this%memoryPath)
     !
     write (this%iout, '(/1x,a)') 'PROCESSING '//trim(adjustl(this%text))// &
       ' OUTLETS'
@@ -1545,6 +1560,10 @@ contains
       this%outwidth(ioutlet) = outlets_width(n)
       this%outrough(ioutlet) = outlets_rough(n)
       this%outslope(ioutlet) = outlets_slope(n)
+      this%outlet_invert_synced(ioutlet) = outlets_invert(n)
+      this%outlet_width_synced(ioutlet) = outlets_width(n)
+      this%outlet_rough_synced(ioutlet) = outlets_rough(n)
+      this%outlet_slope_synced(ioutlet) = outlets_slope(n)
     end do
     !
     write (this%iout, '(1x,a)') 'END OF '//trim(adjustl(this%text))//' OUTLETS'
@@ -3483,7 +3502,9 @@ contains
     !    sync_period_auxvar (inside bnd_ad) handles PERIOD AUXILIARY TS
     call this%BndExtType%bnd_ad()
     !
-    ! -- re-sync static OUTLETS TS values (invert, width, rough, slope);
+    ! -- re-sync static OUTLETS TS values (invert, width, rough, slope)
+    !    that a time series changed since the last copy, so values written
+    !    through the API persist;
     ! -- skip any field a PERIOD-block setting has already overridden for
     !    this outlet -- that override must persist until a later PERIOD
     !    block changes it, not be overwritten by this baseline resync
@@ -3491,14 +3512,30 @@ contains
       do n = 1, size(this%input%outletno)
         itemno = this%input%outletno(n)
         if (itemno < 1 .or. itemno > this%noutlets) cycle
-        if (.not. this%outlet_invert_set(itemno)) &
+        if (.not. this%outlet_invert_set(itemno) .and. &
+            this%input%outlets_invert(n) /= &
+            this%outlet_invert_synced(itemno)) then
           this%outinvert(itemno) = this%input%outlets_invert(n)
-        if (.not. this%outlet_width_set(itemno)) &
+          this%outlet_invert_synced(itemno) = this%input%outlets_invert(n)
+        end if
+        if (.not. this%outlet_width_set(itemno) .and. &
+            this%input%outlets_width(n) /= &
+            this%outlet_width_synced(itemno)) then
           this%outwidth(itemno) = this%input%outlets_width(n)
-        if (.not. this%outlet_rough_set(itemno)) &
+          this%outlet_width_synced(itemno) = this%input%outlets_width(n)
+        end if
+        if (.not. this%outlet_rough_set(itemno) .and. &
+            this%input%outlets_rough(n) /= &
+            this%outlet_rough_synced(itemno)) then
           this%outrough(itemno) = this%input%outlets_rough(n)
-        if (.not. this%outlet_slope_set(itemno)) &
+          this%outlet_rough_synced(itemno) = this%input%outlets_rough(n)
+        end if
+        if (.not. this%outlet_slope_set(itemno) .and. &
+            this%input%outlets_slope(n) /= &
+            this%outlet_slope_synced(itemno)) then
           this%outslope(itemno) = this%input%outlets_slope(n)
+          this%outlet_slope_synced(itemno) = this%input%outlets_slope(n)
+        end if
       end do
     end if
     !
@@ -4416,6 +4453,10 @@ contains
       call mem_deallocate(this%outlet_width_set)
       call mem_deallocate(this%outlet_rough_set)
       call mem_deallocate(this%outlet_slope_set)
+      call mem_deallocate(this%outlet_invert_synced)
+      call mem_deallocate(this%outlet_width_synced)
+      call mem_deallocate(this%outlet_rough_synced)
+      call mem_deallocate(this%outlet_slope_synced)
     end if
     !
     ! -- stage table

@@ -147,6 +147,9 @@ module SfrModule
     logical(LGP), dimension(:), pointer, contiguous :: bedk_set => null() !< reach has an active PERIOD BEDK override
     logical(LGP), dimension(:), pointer, contiguous :: manning_set => null() !< reach has an active PERIOD MANNING override
     logical(LGP), dimension(:), pointer, contiguous :: ustrf_set => null() !< reach has an active PERIOD UPSTREAM_FRACTION override
+    real(DP), dimension(:), pointer, contiguous :: rhk_synced => null() !< PACKAGEDATA RHK last copied into hk
+    real(DP), dimension(:), pointer, contiguous :: man_synced => null() !< PACKAGEDATA MAN last copied into rough
+    real(DP), dimension(:), pointer, contiguous :: ustrf_synced => null() !< PACKAGEDATA USTRF last copied into ustrf
     real(DP), dimension(:), pointer, contiguous :: ftotnd => null() !< total fraction of connected reaches that are not diversions
     integer(I4B), dimension(:), pointer, contiguous :: ndiv => null() !< number of diversions for each reach
     real(DP), dimension(:), pointer, contiguous :: usflow => null() !< upstream reach flow
@@ -511,6 +514,12 @@ contains
     this%bedk_set = .false.
     this%manning_set = .false.
     this%ustrf_set = .false.
+    call mem_allocate(this%rhk_synced, this%maxbound, 'RHK_SYNCED', &
+                      this%memoryPath)
+    call mem_allocate(this%man_synced, this%maxbound, 'MAN_SYNCED', &
+                      this%memoryPath)
+    call mem_allocate(this%ustrf_synced, this%maxbound, 'USTRF_SYNCED', &
+                      this%memoryPath)
     call mem_allocate(this%ftotnd, this%maxbound, 'FTOTND', this%memoryPath)
     call mem_allocate(this%ndiv, this%maxbound, 'NDIV', this%memoryPath)
     call mem_allocate(this%usflow, this%maxbound, 'USFLOW', this%memoryPath)
@@ -1107,10 +1116,13 @@ contains
       this%sfrname(n) = bndName
       !
       ! -- hk, roughness (Manning), upstream fraction: copied from
-      !    input context; sfr_ad re-syncs TS-linked values each timestep
+      !    input context; sfr_ad re-syncs values a time series changes
       this%hk(n) = this%input%rhk(i)
       this%rough(n) = this%input%man(i)
       this%ustrf(n) = this%input%ustrf(i)
+      this%rhk_synced(n) = this%input%rhk(i)
+      this%man_synced(n) = this%input%man(i)
+      this%ustrf_synced(n) = this%input%ustrf(i)
       !
       ! -- initialize sstage to reach top
       this%sstage(n) = this%strtop(n)
@@ -2037,13 +2049,27 @@ contains
     end if
     !
     ! -- sync PACKAGEDATA and PERIOD TS fields from input context each
-    !    timestep; skipped when no TS6 files are configured
+    !    timestep; skipped when no TS6 files are configured. PACKAGEDATA
+    !    values are copied only when a time series changed them, so values
+    !    written through the API persist
     if (this%ts_active) then
       do i = 1, this%maxbound
         n = this%pkg_ifno(i)
-        if (.not. this%bedk_set(n)) this%hk(n) = this%input%rhk(i)
-        if (.not. this%manning_set(n)) this%rough(n) = this%input%man(i)
-        if (.not. this%ustrf_set(n)) this%ustrf(n) = this%input%ustrf(i)
+        if (.not. this%bedk_set(n) .and. &
+            this%input%rhk(i) /= this%rhk_synced(n)) then
+          this%hk(n) = this%input%rhk(i)
+          this%rhk_synced(n) = this%input%rhk(i)
+        end if
+        if (.not. this%manning_set(n) .and. &
+            this%input%man(i) /= this%man_synced(n)) then
+          this%rough(n) = this%input%man(i)
+          this%man_synced(n) = this%input%man(i)
+        end if
+        if (.not. this%ustrf_set(n) .and. &
+            this%input%ustrf(i) /= this%ustrf_synced(n)) then
+          this%ustrf(n) = this%input%ustrf(i)
+          this%ustrf_synced(n) = this%input%ustrf(i)
+        end if
       end do
       !
       if (this%input%nbound > 0) then
@@ -2863,6 +2889,9 @@ contains
     call mem_deallocate(this%bedk_set)
     call mem_deallocate(this%manning_set)
     call mem_deallocate(this%ustrf_set)
+    call mem_deallocate(this%rhk_synced)
+    call mem_deallocate(this%man_synced)
+    call mem_deallocate(this%ustrf_synced)
     call mem_deallocate(this%ftotnd)
     call mem_deallocate(this%usflow)
     call mem_deallocate(this%dsflow)

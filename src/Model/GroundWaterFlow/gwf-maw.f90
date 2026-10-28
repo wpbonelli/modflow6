@@ -161,6 +161,11 @@ module MawModule
     !    for CONSTANT/INACTIVE wells
     logical(LGP), dimension(:), pointer, contiguous :: well_head_set => null()
     !
+    ! -- PACKAGEDATA STRT value last copied into WELL_HEAD; maw_ad copies
+    !    again only when a time series changes STRT, so values written
+    !    through the API persist
+    real(DP), dimension(:), pointer, contiguous :: strt_synced => null()
+    !
     ! -- input context data pointers
     type(MawInputType) :: input
     !
@@ -465,6 +470,9 @@ contains
     call mem_allocate(this%well_head_set, this%nmawwells, 'WELL_HEAD_SET', &
                       this%memoryPath)
     this%well_head_set = .false.
+    call mem_allocate(this%strt_synced, this%nmawwells, 'STRT_SYNCED', &
+                      this%memoryPath)
+    this%strt_synced = DZERO
     !
     ! -- allocate and initialize dbuff
     if (this%iheadout > 0) then
@@ -994,6 +1002,7 @@ contains
       !
       ! -- read the TS integrated numeric value directly
       this%well_head(imaw) = this%input%strt(n)
+      this%strt_synced(imaw) = this%input%strt(n)
       this%strt(imaw) = this%input%strt(n)
       if (this%strt(imaw) < this%bot(imaw)) then
         write (keyword, fmthdbot) this%strt(imaw), this%bot(imaw)
@@ -2636,15 +2645,18 @@ contains
       end do
     end if
     !
-    ! -- copy xnew into xold; CONSTANT well heads track the PACKAGEDATA STRT
-    !    baseline until a PERIOD WELL_HEAD entry overrides it
+    ! -- copy xnew into xold; CONSTANT well heads track time series changes
+    !    to the PACKAGEDATA STRT baseline until a PERIOD WELL_HEAD entry
+    !    overrides it
     do i = 1, this%nmawwells
       n = this%pkg_ifno(i)
       this%xoldpak(n) = this%xnewpak(n)
       this%xoldsto(n) = this%xsto(n)
       if (this%iboundpak(n) < 0) then
-        if (.not. this%well_head_set(n)) then
+        if (.not. this%well_head_set(n) .and. &
+            this%input%strt(i) /= this%strt_synced(n)) then
           this%well_head(n) = this%input%strt(i)
+          this%strt_synced(n) = this%input%strt(i)
         end if
         this%xnewpak(n) = this%well_head(n)
       end if
@@ -3573,6 +3585,7 @@ contains
     nullify (this%rate)
     nullify (this%well_head)
     call mem_deallocate(this%well_head_set)
+    call mem_deallocate(this%strt_synced)
     !
     ! -- connection data
     call mem_deallocate(this%iaconn)
