@@ -58,6 +58,7 @@ module MawModule
   type :: MawInputType
     ! -- packagedata (TS-linked; set in maw_source_packagedata)
     real(DP), dimension(:), pointer, contiguous :: strt => null()
+    integer(I4B), dimension(:), pointer :: strt_tslink => null() !< nonzero for STRT rows linked to a time series
     ! -- period
     integer(I4B), pointer :: nbound => null()
     integer(I4B), dimension(:), pointer, contiguous :: ifno => null()
@@ -862,6 +863,7 @@ contains
   subroutine maw_input_destroy(this)
     class(MawInputType), intent(inout) :: this
     nullify (this%strt)
+    nullify (this%strt_tslink)
     nullify (this%nbound)
     nullify (this%ifno)
     nullify (this%setting)
@@ -896,6 +898,9 @@ contains
     integer(I4B), dimension(:), pointer, contiguous :: ngwfnodes => null()
     type(CharacterStringType), dimension(:), pointer, &
       contiguous :: boundname => null()
+    integer(I4B), dimension(:, :), pointer, contiguous :: tslink => null()
+    type(CharacterStringType), dimension(:), pointer, &
+      contiguous :: tslinkvars => null()
     integer(I4B), allocatable :: nboundchk(:)
     ! -- formats
     character(len=*), parameter :: fmthdbot = &
@@ -910,6 +915,15 @@ contains
     call mem_setptr(radius, 'RADIUS', this%input_mempath)
     call mem_setptr(bottom, 'BOTTOM', this%input_mempath)
     call mem_setptr(this%input%strt, 'STRT', this%input_mempath)
+    call mem_setptr(tslink, 'TSLINK_PD', this%input_mempath)
+    call mem_setptr(tslinkvars, 'TSLINKVARS_PD', this%input_mempath)
+    do n = 1, size(tslinkvars)
+      if (tslinkvars(n) == 'STRT') this%input%strt_tslink => tslink(n, :)
+    end do
+    if (.not. associated(this%input%strt_tslink)) then
+      call store_error('Time series links for STRT not found in input.')
+      call store_error_filename(this%input_fname)
+    end if
     call mem_setptr(condeqn, 'CONDEQN', this%input_mempath)
     call mem_setptr(ngwfnodes, 'NGWFNODES', this%input_mempath)
     if (this%inamedbound /= 0) then
@@ -2515,14 +2529,15 @@ contains
       end do
     end if
     !
-    ! -- copy xnew into xold; CONSTANT well heads track the PACKAGEDATA STRT
-    !    baseline until a PERIOD WELL_HEAD entry overrides it
+    ! -- copy xnew into xold; CONSTANT well heads track a PACKAGEDATA STRT
+    !    time series until a PERIOD WELL_HEAD entry overrides it
     do i = 1, this%nmawwells
       n = this%pkg_ifno(i)
       this%xoldpak(n) = this%xnewpak(n)
       this%xoldsto(n) = this%xsto(n)
       if (this%iboundpak(n) < 0) then
-        if (.not. this%well_head_set(n)) then
+        if (.not. this%well_head_set(n) .and. &
+            this%input%strt_tslink(i) /= 0) then
           this%well_head(n) = this%input%strt(i)
         end if
         this%xnewpak(n) = this%well_head(n)

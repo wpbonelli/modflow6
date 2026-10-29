@@ -77,6 +77,10 @@ module LakModule
     real(DP), dimension(:), pointer, contiguous :: outlets_width => null()
     real(DP), dimension(:), pointer, contiguous :: outlets_rough => null()
     real(DP), dimension(:), pointer, contiguous :: outlets_slope => null()
+    integer(I4B), dimension(:), pointer :: invert_tslink => null() !< nonzero for OUTLETS_INVERT rows linked to a time series
+    integer(I4B), dimension(:), pointer :: width_tslink => null() !< nonzero for OUTLETS_WIDTH rows linked to a time series
+    integer(I4B), dimension(:), pointer :: rough_tslink => null() !< nonzero for OUTLETS_ROUGH rows linked to a time series
+    integer(I4B), dimension(:), pointer :: slope_tslink => null() !< nonzero for OUTLETS_SLOPE rows linked to a time series
   contains
     procedure :: init => lak_input_init
     procedure :: destroy => lak_input_destroy
@@ -3152,6 +3156,11 @@ contains
     character(len=*), intent(in) :: mempath
     integer(I4B), intent(in) :: naux
     integer(I4B), intent(in) :: noutlets
+    ! -- local
+    integer(I4B), dimension(:, :), pointer, contiguous :: tslink => null()
+    type(CharacterStringType), dimension(:), pointer, contiguous :: &
+      tslinkvars => null()
+    integer(I4B) :: n
     !
     ! -- period
     call mem_setptr(this%nbound, 'NBOUND', mempath)
@@ -3169,6 +3178,15 @@ contains
       call mem_setptr(this%outlets_width, 'OUTLETS_WIDTH', mempath)
       call mem_setptr(this%outlets_rough, 'OUTLETS_ROUGH', mempath)
       call mem_setptr(this%outlets_slope, 'OUTLETS_SLOPE', mempath)
+      call mem_setptr(tslink, 'TSLINK_OL', mempath)
+      call mem_setptr(tslinkvars, 'TSLINKVARS_OL', mempath)
+      do n = 1, size(tslinkvars)
+        if (tslinkvars(n) == 'OUTLETS_INVERT') &
+          this%invert_tslink => tslink(n, :)
+        if (tslinkvars(n) == 'OUTLETS_WIDTH') this%width_tslink => tslink(n, :)
+        if (tslinkvars(n) == 'OUTLETS_ROUGH') this%rough_tslink => tslink(n, :)
+        if (tslinkvars(n) == 'OUTLETS_SLOPE') this%slope_tslink => tslink(n, :)
+      end do
     end if
   end subroutine lak_input_init
 
@@ -3189,6 +3207,10 @@ contains
     nullify (this%outlets_width)
     nullify (this%outlets_rough)
     nullify (this%outlets_slope)
+    nullify (this%invert_tslink)
+    nullify (this%width_tslink)
+    nullify (this%rough_tslink)
+    nullify (this%slope_tslink)
   end subroutine lak_input_destroy
 
   !> @brief Allocate and Read
@@ -3238,6 +3260,15 @@ contains
     !
     ! -- bind input context persistent pointers
     call this%input%init(this%input_mempath, this%naux, this%noutlets)
+    if (this%noutlets > 0) then
+      if (.not. (associated(this%input%invert_tslink) .and. &
+                 associated(this%input%width_tslink) .and. &
+                 associated(this%input%rough_tslink) .and. &
+                 associated(this%input%slope_tslink))) then
+        call store_error('Time series links for OUTLETS not found in input.')
+        call store_error_filename(this%input_fname)
+      end if
+    end if
     !
     ! -- setup pakmvrobj
     if (this%imover /= 0) then
@@ -3483,21 +3514,25 @@ contains
     !    sync_period_auxvar (inside bnd_ad) handles PERIOD AUXILIARY TS
     call this%BndExtType%bnd_ad()
     !
-    ! -- re-sync static OUTLETS TS values (invert, width, rough, slope);
-    ! -- skip any field a PERIOD-block setting has already overridden for
-    !    this outlet -- that override must persist until a later PERIOD
-    !    block changes it, not be overwritten by this baseline resync
+    ! -- re-sync static OUTLETS values (invert, width, rough, slope) linked
+    !    to a time series, skipping any field a PERIOD-block setting has
+    !    already overridden for this outlet -- that override must persist
+    !    until a later PERIOD block changes it
     if (this%ts_active .and. this%noutlets > 0) then
       do n = 1, size(this%input%outletno)
         itemno = this%input%outletno(n)
         if (itemno < 1 .or. itemno > this%noutlets) cycle
-        if (.not. this%outlet_invert_set(itemno)) &
+        if (.not. this%outlet_invert_set(itemno) .and. &
+            this%input%invert_tslink(n) /= 0) &
           this%outinvert(itemno) = this%input%outlets_invert(n)
-        if (.not. this%outlet_width_set(itemno)) &
+        if (.not. this%outlet_width_set(itemno) .and. &
+            this%input%width_tslink(n) /= 0) &
           this%outwidth(itemno) = this%input%outlets_width(n)
-        if (.not. this%outlet_rough_set(itemno)) &
+        if (.not. this%outlet_rough_set(itemno) .and. &
+            this%input%rough_tslink(n) /= 0) &
           this%outrough(itemno) = this%input%outlets_rough(n)
-        if (.not. this%outlet_slope_set(itemno)) &
+        if (.not. this%outlet_slope_set(itemno) .and. &
+            this%input%slope_tslink(n) /= 0) &
           this%outslope(itemno) = this%input%outlets_slope(n)
       end do
     end if
