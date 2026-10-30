@@ -186,6 +186,8 @@ def benchmark(
     json_path = out_path / Path(BENCHMARKS_FILE_NAME).with_suffix(".json")
     get_binaries(build_path, bin_path)
     success = run_benchmarks(bin_path, examples_path, json_path)
+    if not json_path.is_file():
+        raise RuntimeError(f"No benchmark results, see pytest output: {json_path}")
     write_results(bin_path, json_path, out_path / BENCHMARKS_FILE_NAME)
     if not success:
         raise RuntimeError("Example(s) failed with the current version")

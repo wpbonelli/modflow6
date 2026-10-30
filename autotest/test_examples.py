@@ -29,8 +29,8 @@ import time
 from pathlib import Path
 
 import pytest
-from conftest import try_get_target
 from modflow_devtools.models import DEFAULT_REGISTRY, LocalRegistry
+from modflow_devtools.ostags import get_binary_suffixes
 
 # prefix of example models in the official model registry
 PREFIX = "mf6/example/"
@@ -42,7 +42,13 @@ EXCLUDE = {
     "ex-prt-mp7-p02": "needs reversed head/budget files from flopy",
     "ex-prt-mp7-p04": "needs reversed head/budget files from flopy",
 }
-VERSIONS = {"current": "mf6", "previous": "mf6_regression"}
+# mf6 binary for each version, relative to the bin path. this doesn't
+# use the targets fixture, which requires binaries these tests don't.
+EXE_EXT = get_binary_suffixes()[0]
+VERSIONS = {
+    "current": Path(f"mf6{EXE_EXT}"),
+    "previous": Path("rebuilt", f"mf6{EXE_EXT}"),
+}
 
 
 def get_examples(registry) -> dict[str, list[str]]:
@@ -116,11 +122,15 @@ def run(exe: Path, workspace: Path) -> float:
 @pytest.mark.slow
 @pytest.mark.examples
 @pytest.mark.parametrize("version", list(VERSIONS))
-def test_example(registry, example_name, version, targets, function_tmpdir, benchmark):
+def test_example(registry, example_name, version, bin_path, function_tmpdir, benchmark):
     if example_name in EXCLUDE:
         pytest.skip(f"Skipping: {example_name} ({EXCLUDE[example_name]})")
 
-    exe = try_get_target(targets, VERSIONS[version]).absolute()
+    exe = (bin_path / VERSIONS[version]).absolute()
+    if not exe.is_file():
+        if version == "current":
+            pytest.fail(f"Couldn't find binary: {exe}")
+        pytest.skip(f"Couldn't find binary: {exe}")
     workspaces = []
     for model_name in get_examples(registry)[example_name]:
         workspace = function_tmpdir / model_name.removeprefix(PREFIX)
