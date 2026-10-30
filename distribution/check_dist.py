@@ -1,18 +1,22 @@
 import platform
 import subprocess
+import sys
 from os import environ
 from pathlib import Path
 from pprint import pprint
 
 import pytest
 from modflow_devtools.markers import no_parallel
-from modflow_devtools.misc import get_model_paths, run_cmd
+from modflow_devtools.misc import get_model_paths
 
 # OS-specific extensions
 SYSTEM = platform.system()
 EXE_EXT = ".exe" if SYSTEM == "Windows" else ""
 LIB_EXT = ".dll" if SYSTEM == "Windows" else ".so" if SYSTEM == "Linux" else ".dylib"
 SCR_EXT = ".bat" if SYSTEM == "Windows" else ".sh"
+
+# autotest dir, containing the examples test module
+AUTOTEST_PATH = Path(__file__).resolve().parent.parent / "autotest"
 
 # fortran compiler
 FC = environ.get("FC", None)
@@ -279,20 +283,36 @@ def test_examples(dist_dir_path, releasemode):
     assert len(model_paths) == len(set(model_paths))
     assert set(model_paths) == {p.resolve() for p in get_model_paths(examples_path)}
 
-    # run each example, in the combined script's order
-    failed = []
+    # check each example's own script runs it
     for model_path in model_paths:
         script_path = model_path / f"run{SCR_EXT}"
-        print(f"Testing example script: {script_path}")
         assert script_path.is_file()
         assert trace_script(script_path, mf6_path) == [model_path]
-        out, err, ret = run_cmd(
-            str(script_path), cwd=model_path, stdin=subprocess.DEVNULL
-        )
-        if ret or "Normal termination" not in out:
-            failed.append(model_path.relative_to(examples_path))
-            print(out + err)
-    assert not failed, f"{len(failed)} example(s) failed: {failed}"
+
+    # run the examples with the distribution's binaries. the autotest
+    # module copies each example to a temp dir and runs its workspaces
+    # in order. no previous version is in the distribution, so only the
+    # current version runs.
+    ret = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-v",
+            "-n",
+            "auto",
+            "test_examples.py",
+            "-m",
+            "examples",
+            "--models-path",
+            str(examples_path),
+            "--bin-path",
+            str(dist_dir_path / "bin"),
+        ],
+        cwd=AUTOTEST_PATH,
+        check=False,
+    ).returncode
+    assert not ret, "example(s) failed"
 
 
 @no_parallel
