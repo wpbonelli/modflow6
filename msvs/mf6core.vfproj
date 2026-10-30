@@ -206,9 +206,13 @@
 				<File RelativePath="..\src\Idm\gwe-estidm.f90"/>
 				<File RelativePath="..\src\Idm\gwe-fmiidm.f90"/>
 				<File RelativePath="..\src\Idm\gwe-icidm.f90"/>
+				<File RelativePath="..\src\Idm\gwe-lkeidm.f90"/>
+				<File RelativePath="..\src\Idm\gwe-mweidm.f90"/>
 				<File RelativePath="..\src\Idm\gwe-namidm.f90"/>
 				<File RelativePath="..\src\Idm\gwe-ocidm.f90"/>
+				<File RelativePath="..\src\Idm\gwe-sfeidm.f90"/>
 				<File RelativePath="..\src\Idm\gwe-ssmidm.f90"/>
+				<File RelativePath="..\src\Idm\gwe-uzeidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-apiidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-buyidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-chdgidm.f90"/>
@@ -225,6 +229,8 @@
 				<File RelativePath="..\src\Idm\gwf-ghbidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-hfbidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-icidm.f90"/>
+				<File RelativePath="..\src\Idm\gwf-lakidm.f90"/>
+				<File RelativePath="..\src\Idm\gwf-mawidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-namidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-npfidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-ocidm.f90"/>
@@ -232,7 +238,9 @@
 				<File RelativePath="..\src\Idm\gwf-rchidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-rivgidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-rividm.f90"/>
+				<File RelativePath="..\src\Idm\gwf-sfridm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-stoidm.f90"/>
+				<File RelativePath="..\src\Idm\gwf-uzfidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-vscidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-welgidm.f90"/>
 				<File RelativePath="..\src\Idm\gwf-welidm.f90"/>
@@ -246,11 +254,15 @@
 				<File RelativePath="..\src\Idm\gwt-fmiidm.f90"/>
 				<File RelativePath="..\src\Idm\gwt-icidm.f90"/>
 				<File RelativePath="..\src\Idm\gwt-istidm.f90"/>
+				<File RelativePath="..\src\Idm\gwt-lktidm.f90"/>
 				<File RelativePath="..\src\Idm\gwt-mstidm.f90"/>
+				<File RelativePath="..\src\Idm\gwt-mwtidm.f90"/>
 				<File RelativePath="..\src\Idm\gwt-namidm.f90"/>
 				<File RelativePath="..\src\Idm\gwt-ocidm.f90"/>
+				<File RelativePath="..\src\Idm\gwt-sftidm.f90"/>
 				<File RelativePath="..\src\Idm\gwt-srcidm.f90"/>
 				<File RelativePath="..\src\Idm\gwt-ssmidm.f90"/>
+				<File RelativePath="..\src\Idm\gwt-uztidm.f90"/>
 				<File RelativePath="..\src\Idm\olf-cdbidm.f90"/>
 				<File RelativePath="..\src\Idm\olf-chdidm.f90"/>
 				<File RelativePath="..\src\Idm\olf-dfwidm.f90"/>
@@ -274,7 +286,9 @@
 				<File RelativePath="..\src\Idm\sim-namidm.f90"/>
 				<File RelativePath="..\src\Idm\sim-tdisidm.f90"/>
 				<File RelativePath="..\src\Idm\utl-hpcidm.f90"/>
+				<File RelativePath="..\src\Idm\utl-laktabidm.f90"/>
 				<File RelativePath="..\src\Idm\utl-ncfidm.f90"/>
+				<File RelativePath="..\src\Idm\utl-sfrtabidm.f90"/>
 				<File RelativePath="..\src\Idm\utl-spcaidm.f90"/>
 				<File RelativePath="..\src\Idm\utl-spcidm.f90"/>
 				<File RelativePath="..\src\Idm\utl-tvkidm.f90"/>
@@ -393,8 +407,10 @@
 					<File RelativePath="..\src\Model\ModelUtilities\GwfBuyInputData.f90"/>
 					<File RelativePath="..\src\Model\ModelUtilities\GwfConductanceUtils.f90"/>
 					<File RelativePath="..\src\Model\ModelUtilities\GwfMvrPeriodData.f90"/>
+					<File RelativePath="..\src\Model\ModelUtilities\GwfNpfExt.f90"/>
 					<File RelativePath="..\src\Model\ModelUtilities\GwfNpfOptions.f90"/>
 					<File RelativePath="..\src\Model\ModelUtilities\GwfSfrCommon.f90"/>
+					<File RelativePath="..\src\Model\ModelUtilities\GwfStoExt.f90"/>
 					<File RelativePath="..\src\Model\ModelUtilities\GwfStorageUtils.f90"/>
 					<File RelativePath="..\src\Model\ModelUtilities\GwfVscInputData.f90"/>
 					<File RelativePath="..\src\Model\ModelUtilities\GwtDspOptions.f90"/>
@@ -763,6 +779,7 @@
 				</Filter>
 				<Filter Name="Memory">
 					<File RelativePath="..\src\Utilities\Memory\Memory.F90"/>
+					<File RelativePath="..\src\Utilities\Memory\MemoryAlias.f90"/>
 					<File RelativePath="..\src\Utilities\Memory\MemoryContainerIterator.f90"/>
 					<File RelativePath="..\src\Utilities\Memory\MemoryHelper.f90"/>
 					<File RelativePath="..\src\Utilities\Memory\MemoryManager.f90"/>

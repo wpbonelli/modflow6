@@ -1,7 +1,7 @@
 project(
   'mf5to6',
   'fortran',
-  version: '6.8.1',
+  version: '6.8.2',
   license: 'CC0',
   meson_version: '>= 1.7.1',
   default_options : [

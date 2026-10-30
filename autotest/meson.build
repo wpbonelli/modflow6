@@ -2,8 +2,11 @@ test_drive = dependency('test-drive', required : false)
 if test_drive.found() and not fc_id.contains('intel')
   tests = [
     'ArrayHandlers',
+    'BinaryFileReader',
+    'Budget',
     'FeatureFlags',
     'GeomUtil',
+    'GridFileReader',
     'HashTable',
     'InputOutput',
     'KeyValueList',
@@ -12,6 +15,7 @@ if test_drive.found() and not fc_id.contains('intel')
     'MathUtil',
     'MawNonVertical',
     'MawNur',
+    'MemoryAlias',
     'MemoryContainerIterator',
     'MemoryStore',
     'Message',
@@ -23,13 +27,16 @@ if test_drive.found() and not fc_id.contains('intel')
     'SwfUtils',
     'TimeSelect',
     'TimeStepSelect',
+    'UzfCellGroup',
     'UzfEtUtil'
   ]
 
   test_srcs = files(
     'tester.f90',
     'tester_utils.f90',
+    'TestBmi.f90',
   )
+  test_srcs += bmi_sources
   foreach t : tests
     test_srcs += files('Test@0@.f90'.format(t.underscorify()))
   endforeach
@@ -46,4 +53,14 @@ if test_drive.found() and not fc_id.contains('intel')
   foreach t : tests
     test(t, tester, args: t)
   endforeach
+
+  # the BMI suite runs the minimal simulation in a process of its own,
+  # because a simulation cannot be initialized twice in one process
+  test(
+    'Bmi',
+    tester,
+    args: 'Bmi',
+    workdir: meson.project_source_root() / '.mf6minsim',
+    is_parallel: false,
+  )
 endif
