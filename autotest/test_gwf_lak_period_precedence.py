@@ -231,6 +231,7 @@ def _outlets_ts_multi_sim(ws, name, width1, perioddata):
         gwf,
         nlakes=1,
         noutlets=2,
+        print_input=True,
         budget_filerecord=f"{name}.lak.cbc",
         packagedata=[(0, multi_stage, 1)],
         connectiondata=[(0, 0, (0, 0, 1), "horizontal", 0.0, 0.0, 150.0, 10.0, 10.0)],
@@ -345,6 +346,15 @@ def check_outlets_ts_multi(test):
             f"{col} with a TS-linked width in OUTLETS row 2 (beyond NLAKES) "
             f"should match the literal-width reference in every period; "
             f"ref={obs_ref[col]}, ts={obs_ts[col]}"
+        )
+    # the TS link is labeled by outlet number, not OUTLETS row position
+    with open(os.path.join(ws1, "mfsim.lst")) as f:
+        lines = [ln for ln in f if "OUTLETS_WIDTH value from time series" in ln]
+    assert lines, "expected OUTLETS_WIDTH time series updates in the listing"
+    for ln in lines:
+        assert "Boundary 1," in ln, (
+            f"outlet 1's TS link should be labeled by its outlet number (1), "
+            f"not its OUTLETS row (2); got: {ln.strip()}"
         )
 
 
