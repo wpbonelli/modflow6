@@ -184,11 +184,14 @@ contains
     if (this%ctx%is_advanced) then
       call mem_setptr(pkg_ifno, 'PACKAGEDATA_IFNO', this%mf6_input%mempath)
     end if
-    ! link static TS strlocs; preserve for re-registration after reset()
+    ! link static TS strlocs; preserve for re-registration after reset().
+    ! pkg_ifno maps PACKAGEDATA rows only; other static blocks (e.g. LAK
+    ! OUTLETS) are not feature-addressed and keep their row position
     do n = 1, this%static_loader%ts_sa_count()
       sa => this%static_loader%get_ts_sa(n)
       if (associated(sa)) then
-        if (associated(pkg_ifno)) then
+        if (associated(pkg_ifno) .and. &
+            sa%struct_vectors(1)%idt%blockname == 'PACKAGEDATA') then
           call sa%ts_update(this%tsmanager, &
                             this%mf6_input%subcomponent_name, &
                             this%ctx%iprpak, this%input_name, &
