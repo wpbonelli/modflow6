@@ -6,9 +6,9 @@
   don't repeat it, taking precedence over the OUTLETS block's own
   time-series-linked value for the same outlet.
 - PERIOD STAGE overrides the PACKAGEDATA STRT baseline for a CONSTANT lake.
-- The above holds with more outlets than lakes and OUTLETS rows out of
-  outlet-number order, so a TS-linked outlet sits in an OUTLETS row
-  beyond NLAKES (row positions are not lake/feature numbers).
+- A TS-linked outlet in an OUTLETS row past NLAKES (more outlets than
+  lakes, rows out of order) still follows its TS and PERIOD overrides,
+  and the listing reports its TS updates by outlet number.
 """
 
 import os
@@ -51,19 +51,20 @@ prec_invert_ts = [invert_a, invert_a, invert_b, invert_d]
 strt = 100.0
 stage_override = 80.0
 
-# -- noutlets-ts case data: outlet 1's width follows a TS for
-# periods 1-2 and a PERIOD override in period 3 (multi_width_ts_unused
-# must never take effect); outlet 2 is static
-multi_stage = 10.0
-multi_invert1, multi_invert2 = 8.0, 9.0
-multi_width1, multi_width2, multi_width3 = 1.0, 3.0, 5.0
-multi_width_ts_unused = 0.5
-multi_ts_times = [0.0, 1.0, 2.0, 3.0]
-multi_width_ts = [
-    multi_width1,
-    multi_width2,
-    multi_width_ts_unused,
-    multi_width_ts_unused,
+# -- noutlets-ts case data: 1 lake, 2 outlets. outlet 1's width follows
+# a stepwise TS (width1 in period 1, width2 in period 2), then a PERIOD
+# override (width3) in period 3. the TS's unused value would only show
+# up if the override were lost. outlet 2's width is fixed.
+noutlets_stage = 10.0
+noutlets_invert1, noutlets_invert2 = 8.0, 9.0
+noutlets_width1, noutlets_width2, noutlets_width3 = 1.0, 3.0, 5.0
+noutlets_width_ts_unused = 0.5
+noutlets_ts_times = [0.0, 1.0, 2.0, 3.0]
+noutlets_width_ts = [
+    noutlets_width1,
+    noutlets_width2,
+    noutlets_width_ts_unused,
+    noutlets_width_ts_unused,
 ]
 
 
@@ -223,7 +224,7 @@ def build_strt_stage(test):
     return sim
 
 
-def _outlets_ts_multi_sim(ws, name, width1, perioddata):
+def _noutlets_ts_sim(ws, name, width1, perioddata):
     sim, gwf = _outlets_ts_base_sim(ws, name, nper=3)
     # OUTLETS rows out of outlet-number order: outlet 1 is in row 2, which
     # is beyond NLAKES
@@ -233,14 +234,14 @@ def _outlets_ts_multi_sim(ws, name, width1, perioddata):
         noutlets=2,
         print_input=True,
         budget_filerecord=f"{name}.lak.cbc",
-        packagedata=[(0, multi_stage, 1)],
+        packagedata=[(0, noutlets_stage, 1)],
         connectiondata=[(0, 0, (0, 0, 1), "horizontal", 0.0, 0.0, 150.0, 10.0, 10.0)],
         outlets=[
-            (1, 0, -1, "weir", multi_invert2, 2.0, 0.0, 0.0),
-            (0, 0, -1, "weir", multi_invert1, width1, 0.0, 0.0),
+            (1, 0, -1, "weir", noutlets_invert2, 2.0, 0.0, 0.0),
+            (0, 0, -1, "weir", noutlets_invert1, width1, 0.0, 0.0),
         ],
         perioddata={
-            0: [(0, "status", "constant"), (0, "stage", multi_stage)],
+            0: [(0, "status", "constant"), (0, "stage", noutlets_stage)],
             **perioddata,
         },
         pname="lak-1",
@@ -249,22 +250,22 @@ def _outlets_ts_multi_sim(ws, name, width1, perioddata):
     return sim, lak
 
 
-def build_outlets_ts_multi(test):
+def build_noutlets_ts(test):
     name = cases[3]
     ws0 = test.workspace
     ws1 = os.path.join(test.workspace, "mf6")
-    ref, _ = _outlets_ts_multi_sim(
+    ref, _ = _noutlets_ts_sim(
         ws0,
         name,
-        multi_width1,
-        {1: [(0, "width", multi_width2)], 2: [(0, "width", multi_width3)]},
+        noutlets_width1,
+        {1: [(0, "width", noutlets_width2)], 2: [(0, "width", noutlets_width3)]},
     )
-    ts, lak = _outlets_ts_multi_sim(
-        ws1, name, "width_ts", {2: [(0, "width", multi_width3)]}
+    ts, lak = _noutlets_ts_sim(
+        ws1, name, "width_ts", {2: [(0, "width", noutlets_width3)]}
     )
     lak.ts.initialize(
         filename=f"{name}.lak.ts",
-        timeseries=list(zip(multi_ts_times, multi_width_ts)),
+        timeseries=list(zip(noutlets_ts_times, noutlets_width_ts)),
         time_series_namerecord=["width_ts"],
         interpolation_methodrecord=["stepwise"],
     )
@@ -276,7 +277,7 @@ def build_models(idx, test):
         build_outlets_ts,
         build_period_precedence,
         build_strt_stage,
-        build_outlets_ts_multi,
+        build_noutlets_ts,
     ][idx](test)
 
 
@@ -328,7 +329,7 @@ def check_strt_stage(test):
     )
 
 
-def check_outlets_ts_multi(test):
+def check_noutlets_ts(test):
     ws0 = test.workspace
     ws1 = os.path.join(test.workspace, "mf6")
     obs_ref = np.genfromtxt(
@@ -363,7 +364,7 @@ def check_output(idx, test):
         check_outlets_ts,
         check_period_precedence,
         check_strt_stage,
-        check_outlets_ts_multi,
+        check_noutlets_ts,
     ][idx](test)
 
 

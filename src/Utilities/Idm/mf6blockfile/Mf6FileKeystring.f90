@@ -180,14 +180,16 @@ contains
     call get_isize('AUXILIARY', this%mf6_input%mempath, naux)
     if (naux > 0) call mem_setptr(auxnames, 'AUXILIARY', this%mf6_input%mempath)
     ! link static TS strlocs; preserve for re-registration after reset().
-    ! advanced packages address each link by its own block's key column
-    ! (PACKAGEDATA IFNO, LAK OUTLETS OUTLETNO), not row position, so a
-    ! later PERIOD override finds an AUX link and listings report the key
+    ! advanced packages address each link by its own block's key column,
+    ! not row position, so a later PERIOD override finds an AUX link and
+    ! listings report the key
     do n = 1, this%static_loader%ts_sa_count()
       sa => this%static_loader%get_ts_sa(n)
       if (.not. associated(sa)) cycle
       nullify (row_key)
       if (this%ctx%is_advanced) then
+        ! key columns are hardcoded for now: PACKAGEDATA IFNO and LAK
+        ! OUTLETS OUTLETNO. TODO: look these up from DFN pk/fk metadata
         select case (sa%struct_vectors(1)%idt%blockname)
         case ('PACKAGEDATA')
           call mem_setptr(row_key, 'PACKAGEDATA_IFNO', this%mf6_input%mempath)
