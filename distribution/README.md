@@ -329,7 +329,7 @@ The `check_dist.py` script runs some checks on the distribution, e.g.:
 
 ```shell
 pixi run check-dist --path $DISTDIR
-pytest -v -s check_dist.py --path $DISTDIR # or from the distributions/ folder
+pytest -v -n auto --dist loadgroup check_dist.py --path $DISTDIR # or from the distribution/ folder
 ```
 
 ### Testing scripts
