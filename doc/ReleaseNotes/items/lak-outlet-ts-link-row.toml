@@ -1,0 +1,3 @@
+section = "fixes"
+subsection = "advanced"
+description = "In the Lake (LAK) Package, a time series assigned to an OUTLETS block value (INVERT, WIDTH, ROUGH or SLOPE) was linked under an incorrect row number: an undefined value when the outlet's OUTLETS row exceeded NLAKES, and otherwise a lake number. Simulated outlet values and results were not affected, but the row number reported for the outlet's time-series updates in the listing file (with PRINT\\_INPUT) could be wrong, and a large number of outlets relative to lakes could cause an invalid memory read. Outlet time series are now linked under their OUTLETS row."

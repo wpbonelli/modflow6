@@ -6,6 +6,9 @@
   don't repeat it, taking precedence over the OUTLETS block's own
   time-series-linked value for the same outlet.
 - PERIOD STAGE overrides the PACKAGEDATA STRT baseline for a CONSTANT lake.
+- The above holds with more outlets than lakes and OUTLETS rows out of
+  outlet-number order, so a TS-linked outlet sits in an OUTLETS row
+  beyond NLAKES (row positions are not lake/feature numbers).
 """
 
 import os
@@ -15,7 +18,12 @@ import numpy as np
 import pytest
 from framework import TestFramework
 
-cases = ["lak-outlets-ts", "lak-outlet-period-precedence", "lak-strt-stage"]
+cases = [
+    "lak-outlets-ts",
+    "lak-outlet-period-precedence",
+    "lak-strt-stage",
+    "lak-noutlets-ts",
+]
 
 # -- outlets-ts case data
 ts_stage = 10.0
@@ -43,10 +51,25 @@ prec_invert_ts = [invert_a, invert_a, invert_b, invert_d]
 strt = 100.0
 stage_override = 80.0
 
+# -- noutlets-ts case data: outlet 1's width follows a TS for
+# periods 1-2 and a PERIOD override in period 3 (multi_width_ts_unused
+# must never take effect); outlet 2 is static
+multi_stage = 10.0
+multi_invert1, multi_invert2 = 8.0, 9.0
+multi_width1, multi_width2, multi_width3 = 1.0, 3.0, 5.0
+multi_width_ts_unused = 0.5
+multi_ts_times = [0.0, 1.0, 2.0, 3.0]
+multi_width_ts = [
+    multi_width1,
+    multi_width2,
+    multi_width_ts_unused,
+    multi_width_ts_unused,
+]
 
-def _outlets_ts_base_sim(ws, name):
+
+def _outlets_ts_base_sim(ws, name, nper=2):
     sim = flopy.mf6.MFSimulation(sim_name=name, exe_name="mf6", sim_ws=ws)
-    flopy.mf6.ModflowTdis(sim, nper=2, perioddata=[(1.0, 1, 1.0)] * 2)
+    flopy.mf6.ModflowTdis(sim, nper=nper, perioddata=[(1.0, 1, 1.0)] * nper)
     flopy.mf6.ModflowIms(sim, print_option="NONE")
     gwf = flopy.mf6.ModflowGwf(sim, modelname=name, save_flows=True)
     flopy.mf6.ModflowGwfdis(
@@ -200,8 +223,60 @@ def build_strt_stage(test):
     return sim
 
 
+def _outlets_ts_multi_sim(ws, name, width1, perioddata):
+    sim, gwf = _outlets_ts_base_sim(ws, name, nper=3)
+    # OUTLETS rows out of outlet-number order: outlet 1 is in row 2, which
+    # is beyond NLAKES
+    lak = flopy.mf6.ModflowGwflak(
+        gwf,
+        nlakes=1,
+        noutlets=2,
+        budget_filerecord=f"{name}.lak.cbc",
+        packagedata=[(0, multi_stage, 1)],
+        connectiondata=[(0, 0, (0, 0, 1), "horizontal", 0.0, 0.0, 150.0, 10.0, 10.0)],
+        outlets=[
+            (1, 0, -1, "weir", multi_invert2, 2.0, 0.0, 0.0),
+            (0, 0, -1, "weir", multi_invert1, width1, 0.0, 0.0),
+        ],
+        perioddata={
+            0: [(0, "status", "constant"), (0, "stage", multi_stage)],
+            **perioddata,
+        },
+        pname="lak-1",
+        observations={"lak_outlet.csv": [("out1", "outlet", 1), ("out2", "outlet", 2)]},
+    )
+    return sim, lak
+
+
+def build_outlets_ts_multi(test):
+    name = cases[3]
+    ws0 = test.workspace
+    ws1 = os.path.join(test.workspace, "mf6")
+    ref, _ = _outlets_ts_multi_sim(
+        ws0,
+        name,
+        multi_width1,
+        {1: [(0, "width", multi_width2)], 2: [(0, "width", multi_width3)]},
+    )
+    ts, lak = _outlets_ts_multi_sim(
+        ws1, name, "width_ts", {2: [(0, "width", multi_width3)]}
+    )
+    lak.ts.initialize(
+        filename=f"{name}.lak.ts",
+        timeseries=list(zip(multi_ts_times, multi_width_ts)),
+        time_series_namerecord=["width_ts"],
+        interpolation_methodrecord=["stepwise"],
+    )
+    return ref, ts
+
+
 def build_models(idx, test):
-    return [build_outlets_ts, build_period_precedence, build_strt_stage][idx](test)
+    return [
+        build_outlets_ts,
+        build_period_precedence,
+        build_strt_stage,
+        build_outlets_ts_multi,
+    ][idx](test)
 
 
 def check_outlets_ts(test):
@@ -252,8 +327,34 @@ def check_strt_stage(test):
     )
 
 
+def check_outlets_ts_multi(test):
+    ws0 = test.workspace
+    ws1 = os.path.join(test.workspace, "mf6")
+    obs_ref = np.genfromtxt(
+        os.path.join(ws0, "lak_outlet.csv"), delimiter=",", names=True
+    )
+    obs_ts = np.genfromtxt(
+        os.path.join(ws1, "lak_outlet.csv"), delimiter=",", names=True
+    )
+    out1 = obs_ts["OUT1"]
+    assert not np.isclose(out1[0], out1[1]) and not np.isclose(out1[1], out1[2]), (
+        f"outlet 1 flow should change each period with its width; got {out1}"
+    )
+    for col in ("OUT1", "OUT2"):
+        assert np.allclose(obs_ref[col], obs_ts[col], rtol=1e-6), (
+            f"{col} with a TS-linked width in OUTLETS row 2 (beyond NLAKES) "
+            f"should match the literal-width reference in every period; "
+            f"ref={obs_ref[col]}, ts={obs_ts[col]}"
+        )
+
+
 def check_output(idx, test):
-    [check_outlets_ts, check_period_precedence, check_strt_stage][idx](test)
+    [
+        check_outlets_ts,
+        check_period_precedence,
+        check_strt_stage,
+        check_outlets_ts_multi,
+    ][idx](test)
 
 
 @pytest.mark.parametrize("idx, name", enumerate(cases))
