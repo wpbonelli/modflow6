@@ -1,0 +1,120 @@
+name: mmr-dfw-drift
+# Throwaway diagnostic: which factor moves the DRB DFW flow mean by ~1.8e-4?
+on:
+  push:
+    branches: [throwaway-mmr-dfw-drift]
+  workflow_dispatch:
+
+env:
+  PWS_SHA: 6323a68a
+  FLOPY_SHA: e13fe8ee960357ec3c8169fa8fb56249c7f22597
+  MF6_DFN_SHA: c1d122a9ff66c8316bd652c12bddcf4eaa751a90
+
+jobs:
+  drift:
+    name: drift ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-latest, asset: linux}
+          - {os: windows-latest, asset: win64}
+          - {os: macos-latest, asset: macarm}
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - name: Checkout tools
+        uses: actions/checkout@v6
+        with:
+          path: drift
+
+      - name: Checkout pywatershed
+        uses: actions/checkout@v6
+        with:
+          repository: jmccreight/pywatershed
+          ref: develop
+          fetch-depth: 0
+          path: pws
+
+      - name: Pin pywatershed
+        run: git -C pws checkout "$PWS_SHA"
+
+      - name: Checkout MODFLOW 6 DFNs
+        uses: actions/checkout@v6
+        with:
+          repository: MODFLOW-ORG/modflow6
+          ref: ${{ env.MF6_DFN_SHA }}
+          path: modflow6
+
+      - name: Install environment
+        uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-file: pws/environment.yml
+          cache-environment: false
+          cache-downloads: true
+          create-args: python=3.13
+
+      - name: Link conda gfortran dylibs on Mac
+        if: runner.os == 'macOS'
+        working-directory: pws
+        run: .github/scripts/symlink_gfortran_mac.sh
+
+      - name: Install pywatershed and pinned flopy
+        working-directory: pws
+        run: |
+          pip install -e .
+          pip install --force-reinstall --no-deps \
+            "git+https://github.com/modflowpy/flopy.git@${FLOPY_SHA}"
+          python -c "
+          from flopy.mf6.utils.generate_classes import generate_classes
+          generate_classes(dfnpath='../modflow6/doc/mf6io/mf6ivar/dfn', verbose=False)
+          " | tail -1
+          python pywatershed/utils/gis_files.py
+          pip list | grep -iE "^(flopy|numpy|pandas|xarray|netcdf4|scipy) "
+          which gfortran; gfortran --version | head -1
+
+      - name: Generate inflows with PRMS
+        working-directory: pws
+        run: python ../drift/tools/run_prms.py test_data/drb_2yr
+
+      - name: Write runner inputs
+        working-directory: pws
+        run: |
+          python ../drift/tools/make_inputs.py test_data/drb_2yr \
+            test_data/drb_2yr/output "$GITHUB_WORKSPACE/runner_input"
+
+      - name: Compare runner inputs with the fixed inputs
+        run: |
+          diff -rq -I '^#' runner_input drift/fixed_input | head -30 || true
+          python - <<'EOF'
+          import pathlib as pl, numpy as np
+          DT = [("n", "i4"), ("q", "f8")]
+          a, b = pl.Path("runner_input/chf_flw_bc"), pl.Path("drift/fixed_input/chf_flw_bc")
+          mx, sum_a, sum_b = 0.0, 0.0, 0.0
+          for f in sorted(a.glob("*.bin")):
+              qa = np.fromfile(f, dtype=DT)["q"]
+              qb = np.fromfile(b / f.name, dtype=DT)["q"]
+              mx = max(mx, float(np.abs(qa - qb).max()))
+              sum_a += float(qa.sum()); sum_b += float(qb.sum())
+          print(f"FLW runner-vs-fixed max|dq|={mx:.6e} sum_runner={sum_a:.12f} sum_fixed={sum_b:.12f}")
+          EOF
+
+      - name: Run all nightlies against both input sets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python drift/tools/run_nightlies.py ${{ matrix.asset }} \
+            runner_input drift/fixed_input
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: drift-${{ matrix.os }}
+          path: |
+            summary.json
+            runner_input/
+          if-no-files-found: warn
