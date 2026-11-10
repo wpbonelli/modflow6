@@ -289,7 +289,7 @@ reader urword
 tagged false
 optional false
 longname record type
-description type of information to save or print.  Can be BUDGET.
+description type of information to save or print.  Can be BUDGET, STAGE, or QOUTFLOW.
 
 block period
 name ocsetting
