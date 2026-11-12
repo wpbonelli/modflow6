@@ -1,0 +1,304 @@
+name: PRT compiler comparison
+# Builds MF6 with ifort, ifx and gfortran under several floating point
+# settings, runs the PRT autotests (and PRT examples on Linux), reruns PRT
+# alone on the baseline build's flow output, and reports where particle
+# tracks diverge. Baseline: ifort with default flags (current release build).
+on:
+  workflow_dispatch:
+    inputs:
+      ifort_version:
+        description: 'ifort (intel-classic) version'
+        required: false
+        default: '2021.6'
+      ifx_version:
+        description: 'ifx (intel) version'
+        required: false
+        default: '2025.2'
+      gcc_version:
+        description: 'gfortran version'
+        required: false
+        default: '13'
+  push:
+    branches:
+      - ifx-prt-compare
+    paths:
+      - '.github/workflows/prt-compilers.yml'
+      - '.github/common/compare_prt_outputs.py'
+      - 'src/**'
+      - 'meson.build'
+env:
+  PIXI_BETA_WARNING_OFF: true
+  IFORT_VERSION: ${{ inputs.ifort_version || '2021.6' }}
+  IFX_VERSION: ${{ inputs.ifx_version || '2025.2' }}
+  GCC_VERSION: ${{ inputs.gcc_version || '13' }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  run:
+    name: Run ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.fp }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+        toolchain: [ifort, ifx]
+        fp: [default, o0-strict, precise, precise-nofma]
+        include:
+          - {os: ubuntu-22.04, toolchain: gfortran, fp: default}
+          - {os: ubuntu-22.04, toolchain: gfortran, fp: o0}
+          - {os: ubuntu-22.04, toolchain: gfortran, fp: uninit}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout MF6
+        uses: actions/checkout@v7
+        with:
+          path: modflow6
+
+      - name: Checkout examples
+        if: runner.os == 'Linux'
+        uses: actions/checkout@v7
+        with:
+          repository: MODFLOW-ORG/modflow6-examples
+          path: modflow6-examples
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Configure variant
+        run: |
+          python modflow6/.github/common/compare_prt_outputs.py config \
+            --os "${{ matrix.os }}" --toolchain "${{ matrix.toolchain }}" --fp "${{ matrix.fp }}" \
+            --ifort-version "$IFORT_VERSION" --ifx-version "$IFX_VERSION" --gcc-version "$GCC_VERSION" \
+            | tee config.txt
+          mkdir -p out
+          cp config.txt out/env.txt
+          # forward slashes work for bash, pwsh and python on all runners
+          out="$GITHUB_WORKSPACE/out"
+          [[ "$RUNNER_OS" == "Windows" ]] && out=$(cygpath -m "$out")
+          echo "OUT=$out" >> $GITHUB_ENV
+
+      - name: Setup pixi
+        uses: prefix-dev/setup-pixi@v0.11.3
+        with:
+          pixi-version: v0.82.1
+          manifest-path: "modflow6/pixi.toml"
+
+      - name: Custom pixi install
+        working-directory: modflow6
+        run: pixi run install
+
+      - name: Setup ${{ env.FC_COMPILER }} ${{ env.FC_VERSION }}
+        uses: fortran-lang/setup-fortran@v1
+        with:
+          compiler: ${{ env.FC_COMPILER }}
+          version: ${{ env.FC_VERSION }}
+
+      - name: Record compiler version
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            "$FC" 2>&1 | head -5 > "$OUT/compiler-version.txt" || true
+          else
+            "$FC" --version 2>&1 | head -5 > "$OUT/compiler-version.txt" || true
+          fi
+          cat "$OUT/compiler-version.txt"
+
+      - name: Update version files
+        working-directory: modflow6
+        run: pixi run update-version
+
+      # pwsh so Windows-style flags (/fp:strict) aren't mangled by MSYS path conversion
+      - name: Build MF6
+        working-directory: modflow6
+        shell: pwsh
+        run: |
+          Write-Host "FFLAGS='$env:FFLAGS' MESON_ARGS='$env:MESON_ARGS'"
+          $margs = @()
+          if ($env:MESON_ARGS) { $margs = $env:MESON_ARGS -split ' ' }
+          $log = Join-Path $env:OUT 'build.log'
+          pixi run setup builddir @margs *>&1 | Tee-Object -FilePath $log
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          pixi run build builddir *>&1 | Tee-Object -FilePath $log -Append
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Record compile command
+        if: always()
+        run: |
+          python modflow6/.github/common/compare_prt_outputs.py buildinfo \
+            --builddir modflow6/builddir --out "$OUT/compile-command.txt"
+          cat "$OUT/compile-command.txt"
+          cp modflow6/builddir/meson-logs/meson-log.txt "$OUT/" || true
+
+      - name: Update flopy
+        working-directory: modflow6
+        run: pixi run update-flopy
+
+      - name: Get executables
+        working-directory: modflow6
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pixi run get-exes
+
+      # test failures are expected (snapshots, mp7 comparisons); outputs are what matter
+      - name: Run PRT autotests
+        working-directory: modflow6/autotest
+        run: |
+          set +e
+          pixi run pytest -v -n auto --durations 0 -m "not large" \
+            --keep "$OUT/autotest" --junitxml "$OUT/junit.xml" test_prt_*.py
+          echo "pytest exit code $?" | tee "$OUT/pytest-exit.txt"
+
+      - name: Install executables
+        if: runner.os == 'Linux'
+        uses: modflowpy/install-modflow-action@v1
+
+      - name: Run PRT examples
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        working-directory: modflow6
+        shell: pixi run bash -e {0}
+        run: |
+          cp -R bin/* ~/.local/bin/modflow/
+          cd ../modflow6-examples/autotest
+          pytest -v -n auto --durations 0 test_scripts.py -k prt || echo "examples failed"
+          mkdir -p "$OUT/examples"
+          for d in ../examples/*prt*; do
+            [ -d "$d" ] && cp -R "$d" "$OUT/examples/"
+          done
+
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: out-${{ env.VARIANT }}
+          path: out
+          retention-days: 7
+
+      - name: Upload mf6 binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: bin-${{ env.VARIANT }}
+          path: modflow6/bin/mf6*
+          retention-days: 7
+
+  cross:
+    name: Rerun PRT ${{ matrix.os }} ${{ matrix.toolchain }} ${{ matrix.fp }}
+    needs: run
+    if: always()
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2022]
+        toolchain: [ifort, ifx]
+        fp: [default, o0-strict, precise, precise-nofma]
+        exclude:
+          - {toolchain: ifort, fp: default}
+        include:
+          - {os: ubuntu-22.04, toolchain: gfortran, fp: default}
+          - {os: ubuntu-22.04, toolchain: gfortran, fp: o0}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout MF6
+        uses: actions/checkout@v7
+        with:
+          path: modflow6
+          sparse-checkout: .github
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Configure variant
+        run: |
+          python modflow6/.github/common/compare_prt_outputs.py config \
+            --os "${{ matrix.os }}" --toolchain "${{ matrix.toolchain }}" --fp "${{ matrix.fp }}" \
+            --ifort-version "$IFORT_VERSION" --ifx-version "$IFX_VERSION" --gcc-version "$GCC_VERSION"
+
+      # for the compiler's runtime libraries
+      - name: Setup ${{ env.FC_COMPILER }} ${{ env.FC_VERSION }}
+        uses: fortran-lang/setup-fortran@v1
+        with:
+          compiler: ${{ env.FC_COMPILER }}
+          version: ${{ env.FC_VERSION }}
+
+      - name: Download baseline outputs
+        uses: actions/download-artifact@v8
+        with:
+          name: out-${{ env.REF_VARIANT }}
+          path: ref
+
+      - name: Download mf6 binary
+        uses: actions/download-artifact@v8
+        with:
+          name: bin-${{ env.VARIANT }}
+          path: variant-bin
+
+      - name: Rerun PRT simulations
+        run: |
+          chmod +x variant-bin/mf6* || true
+          exe=variant-bin/mf6
+          [[ "$RUNNER_OS" == "Windows" ]] && exe=variant-bin/mf6.exe
+          for sub in autotest examples; do
+            if [ -d "ref/$sub" ]; then
+              python modflow6/.github/common/compare_prt_outputs.py rerun \
+                --root "ref/$sub" --mf6 "$exe" --log "rerun-$sub.txt" \
+                --collect "cross/$sub"
+            fi
+          done
+
+      - name: Upload rerun outputs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: out-cross-${{ env.VARIANT }}
+          path: cross
+          retention-days: 7
+
+  compare:
+    name: Compare
+    needs: [run, cross]
+    if: always()
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout MF6
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install numpy
+        run: pip install numpy
+
+      - name: Download outputs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: out-*
+          path: results
+
+      - name: Compare
+        run: |
+          python .github/common/compare_prt_outputs.py compare \
+            --results results --out-md report.md --out-json report.json
+          # step summaries are capped at 1 MiB
+          head -c 1000000 report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: prt-compiler-report
+          path: |
+            report.md
+            report.json
