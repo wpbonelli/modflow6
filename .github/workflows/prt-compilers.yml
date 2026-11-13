@@ -1,6 +1,6 @@
 name: PRT compiler comparison
 # Builds MF6 with ifort, ifx and gfortran under several floating point
-# settings, runs the PRT autotests (and PRT examples on Linux), reruns PRT
+# settings, runs the PRT autotests and PRT examples, reruns PRT
 # alone on the baseline build's flow output, and reports where particle
 # tracks diverge. Baseline: ifort with default flags (current release build).
 on:
@@ -58,7 +58,6 @@ jobs:
           path: modflow6
 
       - name: Checkout examples
-        if: runner.os == 'Linux'
         uses: actions/checkout@v7
         with:
           repository: MODFLOW-ORG/modflow6-examples
@@ -125,6 +124,17 @@ jobs:
           pixi run build builddir *>&1 | Tee-Object -FilePath $log -Append
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      # autotest fixtures require mf5to6; it isn't under test, so default flags
+      - name: Build mf5to6
+        working-directory: modflow6
+        shell: pwsh
+        run: |
+          $env:FFLAGS = ''
+          pixi run setup-mf5to6 builddir *>&1 | Tee-Object -FilePath (Join-Path $env:OUT 'build-mf5to6.log')
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          pixi run build-mf5to6 builddir *>&1 | Tee-Object -FilePath (Join-Path $env:OUT 'build-mf5to6.log') -Append
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Record compile command
         if: always()
         run: |
@@ -153,18 +163,18 @@ jobs:
           echo "pytest exit code $?" | tee "$OUT/pytest-exit.txt"
 
       - name: Install executables
-        if: runner.os == 'Linux'
         uses: modflowpy/install-modflow-action@v1
 
       - name: Run PRT examples
-        if: runner.os == 'Linux'
         continue-on-error: true
         working-directory: modflow6
-        shell: pixi run bash -e {0}
         run: |
-          cp -R bin/* ~/.local/bin/modflow/
+          bindir=~/.local/bin/modflow
+          [[ "$RUNNER_OS" == "Windows" ]] && bindir=/c/Users/runneradmin/.local/bin/modflow
+          cp -R bin/* "$bindir/"
           cd ../modflow6-examples/autotest
-          pytest -v -n auto --durations 0 test_scripts.py -k prt || echo "examples failed"
+          pixi run --manifest-path ../../modflow6/pixi.toml \
+            pytest -v -n auto --durations 0 test_scripts.py -k prt || echo "examples failed"
           mkdir -p "$OUT/examples"
           for d in ../examples/*prt*; do
             [ -d "$d" ] && cp -R "$d" "$OUT/examples/"

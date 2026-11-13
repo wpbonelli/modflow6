@@ -81,6 +81,10 @@ def resolve_variant(os_name, toolchain, fp, versions):
     if toolchain in ("ifort", "ifx"):
         meson_args, lin, win = INTEL_FP[fp]
         fflags = win if oss == "windows" else lin
+        if oss == "windows" and toolchain == "ifx":
+            # ifx 2025.2 on Windows hits an internal compiler error (C0000005)
+            # with /Qimf-arch-consistency:true, even on blas1_d.f90
+            fflags = fflags.replace(" /Qimf-arch-consistency:true", "")
         compiler = "intel-classic" if toolchain == "ifort" else "intel"
     elif toolchain == "gfortran":
         meson_args, fflags = GNU_FP[fp]
