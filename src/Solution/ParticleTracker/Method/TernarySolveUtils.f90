@@ -384,10 +384,18 @@ contains
           else
             ! get alpt and check it
             call get_t_alpt(DZERO, t, alpt)
-            if ((alpt .ge. DZERO) .and. (alpt .le. DONE)) then
+            ! Accept an exit within tolerance of either end of the edge
+            ! and clamp it onto the edge. An exit at a corner, e.g. for
+            ! a particle travelling along an internal subcell edge, can
+            ! otherwise land just past the corner due to roundoff, and
+            ! go undetected here as well as on the adjacent face, along
+            ! which the normal velocity is (roundoff) zero. A trajectory
+            ! can only reach this face's extension beyond a corner after
+            ! crossing the adjacent face, so this can't create an exit.
+            if ((alpt .ge. -tol) .and. (alpt .le. DONE + tol)) then
               ! alpt within the edge, so exit found
               texit = t
-              alpexit = alpt
+              alpexit = min(max(alpt, DZERO), DONE)
               betexit = DZERO
             else
               ! alpt not within the edge, so not an exit
@@ -471,8 +479,32 @@ contains
               fbx = alphi
             end if
             if (fax * fbx .gt. DZERO) then
-              ! Root not bracketed; no exit
+              ! Root not bracketed. But if the trajectory comes within
+              ! tolerance of the face at either end of the interval,
+              ! after the start, treat that end as the exit, e.g. for a
+              ! particle travelling along the adjacent face toward the
+              ! corner where they meet, so it reaches the face only at
+              ! the end of the interval, and roundoff decides the sign.
+              ! The particle's starting point (t = 0) doesn't count, as
+              ! it may sit on this face with tangential flow, and would
+              ! otherwise exit through it immediately.
               texit = huge(DONE)
+              if (dabs(fax) .le. tol .and. tlo .gt. DZERO) then
+                texit = tlo
+                betexit = betlo
+              end if
+              if (dabs(fbx) .le. tol .and. thi .gt. DZERO .and. &
+                  thi .lt. texit) then
+                texit = thi
+                betexit = bethi
+              end if
+              if (texit .ne. huge(DONE)) then
+                if (itriface .eq. 1) then
+                  alpexit = DONE - betexit
+                else
+                  alpexit = DZERO
+                end if
+              end if
             else
               if (isolv .eq. 1) then
                 ! Use Brent's method with initial bounds on beta of betlo and bethi,
