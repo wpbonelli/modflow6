@@ -1,0 +1,14 @@
+# temporary, for testing the release workflow on a fork. do not merge.
+name: Test release workflow
+on:
+  push:
+    branches:
+      - ci-conda-gfortran-release-test
+jobs:
+  make_dist:
+    name: Make distribution
+    uses: ./.github/workflows/release.yml
+    with:
+      ref: ${{ github.sha }}
+      releasemode: false
+      run_tests: true
