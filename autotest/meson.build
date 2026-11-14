@@ -5,7 +5,8 @@ if not fc_id.contains('intel')
   test_drive_proj = subproject(
     'test-drive',
     required : false,
-    default_options : ['default_library=static'],
+    # not our code, so don't fail on its warnings
+    default_options : ['default_library=static', 'werror=false'],
   )
   if test_drive_proj.found()
     test_drive = test_drive_proj.get_variable('testdrive_dep')
