@@ -9,6 +9,7 @@ module MethodSubcellPollockModule
   use BaseDisModule, only: DisBaseType
   use CellModule, only: CellType
   use ConstantsModule, only: DZERO, DONE
+  use MathUtilModule, only: is_close
   use DomainModule, only: DomainType
   use SubcellModule, only: SubcellType
   use ListModule, only: ListType
@@ -136,6 +137,15 @@ contains
     end if
     texit = particle%ttrack + dtexit
 
+    ! Treat an exit time within roundoff of the end of the time step
+    ! (or the particle's stop time) as an exact tie, which counts as
+    ! an exit (texit <= tmax). Otherwise roundoff decides whether a
+    ! time step event is reported before an all-but-immediate exit.
+    if (texit /= tmax .and. is_close(texit, tmax)) then
+      texit = tmax
+      dtexit = texit - t0
+    end if
+
     ! Terminate if no valid exit solution was found.
     ! MP7 is more nuanced in determining what to do
     ! here. It considers whether this stress period
@@ -161,6 +171,17 @@ contains
       do i = this%tracktimes%selection(1), this%tracktimes%selection(2)
         t = this%tracktimes%times(i)
         if (t < particle%ttrack) cycle
+        ! Skip times already reported, e.g. one equal to an exit
+        ! time, which was reported in the subcell being left. Exact
+        ! comparison is safe since both are copies of times(i).
+        if (t <= particle%tusertime) cycle
+        ! Likewise treat a tracking time within roundoff of the exit
+        ! time as equal to it, so it's reported in this subcell, just
+        ! before the exit, which happens at exactly the tracking time.
+        if (t > texit .and. t <= tmax .and. is_close(t, texit)) then
+          texit = t
+          dtexit = texit - t0
+        end if
         if (t > texit .or. t > tmax) exit
         dt = t - t0
         x = new_x(exit_x%v, exit_x%dvdx, subcell%vx1, subcell%vx2, &
@@ -241,6 +262,13 @@ contains
   end subroutine track_subcell
 
   !> @brief Pick the exit solution with the shortest travel time
+  !!
+  !! Exact ties go to the first direction (x, then y, then z), since
+  !! the comparisons are strict. Near-ties, e.g. a particle heading
+  !! for a corner, can flip with roundoff. That's genuine sensitivity
+  !! to the input (any perturbation moves the particle to one side or
+  !! the other), so no tolerance is applied here.
+  !<
   function pick_exit(exit_solutions) result(exit_soln)
     type(LinearExitSolutionType), intent(in) :: exit_solutions(3)
     integer(I4B) :: exit_soln
@@ -394,6 +422,7 @@ contains
       x = xL * dx
       if (v1 .gt. zro) dt = (dx - x) / v1
       if (v1 .lt. zrom) dt = -x / v1
+      if (dt < DZERO) dt = DZERO
       dvdx = DZERO
       status = OK_EXIT_CONSTANT
       return
@@ -401,8 +430,17 @@ contains
 
     ! Velocity has a linear variation.
     ! Compute velocity corresponding to particle position.
+    ! Take the face velocity exactly if the particle is on a face:
+    ! interpolating may not reproduce it, e.g. if the compiler
+    ! reassociates the expression under a fast FP model.
     dvdx = dv / dx
-    v = (DONE - xL) * v1 + xL * v2
+    if (xL <= DZERO) then
+      v = v1
+    else if (xL >= DONE) then
+      v = v2
+    else
+      v = (DONE - xL) * v1 + xL * v2
+    end if
 
     ! If flow is into the cell from both sides there is no outflow.
     ! In that case, set status = 3 and return.
@@ -454,7 +492,16 @@ contains
     end if
 
     ! Compute travel time to exit face. Return with status = 0.
-    dt = log(vr) / dvdx
+    ! A particle on the face it's moving towards exits immediately.
+    ! Set dt to exactly zero rather than rely on log(vr) = log(1),
+    ! which roundoff in vr can make slightly positive or negative,
+    ! deciding whether coincident events (e.g. a tracking time) are
+    ! reported before or after the exit. Never return a negative dt.
+    if ((xL <= DZERO .and. v < DZERO) .or. (xL >= DONE .and. v > DZERO)) then
+      dt = DZERO
+    else
+      dt = max(log(vr) / dvdx, DZERO)
+    end if
     status = OK_EXIT
 
   end function calculate_dt

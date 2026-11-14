@@ -3,6 +3,7 @@ module MethodCellModule
   use KindModule, only: DP, I4B, LGP
   use ErrorUtilModule, only: pstop
   use ConstantsModule, only: DONE, DZERO
+  use MathUtilModule, only: is_close
   use MethodModule, only: MethodType, LEVEL_FEATURE
   use ParticleModule, only: ParticleType, ACTIVE, TERM_NO_EXITS, TERM_BOUNDARY
   use ParticleEventModule, only: ParticleEventType
@@ -92,7 +93,11 @@ contains
     real(DP) :: t, ttrackmax
 
     dry_cell = cell_defn%isatstat == SATURATION_DRY
-    dry_particle = particle%z > cell_defn%top
+    ! A particle within roundoff of the water table isn't dry: the
+    ! z it got entering the cell and the cell's saturated top are
+    ! computed separately, and may differ in the last bit or two.
+    dry_particle = particle%z > cell_defn%top .and. &
+                   .not. is_close(particle%z, cell_defn%top)
     no_exit_face = cell_defn%inoexitface > 0
     stop_zone = cell_defn%izone > 0 .and. particle%istopzone == cell_defn%izone
     weak_sink = cell_defn%iweaksink > 0
@@ -150,6 +155,7 @@ contains
           do i = this%tracktimes%selection(1), this%tracktimes%selection(2)
             t = this%tracktimes%times(i)
             if (t < totimc) cycle
+            if (t <= particle%tusertime) cycle ! already reported
             if (t > tmax) exit
             particle%ttrack = t
             call this%usertime(particle)
@@ -197,6 +203,7 @@ contains
           do i = this%tracktimes%selection(1), this%tracktimes%selection(2)
             t = this%tracktimes%times(i)
             if (t < totimc) cycle
+            if (t <= particle%tusertime) cycle ! already reported
             if (t > tmax) exit
             particle%ttrack = t
             call this%usertime(particle)

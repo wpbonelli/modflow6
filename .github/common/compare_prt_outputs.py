@@ -263,6 +263,18 @@ def fate(recs):
     return (last[IDX["istatus"]], last[IDX["ilay"]], last[IDX["icell"]])
 
 
+def transition(ref, cand, i):
+    """Label the first mismatch by event kind, e.g. "5->1" (ireason ref -> cand).
+
+    A missing record shows as "-". Grouping on this shows whether divergences
+    share one tie-breaking pattern or several.
+    """
+    k = IDX["ireason"]
+    a = str(ref[i][k]) if i < len(ref) else "-"
+    b = str(cand[i][k]) if i < len(cand) else "-"
+    return f"{a}->{b}"
+
+
 def fmt_rec(r):
     if r is None:
         return "—"
@@ -286,6 +298,7 @@ def compare_track_file(ref_path, cand_path, kind, rtol, atol, max_examples):
         "extra": 0,
         "fate_changed": 0,
         "reasons": {},
+        "transitions": {},
         "maxd": {k: 0.0 for k in CONTINUOUS},
         "examples": [],
     }
@@ -304,6 +317,8 @@ def compare_track_file(ref_path, cand_path, kind, rtol, atol, max_examples):
         if status == "diverged":
             reason = info["reason"]
             res["reasons"][reason] = res["reasons"].get(reason, 0) + 1
+            tr = transition(rrecs, crecs, info["index"])
+            res["transitions"][tr] = res["transitions"].get(tr, 0) + 1
             if len(res["examples"]) < max_examples:
                 i = info["index"]
                 res["examples"].append(
@@ -481,6 +496,15 @@ def details(label, cmp, with_examples, max_files):
             out.append(f"- `{rel}` ({f['kind']}): **{st}** {f.get('error', '')}")
             continue
         reasons = ", ".join(f"{k}: {v}" for k, v in sorted(f["reasons"].items()))
+        trans = f.get("transitions", {})
+        if trans:
+            reasons += (
+                " (ireason ref->cand: "
+                + ", ".join(
+                    f"{k}: {v}" for k, v in sorted(trans.items(), key=lambda kv: -kv[1])
+                )
+                + ")"
+            )
         out.append(
             f"- `{rel}` ({f['kind']}): **{st}**, {f['diverged'] + f['missing']}"
             f"/{f['particles']} particles diverged, {f['fate_changed']} fates "

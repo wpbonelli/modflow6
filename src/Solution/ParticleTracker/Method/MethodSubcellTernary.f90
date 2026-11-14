@@ -136,6 +136,15 @@ contains
     end if
     texit = t0 + dtexit
 
+    ! Treat an exit time within roundoff of the end of the time step
+    ! (or the particle's stop time) as an exact tie, which counts as
+    ! an exit (texit <= tmax). Otherwise roundoff decides whether a
+    ! time step event is reported before an all-but-immediate exit.
+    if (texit /= tmax .and. is_close(texit, tmax)) then
+      texit = tmax
+      dtexit = texit - t0
+    end if
+
     ! Select user tracking times to solve. If this is the last time step
     ! in the simulation, times falling after the simulation end time are
     ! only included if the 'extend' option is on, otherwise only times in
@@ -145,6 +154,17 @@ contains
       do i = this%tracktimes%selection(1), this%tracktimes%selection(2)
         t = this%tracktimes%times(i)
         if (t < t0) cycle
+        ! Skip times already reported, e.g. one equal to an exit
+        ! time, which was reported in the subcell being left. Exact
+        ! comparison is safe since both are copies of times(i).
+        if (t <= particle%tusertime) cycle
+        ! Likewise treat a tracking time within roundoff of the exit
+        ! time as equal to it, so it's reported in this subcell, just
+        ! before the exit, which happens at exactly the tracking time.
+        if (t > texit .and. t <= tmax .and. is_close(t, texit)) then
+          texit = t
+          dtexit = texit - t0
+        end if
         if (t > texit .or. t > tmax) exit
         dt = t - t0
         call calculate_xyz_position(dt, &
@@ -444,6 +464,7 @@ contains
         dt = -x / v1
         itopbotexit = -1
       end if
+      if (dt < DZERO) dt = DZERO
       dvdx = DZERO
       status = OK_EXIT_CONSTANT
       return
@@ -451,8 +472,17 @@ contains
 
     ! Velocity has a linear variation.
     ! Compute velocity corresponding to particle position
+    ! Take the face velocity exactly if the particle is on a face:
+    ! interpolating may not reproduce it, e.g. if the compiler
+    ! reassociates the expression under a fast FP model.
     dvdx = dv / dx
-    v = (DONE - xL) * v1 + xL * v2
+    if (xL <= DZERO) then
+      v = v1
+    else if (xL >= DONE) then
+      v = v2
+    else
+      v = (DONE - xL) * v1 + xL * v2
+    end if
 
     ! If flow is into the cell from both sides there is no outflow.
     ! In that case, set status = 3 and return
@@ -503,7 +533,16 @@ contains
     end if
 
     ! Compute travel time to exit face. Return with status = 0
-    dt = log(abs(vr)) / dvdx
+    ! A particle on the face it's moving towards exits immediately.
+    ! Set dt to exactly zero rather than rely on log(vr) = log(1),
+    ! which roundoff in vr can make slightly positive or negative,
+    ! deciding whether coincident events (e.g. a tracking time) are
+    ! reported before or after the exit. Never return a negative dt.
+    if ((xL <= DZERO .and. v < DZERO) .or. (xL >= DONE .and. v > DZERO)) then
+      dt = DZERO
+    else
+      dt = max(log(abs(vr)) / dvdx, DZERO)
+    end if
     status = OK_EXIT
   end subroutine calculate_dt
 
