@@ -31,6 +31,7 @@ module PrtModule
   use MethodDisvModule, only: MethodDisvType, create_method_disv
   use HashTableModule, only: HashTableType, hash_table_cr, hash_table_da
   use ArrayHandlersModule, only: ExpandArray
+  use MathUtilModule, only: is_close
 
   implicit none
 
@@ -97,7 +98,7 @@ module PrtModule
     procedure, private :: create_bndpkgs
     procedure, private :: create_exg_prp
     procedure, private :: log_namfile_options
-    procedure, private :: simulation_end
+    procedure, private :: snap_to_tracktime
     procedure, private :: warn_late_tracktimes
 
   end type PrtModelType
@@ -1077,7 +1078,7 @@ contains
     call create_particle(particle)
     ! End of the time step, or, in the final time step, of the simulation.
     tend = totimc + delt
-    if (endofsimulation) tend = this%simulation_end(tend)
+    if (endofsimulation) tend = this%snap_to_tracktime(tend)
     ! Loop over PRP packages and particles within them.
     iprp = 0
     do ip = 1, this%bndlist%Count()
@@ -1119,6 +1120,13 @@ contains
                 ! The particle was released this time step; emit a
                 ! release event.
                 call this%method%release(particle)
+                ! A stop time from STOPTRAVELTIME is a computed sum, so
+                ! it moves onto a tracking time within roundoff after
+                ! it. Once, at release, so it can't creep onto a later
+                ! tracking time close to that one.
+                if (packobj%stoptraveltime /= huge(1d0) .and. &
+                    particle%tstop /= packobj%stoptime) &
+                  particle%tstop = this%snap_to_tracktime(particle%tstop)
               end if
             end if
           end if
@@ -1141,6 +1149,12 @@ contains
             ! methods assume a nonnegative time interval, and calling
             ! apply() with tmax < ttrack sends them a negative one,
             ! which corrupts the tracking method.
+            ! The exception is a release time within roundoff after the
+            ! computed end of the simulation, which PRP keeps: the end
+            ! moves onto it, so the particle is released and terminated
+            ! there.
+            if (endofsimulation .and. tmax < particle%ttrack .and. &
+                is_close(particle%ttrack, tmax)) tmax = particle%ttrack
             if (tmax < particle%ttrack) &
               call pstop(1, 'Programmer error: PRT tracking tmax &
                 &precedes particle%ttrack.')
@@ -1167,23 +1181,24 @@ contains
     deallocate (particle)
   end subroutine prt_solve
 
-  !> @brief End of the simulation, for tracking without EXTEND_TRACKING.
+  !> @brief Move a computed end of tracking onto a tracking time.
   !!
-  !! The simulation's end time is a sum computed by TDIS, so it can come
-  !! out a few ulps below the time a user would type for it, e.g. ten
-  !! periods of 0.1 end at 0.9999999999999999, not 1.0. A tracking time
-  !! at the typed end would then fall just after the simulation, and,
-  !! with no later time step to report it in, be dropped. A tracking
-  !! time within roundoff after the computed end is the given time, so
-  !! the end moves onto it, as a computed exit time moves onto a given
-  !! time in the subcell methods. Tracking then runs to that time, and
-  !! the final time step and termination events are reported there too.
+  !! Times at which tracking ends can be sums computed by PRT, so they
+  !! can come out a few ulps below the time a user would type for them.
+  !! The end of the simulation is a sum of period lengths: ten periods
+  !! of 0.1 end at 0.9999999999999999, not 1.0. A particle's stop time
+  !! from STOPTRAVELTIME is its release time plus the travel time: 0.7
+  !! plus 0.1 is 0.7999999999999999. A tracking time typed at either end
+  !! would then fall just after it and, with no later time step for the
+  !! particle, be dropped. A tracking time within roundoff after such an
+  !! end is the given time, so the end moves onto it, as a computed exit
+  !! time moves onto a given time in the subcell methods. Tracking then
+  !! runs to that time, and the events at the end are reported there.
   !<
-  function simulation_end(this, tend) result(t)
-    use MathUtilModule, only: is_close
+  function snap_to_tracktime(this, tend) result(t)
     ! dummy
     class(PrtModelType) :: this
-    real(DP), intent(in) :: tend !< computed end of the simulation
+    real(DP), intent(in) :: tend !< computed end of tracking
     real(DP) :: t
     ! local
     integer(I4B) :: i
@@ -1197,7 +1212,7 @@ contains
       if (is_close(ti, tend)) t = ti
       exit
     end do
-  end function simulation_end
+  end function snap_to_tracktime
 
   !> @brief Warn about tracking times after the end of the simulation.
   !!
