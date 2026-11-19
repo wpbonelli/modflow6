@@ -1,0 +1,3 @@
+section = "fixes"
+subsection = "model"
+description = "The PRT ternary method computed a wrong exit time from a triangular subcell when the particle's velocity normal to the subcell's outer face was zero but its velocity along the face varied, as where flow runs parallel to a cell face and speeds up or slows down. The time was often negative, which stopped the simulation with the message \"texit is negative (unexpected)\". Misplaced parentheses in the formula have been corrected."

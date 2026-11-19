@@ -445,7 +445,7 @@ contains
               betexit = beti
               if (dabs(waa) > zerotol) then
                 alplim = -v0alpstar / waa
-                texit = dlog(alpexit - alplim / (alpi - alplim)) / waa
+                texit = dlog((alpexit - alplim) / (alpi - alplim)) / waa
               else
                 texit = (alpexit - alpi) / v0alpstar
               end if
