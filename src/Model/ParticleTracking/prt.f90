@@ -97,6 +97,8 @@ module PrtModule
     procedure, private :: create_bndpkgs
     procedure, private :: create_exg_prp
     procedure, private :: log_namfile_options
+    procedure, private :: simulation_end
+    procedure, private :: warn_late_tracktimes
 
   end type PrtModelType
 
@@ -1061,6 +1063,7 @@ contains
     class(BndType), pointer :: packobj
     type(ParticleType), pointer :: particle
     real(DP) :: tmax
+    real(DP) :: tend
     integer(I4B) :: iprp
 
     ! Skip tracking during Picard iterations: PRT doesn't affect the flow
@@ -1072,6 +1075,9 @@ contains
     ! to avoid allocating and deallocating it each time.
     ! get() and put() retrieve and store particle state.
     call create_particle(particle)
+    ! End of the time step, or, in the final time step, of the simulation.
+    tend = totimc + delt
+    if (endofsimulation) tend = this%simulation_end(tend)
     ! Loop over PRP packages and particles within them.
     iprp = 0
     do ip = 1, this%bndlist%Count()
@@ -1079,6 +1085,8 @@ contains
       select type (packobj)
       type is (PrtPrpType)
         iprp = iprp + 1
+        if (endofsimulation .and. .not. packobj%extend) &
+          call this%warn_late_tracktimes(packobj, tend)
         do np = 1, packobj%nparticles
           ! Get the particle from the staging store
           call packobj%particles_staging%get(particle, this%id, iprp, np)
@@ -1121,7 +1129,7 @@ contains
             if (endofsimulation .and. particle%extend) then
               tmax = particle%tstop
             else
-              tmax = min(totimc + delt, particle%tstop)
+              tmax = min(tend, particle%tstop)
             end if
             ! tmax should never be less than the particle's current
             ! tracked time: ttrack can't get ahead of totimc, the
@@ -1157,6 +1165,68 @@ contains
     call particle%destroy()
     deallocate (particle)
   end subroutine prt_solve
+
+  !> @brief End of the simulation, for tracking without EXTEND_TRACKING.
+  !!
+  !! The simulation's end time is a sum computed by TDIS, so it can come
+  !! out a few ulps below the time a user would type for it, e.g. ten
+  !! periods of 0.1 end at 0.9999999999999999, not 1.0. A tracking time
+  !! at the typed end would then fall just after the simulation, and,
+  !! with no later time step to report it in, be dropped. A tracking
+  !! time within roundoff after the computed end is the given time, so
+  !! the end moves onto it, as a computed exit time moves onto a given
+  !! time in the subcell methods. Tracking then runs to that time, and
+  !! the final time step and termination events are reported there too.
+  !<
+  function simulation_end(this, tend) result(t)
+    use MathUtilModule, only: is_close
+    ! dummy
+    class(PrtModelType) :: this
+    real(DP), intent(in) :: tend !< computed end of the simulation
+    real(DP) :: t
+    ! local
+    integer(I4B) :: i
+    real(DP) :: ti
+
+    t = tend
+    if (.not. allocated(this%oc%tracktimes%times)) return
+    do i = 1, size(this%oc%tracktimes%times)
+      ti = this%oc%tracktimes%times(i)
+      if (ti <= tend) cycle
+      if (is_close(ti, tend)) t = ti
+      exit
+    end do
+  end function simulation_end
+
+  !> @brief Warn about tracking times after the end of the simulation.
+  !!
+  !! Without EXTEND_TRACKING, tracking stops at the end of the simulation,
+  !! so the package's particles never reach tracking times after it.
+  !<
+  subroutine warn_late_tracktimes(this, prp, tend)
+    use PrtPrpModule, only: PrtPrpType
+    use SimVariablesModule, only: warnmsg
+    ! dummy
+    class(PrtModelType) :: this
+    class(PrtPrpType), intent(in) :: prp
+    real(DP), intent(in) :: tend !< end of the simulation
+    ! local
+    integer(I4B) :: i, n
+
+    if (.not. allocated(this%oc%tracktimes%times)) return
+    n = 0
+    do i = 1, size(this%oc%tracktimes%times)
+      if (this%oc%tracktimes%times(i) > tend) n = n + 1
+    end do
+    if (n == 0) return
+    write (warnmsg, '(a,i0,a,g0,a)') &
+      'PRT model '//trim(this%name)//' package '//trim(prp%packName)// &
+      ': ', n, ' tracking time(s) &
+      &after the end of the simulation (t=', tend, ') will not be &
+      &reported. Enable EXTEND_TRACKING to track particles past the &
+      &simulation end time.'
+    call store_warning(warnmsg, substring=trim(warnmsg))
+  end subroutine warn_late_tracktimes
 
   !> @brief Source package info and begin to process
   subroutine create_bndpkgs(this, bndpkgs, pkgtypes, pkgnames, &

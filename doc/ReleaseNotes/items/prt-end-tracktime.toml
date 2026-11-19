@@ -1,0 +1,3 @@
+section = "fixes"
+subsection = "model"
+description = "Without EXTEND\\_TRACKING, PRT could drop a user tracking time at the end of the simulation. The simulation's end time is a floating point sum, which can come out slightly below the time given for the tracking time, e.g. 0.9999999999999999 instead of 1.0 for ten stress periods of 0.1, putting the tracking time just after the end. A tracking time within roundoff after the end of the simulation is now reported, and the final time step and termination events are reported at the same time. PRT now also warns about tracking times after the end of the simulation that will not be reported."
