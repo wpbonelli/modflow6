@@ -1290,7 +1290,10 @@ contains
     ! and, unless EXTEND_TRACKING is on, times after the end of the
     ! simulation. Deciding here rather than at each time step keeps
     ! the schedule to the releases that actually happen. Options are
-    ! read before dimensions, so EXTEND_TRACKING is known here.
+    ! read before dimensions, so EXTEND_TRACKING is known here. A time
+    ! within roundoff after the end is kept: the end is a computed sum
+    ! of period lengths, and can fall just below the time given for it.
+    ! The model's solve moves the end onto such a release.
     allocate (times(0))
     do n = 1, size(time)
       t = time(n)
@@ -1299,7 +1302,8 @@ contains
           'Skipping negative release time (t=', t, ').'
         call store_warning(warnmsg)
         cycle
-      else if (t > totalsimtime .and. .not. this%extend) then
+      else if (t > totalsimtime .and. .not. this%extend .and. &
+               .not. is_close(t, totalsimtime)) then
         write (warnmsg, '(a,g0,a)') &
           'Skipping release time falling after the end of the &
           &simulation (t=', t, '). Enable EXTEND_TRACKING to &

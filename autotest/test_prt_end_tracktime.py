@@ -1,17 +1,30 @@
 """
-A tracking time at the end of the simulation, without EXTEND_TRACKING.
+Tracking times and releases at a computed end of tracking.
 
-The simulation's end time is a sum computed by TDIS. Ten stress periods
-of 0.1 end at 0.9999999999999999, 1 ulp below the 1.0 a user would type
-for a tracking time at the end. Such a tracking time, within roundoff
-after the computed end, is reported, once, in the final time step, and
-the final time step and termination events move onto it, so times don't
-decrease. A tracking time well after the end (1.5) isn't reported, and a
-warning says so.
+Some times at which tracking ends are sums computed by PRT, which can
+come out 1 ulp below the time a user would type for them. A given time
+within roundoff after such an end is treated as the end. All cases use
+ten stress periods of 0.1, which end at 0.9999999999999999, not 1.0,
+and run without EXTEND_TRACKING.
 
-The particle is still moving when the simulation ends. Each case runs on
-a DIS grid with Pollock's method, and on a DISV grid with Pollock's
-method and with the ternary method.
+    end:      a tracking time at the end of the simulation (1.0). It's
+              reported once, in the last time step, and the final time
+              step and termination events follow at the same time. A
+              tracking time well after the end (1.5) isn't reported,
+              and a warning says so.
+    stoptt:   a tracking time at the stop time from STOPTRAVELTIME. A
+              release at 0.35 with travel time 0.1 stops at
+              0.44999999999999996; the tracking time 0.45 is reported,
+              and the termination follows at the same time.
+    release:  a release time at the end of the simulation (1.0). It
+              isn't skipped: the particle is released and terminated at
+              1.0, as it would be if the simulation ended exactly
+              there. A release time well after the end (1.5) is
+              skipped, with a warning.
+
+In each case the particle is still moving when tracking ends. Each case
+runs on a DIS grid with Pollock's method, and on a DISV grid with
+Pollock's method and with the ternary method.
 """
 
 from pathlib import Path
@@ -31,15 +44,27 @@ porosity = 0.1
 nper, perlen = 10, 0.1
 PERIODDATA = [(perlen, 1, 1.0)] * nper
 TEND = 1.0  # the end of the simulation, as a user would type it
-TRACKTIMES = [0.5, TEND, 1.5]
+TRELEASE, STOPTRAVELTIME, TSTOP = 0.35, 0.1, 0.45
+CASES = {
+    # case: (release times, tracking times, stop travel time)
+    "end": ([0.0], [0.5, TEND, 1.5], None),
+    "stoptt": ([TRELEASE], [0.4, TSTOP, 0.5], STOPTRAVELTIME),
+    "release": ([0.0, TEND, 1.5], None, None),
+}
 RELEASE_CELL = (0, 2, 2)
 # off the cell center and the grid's line of symmetry, so the particle
 # doesn't track exactly along an internal edge between ternary subcells
 RELEASE_POINT = (2.4, 7.3, 0.5)
 GRIDS = {"dis": "pollock", "disv": "pollock", "disvt": "ternary"}
-cases = [f"{simname}_{grid}" for grid in GRIDS]
+cases = [f"{simname}{case[0]}_{grid}" for case in CASES for grid in GRIDS]
 
 RELEASE, EXIT, TIMESTEP, TERMINATE, USERTIME = 0, 1, 2, 3, 5
+
+
+def parse(name):
+    code, grid = name[len(simname) :].split("_")
+    case = next(c for c in CASES if c[0] == code)
+    return case, grid
 
 
 def float_exactly(sim):
@@ -108,7 +133,8 @@ def build_gwf_sim(name, ws, mf6, grid):
     return sim
 
 
-def build_prt_sim(name, gwf_ws, prt_ws, mf6, grid):
+def build_prt_sim(name, gwf_ws, prt_ws, mf6, grid, case):
+    releasetimes, tracktimes, stoptraveltime = CASES[case]
     sim = flopy.mf6.MFSimulation(sim_name=name, exe_name=mf6, sim_ws=prt_ws)
     float_exactly(sim)
     flopy.mf6.ModflowTdis(sim, time_units="DAYS", nper=nper, perioddata=PERIODDATA)
@@ -123,8 +149,9 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, grid):
         filename=f"{prtname}_1.prp",
         nreleasepts=1,
         packagedata=[[0, cellid(grid, RELEASE_CELL), x, y, z]],
-        nreleasetimes=1,
-        releasetimes=[(0.0,)],
+        nreleasetimes=len(releasetimes),
+        releasetimes=[(t,) for t in releasetimes],
+        stoptraveltime=stoptraveltime,
         dev_forceternary=GRIDS[grid] == "ternary",
         extend_tracking=False,
     )
@@ -132,8 +159,8 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, grid):
         prt,
         pname="oc",
         trackcsv_filerecord=[f"{prtname}.trk.csv"],
-        ntracktimes=len(TRACKTIMES),
-        tracktimes=[(t,) for t in TRACKTIMES],
+        ntracktimes=len(tracktimes) if tracktimes else None,
+        tracktimes=[(t,) for t in tracktimes] if tracktimes else None,
     )
     gwfname = get_model_name(name, "gwf")
     flopy.mf6.ModflowPrtfmi(
@@ -148,27 +175,21 @@ def build_prt_sim(name, gwf_ws, prt_ws, mf6, grid):
     return sim
 
 
-def build_models(test, grid):
+def build_models(test, grid, case):
     mf6 = test.targets["mf6"]
     gwf_sim = build_gwf_sim(test.name, test.workspace, mf6, grid)
     prt_sim = build_prt_sim(
-        test.name, test.workspace, test.workspace / "prt", mf6, grid
+        test.name, test.workspace, test.workspace / "prt", mf6, grid, case
     )
     return gwf_sim, prt_sim
 
 
-def check_output(test, grid):
-    # the premise: TDIS's computed end is just below the typed end
-    tsim = 0.0
-    for _ in range(nper):
-        tsim += perlen
-    assert tsim < TEND and np.nextafter(tsim, np.inf) == TEND
+def read_lst(test):
+    lst = (test.workspace / "prt" / "mfsim.lst").read_text().upper()
+    return " ".join(lst.split())  # messages are wrapped
 
-    prtname = get_model_name(test.name, "prt")
-    trk = pd.read_csv(test.workspace / "prt" / f"{prtname}.trk.csv")
-    assert trk.ireason.iloc[0] == RELEASE
-    assert (np.diff(trk.t) >= 0).all(), f"times decrease:\n{trk.tail(6)}"
 
+def check_end(trk, test):
     # the tracking time at the typed end is reported once, in the last step
     at = trk[(trk.ireason == USERTIME) & (trk.t == TEND)]
     assert len(at) == 1, f"tracking time {TEND} reported {len(at)} times:\n{trk}"
@@ -182,19 +203,68 @@ def check_output(test, grid):
 
     # the tracking time well after the end isn't reported, with a warning
     assert (trk.t <= TEND).all(), trk.tail(4)
-    lst = (test.workspace / "prt" / "mfsim.lst").read_text().upper()
-    lst = " ".join(lst.split())  # messages are wrapped
-    assert "1 TRACKING TIME(S) AFTER THE END OF THE SIMULATION" in lst
+    assert "1 TRACKING TIME(S) AFTER THE END OF THE SIMULATION" in read_lst(test)
+
+
+def check_stoptt(trk, test):
+    # the premise: the computed stop time is just below the typed one
+    tstop = TRELEASE + STOPTRAVELTIME
+    assert tstop < TSTOP and np.nextafter(tstop, np.inf) == TSTOP
+
+    # the tracking time at the typed stop time is reported once, and the
+    # termination follows at the same time; the later one isn't reported
+    at = trk[(trk.ireason == USERTIME) & (trk.t == TSTOP)]
+    assert len(at) == 1, f"tracking time {TSTOP} reported {len(at)} times:\n{trk}"
+    last = trk.iloc[-1]
+    assert last.ireason == TERMINATE and last.t == TSTOP, trk.tail(4)
+    assert (trk.t <= TSTOP).all(), trk.tail(4)
+
+
+def check_release(trk, test):
+    # the release at the typed end isn't skipped: the particle is
+    # released and terminated there, in the last time step, with a time
+    # step event in between, as for a release exactly at the end
+    late = trk[trk.trelease == TEND]
+    assert list(late.ireason) == [RELEASE, TIMESTEP, TERMINATE], f"\n{late}"
+    assert (late.t == TEND).all() and (late.kper == nper).all(), late
+
+    # the first particle ends at the end of the simulation as computed
+    first = trk[trk.trelease == 0.0]
+    assert first.ireason.iloc[-1] == TERMINATE
+    assert first.t.iloc[-1] == np.nextafter(TEND, -np.inf), first.tail(2)
+
+    # the release well after the end is skipped, with a warning
+    assert not (trk.trelease == 1.5).any()
+    lst = read_lst(test)
+    # only the release at 1.5 is skipped
+    assert lst.count("SKIPPING RELEASE TIME") == 1 and "(T=1.5" in lst
+
+
+def check_output(test, grid, case):
+    # the premise: TDIS's computed end is just below the typed end
+    tsim = 0.0
+    for _ in range(nper):
+        tsim += perlen
+    assert tsim < TEND and np.nextafter(tsim, np.inf) == TEND
+
+    prtname = get_model_name(test.name, "prt")
+    trk = pd.read_csv(test.workspace / "prt" / f"{prtname}.trk.csv")
+    assert trk.ireason.iloc[0] == RELEASE
+    for _, p in trk.groupby("trelease"):
+        assert (np.diff(p.t) >= 0).all(), f"times decrease:\n{p.tail(6)}"
+    {"end": check_end, "stoptt": check_stoptt, "release": check_release}[case](
+        trk, test
+    )
 
 
 @pytest.mark.parametrize("name", cases)
 def test_mf6model(name, function_tmpdir, targets):
-    grid = name[len(simname) + 1 :]
+    case, grid = parse(name)
     test = TestFramework(
         name=name,
         workspace=function_tmpdir,
-        build=lambda t: build_models(t, grid),
-        check=lambda t: check_output(t, grid),
+        build=lambda t: build_models(t, grid, case),
+        check=lambda t: check_output(t, grid, case),
         targets=targets,
         compare=None,
     )
