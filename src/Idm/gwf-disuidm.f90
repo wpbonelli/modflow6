@@ -23,6 +23,9 @@ module GwfDisuInputModule
     logical :: yorigin = .false.
     logical :: angrot = .false.
     logical :: voffsettol = .false.
+    logical :: vtu_geometry = .false.
+    logical :: vtu_fileout = .false.
+    logical :: full_3d = .false.
     logical :: export_ascii = .false.
     logical :: crs = .false.
     logical :: nodes = .false.
@@ -31,6 +34,10 @@ module GwfDisuInputModule
     logical :: top = .false.
     logical :: bot = .false.
     logical :: area = .false.
+    logical :: volume = .false.
+    logical :: xcell = .false.
+    logical :: ycell = .false.
+    logical :: zcell = .false.
     logical :: idomain = .false.
     logical :: iac = .false.
     logical :: ja = .false.
@@ -248,6 +255,63 @@ module GwfDisuInputModule
     )
 
   type(InputParamDefinitionType), parameter :: &
+    gwfdisu_vtu_geometry = InputParamDefinitionType &
+    ( &
+    'GWF', & ! component
+    'DISU', & ! subcomponent
+    'OPTIONS', & ! block
+    'VTU_GEOMETRY', & ! tag name
+    'VTU_GEOMETRY', & ! fortran variable
+    'STRING', & ! type
+    '', & ! shape
+    'file with the cell geometry for VTU output', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .true., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwfdisu_vtu_fileout = InputParamDefinitionType &
+    ( &
+    'GWF', & ! component
+    'DISU', & ! subcomponent
+    'OPTIONS', & ! block
+    'VTU_FILEOUT', & ! tag name
+    'VTU_FILEOUT', & ! fortran variable
+    'STRING', & ! type
+    '', & ! shape
+    'root name of the VTU output files', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .true., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwfdisu_full_3d = InputParamDefinitionType &
+    ( &
+    'GWF', & ! component
+    'DISU', & ! subcomponent
+    'OPTIONS', & ! block
+    'FULL_3D', & ! tag name
+    'FULL_3D', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'fully three-dimensional unstructured grid', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
     gwfdisu_export_ascii = InputParamDefinitionType &
     ( &
     'GWF', & ! component
@@ -392,6 +456,82 @@ module GwfDisuInputModule
     'NODES', & ! shape
     'cell surface area', & ! longname
     .true., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwfdisu_volume = InputParamDefinitionType &
+    ( &
+    'GWF', & ! component
+    'DISU', & ! subcomponent
+    'GRIDDATA', & ! block
+    'VOLUME', & ! tag name
+    'VOLUME', & ! fortran variable
+    'DOUBLE1D', & ! type
+    'NODES', & ! shape
+    'cell volume', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwfdisu_xcell = InputParamDefinitionType &
+    ( &
+    'GWF', & ! component
+    'DISU', & ! subcomponent
+    'GRIDDATA', & ! block
+    'XCELL', & ! tag name
+    'XCELL', & ! fortran variable
+    'DOUBLE1D', & ! type
+    'NODES', & ! shape
+    'x-coordinate of cell center', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwfdisu_ycell = InputParamDefinitionType &
+    ( &
+    'GWF', & ! component
+    'DISU', & ! subcomponent
+    'GRIDDATA', & ! block
+    'YCELL', & ! tag name
+    'YCELL', & ! fortran variable
+    'DOUBLE1D', & ! type
+    'NODES', & ! shape
+    'y-coordinate of cell center', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwfdisu_zcell = InputParamDefinitionType &
+    ( &
+    'GWF', & ! component
+    'DISU', & ! subcomponent
+    'GRIDDATA', & ! block
+    'ZCELL', & ! tag name
+    'ZCELL', & ! fortran variable
+    'DOUBLE1D', & ! type
+    'NODES', & ! shape
+    'z-coordinate of cell center', & ! longname
+    .false., & ! required
     .false., & ! developmode
     .false., & ! multi-record
     .false., & ! preserve case
@@ -697,6 +837,9 @@ module GwfDisuInputModule
     gwfdisu_yorigin, &
     gwfdisu_angrot, &
     gwfdisu_voffsettol, &
+    gwfdisu_vtu_geometry, &
+    gwfdisu_vtu_fileout, &
+    gwfdisu_full_3d, &
     gwfdisu_export_ascii, &
     gwfdisu_crs, &
     gwfdisu_nodes, &
@@ -705,6 +848,10 @@ module GwfDisuInputModule
     gwfdisu_top, &
     gwfdisu_bot, &
     gwfdisu_area, &
+    gwfdisu_volume, &
+    gwfdisu_xcell, &
+    gwfdisu_ycell, &
+    gwfdisu_zcell, &
     gwfdisu_idomain, &
     gwfdisu_iac, &
     gwfdisu_ja, &

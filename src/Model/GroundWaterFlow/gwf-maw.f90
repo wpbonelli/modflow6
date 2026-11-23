@@ -1137,6 +1137,20 @@ contains
       nn = this%dis%noder_from_cellid(cellid_str, this%inunit, this%iout)
       topnn = this%dis%top(nn)
       botnn = this%dis%bot(nn)
+      if (this%dis%is_full_3d()) then
+        !
+        ! -- cells of a FULL_3D grid have no top and bottom: only connections
+        !    with explicit geometry are supported (SPECIFIED and MEAN), and the
+        !    screen elevations are used as specified
+        if (this%ieqn(imaw) /= 0 .and. this%ieqn(imaw) /= 4) then
+          write (errmsg, '(a,1x,i0,1x,a)') 'The conductance equation of maw &
+            &well', imaw, 'must be SPECIFIED or MEAN because the DISU &
+            &Package uses the FULL_3D option.'
+          call store_error(errmsg)
+        end if
+        topnn = scrn_top(n)
+        botnn = scrn_bot(n)
+      end if
       botw = this%bot(imaw)
       !
       ! -- set gwf node number for connection
@@ -1398,8 +1412,13 @@ contains
         !    saturation is calculated over the correct interval. It is the
         !    user's responsibility to calculate the correct conductance.
         if (this%ieqn(imaw) == 0) then
-          this%topscrn(jpos) = min(this%usrtopscrn(jpos), this%dis%top(node))
-          this%botscrn(jpos) = max(this%usrbotscrn(jpos), this%dis%bot(node))
+          if (this%dis%is_full_3d()) then
+            this%topscrn(jpos) = this%usrtopscrn(jpos)
+            this%botscrn(jpos) = this%usrbotscrn(jpos)
+          else
+            this%topscrn(jpos) = min(this%usrtopscrn(jpos), this%dis%top(node))
+            this%botscrn(jpos) = max(this%usrbotscrn(jpos), this%dis%bot(node))
+          end if
         end if
         !
         dz = this%topscrn(jpos) - this%botscrn(jpos)
@@ -4256,7 +4275,7 @@ contains
     !
     ! -- scale screen thickness using gwfsat (for NPF Package THICKSTRT)
     if (gwftop == topw .and. gwfbot == botw) then
-      if (this%icelltype(node) == 0) then
+      if (this%icelltype(node) == 0 .and. .not. this%dis%is_full_3d()) then
         tthkw = tthkw * gwfsat
         tthka = tthka * gwfsat
       end if
@@ -4518,7 +4537,8 @@ contains
     if (this%correct_flow) then
       !
       ! -- set bmaw, determine en, and set correct_flow flag
-      en = max(bmaw, this%dis%bot(igwfnode))
+      en = bmaw
+      if (.not. this%dis%is_full_3d()) en = max(bmaw, this%dis%bot(igwfnode))
       correct_flow = .FALSE.
       if (hmaw < en) then
         correct_flow = .TRUE.

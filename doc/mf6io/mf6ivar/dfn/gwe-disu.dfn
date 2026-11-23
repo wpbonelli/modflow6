@@ -91,6 +91,33 @@ description checks are performed to ensure that the top of a cell is not higher 
 mf6internal voffsettol
 
 block options
+name vtu_geometry
+type string
+reader urword
+optional true
+preserve_case true
+longname file with the cell geometry for VTU output
+description name of the geometry file with the cell polyhedra (extension .v3d, written by VORO2MESH) used to write the results in VTU format.  It requires the FULL\_3D option and VTU\_FILEOUT.
+
+block options
+name vtu_fileout
+type string
+reader urword
+optional true
+preserve_case true
+longname root name of the VTU output files
+description root name of the VTU output files.  If specified together with VTU\_GEOMETRY, a VTU file with the results is written for each time step at which the dependent variable (head, concentration, or temperature) is saved by the Output Control Package, together with a PVD file ROOT.pvd that collects the time series.  The head and the specific discharge (if calculated) are written for the GWF Model, the concentration or temperature for the transport models.
+
+block options
+name full_3d
+type keyword
+reader urword
+optional true
+mf6internal full_3d
+longname fully three-dimensional unstructured grid
+description keyword to indicate that the grid is a fully three-dimensional unstructured grid (for example, a 3D Voronoi grid) in which cells are not organized in layers and have no top or bottom elevation.  If this option is specified, then the VOLUME, XCELL, YCELL, and ZCELL arrays must be specified in the GRIDDATA block instead of the TOP and BOT arrays, the AREA array is optional (see below), every connection must have IHC = 3, and HWVA is the area of the face shared by the two cells.  NVERT must be zero or not specified, and ANGLDEGX is not used.  All cells are fully saturated and the GWF model that provides the flow must use the same grid with the FULL_3D option.  The binary grid file is not written.
+
+block options
 name export_array_ascii
 type keyword
 reader urword
@@ -159,7 +186,43 @@ type double precision
 shape (nodes)
 reader readarray
 longname cell surface area
-description is the cell surface area (in plan view).
+description is the cell surface area (in plan view).  If the FULL_3D option is specified, AREA is optional and is the surface area of the cell that is exposed to recharge and evapotranspiration, which is used by the RCH and EVT Packages only; it is zero for cells without a value.
+
+block griddata
+name volume
+type double precision
+shape (nodes)
+reader readarray
+optional true
+longname cell volume
+description is the volume of each cell.  VOLUME is only used, and must be specified, if the FULL_3D option is specified.
+
+block griddata
+name xcell
+type double precision
+shape (nodes)
+reader readarray
+optional true
+longname x-coordinate of cell center
+description is the x-coordinate of the center of each cell.  XCELL is only used, and must be specified, if the FULL_3D option is specified.
+
+block griddata
+name ycell
+type double precision
+shape (nodes)
+reader readarray
+optional true
+longname y-coordinate of cell center
+description is the y-coordinate of the center of each cell.  YCELL is only used, and must be specified, if the FULL_3D option is specified.
+
+block griddata
+name zcell
+type double precision
+shape (nodes)
+reader readarray
+optional true
+longname z-coordinate of cell center
+description is the z-coordinate of the center of each cell.  ZCELL is only used, and must be specified, if the FULL_3D option is specified.
 
 block griddata
 name idomain
@@ -197,7 +260,7 @@ type integer
 shape (nja)
 reader readarray
 longname connection type
-description is an index array indicating the direction between node n and all of its m connections.  If IHC = 0 then cell n and cell m are connected in the vertical direction.  Cell n overlies cell m if the cell number for n is less than m; cell m overlies cell n if the cell number for m is less than n.  If IHC = 1 then cell n and cell m are connected in the horizontal direction.  If IHC = 2 then cell n and cell m are connected in the horizontal direction, and the connection is vertically staggered.  A vertically staggered connection is one in which a cell is horizontally connected to more than one cell in a horizontal connection.
+description is an index array indicating the direction between node n and all of its m connections.  If IHC = 0 then cell n and cell m are connected in the vertical direction.  Cell n overlies cell m if the cell number for n is less than m; cell m overlies cell n if the cell number for m is less than n.  If IHC = 1 then cell n and cell m are connected in the horizontal direction.  If IHC = 2 then cell n and cell m are connected in the horizontal direction, and the connection is vertically staggered.  A vertically staggered connection is one in which a cell is horizontally connected to more than one cell in a horizontal connection.  If IHC = 3 then cell n and cell m are connected through a face with an arbitrary orientation in a fully three-dimensional grid.  IHC = 3 must be specified for all connections if the FULL_3D option is specified, and it cannot be specified otherwise.
 jagged_array iac
 
 block connectiondata

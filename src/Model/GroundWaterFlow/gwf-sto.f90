@@ -1110,6 +1110,23 @@ contains
     call mem_set_value(this%ss, 'SS', this%input_mempath, map, found%ss)
     call mem_set_value(this%sy, 'SY', this%input_mempath, map, found%sy)
     !
+    ! -- A FULL_3D grid has no cell top and bottom, so cells cannot be
+    !    convertible and storage must be specific storage times volume
+    if (this%dis%is_full_3d()) then
+      if (found%iconvert) then
+        if (any(this%iconvert /= 0)) then
+          write (errmsg, '(a)') 'Error in GRIDDATA block: ICONVERT must be &
+            &zero for all cells when the DISU Package uses the FULL_3D option.'
+          call store_error(errmsg)
+        end if
+      end if
+      if (this%istor_coef /= 0) then
+        write (errmsg, '(a)') 'The STORAGECOEFFICIENT option is not &
+          &supported when the DISU Package uses the FULL_3D option.'
+        call store_error(errmsg)
+      end if
+    end if
+    !
     ! -- Check for ICONVERT
     if (found%iconvert) then
       isconv = .false.

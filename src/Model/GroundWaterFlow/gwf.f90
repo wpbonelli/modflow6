@@ -65,6 +65,7 @@ module GwfModule
   contains
 
     procedure :: model_df => gwf_df
+    procedure :: check_full_3d
     procedure :: model_ac => gwf_ac
     procedure :: model_mc => gwf_mc
     procedure :: model_ar => gwf_ar
@@ -208,6 +209,44 @@ contains
     call this%create_packages()
   end subroutine gwf_cr
 
+  !> @brief Check that the model packages support a fully 3D (FULL_3D) grid
+  !!
+  !! A FULL_3D DISU grid has no cell top and bottom or layers.  Only
+  !! confined, fully saturated flow is supported, and only boundary packages
+  !! that do not depend on cell geometry (CHD, WEL, DRN, RIV, GHB).
+  !<
+  subroutine check_full_3d(this)
+    ! -- modules
+    use SimModule, only: store_error
+    ! -- dummy
+    class(GwfModelType) :: this
+    ! -- local
+    integer(I4B) :: ip
+    class(BndType), pointer :: packobj
+    !
+    if (.not. this%dis%is_full_3d()) return
+    !
+    if (this%inbuy > 0 .or. this%invsc > 0 .or. this%ingnc > 0 .or. &
+        this%inhfb > 0 .or. this%incsub > 0) then
+      write (errmsg, '(a)') 'The BUY, VSC, GNC, HFB, and CSUB Packages are &
+        &not supported when the DISU Package uses the FULL_3D option.'
+      call store_error(errmsg, terminate=.true.)
+    end if
+    do ip = 1, this%bndlist%Count()
+      packobj => GetBndFromList(this%bndlist, ip)
+      select case (trim(packobj%filtyp))
+      case ('CHD', 'WEL', 'DRN', 'RIV', 'GHB', 'RCH', 'EVT', 'SFR', 'MAW', 'LAK')
+        ! -- supported
+      case default
+        write (errmsg, '(a)') 'The '//trim(packobj%filtyp)//' Package is &
+          &not supported when the DISU Package uses the FULL_3D option. &
+          &Supported packages are CHD, WEL, DRN, RIV, GHB, RCH, EVT, SFR, &
+          &MAW, and LAK.'
+        call store_error(errmsg, terminate=.true.)
+      end select
+    end do
+  end subroutine check_full_3d
+
   !> @brief Define packages of the model
   !!
   !! (1) call df routines for each package
@@ -224,6 +263,7 @@ contains
     !
     ! -- Define packages and utility objects
     call this%dis%dis_df()
+    call this%check_full_3d()
     call this%npf%npf_df(this%dis, this%xt3d, this%ingnc, this%invsc)
     call this%oc%oc_df()
     call this%budget%budget_df(NIUNIT_GWF, 'VOLUME', 'L**3')
@@ -973,6 +1013,7 @@ contains
   !> @brief Groundwater Flow Model output dependent variable
   !<
   subroutine gwf_ot_dv(this, idvsave, idvprint, ipflag)
+    use TdisModule, only: totim
     class(GwfModelType) :: this
     integer(I4B), intent(in) :: idvsave
     integer(I4B), intent(in) :: idvprint
@@ -1001,6 +1042,18 @@ contains
     !
     ! -- save head and print head
     call this%oc%oc_ot(ipflag)
+    !
+    ! -- VTU output (FULL_3D grids)
+    if (idvsave == 1) then
+      if (this%dis%is_full_3d()) then
+        if (this%npf%icalcspdis == 1) then
+          call this%dis%write_vtu_step(totim, 'HEAD', this%x, &
+                                       'SPECIFIC_DISCHARGE', this%npf%spdis)
+        else
+          call this%dis%write_vtu_step(totim, 'HEAD', this%x)
+        end if
+      end if
+    end if
   end subroutine gwf_ot_dv
 
   !> @brief Groundwater Flow Model output budget summary

@@ -6,7 +6,7 @@ module GwfNpfModule
                              DHALF, DP9, DONE, DTWO, &
                              DHNOFLO, DHDRY, DEM10, &
                              LENMEMPATH, LENVARNAME, LINELENGTH, &
-                             C3D_VERTICAL
+                             C3D_VERTICAL, C3D_FULL
   use SmoothingModule, only: sQuadraticSaturation, &
                              sQuadraticSaturationDerivative
   use NumericalPackageModule, only: NumericalPackageType
@@ -22,7 +22,7 @@ module GwfNpfModule
                                  mem_reassignptr
   use MatrixBaseModule
   use HGeoUtilModule, only: hyeff
-  use GwfConductanceUtilsModule, only: hcond, vcond, &
+  use GwfConductanceUtilsModule, only: hcond, vcond, fcond, fcond_sat, &
                                        condmean, thksatnm, &
                                        CCOND_HMEAN
   use GwfNpfFormulationModule, only: GwfNpfFormulationType, &
@@ -133,6 +133,7 @@ module GwfNpfModule
     procedure :: rewet_check
     procedure :: hy_eff
     procedure :: calc_spdis
+    procedure :: calc_spdis_full3d
     procedure :: sav_spdis
     procedure :: sav_sat
     procedure :: increase_edge_count
@@ -608,7 +609,11 @@ contains
     hyn = this%hy_eff(n, m, ihc, ipos=ipos)
     hym = this%hy_eff(m, n, ihc, ipos=ipos)
 
-    if (ihc == C3D_VERTICAL) then
+    if (ihc == C3D_FULL) then
+      ! Fully 3D connection: confined, saturated conductance
+      cond = fcond(this%ibound(n), this%ibound(m), &
+                   this%condsat(this%dis%con%jas(ipos)))
+    else if (ihc == C3D_VERTICAL) then
       ! Horizontal conductance
       cond = vcond(this%ibound(n), this%ibound(m), &
                    this%icelltype(n), this%icelltype(m), this%inewton, &
@@ -1076,7 +1081,10 @@ contains
     hym = this%hy_eff(m, n, ihc, ipos=icon)
     !
     ! -- Calculate conductance
-    if (ihc == C3D_VERTICAL) then
+    if (ihc == C3D_FULL) then
+      condnm = fcond(this%ibound(n), this%ibound(m), &
+                     this%condsat(this%dis%con%jas(icon)))
+    else if (ihc == C3D_VERTICAL) then
       condnm = vcond(this%ibound(n), this%ibound(m), &
                      this%icelltype(n), this%icelltype(m), this%inewton, &
                      this%ivarcv, this%idewatcv, &
@@ -1759,6 +1767,23 @@ contains
       end if
     end if
     !
+    !
+    ! -- A fully 3D (FULL_3D) DISU grid has no cell top and bottom, so only
+    !    fully saturated, confined flow with standard conductance is supported
+    if (this%dis%is_full_3d()) then
+      if (this%inewton > 0 .or. this%irewet > 0 .or. &
+          this%ithickstrt > 0 .or. this%iperched > 0 .or. this%ivarcv > 0 .or. &
+          this%idewatcv > 0 .or. this%icellavg > 0 .or. &
+          this%ihighcellsat /= 0) then
+        write (errmsg, '(a)') 'ERROR IN NPF OPTIONS. THE NEWTON, '// &
+          'REWET, THICKSTRT, PERCHED, VARIABLECV, DEWATERED, '// &
+          'ALTERNATIVE_CELL_AVERAGING, AND HIGHEST_CELL_SATURATION '// &
+          'OPTIONS ARE NOT SUPPORTED WHEN THE '// &
+          'DISU PACKAGE USES THE FULL_3D OPTION.'
+        call store_error(errmsg)
+      end if
+    end if
+    !
     ! -- Terminate if errors
     if (count_errors() > 0) then
       call store_error_filename(this%input_fname)
@@ -1855,6 +1880,15 @@ contains
     if (.not. found%icelltype) then
       write (errmsg, '(a)') 'Error in GRIDDATA block: ICELLTYPE not found.'
       call store_error(errmsg)
+    end if
+    !
+    ! -- all cells of a FULL_3D grid are confined
+    if (this%dis%is_full_3d()) then
+      if (any(this%icelltype /= 0)) then
+        write (errmsg, '(a)') 'Error in GRIDDATA block: ICELLTYPE must be &
+          &zero for all cells when the DISU Package uses the FULL_3D option.'
+        call store_error(errmsg)
+      end if
     end if
     !
     ! -- ensure K was found
@@ -1976,7 +2010,7 @@ contains
     if (this%ik22 /= 0) then
       !
       ! -- Check to make sure that angles are available
-      if (this%dis%con%ianglex == 0) then
+      if (this%dis%con%ianglex == 0 .and. .not. this%dis%is_full_3d()) then
         write (errmsg, '(a)') 'Error.  ANGLDEGX not provided in '// &
           'discretization file, but K22 was specified. '
         call store_error(errmsg)
@@ -2335,7 +2369,13 @@ contains
       !
       ! -- Calculate conductance depending on whether connection is
       !    vertical (0), horizontal (1), or staggered horizontal (2)
-      if (ihc == C3D_VERTICAL) then
+      if (ihc == C3D_FULL) then
+        !
+        ! -- Fully 3D connection: harmonic mean of the conductances from each
+        !    cell center to the shared face; HWVA is the face area
+        csat = fcond_sat(this%dis%con%cl1(jj), this%dis%con%cl2(jj), &
+                         this%dis%con%hwva(jj), hyn, hym)
+      else if (ihc == C3D_VERTICAL) then
         !
         ! -- Vertical conductance for fully saturated conditions
         csat = vcond(1, 1, 1, 1, 0, 1, 1, DONE, &
@@ -2631,8 +2671,34 @@ contains
     hy33 = this%k33(n)
     !
     ! -- Calculate effective K based on whether connection is vertical
-    !    or horizontal
-    if (ihc == C3D_VERTICAL) then
+    !    or horizontal, or fully 3D
+    if (ihc == C3D_FULL) then
+      !
+      ! -- Fully 3D connection: K along the connection direction, from the
+      !    full 3D hydraulic conductivity tensor
+      hy = hy11
+      if (this%ik22 > 0 .or. this%ik33 > 0) then
+        if (present(vg)) then
+          vg1 = vg(1)
+          vg2 = vg(2)
+          vg3 = vg(3)
+        else
+          call this%dis%connection_normal(n, m, ihc, vg1, vg2, vg3, iipos)
+        end if
+        ang1 = DZERO
+        ang2 = DZERO
+        ang3 = DZERO
+        if (this%iangle1 > 0) then
+          ang1 = this%angle1(n)
+          if (this%iangle2 > 0) then
+            ang2 = this%angle2(n)
+            if (this%iangle3 > 0) ang3 = this%angle3(n)
+          end if
+        end if
+        hy = hyeff(hy11, hy22, hy33, ang1, ang2, ang3, vg1, vg2, vg3, &
+                   this%iavgkeff)
+      end if
+    else if (ihc == C3D_VERTICAL) then
       !
       ! -- Handle rotated anisotropy case that would affect the effective
       !    vertical hydraulic conductivity
@@ -2727,6 +2793,10 @@ contains
     type(SpdisWorkArrayType), pointer :: swa => null() !< pointer to spdis work arrays structure
     !
     ! -- Ensure dis has necessary information
+    if (this%dis%is_full_3d()) then
+      call this%calc_spdis_full3d(flowja)
+      return
+    end if
     if (this%icalcspdis /= 0 .and. this%dis%con%ianglex == 0) then
       call store_error('Error.  ANGLDEGX not provided in '// &
                        'discretization file.  ANGLDEGX required for '// &
@@ -2932,6 +3002,67 @@ contains
     end do
 
   end subroutine calc_spdis
+
+  !> @brief Calculate specific discharge at the cell centers of a FULL_3D grid
+  !!
+  !! The cell velocity vector v is the least-squares fit, weighted by the face
+  !! area, of the face-normal Darcy fluxes u_f = (outward flow)/(face area) to
+  !! v . n_f, where n_f is the unit vector from the cell center to the
+  !! neighbor.  The fit is exact for a uniform velocity field.  Flow through
+  !! boundary-package faces is not included, as for the other grid types.
+  !<
+  subroutine calc_spdis_full3d(this, flowja)
+    ! -- dummy
+    class(GwfNpfType) :: this
+    real(DP), intent(in), dimension(:) :: flowja
+    ! -- local
+    integer(I4B) :: n, m, ipos, isympos, i, j
+    real(DP) :: area, w, uf, trace, det
+    real(DP), dimension(3) :: nv, b, v
+    real(DP), dimension(3, 3) :: a, ainv
+    !
+    do n = 1, this%dis%nodes
+      a = DZERO
+      b = DZERO
+      do ipos = this%dis%con%ia(n) + 1, this%dis%con%ia(n + 1) - 1
+        m = this%dis%con%ja(ipos)
+        isympos = this%dis%con%jas(ipos)
+        area = this%dis%con%hwva(isympos)
+        if (area <= DZERO) cycle
+        call this%dis%connection_normal(n, m, C3D_FULL, nv(1), nv(2), nv(3), &
+                                        ipos)
+        ! -- outward flux per unit face area (flowja is positive into n)
+        uf = -flowja(ipos) / area
+        w = area
+        do i = 1, 3
+          b(i) = b(i) + w * nv(i) * uf
+          do j = 1, 3
+            a(i, j) = a(i, j) + w * nv(i) * nv(j)
+          end do
+        end do
+      end do
+      ! -- small regularization so that cells with few active faces give
+      !    the minimum-norm fit instead of a singular system
+      trace = a(1, 1) + a(2, 2) + a(3, 3)
+      do i = 1, 3
+        a(i, i) = a(i, i) + 1.0e-9_DP * trace
+      end do
+      ! -- invert the symmetric 3 x 3 matrix by cofactors
+      ainv(1, 1) = a(2, 2) * a(3, 3) - a(2, 3) * a(3, 2)
+      ainv(1, 2) = a(1, 3) * a(3, 2) - a(1, 2) * a(3, 3)
+      ainv(1, 3) = a(1, 2) * a(2, 3) - a(1, 3) * a(2, 2)
+      ainv(2, 1) = ainv(1, 2)
+      ainv(2, 2) = a(1, 1) * a(3, 3) - a(1, 3) * a(3, 1)
+      ainv(2, 3) = a(1, 3) * a(2, 1) - a(1, 1) * a(2, 3)
+      ainv(3, 1) = ainv(1, 3)
+      ainv(3, 2) = ainv(2, 3)
+      ainv(3, 3) = a(1, 1) * a(2, 2) - a(1, 2) * a(2, 1)
+      det = a(1, 1) * ainv(1, 1) + a(1, 2) * ainv(2, 1) + a(1, 3) * ainv(3, 1)
+      v = DZERO
+      if (det /= DZERO) v = matmul(ainv, b) / det
+      this%spdis(:, n) = v
+    end do
+  end subroutine calc_spdis_full3d
 
   !> @brief Save specific discharge in binary format to ibinun
   !<

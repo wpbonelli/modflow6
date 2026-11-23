@@ -449,6 +449,7 @@ contains
   !! Loop through attached packages saving and printing dependent variables
   !<
   subroutine tsp_ot_dv(this, idvsave, idvprint, ipflag)
+    use TdisModule, only: totim
     class(TransportModelType) :: this
     integer(I4B), intent(in) :: idvsave
     integer(I4B), intent(in) :: idvprint
@@ -464,6 +465,13 @@ contains
     !
     ! -- Save head and print head
     call this%oc%oc_ot(ipflag)
+    !
+    ! -- VTU output (FULL_3D grids)
+    if (idvsave == 1) then
+      if (this%dis%is_full_3d()) then
+        call this%dis%write_vtu_step(totim, trim(this%depvartype), this%x)
+      end if
+    end if
   end subroutine tsp_ot_dv
 
   !> @brief Generalized transport model output budget summary

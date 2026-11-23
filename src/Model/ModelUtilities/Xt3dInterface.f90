@@ -1,7 +1,7 @@
 module Xt3dModule
 
   use KindModule, only: DP, I4B
-  use ConstantsModule, only: DZERO, DHALF, DONE, LENMEMPATH
+  use ConstantsModule, only: DZERO, DHALF, DONE, LENMEMPATH, C3D_FULL
   use BaseDisModule, only: DisBaseType
   use MemoryHelperModule, only: create_mem_path
   use MatrixBaseModule
@@ -351,7 +351,7 @@ contains
     end if
     !
     ! -- Check to make sure ANGLEDEGX is available for interface normals
-    if (this%dis%con%ianglex == 0) then
+    if (this%dis%con%ianglex == 0 .and. .not. this%dis%is_full_3d()) then
       call store_error('ANGLDEGX is not specified in the DIS package, '// &
                        'but XT3D is active: '//trim(adjustl(this%memoryPath))// &
                        '. ANGLDEGX must be provided in discretization '// &
@@ -1280,7 +1280,8 @@ contains
         ooclsum = 1d0 / (cl1njj + cl2njj)
         dl(il) = dltot * cl1njj * ooclsum
         dln(il) = dltot * cl2njj * ooclsum
-        if (this%dis%con%ihc(jjs) .eq. 0) allhc = .false.
+        if (this%dis%con%ihc(jjs) .eq. 0 .or. &
+            this%dis%con%ihc(jjs) .eq. C3D_FULL) allhc = .false.
       else
         inbr(il) = 0
       end if
@@ -1328,9 +1329,10 @@ contains
     real(DP) :: satups
     !
     ! -- Compute area depending on connection type
-    if (this%dis%con%ihc(jjs01) == 0) then
+    if (this%dis%con%ihc(jjs01) == 0 .or. &
+        this%dis%con%ihc(jjs01) == C3D_FULL) then
       !
-      ! -- Vertical connection
+      ! -- Vertical connection, or fully 3D connection (HWVA is the face area)
       ar01 = this%dis%con%hwva(jjs01)
       ar10 = ar01
     else if (this%inewton /= 0) then

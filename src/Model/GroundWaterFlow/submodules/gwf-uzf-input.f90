@@ -8,6 +8,7 @@ contains
   module procedure uzf_source_packagedata
   ! -- modules
   use SimModule, only: store_error, store_error_filename, count_errors
+  use SparseModule, only: sparsematrix
   ! -- local
   integer(I4B), dimension(:), pointer, contiguous :: ifno => null()
   integer(I4B), dimension(:, :), pointer, contiguous :: cellid_idm => null()

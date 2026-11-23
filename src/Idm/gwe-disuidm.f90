@@ -23,6 +23,9 @@ module GweDisuInputModule
     logical :: yorigin = .false.
     logical :: angrot = .false.
     logical :: voffsettol = .false.
+    logical :: vtu_geometry = .false.
+    logical :: vtu_fileout = .false.
+    logical :: full_3d = .false.
     logical :: export_ascii = .false.
     logical :: crs = .false.
     logical :: nodes = .false.
@@ -31,6 +34,10 @@ module GweDisuInputModule
     logical :: top = .false.
     logical :: bot = .false.
     logical :: area = .false.
+    logical :: volume = .false.
+    logical :: xcell = .false.
+    logical :: ycell = .false.
+    logical :: zcell = .false.
     logical :: idomain = .false.
     logical :: iac = .false.
     logical :: ja = .false.
@@ -248,6 +255,63 @@ module GweDisuInputModule
     )
 
   type(InputParamDefinitionType), parameter :: &
+    gwedisu_vtu_geometry = InputParamDefinitionType &
+    ( &
+    'GWE', & ! component
+    'DISU', & ! subcomponent
+    'OPTIONS', & ! block
+    'VTU_GEOMETRY', & ! tag name
+    'VTU_GEOMETRY', & ! fortran variable
+    'STRING', & ! type
+    '', & ! shape
+    'file with the cell geometry for VTU output', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .true., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwedisu_vtu_fileout = InputParamDefinitionType &
+    ( &
+    'GWE', & ! component
+    'DISU', & ! subcomponent
+    'OPTIONS', & ! block
+    'VTU_FILEOUT', & ! tag name
+    'VTU_FILEOUT', & ! fortran variable
+    'STRING', & ! type
+    '', & ! shape
+    'root name of the VTU output files', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .true., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwedisu_full_3d = InputParamDefinitionType &
+    ( &
+    'GWE', & ! component
+    'DISU', & ! subcomponent
+    'OPTIONS', & ! block
+    'FULL_3D', & ! tag name
+    'FULL_3D', & ! fortran variable
+    'KEYWORD', & ! type
+    '', & ! shape
+    'fully three-dimensional unstructured grid', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
     gwedisu_export_ascii = InputParamDefinitionType &
     ( &
     'GWE', & ! component
@@ -392,6 +456,82 @@ module GweDisuInputModule
     'NODES', & ! shape
     'cell surface area', & ! longname
     .true., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwedisu_volume = InputParamDefinitionType &
+    ( &
+    'GWE', & ! component
+    'DISU', & ! subcomponent
+    'GRIDDATA', & ! block
+    'VOLUME', & ! tag name
+    'VOLUME', & ! fortran variable
+    'DOUBLE1D', & ! type
+    'NODES', & ! shape
+    'cell volume', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwedisu_xcell = InputParamDefinitionType &
+    ( &
+    'GWE', & ! component
+    'DISU', & ! subcomponent
+    'GRIDDATA', & ! block
+    'XCELL', & ! tag name
+    'XCELL', & ! fortran variable
+    'DOUBLE1D', & ! type
+    'NODES', & ! shape
+    'x-coordinate of cell center', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwedisu_ycell = InputParamDefinitionType &
+    ( &
+    'GWE', & ! component
+    'DISU', & ! subcomponent
+    'GRIDDATA', & ! block
+    'YCELL', & ! tag name
+    'YCELL', & ! fortran variable
+    'DOUBLE1D', & ! type
+    'NODES', & ! shape
+    'y-coordinate of cell center', & ! longname
+    .false., & ! required
+    .false., & ! developmode
+    .false., & ! multi-record
+    .false., & ! preserve case
+    .false., & ! layered
+    .false. & ! timeseries
+    )
+
+  type(InputParamDefinitionType), parameter :: &
+    gwedisu_zcell = InputParamDefinitionType &
+    ( &
+    'GWE', & ! component
+    'DISU', & ! subcomponent
+    'GRIDDATA', & ! block
+    'ZCELL', & ! tag name
+    'ZCELL', & ! fortran variable
+    'DOUBLE1D', & ! type
+    'NODES', & ! shape
+    'z-coordinate of cell center', & ! longname
+    .false., & ! required
     .false., & ! developmode
     .false., & ! multi-record
     .false., & ! preserve case
@@ -697,6 +837,9 @@ module GweDisuInputModule
     gwedisu_yorigin, &
     gwedisu_angrot, &
     gwedisu_voffsettol, &
+    gwedisu_vtu_geometry, &
+    gwedisu_vtu_fileout, &
+    gwedisu_full_3d, &
     gwedisu_export_ascii, &
     gwedisu_crs, &
     gwedisu_nodes, &
@@ -705,6 +848,10 @@ module GweDisuInputModule
     gwedisu_top, &
     gwedisu_bot, &
     gwedisu_area, &
+    gwedisu_volume, &
+    gwedisu_xcell, &
+    gwedisu_ycell, &
+    gwedisu_zcell, &
     gwedisu_idomain, &
     gwedisu_iac, &
     gwedisu_ja, &

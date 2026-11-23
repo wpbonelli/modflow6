@@ -223,6 +223,7 @@ module ConstantsModule
     ENUMERATOR :: C3D_VERTICAL = 0 !< vertical connection
     ENUMERATOR :: C3D_HORIZONTAL = 1 !< horizontal connection
     ENUMERATOR :: C3D_STAGGERED = 2 !< horizontal connection for a vertically staggered grid
+    ENUMERATOR :: C3D_FULL = 3 !< fully 3D connection (FULL_3D DISU); HWVA is the face area, direction from cell centers
   END ENUM
 
 end module ConstantsModule

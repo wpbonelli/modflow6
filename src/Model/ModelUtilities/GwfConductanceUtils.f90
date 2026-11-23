@@ -17,6 +17,8 @@ module GwfConductanceUtilsModule
   private
   public :: hcond
   public :: vcond
+  public :: fcond
+  public :: fcond_sat
   public :: condmean
   public :: thksatnm
   public :: staggered_thkfrac
@@ -230,6 +232,45 @@ contains
       end if
     end if
   end function vcond
+
+  !> @brief Saturated conductance of a fully 3D connection
+  !!
+  !! The face area is flowarea; the cell centers are at distances cl1 and cl2
+  !! from the face, in cells with hydraulic conductivities hyn and hym along
+  !! the connection direction.  The harmonic mean is used.
+  !<
+  function fcond_sat(cl1, cl2, flowarea, hyn, hym) result(condsat)
+    ! -- return
+    real(DP) :: condsat
+    ! -- dummy
+    real(DP), intent(in) :: cl1 !< distance from the center of cell n to the face
+    real(DP), intent(in) :: cl2 !< distance from the center of cell m to the face
+    real(DP), intent(in) :: flowarea !< area of the face
+    real(DP), intent(in) :: hyn !< hydraulic conductivity of cell n along the connection
+    real(DP), intent(in) :: hym !< hydraulic conductivity of cell m along the connection
+    ! -- local
+    real(DP) :: denom
+    !
+    condsat = DZERO
+    if (hyn > DZERO .and. hym > DZERO) then
+      denom = cl1 / hyn + cl2 / hym
+      if (denom > DZERO) condsat = flowarea / denom
+    end if
+  end function fcond_sat
+
+  !> @brief Conductance of a fully 3D connection (confined, fully saturated)
+  !<
+  function fcond(ibdn, ibdm, condsat) result(condnm)
+    ! -- return
+    real(DP) :: condnm
+    ! -- dummy
+    integer(I4B), intent(in) :: ibdn !< ibound of cell n
+    integer(I4B), intent(in) :: ibdm !< ibound of cell m
+    real(DP), intent(in) :: condsat !< saturated conductance
+    !
+    condnm = condsat
+    if (ibdn == 0 .or. ibdm == 0) condnm = DZERO
+  end function fcond
 
   !> @brief Calculate the conductance between two cells
   !<

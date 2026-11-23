@@ -207,6 +207,9 @@ contains
     ! -- copy nodelist to nodesontop if not fixed cell
     if (.not. this%fixed_cell) call this%set_nodesontop()
     !
+    ! -- FULL_3D grids: the exposed surface area (AREA) must be specified
+    call this%check_exposed_area()
+    !
   end subroutine rch_rp
 
   !> @brief Store nodelist in nodesontop

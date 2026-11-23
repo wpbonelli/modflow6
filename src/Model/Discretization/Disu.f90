@@ -3,7 +3,7 @@ module DisuModule
   use ArrayReadersModule, only: ReadArray
   use KindModule, only: DP, I4B, LGP
   use ConstantsModule, only: LINELENGTH, LENBIGLINE, LENMEMPATH, LENVARNAME, &
-                             DZERO, DONE, DHALF, DEM6, DPIO180
+                             DZERO, DONE, DHALF, DTHREE, DEM6, DPIO180, C3D_FULL
   use ConnectionsModule, only: iac_to_ia
   use InputOutputModule, only: URWORD, ulasav, ulaprufw, ubdsv1, ubdsv06, &
                                getunit, openfile
@@ -13,11 +13,13 @@ module DisuModule
   use MessageModule, only: write_message_counter
   use BaseDisModule, only: DisBaseType
   use MemoryManagerModule, only: mem_allocate, mem_deallocate, &
-                                 mem_reallocate, mem_setptr
+                                 mem_reallocate, mem_setptr, get_isize
   use MemoryManagerExtModule, only: mem_set_value, memorystore_remove, &
                                     memorystore_release
   use TdisModule, only: kstp, kper, pertim, totim, delt
   use DisvGeom, only: line_unit_vector
+  use VtuOutputModule, only: VtuOutputType
+  use SmoothingModule, only: sQuadraticSaturation
 
   implicit none
 
@@ -30,6 +32,7 @@ module DisuModule
   type, extends(DisBaseType) :: DisuType
     integer(I4B), pointer :: njausr => null() ! user-specified nja size
     integer(I4B), pointer :: nvert => null() ! number of x,y vertices
+    integer(I4B), pointer :: ifull3d => null() ! =1 for a fully 3D unstructured grid (FULL_3D option), 0 otherwise
     integer(I4B), pointer :: nangldegxerr => null() ! number of horizontal connections with an ANGLDEGX value that is inconsistent with the reverse connection or with the vertices
     real(DP), pointer :: voffsettol => null() ! vertical offset tolerance
     real(DP), dimension(:, :), pointer, contiguous :: vertices => null() ! cell vertices stored as 2d array of x and y
@@ -37,6 +40,15 @@ module DisuModule
     real(DP), dimension(:), pointer, contiguous :: top1d => null() ! (size:nodesuser) cell top elevation
     real(DP), dimension(:), pointer, contiguous :: bot1d => null() ! (size:nodesuser) cell bottom elevation
     real(DP), dimension(:), pointer, contiguous :: area1d => null() ! (size:nodesuser) cell area, in plan view
+    real(DP), dimension(:), pointer, contiguous :: vol1d => null() ! (size:nodesuser) cell volume (FULL_3D only)
+    real(DP), dimension(:), pointer, contiguous :: zcell1d => null() ! (size:nodesuser) cell center z coordinate (FULL_3D only)
+    real(DP), dimension(:), pointer, contiguous :: zc => null() ! (size:nodes) cell center z coordinate (FULL_3D only)
+    real(DP), dimension(:), pointer, contiguous :: volume => null() ! (size:nodes) cell volume (FULL_3D only)
+    real(DP), dimension(:), pointer, contiguous :: surf1d => null() ! (size:nodesuser) exposed surface area for recharge, ET, etc. (FULL_3D only)
+    real(DP), dimension(:), pointer, contiguous :: surfarea => null() ! (size:nodes) exposed surface area (FULL_3D only)
+    type(VtuOutputType), pointer :: vtu => null() ! VTU output (FULL_3D only)
+    character(len=LINELENGTH) :: vtugeom = '' ! VTU geometry file
+    character(len=LINELENGTH) :: vtuout = '' ! root name of the VTU files
     integer(I4B), dimension(:), pointer, contiguous :: iainp => null() ! (size:nodesuser+1) user iac converted ia
     integer(I4B), dimension(:), pointer, contiguous :: jainp => null() ! (size:njausr) user-input ja array
     integer(I4B), dimension(:), pointer, contiguous :: ihcinp => null() ! (size:njausr) user-input ihc array
@@ -56,6 +68,11 @@ module DisuModule
     procedure :: dis_da => disu_da
     procedure :: get_dis_type => get_dis_type
     procedure :: get_dis_enum => get_dis_enum
+    procedure :: is_full_3d
+    procedure :: get_cell_volume
+    procedure :: get_area
+    procedure :: get_cell_center
+    procedure :: write_vtu_step
     procedure :: disu_ck
     procedure :: disu_write_warning
     procedure :: disu_face_normal
@@ -81,6 +98,7 @@ module DisuModule
     procedure :: source_options
     procedure :: source_dimensions
     procedure :: source_griddata
+    procedure :: source_griddata_full3d
     procedure :: source_connectivity
     procedure :: source_vertices
     procedure :: source_cell2d
@@ -104,6 +122,13 @@ module DisuModule
     logical :: yorigin = .false.
     logical :: angrot = .false.
     logical :: voffsettol = .false.
+    logical :: full_3d = .false.
+    logical :: vtu_geometry = .false.
+    logical :: vtu_fileout = .false.
+    logical :: volume = .false.
+    logical :: xcell = .false.
+    logical :: ycell = .false.
+    logical :: zcell = .false.
     logical :: nodes = .false.
     logical :: nja = .false.
     logical :: nvert = .false.
@@ -183,7 +208,7 @@ contains
     if (this%nvert > 0) then
       call this%source_vertices()
       call this%source_cell2d()
-    else
+    else if (this%ifull3d == 0) then
       ! -- connection direction information cannot be calculated
       this%icondir = 0
     end if
@@ -285,13 +310,18 @@ contains
     end do
     !
     ! -- fill cell center coordinates
-    if (this%nvert > 0) then
+    if (this%nvert > 0 .or. this%ifull3d == 1) then
       do node = 1, this%nodesuser
         noder = node
         if (this%nodes < this%nodesuser) noder = this%nodereduced(node)
         if (noder <= 0) cycle
         this%xc(noder) = this%cellxy(1, node)
         this%yc(noder) = this%cellxy(2, node)
+        if (this%ifull3d == 1) then
+          this%zc(noder) = this%zcell1d(node)
+          this%volume(noder) = this%vol1d(node)
+          this%surfarea(noder) = this%surf1d(node)
+        end if
       end do
     else
       call mem_reallocate(this%xc, 0, 'XC', this%memoryPath)
@@ -337,6 +367,8 @@ contains
     integer(I4B) :: n_dir, m_dir
     integer(I4B) :: n_vrt, m_vrt
     integer(I4B) :: n_warn, m_warn
+    integer(I4B) :: ndist, n_dist, m_dist
+    real(DP) :: dsum, dsum_1, dist_1
     character(len=LENBIGLINE) :: bigmsg
     real(DP), parameter :: angtol = 0.01_DP !< tolerance (degrees) for the 180-degree reciprocity check
     real(DP), parameter :: angvtol = 1.0_DP !< tolerance (degrees) for the comparison with the normal computed from the vertices
@@ -386,6 +418,22 @@ contains
       &closer look at the grid.')"
     character(len=*), parameter :: fmtdz = &
       &"('Cell ', i0, ' with thickness <= 0. Top, bot: ', 2(1pg24.15))"
+    character(len=*), parameter :: fmtvol = &
+      &"('Cell ', i0, ' with volume <= 0. Volume: ', 1(1pg24.15))"
+    character(len=*), parameter :: fmtihc3 = &
+      &"('Connection from cell ', i0, ' to cell ', i0, ' has IHC = ', i0, &
+      &'. IHC must be 3 for all connections if the FULL_3D option is &
+      &specified, and IHC = 3 cannot be specified otherwise.')"
+    character(len=*), parameter :: fmtcl3 = &
+      &"('Connection from cell ', i0, ' to cell ', i0, ' has CL12 <= 0 or &
+      &HWVA <= 0. CL12: ', 1pg15.6, ' HWVA: ', 1pg15.6)"
+    character(len=*), parameter :: fmtdist3 = &
+      "('For ', i0, ' FULL_3D connections the sum of CL12 for the two cells &
+      &differs by more than 25 percent from the distance between the cell &
+      &centers (for example, cells ', i0, ' and ', i0, ': CL12 sum = ', &
+      &1pg15.6, ', center distance = ', 1pg15.6, '). Flow is calculated &
+      &from CL12; check that the cell centers, CL12 and HWVA are &
+      &consistent.')"
     character(len=*), parameter :: fmtarea = &
       &"('Cell ', i0, ' with area <= 0. Area: ', 1(1pg24.15))"
     character(len=*), parameter :: fmtjan = &
@@ -440,8 +488,16 @@ contains
     end do
     !
     ! -- Check for zero and negative thickness and zero or negative areas
-    !    for active cells (idomain > 0)
+    !    for active cells (idomain > 0); for a fully 3D grid check the
+    !    volume instead
     do n = 1, this%nodesuser
+      if (this%ifull3d == 1) then
+        if (this%idomain(n) > 0 .and. this%vol1d(n) <= DZERO) then
+          write (errmsg, fmtvol) n, this%vol1d(n)
+          call store_error(errmsg)
+        end if
+        cycle
+      end if
       if (this%idomain(n) > 0) then
         dz = this%top1d(n) - this%bot1d(n)
         if (dz <= DZERO) then
@@ -454,6 +510,68 @@ contains
         end if
       end if
     end do
+    !
+    ! -- Check IHC, CL12 and HWVA for a fully 3D grid, and IHC otherwise
+    do n = 1, this%nodesuser
+      do ipos = this%iainp(n) + 1, this%iainp(n + 1) - 1
+        m = this%jainp(ipos)
+        ihc = this%ihcinp(ipos)
+        if ((this%ifull3d == 1 .and. ihc /= C3D_FULL) .or. &
+            (this%ifull3d == 0 .and. ihc == C3D_FULL)) then
+          write (errmsg, fmtihc3) n, m, ihc
+          call store_error(errmsg)
+        end if
+        if (this%ifull3d == 1 .and. ihc == C3D_FULL) then
+          if (this%cl12inp(ipos) <= DZERO .or. this%hwvainp(ipos) <= DZERO) then
+            write (errmsg, fmtcl3) n, m, this%cl12inp(ipos), this%hwvainp(ipos)
+            call store_error(errmsg)
+          end if
+        end if
+      end do
+    end do
+    if (count_errors() > 0) then
+      if (this%inunit > 0) then
+        call store_error_filename(this%input_fname)
+      end if
+    end if
+    !
+    ! -- For a fully 3D grid, compare CL12 with the center-to-center distance
+    if (this%ifull3d == 1) then
+      ndist = 0
+      do n = 1, this%nodesuser
+        do ipos = this%iainp(n) + 1, this%iainp(n + 1) - 1
+          m = this%jainp(ipos)
+          if (m <= n) cycle
+          jpos = 0
+          do kpos = this%iainp(m) + 1, this%iainp(m + 1) - 1
+            if (this%jainp(kpos) == n) then
+              jpos = kpos
+              exit
+            end if
+          end do
+          if (jpos == 0) cycle
+          dx = this%cellxy(1, m) - this%cellxy(1, n)
+          dy = this%cellxy(2, m) - this%cellxy(2, n)
+          dist = sqrt(dx * dx + dy * dy + &
+                      (this%zcell1d(m) - this%zcell1d(n))**2)
+          dsum = this%cl12inp(ipos) + this%cl12inp(jpos)
+          if (abs(dsum - dist) > 0.25_DP * dist) then
+            ndist = ndist + 1
+            if (ndist == 1) then
+              n_dist = n
+              m_dist = m
+              dsum_1 = dsum
+              dist_1 = dist
+            end if
+          end if
+        end do
+      end do
+      if (ndist > 0) then
+        write (bigmsg, fmtdist3) ndist, n_dist, m_dist, dsum_1, dist_1
+        call store_warning(bigmsg)
+        call this%disu_write_warning(bigmsg)
+      end if
+    end if
     !
     ! -- check to make sure voffsettol is >= 0
     if (this%voffsettol < DZERO) then
@@ -472,7 +590,7 @@ contains
       do ipos = this%iainp(n) + 1, this%iainp(n + 1) - 1
         m = this%jainp(ipos)
         ihc = this%ihcinp(ipos)
-        if (ihc == 0 .and. m > n) then
+        if (this%ifull3d == 0 .and. ihc == 0 .and. m > n) then
           dz = this%top1d(m) - this%bot1d(n)
           if (dz > this%voffsettol) then
             write (errmsg, fmterrmsg) this%top1d(m), m, this%bot1d(n), n, m, n
@@ -742,6 +860,11 @@ contains
       call mem_deallocate(this%top1d)
       call mem_deallocate(this%bot1d)
       call mem_deallocate(this%area1d)
+      if (this%ifull3d == 1) then
+        call mem_deallocate(this%vol1d)
+        call mem_deallocate(this%zcell1d)
+        call mem_deallocate(this%surf1d)
+      end if
       if (associated(this%iavert)) then
         call mem_deallocate(this%iavert)
         call mem_deallocate(this%javert)
@@ -757,6 +880,12 @@ contains
     !
     call mem_deallocate(this%idomain)
     call mem_deallocate(this%cellxy)
+    if (this%ifull3d == 1) then
+      call mem_deallocate(this%zc)
+      call mem_deallocate(this%volume)
+      call mem_deallocate(this%surfarea)
+    end if
+    call mem_deallocate(this%ifull3d)
     !
     call mem_deallocate(this%nodeuser)
     call mem_deallocate(this%nodereduced)
@@ -823,6 +952,27 @@ contains
     call mem_set_value(this%angrot, 'ANGROT', this%input_mempath, found%angrot)
     call mem_set_value(this%voffsettol, 'VOFFSETTOL', this%input_mempath, &
                        found%voffsettol)
+    call mem_set_value(this%ifull3d, 'FULL_3D', this%input_mempath, &
+                       found%full_3d)
+    !
+    call mem_set_value(this%vtugeom, 'VTU_GEOMETRY', this%input_mempath, &
+                       found%vtu_geometry)
+    call mem_set_value(this%vtuout, 'VTU_FILEOUT', this%input_mempath, &
+                       found%vtu_fileout)
+    if (found%vtu_geometry .neqv. found%vtu_fileout) then
+      write (errmsg, '(a)') 'VTU_GEOMETRY and VTU_FILEOUT must be specified &
+        &together.'
+      call store_error(errmsg)
+    end if
+    if (found%vtu_geometry .and. this%ifull3d /= 1) then
+      write (errmsg, '(a)') 'VTU_GEOMETRY and VTU_FILEOUT require the FULL_3D &
+        &option.'
+      call store_error(errmsg)
+    end if
+    if (found%vtu_geometry .and. this%ifull3d == 1) then
+      allocate (this%vtu)
+      call this%vtu%init(this%vtugeom, this%vtuout)
+    end if
     !
     ! -- log values to list file
     if (this%iout > 0) then
@@ -865,6 +1015,13 @@ contains
     if (found%voffsettol) then
       write (this%iout, '(4x,a,G0)') 'VERTICAL_OFFSET_TOLERANCE = ', &
         this%voffsettol
+    end if
+    !
+    if (found%full_3d) then
+      write (this%iout, '(4x,a)') 'FULL_3D: fully three-dimensional &
+        &unstructured grid; cells have no top and bottom (the TOP and BOT &
+        &arrays of the binary grid file hold the extent of a cube of the &
+        &same volume)'
     end if
     !
     write (this%iout, '(1x,a,/)') 'End Setting Discretization Options'
@@ -919,7 +1076,18 @@ contains
     call mem_allocate(this%hwvainp, this%njausr, 'HWVAINP', this%memoryPath)
     call mem_allocate(this%angldegxinp, this%njausr, 'ANGLDEGXINP', &
                       this%memoryPath)
-    if (this%nvert > 0) then
+    if (this%ifull3d == 1) then
+      if (this%nvert > 0) then
+        call store_error('NVERT must be zero or not specified if the &
+                         &FULL_3D option is specified.')
+        call store_error_filename(this%input_fname)
+      end if
+      call mem_allocate(this%vol1d, this%nodesuser, 'VOL1D', this%memoryPath)
+      call mem_allocate(this%zcell1d, this%nodesuser, 'ZCELL1D', &
+                        this%memoryPath)
+      call mem_allocate(this%surf1d, this%nodesuser, 'SURF1D', this%memoryPath)
+      call mem_allocate(this%cellxy, 2, this%nodesuser, 'CELLXY', this%memoryPath)
+    else if (this%nvert > 0) then
       call mem_allocate(this%cellxy, 2, this%nodesuser, 'CELLXY', this%memoryPath)
     else
       call mem_allocate(this%cellxy, 2, 0, 'CELLXY', this%memoryPath)
@@ -929,6 +1097,12 @@ contains
     do n = 1, this%nodesuser
       this%idomain(n) = 1
     end do
+    if (this%ifull3d == 1) then
+      this%vol1d = DZERO
+      this%zcell1d = DZERO
+      this%surf1d = DZERO
+      this%cellxy = DZERO
+    end if
     !
   end subroutine source_dimensions
 
@@ -963,6 +1137,7 @@ contains
     class(DisuType) :: this
     ! -- locals
     type(DisuFoundType) :: found
+    integer(I4B), dimension(4) :: isize
     !
     ! -- update defaults with idm sourced values
     call mem_set_value(this%top1d, 'TOP', this%input_mempath, found%top)
@@ -970,12 +1145,88 @@ contains
     call mem_set_value(this%area1d, 'AREA', this%input_mempath, found%area)
     call mem_set_value(this%idomain, 'IDOMAIN', this%input_mempath, found%idomain)
     !
+    ! -- fully 3D grid: cell volume and cell center coordinates are
+    !    input instead of top, bottom, and area
+    if (this%ifull3d == 1) then
+      call this%source_griddata_full3d(found)
+    else
+      call get_isize('VOLUME', this%input_mempath, isize(1))
+      call get_isize('XCELL', this%input_mempath, isize(2))
+      call get_isize('YCELL', this%input_mempath, isize(3))
+      call get_isize('ZCELL', this%input_mempath, isize(4))
+      if (any(isize >= 0)) then
+        call store_error('VOLUME, XCELL, YCELL, and ZCELL can only be &
+                         &specified if the FULL_3D option is specified.')
+        call store_error_filename(this%input_fname)
+      end if
+    end if
+    !
     ! -- log simulation values
     if (this%iout > 0) then
       call this%log_griddata(found)
     end if
     !
   end subroutine source_griddata
+
+  !> @brief Copy FULL_3D grid data from IDM into package
+  !!
+  !! A fully 3D cell has no top and bottom.  Internally the cell is stored as
+  !! an equivalent cell of unit thickness (top = 1, bot = 0) whose plan-view
+  !! area equals the cell volume, so that confined storage capacity
+  !! (area * thickness) is the cell volume.  These placeholders are never
+  !! used as geometry: all flow terms use the face areas and the cell centers.
+  !<
+  subroutine source_griddata_full3d(this, found)
+    ! -- dummy
+    class(DisuType) :: this
+    type(DisuFoundType), intent(inout) :: found
+    ! -- local
+    integer(I4B) :: n, isize
+    type(DisuFoundType) :: foundg
+    real(DP), dimension(:), pointer, contiguous :: xcell1d => null()
+    real(DP), dimension(:), pointer, contiguous :: ycell1d => null()
+    !
+    if (found%top .or. found%bot) then
+      call store_error('TOP and BOT cannot be specified if the &
+                       &FULL_3D option is specified.')
+    end if
+    ! -- AREA is the optional exposed surface area (recharge, ET, ...)
+    if (found%area) this%surf1d = this%area1d
+    call mem_set_value(this%vol1d, 'VOLUME', this%input_mempath, foundg%volume)
+    call mem_set_value(this%zcell1d, 'ZCELL', this%input_mempath, foundg%zcell)
+    call get_isize('XCELL', this%input_mempath, isize)
+    if (isize >= 0) call mem_setptr(xcell1d, 'XCELL', this%input_mempath)
+    call get_isize('YCELL', this%input_mempath, isize)
+    if (isize >= 0) call mem_setptr(ycell1d, 'YCELL', this%input_mempath)
+    if (.not. foundg%volume) call store_error('VOLUME must be specified if &
+                                              &the FULL_3D option is &
+                                              &specified.')
+    if (.not. foundg%zcell) call store_error('ZCELL must be specified if &
+                                             &the FULL_3D option is &
+                                             &specified.')
+    if (.not. associated(xcell1d)) call store_error('XCELL must be &
+                                                    &specified if the &
+                                                    &FULL_3D option is &
+                                                    &specified.')
+    if (.not. associated(ycell1d)) call store_error('YCELL must be &
+                                                    &specified if the &
+                                                    &FULL_3D option is &
+                                                    &specified.')
+    if (count_errors() > 0) call store_error_filename(this%input_fname)
+    do n = 1, this%nodesuser
+      this%cellxy(1, n) = xcell1d(n)
+      this%cellxy(2, n) = ycell1d(n)
+      this%area1d(n) = this%vol1d(n)
+      this%top1d(n) = DONE
+      this%bot1d(n) = DZERO
+    end do
+    found%volume = foundg%volume
+    found%zcell = foundg%zcell
+    if (this%iout > 0) then
+      write (this%iout, '(4x,a)') 'VOLUME, XCELL, YCELL, ZCELL set from &
+                                  &input file'
+    end if
+  end subroutine source_griddata_full3d
 
   !> @brief Write griddata found to list file
   !<
@@ -1221,6 +1472,7 @@ contains
     character(len=LINELENGTH) :: fname
     character(len=LENBIGLINE) :: crs
     logical(LGP) :: found_crs
+    real(DP), allocatable :: topbot(:)
     ! -- formats
     character(len=*), parameter :: fmtgrdsave = &
       "(4X,'BINARY GRID INFORMATION WILL BE WRITTEN TO:', &
@@ -1330,8 +1582,23 @@ contains
     write (iunit) this%xorigin ! xorigin
     write (iunit) this%yorigin ! yorigin
     write (iunit) this%angrot ! angrot
-    write (iunit) this%top1d ! top
-    write (iunit) this%bot1d ! bot
+    if (this%ifull3d == 1) then
+      ! -- a fully 3D grid has no top and bottom: write the extent of a cube of
+      !    the same volume centered on the cell center (not used by MODFLOW 6)
+      allocate (topbot(this%nodesuser))
+      do i = 1, this%nodesuser
+        topbot(i) = this%zcell1d(i) + DHALF * this%vol1d(i)**(DONE / DTHREE)
+      end do
+      write (iunit) topbot ! top
+      do i = 1, this%nodesuser
+        topbot(i) = this%zcell1d(i) - DHALF * this%vol1d(i)**(DONE / DTHREE)
+      end do
+      write (iunit) topbot ! bot
+      deallocate (topbot)
+    else
+      write (iunit) this%top1d ! top
+      write (iunit) this%bot1d ! bot
+    end if
     write (iunit) this%con%iausr ! ia
     write (iunit) this%con%jausr ! ja
     write (iunit) this%idomain ! idomain
@@ -1401,6 +1668,14 @@ contains
     ! -- local
     real(DP) :: angle, dmult
     !
+    ! -- Fully 3D connection: direction between the cell centers
+    if (ihc == C3D_FULL) then
+      call line_unit_vector(this%xc(noden), this%yc(noden), this%zc(noden), &
+                            this%xc(nodem), this%yc(nodem), this%zc(nodem), &
+                            xcomp, ycomp, zcomp, dmult)
+      return
+    end if
+    !
     ! -- Set vector components based on ihc
     if (ihc == 0) then
       !
@@ -1451,6 +1726,14 @@ contains
     ! -- local
     real(DP) :: xn, xm, yn, ym, zn, zm
     !
+    ! -- Fully 3D connection: coordinates of the cell centers
+    if (ihc == C3D_FULL) then
+      call line_unit_vector(this%xc(noden), this%yc(noden), this%zc(noden), &
+                            this%xc(nodem), this%yc(nodem), this%zc(nodem), &
+                            xcomp, ycomp, zcomp, conlen)
+      return
+    end if
+    !
     ! -- Terminate with error if requesting unit vector components for problems
     !    without cell data
     if (size(this%cellxy, 2) < 1) then
@@ -1491,6 +1774,92 @@ contains
     !
   end subroutine connection_vector
 
+  !> @brief Return true if the grid is a fully 3D unstructured grid
+  !<
+  function is_full_3d(this) result(r)
+    class(DisuType) :: this
+    logical(LGP) :: r
+    r = (this%ifull3d == 1)
+  end function is_full_3d
+
+  !> @brief Write the results in VTU format if requested
+  subroutine write_vtu_step(this, totim, sname, svals, vname, vvals)
+    class(DisuType) :: this
+    real(DP), intent(in) :: totim
+    character(len=*), intent(in) :: sname
+    real(DP), dimension(:), intent(in) :: svals
+    character(len=*), intent(in), optional :: vname
+    real(DP), dimension(:, :), intent(in), optional :: vvals
+    real(DP), allocatable :: xyz(:, :)
+    integer(I4B) :: n
+    !
+    if (.not. associated(this%vtu)) return
+    allocate (xyz(3, this%nodes))
+    do n = 1, this%nodes
+      call this%get_cell_center(n, xyz(1, n), xyz(2, n), xyz(3, n))
+    end do
+    if (this%nodes < this%nodesuser) then
+      call this%vtu%write_step(totim, this%nodereduced, sname, svals, vname, &
+                               vvals, this%volume, xyz)
+    else
+      call this%vtu%write_step(totim, [integer(I4B) ::], sname, svals, vname, &
+                               vvals, this%volume, xyz)
+    end if
+    deallocate (xyz)
+  end subroutine write_vtu_step
+
+  !> @brief Return the coordinates of the center of cell n
+  subroutine get_cell_center(this, n, x, y, z)
+    class(DisuType) :: this
+    integer(I4B), intent(in) :: n !< reduced node number
+    real(DP), intent(out) :: x
+    real(DP), intent(out) :: y
+    real(DP), intent(out) :: z
+    x = this%xc(n)
+    y = this%yc(n)
+    z = DZERO
+    if (this%ifull3d == 1) z = this%zc(n)
+  end subroutine get_cell_center
+
+  !> @brief Return the area of cell n used by area-based stresses
+  !!
+  !! For a FULL_3D grid this is the optional exposed surface area (AREA input,
+  !! zero if not specified) used by the RCH and EVT Packages, and not the
+  !! internal placeholder plan area.
+  !<
+  function get_area(this, node) result(area)
+    class(DisuType) :: this
+    integer(I4B), intent(in) :: node !< reduced node number
+    real(DP) :: area
+    if (this%ifull3d == 1) then
+      area = this%surfarea(node)
+    else
+      area = this%area(node)
+    end if
+  end function get_area
+
+  !> @brief Return the volume of cell n
+  !!
+  !! For a FULL_3D grid the volume is an input and does not depend on x.
+  !<
+  function get_cell_volume(this, n, x)
+    ! -- return
+    real(DP) :: get_cell_volume
+    ! -- dummy
+    class(DisuType) :: this
+    integer(I4B), intent(in) :: n
+    real(DP), intent(in) :: x
+    ! -- local
+    real(DP) :: sat
+    !
+    if (this%ifull3d == 1) then
+      get_cell_volume = this%volume(n)
+    else
+      sat = sQuadraticSaturation(this%top(n), this%bot(n), x)
+      get_cell_volume = this%area(n) * (this%top(n) - this%bot(n)) * sat
+    end if
+  end function get_cell_volume
+
   !> @brief Get the discretization type
   !<
   subroutine get_dis_type(this, dis_type)
@@ -1524,6 +1893,7 @@ contains
     ! -- Allocate variables for DISU
     call mem_allocate(this%njausr, 'NJAUSR', this%memoryPath)
     call mem_allocate(this%nvert, 'NVERT', this%memoryPath)
+    call mem_allocate(this%ifull3d, 'IFULL3D', this%memoryPath)
     call mem_allocate(this%nangldegxerr, 'NANGLDEGXERR', this%memoryPath)
     call mem_allocate(this%voffsettol, 'VOFFSETTOL', this%memoryPath)
     call mem_allocate(this%iangledegx, 'IANGLEDEGX', this%memoryPath)
@@ -1532,6 +1902,7 @@ contains
     this%ndim = 1
     this%njausr = 0
     this%nvert = 0
+    this%ifull3d = 0
     this%nangldegxerr = 0
     this%voffsettol = DZERO
     this%iangledegx = 0
@@ -1556,6 +1927,12 @@ contains
     else
       call mem_allocate(this%nodeuser, 1, 'NODEUSER', this%memoryPath)
       call mem_allocate(this%nodereduced, 1, 'NODEREDUCED', this%memoryPath)
+    end if
+    !
+    if (this%ifull3d == 1) then
+      call mem_allocate(this%zc, this%nodes, 'ZC', this%memoryPath)
+      call mem_allocate(this%volume, this%nodes, 'VOLUME', this%memoryPath)
+      call mem_allocate(this%surfarea, this%nodes, 'SURFAREA', this%memoryPath)
     end if
     !
     ! -- Initialize

@@ -1135,7 +1135,24 @@ contains
         nn = this%gwfconn(ipos)
         top = this%dis%top(nn)
         bot = this%dis%bot(nn)
-        if (this%ictype(ipos) == 0) then
+        if (this%dis%is_full_3d()) then
+          !
+          ! -- cells of a FULL_3D grid have no top and bottom: only HORIZONTAL
+          !    connections with specified TELEV and BELEV are supported
+          if (this%ictype(ipos) /= 1) then
+            write (errmsg, '(a,1x,i0,1x,a,1x,i0,1x,a)') 'Connection', j, &
+              'of lake', n, 'must be HORIZONTAL because the DISU Package &
+              &uses the FULL_3D option.'
+            call store_error(errmsg)
+          else if (this%belev(ipos) >= this%telev(ipos)) then
+            write (errmsg, '(a,1x,i0,1x,a,1x,i0,1x,a)') &
+              'telev FOR LAKE ', n, ' HORIZONTAL CONNECTION ', j, &
+              'MUST BE > belev WHEN THE DISU PACKAGE USES THE FULL_3D OPTION'
+            call store_error(errmsg)
+          end if
+          this%laketop(n) = max(this%telev(ipos), this%laketop(n))
+          this%lakebot(n) = min(this%belev(ipos), this%lakebot(n))
+        else if (this%ictype(ipos) == 0) then
           this%telev(ipos) = top + this%surfdep
           this%belev(ipos) = top
           this%lakebot(n) = min(this%belev(ipos), this%lakebot(n))
@@ -1819,7 +1836,8 @@ contains
           area = (this%telev(j) - this%belev(j)) * this%connwidth(j)
           ! -- recalculate area if connected cell is confined and lake
           !    connection top and bot are equal to the cell top and bot
-          if (top == this%telev(j) .and. bot == this%belev(j)) then
+          if (top == this%telev(j) .and. bot == this%belev(j) .and. &
+              .not. this%dis%is_full_3d()) then
             if (this%icelltype(nn) == 0) then
               area = this%gwfsat(nn) * (top - bot) * this%connwidth(j)
             end if

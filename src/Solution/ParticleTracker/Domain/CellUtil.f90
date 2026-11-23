@@ -16,7 +16,7 @@ contains
     use CellPolyModule, only: CellPolyType
     use CellDefnModule, only: CellDefnType
     ! dummy
-    type(CellPolyType), intent(in), pointer :: poly
+    type(CellPolyType), intent(in) :: poly
     type(CellRectType), intent(inout), pointer :: rect
     ! local
     type(CellDefnType), pointer :: defn
@@ -116,7 +116,7 @@ contains
     use CellPolyModule, only: CellPolyType
     use MathUtilModule, only: mod_offset
     ! dummy
-    type(CellPolyType), intent(in), pointer :: poly
+    type(CellPolyType), intent(in) :: poly
     type(CellRectQuadType), intent(inout), pointer :: quad
     ! local
     integer(I4B) :: i, irv, isc

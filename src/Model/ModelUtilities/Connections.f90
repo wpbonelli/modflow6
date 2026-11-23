@@ -190,7 +190,7 @@ contains
         &' Entries not sorted for row: ',i0,'.', &
         &' Offending entries are: ',i0,' and ',i0)"
     character(len=*), parameter :: fmtihcerr = &
-                                   "('IHC must be 0, 1, or 2.  Found: ',i0)"
+                                   "('IHC must be 0, 1, 2, or 3.  Found: ',i0)"
     ! -- data
     data aname(1)/'                     IAC'/
     data aname(2)/'                      JA'/
@@ -288,7 +288,7 @@ contains
             hwvatemp(ii), hwvatemp(this%isym(ii)), n, m
           call store_error(errmsg)
         end if
-        if (ihctemp(ii) < 0 .or. ihctemp(ii) > 2) then
+        if (ihctemp(ii) < 0 .or. ihctemp(ii) > 3) then
           write (errmsg, fmtihcerr) ihctemp(ii)
           call store_error(errmsg)
         end if

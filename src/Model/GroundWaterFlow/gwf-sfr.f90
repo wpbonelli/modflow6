@@ -4282,6 +4282,9 @@ contains
       nn = this%igwfnode(n)
       if (nn > 0) then
         btgwf = this%dis%bot(nn)
+        ! -- cells of a FULL_3D grid have no bottom, so the bed bottom is not
+        !    compared with the cell bottom
+        if (this%dis%is_full_3d()) btgwf = -huge(btgwf)
         call this%dis%noder_to_string(nn, nodestr)
       else
         nodestr = 'none'

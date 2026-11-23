@@ -63,6 +63,7 @@ module BndExtModule
     procedure :: check_cellid
     procedure :: write_lstfile
     procedure :: bound_value
+    procedure :: check_exposed_area
   end type BndExtType
 
   !> @brief BndExtFoundType
@@ -1070,5 +1071,37 @@ contains
     !    routine in the derived package.
     bndval = DNODATA
   end function bound_value
+
+  !> @brief Check the exposed surface area of cells with area-based stresses
+  !!
+  !! For FULL_3D DISU grids there is no cell plan area, so the packages that
+  !! multiply a rate by the cell area (RCH and EVT) use the optional AREA array
+  !! of the DISU Package, the surface area of the cell exposed to the
+  !! recharge or evapotranspiration.  An error is stored if a cell that
+  !! receives a stress has no exposed surface area.
+  !<
+  subroutine check_exposed_area(this)
+    ! -- dummy
+    class(BndExtType) :: this
+    ! -- local
+    integer(I4B) :: i, node
+    character(len=LINELENGTH) :: nodestr
+    !
+    if (.not. this%dis%is_full_3d()) return
+    do i = 1, this%nbound
+      node = this%nodelist(i)
+      if (node <= 0) cycle
+      if (this%dis%get_area(node) <= DZERO) then
+        call this%dis%noder_to_string(node, nodestr)
+        write (errmsg, '(a)') 'The '//trim(adjustl(this%text))//' Package '// &
+          'requires the exposed surface area of cell '//trim(adjustl(nodestr))// &
+          ' because the DISU Package uses the FULL_3D option. Specify a '// &
+          'positive value for the AREA array in the GRIDDATA block of the '// &
+          'DISU Package.'
+        call store_error(errmsg)
+      end if
+    end do
+    if (count_errors() > 0) call store_error_filename(this%input_fname)
+  end subroutine check_exposed_area
 
 end module BndExtModule

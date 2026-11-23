@@ -93,6 +93,9 @@ module BaseDisModule
     procedure :: allocate_arrays
     procedure :: get_ncpl
     procedure :: get_cell_volume
+    procedure :: is_full_3d
+    procedure :: get_cell_center
+    procedure :: write_vtu_step
     procedure :: get_polyverts
     procedure :: get_npolyverts
     procedure :: get_max_npolyverts
@@ -654,6 +657,39 @@ contains
     call store_error('Programmer error: get_ncpl must be overridden', &
                      terminate=.true.)
   end function get_ncpl
+
+  !> @brief Return true if the grid is a fully 3D unstructured grid (cells
+  !! have no top and bottom).  Only DISU with FULL_3D overrides this.
+  logical(LGP) function is_full_3d(this)
+    class(DisBaseType) :: this
+    is_full_3d = .false.
+  end function is_full_3d
+
+  !> @brief Write the results in VTU format (only FULL_3D DISU grids)
+  subroutine write_vtu_step(this, totim, sname, svals, vname, vvals)
+    class(DisBaseType) :: this
+    real(DP), intent(in) :: totim
+    character(len=*), intent(in) :: sname
+    real(DP), dimension(:), intent(in) :: svals
+    character(len=*), intent(in), optional :: vname
+    real(DP), dimension(:, :), intent(in), optional :: vvals
+  end subroutine write_vtu_step
+
+  !> @brief Return the coordinates of the center of cell n
+  !!
+  !! The z coordinate is only defined for FULL_3D DISU grids, and it is zero for
+  !! all other grids.
+  !<
+  subroutine get_cell_center(this, n, x, y, z)
+    class(DisBaseType) :: this
+    integer(I4B), intent(in) :: n !< reduced node number
+    real(DP), intent(out) :: x
+    real(DP), intent(out) :: y
+    real(DP), intent(out) :: z
+    x = this%xc(n)
+    y = this%yc(n)
+    z = DZERO
+  end subroutine get_cell_center
 
   !> @brief Return volume of cell n based on x value passed.
   function get_cell_volume(this, n, x)

@@ -17,7 +17,7 @@ module GwfGwfExchangeModule
   use BaseExchangeModule, only: BaseExchangeType, AddBaseExchangeToList
   use BaseDisModule, only: DisBaseType
   use ConstantsModule, only: LENBOUNDNAME, NAMEDBOUNDFLAG, LINELENGTH, &
-                             TABCENTER, TABLEFT, LENAUXNAME, DNODATA
+                             TABCENTER, TABLEFT, LENAUXNAME, DNODATA, C3D_FULL
   use ListModule, only: ListType
   use ListsModule, only: basemodellist
   use DisConnExchangeModule, only: DisConnExchangeType
@@ -109,6 +109,8 @@ module GwfGwfExchangeModule
     procedure, private :: gwf_gwf_calc_simvals
     procedure, public :: gwf_gwf_set_flow_to_npf
     procedure, private :: validate_exchange
+    procedure, private :: validate_full_3d
+    procedure, private :: center_vector
     procedure :: gwf_gwf_add_to_flowja
   end type GwfExchangeType
 
@@ -285,6 +287,9 @@ contains
         call store_error(errmsg, terminate=.TRUE.)
       end if
     end if
+    !
+    ! FULL_3D grids
+    call this%validate_full_3d()
     !
     ! XT3D needs angle information
     if (this%ixt3d > 0 .and. this%ianglex == 0) then
@@ -780,6 +785,10 @@ contains
       n1 = this%nodem1(i)
       n2 = this%nodem2(i)
       ihc = this%ihc(i)
+      !
+      ! -- exchange flows through fully 3D faces are not included in the
+      !    specific discharge of the FULL_3D models
+      if (ihc == C3D_FULL) cycle
       hwva = this%hwva(i)
       ibdn1 = this%gwfmodel1%ibound(n1)
       ibdn2 = this%gwfmodel2%ibound(n2)
@@ -1464,10 +1473,73 @@ contains
     end do
   end subroutine rewet
 
+  !> @brief Unit vector between the centers of the two cells of an exchange
+  !<
+  subroutine center_vector(this, n, m, vg)
+    use DisvGeom, only: line_unit_vector
+    class(GwfExchangeType) :: this !<  GwfExchangeType
+    integer(I4B), intent(in) :: n !< cell in model 1
+    integer(I4B), intent(in) :: m !< cell in model 2
+    real(DP), dimension(3), intent(out) :: vg
+    real(DP) :: x1, y1, z1, x2, y2, z2, vmag
+    !
+    call this%gwfmodel1%dis%get_cell_center(n, x1, y1, z1)
+    call this%gwfmodel2%dis%get_cell_center(m, x2, y2, z2)
+    call line_unit_vector(x1, y1, z1, x2, y2, z2, vg(1), vg(2), vg(3), vmag)
+  end subroutine center_vector
+
+  !> @brief Validate exchanges with models that use the FULL_3D DISU option
+  !!
+  !! IHC = 3 (fully 3D face) must be used for all the exchanges if and only if
+  !! both models are FULL_3D.
+  !<
+  subroutine validate_full_3d(this)
+    class(GwfExchangeType) :: this !<  GwfExchangeType
+    logical(LGP) :: full1, full2
+    integer(I4B) :: iexg, n3
+    !
+    full1 = .false.
+    full2 = .false.
+    if (associated(this%gwfmodel1)) full1 = this%gwfmodel1%dis%is_full_3d()
+    if (associated(this%gwfmodel2)) full2 = this%gwfmodel2%dis%is_full_3d()
+    n3 = count(this%ihc(1:this%nexg) == C3D_FULL)
+    !
+    if (.not. (full1 .or. full2)) then
+      if (n3 > 0) then
+        write (errmsg, '(3a)') 'GWF-GWF exchange ', trim(this%name), &
+          ' uses IHC = 3, which requires that both models use a DISU &
+          &Package with the FULL_3D option.'
+        call store_error(errmsg, terminate=.TRUE.)
+      end if
+      return
+    end if
+    !
+    if (associated(this%gwfmodel1) .and. associated(this%gwfmodel2)) then
+      if (full1 .neqv. full2) then
+        write (errmsg, '(3a)') 'GWF-GWF exchange ', trim(this%name), &
+          ' connects a model that uses the FULL_3D option of the DISU &
+          &Package with a model that does not. Both models must use it.'
+        call store_error(errmsg, terminate=.TRUE.)
+      end if
+    end if
+    if (n3 /= this%nexg) then
+      write (errmsg, '(3a)') 'GWF-GWF exchange ', trim(this%name), &
+        ' connects models that use the FULL_3D option of the DISU Package, &
+        &and IHC must be 3 for all the exchanges.'
+      call store_error(errmsg, terminate=.TRUE.)
+    end if
+    if (this%ixt3d > 0) then
+      write (errmsg, '(3a)') 'GWF-GWF exchange ', trim(this%name), &
+        ' cannot use XT3D with models that use the FULL_3D option of the &
+        &DISU Package.'
+      call store_error(errmsg, terminate=.TRUE.)
+    end if
+  end subroutine validate_full_3d
+
   subroutine calc_cond_sat(this)
     ! -- modules
     use ConstantsModule, only: LINELENGTH, DZERO, DHALF, DONE, DPIO180
-    use GwfConductanceUtilsModule, only: condmean, vcond, hcond
+    use GwfConductanceUtilsModule, only: condmean, vcond, hcond, fcond_sat
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
     ! -- local
@@ -1497,7 +1569,15 @@ contains
       thickm = (topm - botm) * satm
       !
       ! -- Calculate conductance depending on connection orientation
-      if (ihc == 0) then
+      if (ihc == C3D_FULL) then
+        !
+        ! -- Fully 3D connection: K along the line between the cell centers
+        call this%center_vector(n, m, vg)
+        hyn = this%gwfmodel1%npf%hy_eff(n, 0, ihc, vg=vg)
+        hym = this%gwfmodel2%npf%hy_eff(m, 0, ihc, vg=vg)
+        csat = fcond_sat(this%cl1(iexg), this%cl2(iexg), this%hwva(iexg), &
+                         hyn, hym)
+      else if (ihc == 0) then
         !
         ! -- Vertical conductance for fully saturated conditions
         vg(1) = DZERO
@@ -1558,7 +1638,7 @@ contains
   subroutine condcalc(this)
     ! -- modules
     use ConstantsModule, only: DHALF, DZERO, DONE
-    use GwfConductanceUtilsModule, only: hcond, vcond
+    use GwfConductanceUtilsModule, only: hcond, vcond, fcond
     ! -- dummy
     class(GwfExchangeType) :: this !<  GwfExchangeType
     ! -- local
@@ -1595,7 +1675,11 @@ contains
       hm = this%gwfmodel2%x(m)
       !
       ! -- Calculate conductance depending on connection orientation
-      if (ihc == 0) then
+      if (ihc == C3D_FULL) then
+        !
+        ! -- Fully 3D connection: confined, fully saturated
+        cond = fcond(ibdn, ibdm, this%condsat(iexg))
+      else if (ihc == 0) then
         !
         ! -- Vertical connection
         vg(1) = DZERO

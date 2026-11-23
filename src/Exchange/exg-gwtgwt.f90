@@ -80,6 +80,7 @@ module GwtGwtExchangeModule
 
     procedure :: exg_df => gwt_gwt_df
     procedure :: exg_ar => gwt_gwt_ar
+    procedure :: full_3d_error
     procedure :: exg_rp => gwt_gwt_rp
     procedure :: exg_ad => gwt_gwt_ad
     procedure :: exg_cf => gwt_gwt_cf
@@ -312,12 +313,31 @@ contains
     ! -- dummy
     class(GwtExchangeType) :: this !<  GwtExchangeType
     !
+    ! -- Models that use the FULL_3D option of the DISU Package are not
+    !    supported
+    if (associated(this%gwtmodel1)) then
+      if (this%gwtmodel1%dis%is_full_3d()) call this%full_3d_error()
+    end if
+    if (associated(this%gwtmodel2)) then
+      if (this%gwtmodel2%dis%is_full_3d()) call this%full_3d_error()
+    end if
+    !
     ! -- If mover is active, then call ar routine
     if (this%inmvt > 0) call this%mvt%mvt_ar()
     !
     ! -- Observation AR
     call this%obs%obs_ar()
   end subroutine gwt_gwt_ar
+
+  !> @brief Terminate with an error: FULL_3D DISU grids are not supported
+  !<
+  subroutine full_3d_error(this)
+    class(GwtExchangeType) :: this
+    write (errmsg, '(3a)') 'GWT-GWT exchange ', trim(this%name), &
+      ' is not supported when the DISU Package of a model uses the FULL_3D &
+      &option.'
+    call store_error(errmsg, terminate=.TRUE.)
+  end subroutine full_3d_error
 
   !> @brief Read and prepare
   !!

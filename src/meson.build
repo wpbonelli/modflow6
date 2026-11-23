@@ -474,6 +474,7 @@ modflow_sources = files(
     'Utilities' / 'HeadFileReader.f90',
     'Utilities' / 'HGeoUtil.f90',
     'Utilities' / 'Iterator.f90',
+    'Utilities' / 'VtuOutput.f90',
     'Utilities' / 'InputOutput.f90',
     'Utilities' / 'Iunit.f90',
     'Utilities' / 'kind.f90',
