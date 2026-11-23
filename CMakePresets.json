@@ -1,0 +1,31 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "ifx-release",
+      "displayName": "Intel ifx, Release (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ifx-release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "CMAKE_Fortran_COMPILER": "ifx" }
+    },
+    {
+      "name": "ifx-debug",
+      "displayName": "Intel ifx, Debug (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ifx-debug",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_Fortran_COMPILER": "ifx" }
+    },
+    {
+      "name": "gfortran-release",
+      "displayName": "gfortran, Release (Ninja)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/gfortran-release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "CMAKE_Fortran_COMPILER": "gfortran" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "ifx-release", "configurePreset": "ifx-release" },
+    { "name": "ifx-debug", "configurePreset": "ifx-debug" },
+    { "name": "gfortran-release", "configurePreset": "gfortran-release" }
+  ]
+}
