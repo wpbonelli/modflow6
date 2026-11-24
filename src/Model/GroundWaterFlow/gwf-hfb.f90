@@ -117,16 +117,16 @@ contains
     !
     call mem_setptr(this%icelltype, 'ICELLTYPE', &
                     create_mem_path(this%name_model, 'NPF'))
-    call mem_setptr(this%ihc, 'IHC', create_mem_path(this%name_model, 'CON'))
-    call mem_setptr(this%ia, 'IA', create_mem_path(this%name_model, 'CON'))
-    call mem_setptr(this%ja, 'JA', create_mem_path(this%name_model, 'CON'))
-    call mem_setptr(this%jas, 'JAS', create_mem_path(this%name_model, 'CON'))
-    call mem_setptr(this%isym, 'ISYM', create_mem_path(this%name_model, 'CON'))
     call mem_setptr(this%condsat, 'CONDSAT', create_mem_path(this%name_model, &
                                                              'NPF'))
-    call mem_setptr(this%top, 'TOP', create_mem_path(this%name_model, 'DIS'))
-    call mem_setptr(this%bot, 'BOT', create_mem_path(this%name_model, 'DIS'))
-    call mem_setptr(this%hwva, 'HWVA', create_mem_path(this%name_model, 'CON'))
+    this%ihc => dis%con%ihc
+    this%ia => dis%con%ia
+    this%ja => dis%con%ja
+    this%jas => dis%con%jas
+    this%isym => dis%con%isym
+    this%top => dis%top
+    this%bot => dis%bot
+    this%hwva => dis%con%hwva
     !
     call this%source_options()
     call this%source_dimensions()
