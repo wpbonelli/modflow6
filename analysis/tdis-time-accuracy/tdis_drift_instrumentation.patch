@@ -1,0 +1,186 @@
+From 6755b38f557b22d85a9beec61cfb261568ddac7b Mon Sep 17 00:00:00 2001
+From: wpbonelli <wbonelli@ucar.edu>
+Date: Tue, 24 Nov 2026 07:20:24 -0800
+Subject: [PATCH] chore(tdis): throwaway drift instrumentation (do not merge)
+
+MF6_TDIS_DRIFT=<file> logs each step attempt, MF6_TDIS_FIRSTSTEP=int|pow|hybrid
+selects the first-step formula, MF6_TDIS_FORCE_RETRY=N forces ATS retries.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/Timing/tdis.f90 | 87 +++++++++++++++++++++++++++++++++++++++++++--
+ src/mf6core.f90     | 22 +++++++++++-
+ 2 files changed, 106 insertions(+), 3 deletions(-)
+
+diff --git a/src/Timing/tdis.f90 b/src/Timing/tdis.f90
+index 5d80f740c2..1f76150783 100644
+--- a/src/Timing/tdis.f90
++++ b/src/Timing/tdis.f90
+@@ -21,6 +21,12 @@ module TdisModule
+   public :: tdis_da
+   public :: ats
+   !
++  ! -- drift instrumentation (throwaway): MF6_TDIS_DRIFT=<csv file>,
++  !    MF6_TDIS_FIRSTSTEP=int|pow|hybrid
++  integer(I4B), save :: idrift = 0
++  logical(LGP), save :: drift_init = .false.
++  integer(I4B), save :: ifirststep = -1
++  !
+   integer(I4B), public, pointer :: nper => null() !< number of stress period
+   integer(I4B), public, pointer :: itmuni => null() !< flag indicating time units
+   integer(I4B), public, pointer :: kper => null() !< current stress period number
+@@ -202,6 +208,7 @@ contains
+     if (endofperiod .and. kper == nper) then
+       endofsimulation = .true.
+     end if
++    call tdis_drift_log(0, adaptivePeriod)
+   end subroutine tdis_set_timestep
+ 
+   !> @brief Reset delt and update timing variables and indicators
+@@ -243,6 +250,7 @@ contains
+       endofsimulation = .true.
+       totim = totalsimtime
+     end if
++    call tdis_drift_log(1, adaptivePeriod)
+   end subroutine tdis_delt_reset
+ 
+   !> @brief Set time step length
+@@ -256,8 +264,7 @@ contains
+       topertim = totim
+       if (tsmult(kper) /= DONE) then
+         ! -- Timestep length has a geometric progression
+-        delt = perlen(kper) * (DONE - tsmult(kper)) / &
+-               (DONE - tsmult(kper)**nstp(kper))
++        delt = tdis_first_delt(perlen(kper), nstp(kper), tsmult(kper))
+       else
+         ! -- Timestep length is constant
+         delt = perlen(kper) / float(nstp(kper))
+@@ -270,6 +277,80 @@ contains
+     end if
+   end subroutine tdis_set_delt
+ 
++  !> @brief First step length of a geometric period (instrumented)
++  !<
++  function tdis_first_delt(p, n, r) result(dt)
++    use ConstantsModule, only: DONE
++    use, intrinsic :: iso_c_binding, only: c_double
++    real(DP), intent(in) :: p
++    integer(I4B), intent(in) :: n
++    real(DP), intent(in) :: r
++    real(DP) :: dt
++    real(DP) :: y
++    character(len=16) :: val
++    integer(I4B) :: ilen, istat
++    interface
++      function c_expm1(x) bind(c, name='expm1') result(z)
++        import :: c_double
++        real(c_double), value :: x
++        real(c_double) :: z
++      end function c_expm1
++      function c_log1p(x) bind(c, name='log1p') result(z)
++        import :: c_double
++        real(c_double), value :: x
++        real(c_double) :: z
++      end function c_log1p
++    end interface
++    if (ifirststep < 0) then
++      ifirststep = 0
++      call get_environment_variable('MF6_TDIS_FIRSTSTEP', val, ilen, istat)
++      if (istat == 0) then
++        if (val == 'pow') ifirststep = 1
++        if (val == 'hybrid') ifirststep = 2
++      end if
++    end if
++    select case (ifirststep)
++    case (1)
++      dt = p * (DONE - r) / (DONE - r**real(n, DP))
++    case (2)
++      y = real(n, DP) * c_log1p(r - DONE)
++      if (abs(y) < DONE) then
++        dt = p * c_expm1(c_log1p(r - DONE)) / c_expm1(y)
++      else
++        dt = p * (DONE - r) / (DONE - r**real(n, DP))
++      end if
++    case default
++      dt = p * (DONE - r) / (DONE - r**n)
++    end select
++  end function tdis_first_delt
++
++  !> @brief Log timing state for drift measurement (instrumented)
++  !<
++  subroutine tdis_drift_log(iretry, adaptive)
++    integer(I4B), intent(in) :: iretry
++    logical(LGP), intent(in) :: adaptive
++    character(len=LINELENGTH) :: fname
++    integer(I4B) :: ilen, istat, iats, ieop
++    if (.not. drift_init) then
++      drift_init = .true.
++      call get_environment_variable('MF6_TDIS_DRIFT', fname, ilen, istat)
++      if (istat == 0 .and. ilen > 0) then
++        open (newunit=idrift, file=trim(fname), status='replace', &
++              action='write')
++        write (idrift, '(a)') 'retry,kper,kstp,nstp,ats,eop,perlen,'// &
++          'tsmult,delt,totim,pertim,totimc,totalsimtime'
++      end if
++    end if
++    if (idrift == 0) return
++    iats = 0
++    if (adaptive) iats = 1
++    ieop = 0
++    if (endofperiod) ieop = 1
++    write (idrift, '(6(i0,","),6(es25.17e3,","),es25.17e3)') &
++      iretry, kper, kstp, nstp(kper), iats, ieop, perlen(kper), &
++      tsmult(kper), delt, totim, pertim, totimc, totalsimtime
++  end subroutine tdis_drift_log
++
+   !> @brief Print simulation time
+   !<
+   subroutine tdis_ot(iout)
+@@ -347,6 +428,8 @@ contains
+     ! -- modules
+     use MemoryManagerModule, only: mem_deallocate
+     !
++    if (idrift /= 0) close (idrift)
++    !
+     ! -- ats
+     if (inats > 0) then
+       call ats%ats_da()
+diff --git a/src/mf6core.f90 b/src/mf6core.f90
+index 863aa58407..03a6a93e4d 100644
+--- a/src/mf6core.f90
++++ b/src/mf6core.f90
+@@ -676,10 +676,30 @@ contains
+     use KindModule, only: DP
+     use SimVariablesModule, only: lastStepFailed
+     use SimModule, only: converge_reset
+-    use TdisModule, only: kstp, kper, delt, tdis_delt_reset, ats
++    use TdisModule, only: kstp, kper, delt, tdis_delt_reset, ats, endofperiod
++    use SimVariablesModule, only: iFailedStepRetry
+     ! -- dummy variables
+     logical, intent(out) :: finishedTrying !< boolean that indicates if no
+     ! additional reruns of the time step are required
++    ! -- drift instrumentation (throwaway): MF6_TDIS_FORCE_RETRY=N fails the
++    !    first attempt of every Nth step and of the first end-of-period
++    !    attempt in each period
++    integer, save :: nforce = -1, icount = 0, keop = 0
++    character(len=16) :: val
++    integer :: ilen, istat
++    if (nforce < 0) then
++      nforce = 0
++      call get_environment_variable('MF6_TDIS_FORCE_RETRY', val, ilen, istat)
++      if (istat == 0 .and. ilen > 0) read (val, *) nforce
++    end if
++    if (nforce > 0 .and. iFailedStepRetry == 0) then
++      icount = icount + 1
++      if (mod(icount, nforce) == 0) lastStepFailed = 1
++      if (endofperiod .and. kper /= keop) then
++        lastStepFailed = 1
++        keop = kper
++      end if
++    end if
+     !
+     ! -- Check with ats to reset delt and keep trying
+     finishedTrying = .true.
+-- 
+2.54.0 (Apple Git-157)
+

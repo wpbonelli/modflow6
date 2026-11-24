@@ -6,15 +6,19 @@ Notes and scripts for reproducing the analysis of simulation time accuracy in TD
 
 | File | Contents |
 |---|---|
-| `analysis.md` | The analysis: error sources, current behavior, options, measurement plan |
+| `analysis.md` | The analysis: error sources, current behavior, options, measured drift |
 | `first_step_errors.py` | First-step error tables and the 20,000-case random survey |
 | `step_errors.py` | Middle-step and last-step error within one geometric period |
 | `plot_errors.py`, `figures/` | Figures comparing the first-step methods (current, #3204, `expm1`/`log1p`, hybrid) |
 | `first_step.f90`, `first_step_cmp.py` | Same first-step forms in Fortran, compared with Python |
+| `tdis_drift_instrumentation.patch` | Throwaway TDIS logging for the drift measurement (apply to `develop`) |
+| `build_cases.py`, `run_drift.sh` | Synthetic drift models, and a runner for each first-step method |
+| `analyze_drift.py`, `plot_drift.py`, `drift_summary.csv` | Drift against exact references, figures, and the measured results |
 | `tdis_val_repro.py` | Writes small models that show the zero-`PERLEN` validation bug |
 
-The scripts use only the Python standard library, except `tdis_val_repro.py`, which needs
-FloPy, and `plot_errors.py`, which needs numpy and matplotlib. Run from the repository root.
+The scripts use only the Python standard library, except `tdis_val_repro.py` and
+`build_cases.py`, which need FloPy, and `plot_errors.py` and `plot_drift.py`, which need numpy
+and matplotlib. Run from the repository root.
 
 ## First-step and per-step errors
 
@@ -28,6 +32,42 @@ The figures need numpy and matplotlib (both in the pixi environment) and take a 
 ```shell
 pixi run python -I analysis/tdis-time-accuracy/plot_errors.py
 ```
+
+## Drift measurement
+
+Build an instrumented `mf6` in a separate worktree. The ATS cases also need the #3202 fix
+(`fix-tdis-endofsim-retry`); without it, a retry on the final step ends the simulation early.
+
+```shell
+git worktree add -b tdis-drift ../mf6-drift develop
+cd ../mf6-drift
+git am ../modflow6/analysis/tdis-time-accuracy/tdis_drift_instrumentation.patch
+pixi run --manifest-path ../modflow6/pixi.toml meson setup _bd
+pixi run --manifest-path ../modflow6/pixi.toml meson compile -C _bd ./src/mf6:executable
+```
+
+Build the synthetic models, copy in the real ones, and run each under all three first-step
+methods. Set `MF6_TDIS_FORCE_RETRY` only for the ATS cases. The variables are described in
+`analysis.md`.
+
+```shell
+D=<workspace>; T=analysis/tdis-time-accuracy; MF6=$PWD/../mf6-drift/_bd/src/mf6
+pixi run python -I $T/build_cases.py $D/cases
+mkdir -p $D/real && for m in \
+    modflow6-testmodels/mf6/{test020_NevilleTonkinTransient,test028_sfr,test045_lake2tr_dev} \
+    modflow6-testmodels/mf6/{test051_uzfp3_lakmvr_v2_dev,test061_csub_holly,test205_gwtbuy-henrytidal} \
+    modflow6-largetestmodels/{test1200_gwtbuy-goswami,test1201_gwtbuy-elderRa60} \
+    modflow6-examples/examples/{ex-gwe-prt,ex-gwf-sagehen,ex-gwt-keating}; do
+  cp -R ../$m $D/real/; done
+R="$(ls -d $D/real/test* $D/real/ex-gwf-sagehen) $D/real/ex-gwe-prt/gwe $D/real/ex-gwt-keating/mf6gwt"
+$T/run_drift.sh $MF6 $(ls -d $D/cases/* | grep -v ats_) $R
+MF6_TDIS_FORCE_RETRY=10 $T/run_drift.sh $MF6 $D/cases/ats_*
+python3 -I $T/analyze_drift.py $D/out $D/cases/* $R
+pixi run python -I $T/plot_drift.py $D/out $T/figures
+```
+
+The GWE and GWT examples run their transport simulation from the flow output already in the
+example directory. Analysis takes about 20 seconds for all 31 models.
 
 ## Fortran comparison
 

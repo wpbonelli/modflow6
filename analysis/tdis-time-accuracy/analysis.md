@@ -11,8 +11,10 @@ not across periods.
 Computing times directly from the inputs (closed form where possible, compensated summation
 elsewhere) would bound the error at a few ulps of `t` for every step. The change is small in
 code but affects every model, because `totim` feeds output, time series, observations, and
-exchanges. This note describes the current behavior and the options, and proposes measuring the
-actual drift before deciding.
+exchanges. This note describes the current behavior and the options, and the measured drift
+(see [Measured drift](#measured-drift)). In realistic models drift reaches hundreds to thousands
+of ulp, beyond the `DSAME * t` tolerance used by time-series matching, but far below the BMI and
+PRT tolerances.
 
 `totim` and `delt` can't both be accurate and exactly consistent (`totim(k) = totim(k-1) +
 delt(k)`) in floating point, because times near `totim` are only representable on a grid of
@@ -408,9 +410,9 @@ Places outside TDIS compute or compare times in ways the options have to account
   add a time step". This is evidence that drift is noticeable in practice, and a ceiling the
   measurement should be compared against.
 - **Time-series interpolation** (`TimeSeries.f90`) matches breakpoints with `is_close`, whose
-  default is relative `DSAME = 100 * eps` (about 50 to 100 ulp of `t`). Drift beyond that can
+  default is relative `DSAME = 100 * eps` (100 to 200 ulp of `t`). Drift beyond that can
   change which time-series record a step is matched to. This is the most concrete threshold for
-  the measurement step.
+  the drift measurement. It is crossed in practice (see [Measured drift](#measured-drift)).
 
 ## Options
 
@@ -543,37 +545,117 @@ Expected effects:
   steps, long simulation times, or `tsmult != 1` would see the largest differences. A release
   note is needed.
 
-## Preliminary step: measure drift (not yet done)
+## Measured drift
 
-Before committing to the change, measure how much error the current scheme actually accumulates:
+Drift was measured with an instrumented build on 31 models: 19 synthetic models, each built to
+stress one mechanism, and 12 from the test-model and example repositories. Each was run three
+times, once with each first-step method: current integer exponent, #3204's real exponent, and
+the hybrid. Totals are against the time the TDIS inputs describe, computed exactly from the
+logged values. Data: `drift_summary.csv`. Reproduction: see the README.
 
-1. **Instrument TDIS in a throwaway build.** For each step, log `totim` and `delt` alongside:
-   - a reference computed with compensated summation (or in `real(REAL128)` where the compiler
-     supports it), and
-   - the closed-form value for fixed-stepping periods.
+![Drift by model](figures/drift_summary.png)
 
-   Report the difference in ulps and as a relative error. Report `delt` error separately for
-   the last step of each period. No other behavior should change.
-2. **Run a representative set of models,** chosen to stress each mechanism:
-   - many steps per period with `tsmult = 1`
-   - `tsmult > 1` with large `NSTP` (first-step error, #3204)
-   - `tsmult < 1` (last-step cancellation)
-   - `tsmult` within about 1e-3 of 1 (first-step cancellation)
-   - many periods
-   - ATS with many steps and retries, including a retry on the last step of a period and of
-     the simulation
-   - a long simulation in seconds (T around 1e9 or more)
+![Drift over time](figures/drift_series.png)
 
-   Draw these from autotest and the example models. Build with both gfortran and ifx, since the
-   first step is compiler-dependent.
-3. **Summarize.** For each model, report the maximum and final drift in ulps and the step at
-   which drift crosses common tolerances (`DSAME * t` as used by time-series matching, the BMI
-   `1e-10 * t`, and the PRT release-time tolerance). Also note any model where drift is large
-   enough to flip a time comparison.
+### Results
 
-If measured drift is consistently within a few ulps, the case for options 1 to 3 is weak and the
-current scheme can be documented as-is. If drift reaches hundreds or thousands of ulps in
-realistic models, that supports doing them. Option 0 and option 5 are worth doing either way.
+- **Steps that are exact in binary don't drift.** Step lengths of 1 day, whole seconds, or
+  other values whose partial sums are exactly representable give zero error throughout. This
+  covers Sagehen (399 periods), Keating (3000 steps), `test061_csub_holly` (6946 steps),
+  `test051_uzfp3_lakmvr_v2_dev`, and the uniform and ATS cases in seconds.
+- **Uniform steps that aren't exact in binary accumulate within the period.**
+  - `test1200_gwtbuy-goswami` (12000 steps of 1/60 day) drifts 1.7e3 ulp, about 11 times
+    `DSAME * t`. It is over `DSAME * t` for 57% of steps.
+  - The synthetic 1e5 steps of 0.1 drift 1.35e4 ulp, about 85 times `DSAME * t`.
+  - The last-step correction returns the period end to exact. The last `delt` absorbs the
+    whole error: 2.9e-9 relative for goswami, 1.9e-7 for the synthetic case.
+  - The first-step method makes no difference here. This is what option 2 addresses.
+- **The integer exponent dominates geometric periods.**
+  - `ex-gwe-prt` (`tsmult = 1.003`, `NSTP = 1000`) drifts 231 ulp (1.2 times `DSAME * t`, over
+    it for 999 of 1000 steps). `test045_lake2tr_dev` (`tsmult = 1.005`, 200 steps) drifts 128
+    ulp.
+  - The synthetic near-1 cases reach 1.8e4 ulp, 91 times `DSAME * t`.
+  - #3204 and the hybrid both bring every one of these to at most 22 ulp.
+  - For the `tsmult` values here (`|tsmult - 1| >= 1e-5`), the two methods differ by only a few
+    ulp. The hybrid's advantage is closer to 1 (see [Figures](#figures)). For `tsmult =
+    1.00001`, `NSTP = 10000`, it lowers last-step `delt` error from 4.8e-12 to 7.4e-13.
+- **Carry-over across many periods.**
+  - Synthetic, 2000 periods of 0.1: period-end error grows to 249 ulp. 768 of 2000 period ends
+    are farther from the exact value than `DSAME * t`. Time-series breakpoints placed at those
+    period ends would miss `is_close`.
+  - `test205_gwtbuy-henrytidal` (1001 periods): reaches 121 ulp, 0.97 times `DSAME * t`. 966 of
+    its 1001 period ends are not the nearest double to the exact time.
+  - This is what option 1 addresses.
+- **`tsmult < 1`: `totim` is fine (at most 10 ulp), `delt` isn't.** The last-step cancellation
+  gives last-step `delt` errors of 2.4e-9 (`tsmult = 0.99`, `NSTP = 1000`) and 0.12
+  (`tsmult = 0.5`, `NSTP = 50`, where the last step is about 13 ulp of `t`), whatever the
+  first-step method.
+- **ATS.**
+  - With `PERLEN = 10.1`, period ends drift 9.3 ulp after 50 periods, and 45 of the 50 are not
+    bit-exact.
+  - Retries add no error of their own, because the retry path restores `totim` from
+    `totimsav`.
+  - The case with period lengths in seconds is exact.
+- **`totimc + delt == totim` held bit-for-bit at every step**, with or without retries, because
+  `totim` is computed as exactly that sum. The sum of the step lengths, though, drifts from
+  `totim` by up to 1.8e3 ulp (goswami) and 1.45e3 ulp (Elder), because the last-step
+  correction moves error into `delt`.
+
+### Tolerances
+
+| Tolerance | Crossed? |
+|---|---|
+| `DSAME * t` (time-series matching, PRT `rtol`) | Yes, in 2 of 12 real models with the current method (`ex-gwe-prt`, goswami) and 1 more within 3% (henrytidal). With #3204 or the hybrid, only goswami. Synthetic cases cross it by up to 91 times. |
+| BMI `1e-10 * t` | No. The largest relative error is 2.4e-13 (goswami); synthetic 1.9e-12. |
+| PRT default `rttol` 2.2e-5 (absolute) | No. The largest absolute error is 4.1e-6, at T = 3.2e9 seconds. |
+
+### Conclusion
+
+Drift reaches hundreds to thousands of ulp in realistic models, so the "consistently within a
+few ulps" outcome doesn't hold. The evidence for each option:
+
+- **Option 0 (#3204 plus the hybrid)** is the largest single improvement for geometric periods.
+  It is worth landing first.
+- **Option 2 (closed-form step times)** is the only one that helps uniform steps that aren't
+  exact in binary (goswami). That case is common: any step length like 1/60 day or 0.1.
+- **Option 1 (period start times)** keeps period ends exact over many periods (henrytidal, and
+  the 0.1 case where it decides time-series matches).
+- **Option 3 (compensated ATS accumulation)** matters less in practice: drift is a few ulp per
+  50 periods.
+
+Drift stays far below the BMI and PRT tolerances, so neither needs to change for drift alone.
+
+### Retry at the end of the simulation
+
+On `develop`, a retry of the final period-end step stops the simulation early: 504.12 of 505
+days, and 3.152e9 of 3.156e9 seconds in the ATS cases here. `tdis_delt_reset` never clears
+`endofsimulation`. This is #3202, fixed on branch `fix-tdis-endofsim-retry`. The ATS runs above
+include that fix (`d49bdcd11e`, cherry-picked into the instrumented build).
+
+### Method and limits
+
+- **Instrumentation** (`tdis_drift_instrumentation.patch`, throwaway). Logs every step attempt
+  to a CSV when `MF6_TDIS_DRIFT` is set. `MF6_TDIS_FIRSTSTEP` selects the first-step method.
+  `MF6_TDIS_FORCE_RETRY=N` marks as failed the first attempt of every Nth step and of the first
+  period-end step in each period, so ATS retries happen regardless of the physics. No other
+  behavior changes.
+- **Reference** (`analyze_drift.py`):
+  - The ideal time is `T0 + P (r^k - 1) / (r^n - 1)`. `T0` is the exact sum of earlier
+    `PERLEN`. Each value is the logged double, taken as exact. It is evaluated in 80-digit
+    decimal arithmetic.
+  - ATS periods have a reference only at the period end.
+  - Errors are in ulps of the reference.
+- **Models.**
+  - Synthetic models (`build_cases.py`) are one cell with a linear GWF solution, so only TDIS
+    varies. ATS cases add `ATS_OUTER_MAXIMUM_FRACTION` so steps can grow back after a retry.
+  - Real models were copied from `modflow6-testmodels`, `modflow6-largetestmodels`, and
+    `modflow6-examples`. GWE and GWT examples ran from their existing flow output.
+  - None of the repositories has a model with `tsmult < 1` or with ATS, so those cases are
+    synthetic only.
+- **Compiler.** Only gfortran 13.4 on arm64 macOS. ifx isn't available here. The first step
+  is the compiler-dependent part, and this build matches the Python evaluation (see [How these
+  were measured](#how-these-were-measured-and-whether-fortran-agrees)). The ifx measurement
+  remains to be done.
 
 ## Relationship to #3204
 
@@ -586,7 +668,7 @@ near 1 case:
 - It doesn't address accumulation (compounding, carry-over across periods, ATS `totim`,
   `totalsimtime`), cancellation for `tsmult` near 1, or the last-step cancellation for
   `tsmult < 1`.
-- Its autotest survey is a first data point for the measurement step: of 105 simulations with
+- Its autotest survey is a first data point for the drift measurement: of 105 simulations with
   `NSTP > 1` and `TSMULT != 1`, 15 of 17 distinct period settings get a different first step, by
   at most 1.2e-14 relative (roughly 50 to 100 ulp). Period end times are unchanged.
 - It trades exact cross-compiler agreement in the algorithm for platform `pow`, which can differ
