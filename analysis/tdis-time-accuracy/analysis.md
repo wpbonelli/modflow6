@@ -15,9 +15,10 @@ exchanges. This note describes the current behavior and the options, and propose
 actual drift before deciding.
 
 `totim` and `delt` can't both be accurate and exactly consistent (`totim(k) = totim(k-1) +
-delt(k)`) in floating point. The current scheme mostly favors accurate `delt` and lets `totim`
-drift; the options below need to choose deliberately (see [Decoupling `totim` and
-`delt`](#decoupling-totim-and-delt)).
+delt(k)`) in floating point, because times near `totim` are only representable on a grid of
+spacing `ulp(totim)`, which is much coarser than the resolution of `delt`. The current scheme
+mostly favors accurate `delt` and lets `totim` drift; the options below need to choose
+deliberately (see [Decoupling `totim` and `delt`](#decoupling-totim-and-delt)).
 
 This came up while working on PRT release time deduplication. PRP compares `totimc` with
 release times parsed from input and needs a tolerance to absorb the difference. A fixed absolute
@@ -371,6 +372,45 @@ inputs, regardless of step or period count, and every `delt` is within a few ulp
 nominal value.
 
 ### Decoupling `totim` and `delt`
+
+**Why exact consistency is impossible.** The doubles near `totim` lie on a grid with spacing
+`ulp(totim)`, and the grid gets coarser as `totim` grows. Two adjacent times on that grid can
+only differ by a multiple of the spacing. `delt` is a much smaller number, stored with much
+finer resolution (`ulp(delt)`). Unless `delt` happens to be a multiple of `ulp(totim)`, no two
+representable times are exactly `delt` apart.
+
+For example, at `totim = 1e6` days the grid spacing is 1.16e-10. With `delt = 1e-3`:
+
+```
+t1 = 1e6 + 1e-3
+t1 - t0 = 0.0010000000474974513     (relative error 4.7e-8)
+```
+
+`delt` itself is accurate to about 1e-16 relative, but the clock advances by an interval that
+is off by 4.7e-8, because `t1` was snapped to the grid near 1e6. (The subtraction `t1 - t0` is
+exact by Sterbenz, so this is the true advance of the clock.)
+
+That leaves three choices, and each gives something up:
+
+- **Compute both independently.** Take `delt` from the step formula and `totim` from
+  `perstart` plus a closed-form elapsed time, or from a compensated sum. Each is accurate on
+  its own, but `totim(k) - totim(k-1)` differs from `delt(k)` by up to about `ulp(totim)`.
+- **Derive `totim` from `delt`** (`totim = totimsav + delt`, `tdis.f90:185`, the current
+  scheme). Each addition rounds by up to `ulp(totim)/2`, so `totim` drifts from the true
+  elapsed time as the errors accumulate. The increment still isn't exactly `delt`, because the
+  sum lands on the grid, so this isn't fully consistent either.
+- **Derive `delt` from `totim` differences.** The difference matches the clock exactly, but
+  `delt` inherits the grid error: relative error about `ulp(totim) / delt`, the 4.7e-8 above.
+  It grows for long simulations with small steps. `delt` feeds the storage and budget terms
+  directly, so it is the quantity that most needs full accuracy, which is why option 2 under
+  [Options](#options) should not derive `delt` this way.
+
+Consistency matters because code that works on the interval `[totim - delt, totim]` treats the
+two as interchangeable: time-series averaging over a step, `TimeSelect` and PRT computing
+`totimc + delt`, and the ATS and BMI time comparisons. A mismatch of about `ulp(totim)` can put
+a target-time comparison on the wrong side by one grid spacing (hence the tolerances in those
+consumers) and gives integrals over the step a tiny mismatch. It is small in absolute terms, but
+it can only be moved, not removed.
 
 The current scheme keeps `totim(k) = totim(k-1) + delt(k)` up to one rounding per step and
 lets the error collect in `totim` (and in the last `delt` of each period). Options 1 to 3 make
