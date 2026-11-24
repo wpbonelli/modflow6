@@ -12,6 +12,86 @@ worth doing on its own merits, regardless of what happens with that proposal.
 
 Counts and line references below are from `upstream/develop` at the time of writing.
 
+## Executive summary
+
+`DisBaseType` exposes `top`, `bot`, and `area` as public arrays, and packages use them to
+re-derive cell volumes, thicknesses, and connection flow areas themselves. There are ~250
+such references across 37 source files. The proposal is to route derived geometry through
+type-bound accessors on the discretization (with per-grid-type overrides), so each
+geometric concept has one implementation owned by the grid. The pattern already exists
+and works: SWF calls `dis%get_flow_width`, which DISV1D overrides, so SWF packages never
+need to know the grid type. This would extend it to the quantities that matter most
+numerically.
+
+### Motivation
+
+- **Duplication.** `get_cell_volume` exists but has only 2 callers. 17 sites in GWT
+  MST/IST, GWE EST, and FMI write out `area*(top-bot)` inline. The saturated flow area of
+  a connection (vertical → `hwva`; horizontal → `hwva` × saturated thickness, with
+  staggered/convertible special cases) is reimplemented in NPF, XT3D, DSP, CND,
+  `GwfGwfConnection`, the GWF-GWF exchange, and the central-difference weights.
+  `calcdispcoef` in DSP and CND is 127 lines each, and only 3 differ. Every copy is a
+  chance for a fix to miss the others.
+- **Encapsulation.** What volume, thickness, and flow area mean depends on the grid type
+  (prisms, DIS2D/DISV1D, the synthetic interface-model DISU). With raw-array access every
+  package implicitly hard-codes those conventions, so adding or changing a grid type means
+  auditing all of them.
+- **Less orientation branching.** About 18 files branch on `ihc`. Many of those branches
+  only choose between "area" and "width × thickness", and would collapse into a single
+  accessor.
+- **Testability.** Accessors can be unit-tested per grid type (staggered connections,
+  dry/pinched cells, `idomain` reduction) rather than only through integration tests.
+- **Parallel/interface models.** The interface DISU currently fills `top`/`bot`/`area`
+  with placeholders and overwrites them from virtual model data, because consumers read
+  the raw arrays. Accessors make the required contract explicit and narrow what has to be
+  transferred. HFB also bypasses the dis object and fetches `TOP`/`BOT` via memory paths.
+- **Room to evolve.** Non-prism or polyhedral cells (cf. #3207), time-varying thickness,
+  alternative saturation functions, and capability flags (like the existing
+  `supports_layers`) become local to the discretization instead of spreading `if`
+  branches across packages.
+
+### Sketch
+
+Default implementations in `DisBaseType` reproduce today's prism behavior exactly:
+
+- cells: `get_cell_volume(n)`, `get_sat_volume(n, h)` / `get_dvdh(n, h)`,
+  `get_cell_thickness(n)`, `get_sat_thickness(n, h)`, `get_cell_center(n, x, y, z)`
+- connections: `get_flow_area(ipos, satn, satm)` alongside the existing `get_flow_width`
+  and `connection_normal/vector`
+- capabilities: e.g. `has_vertical_extent`, `supports_unconfined`
+
+Real elevation comparisons (boundary elevations against the cell bottom, highest active
+cell, LAK/MAW/SFR connection geometry) can keep using elevations. The goal is to stop
+packages *re-deriving* geometry, not to ban `top`/`bot`.
+
+### Plan
+
+Each step should be behavior-preserving (identical results to round-off) and mergeable on
+its own:
+
+1. Replace the 17 inline cell-volume formulas with an accessor.
+2. Add `get_flow_area`, and merge the duplicated DSP/CND coefficient code.
+3. Route NPF/XT3D/exchange/advection flow-area logic through it, collapsing the `ihc`
+   branching. This is the riskiest step and needs review against the staggered, Newton,
+   and convertible-cell models.
+4. HFB: use the dis object instead of memory-path pointers.
+5. Migrate the remaining thickness/center derivations (STO, CSUB, advanced packages).
+6. Add capability flags.
+7. Narrow the virtual-model data the interface model needs.
+
+Steps 1–2 are worthwhile even if we go no further.
+
+### Concerns
+
+- **Performance:** a virtual call per cell or connection in `fc`/`cq` loops. Mitigate by
+  caching static quantities in `dis_ar`, adding array-valued variants for hot loops, and
+  benchmarking large models before and after.
+- **Churn:** keep PRs small and component-scoped.
+- **Intentional differences** between existing copies must be preserved explicitly
+  through arguments rather than merged away.
+
+The rest of this document gives the evidence and detail behind each point.
+
 ## The current situation
 
 `DisBaseType` exposes geometry as public pointer arrays:
