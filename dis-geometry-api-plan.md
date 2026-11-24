@@ -46,7 +46,7 @@ Default implementations in `DisBaseType` reproduce today's prism behavior exactl
 
 - cells: `get_cell_volume(n)`, `get_sat_volume(n, h)` / `get_dvdh(n, h)`,
   `get_cell_thickness(n)`, `get_sat_thickness(n, h)`, `get_cell_center(n, x, y, z)`
-- connections: `get_flow_area(n, m, ipos, satn, satm, area_n, area_m)` alongside the existing `get_flow_width`
+- connections: saturated flow area as a stateless prism function (`flow_area` in `GwfConductanceUtils`), alongside the existing `get_flow_width`
   and `connection_normal/vector`
 - capabilities: e.g. `has_vertical_extent`, `supports_unconfined`
 
@@ -60,7 +60,7 @@ Each step should be behavior-preserving (identical results to round-off) and mer
 its own:
 
 1. Replace the 17 inline cell-volume formulas with an accessor.
-2. Add `get_flow_area`, and merge the duplicated DSP/CND coefficient code.
+2. Add a shared flow-area function, and merge the duplicated DSP/CND coefficient code.
 3. Route the XT3D flow-area logic through it.
 4. HFB: use the dis object instead of memory-path pointers.
 5. Migrate the remaining thickness/center derivations (STO, CSUB, advanced packages).
@@ -149,7 +149,7 @@ What "volume", "thickness" and "flow area" mean depends on the grid type:
 
 When packages read raw arrays, each package implicitly takes a position on these
 conventions, and adding or changing a grid type means auditing every package. When
-packages call `dis%get_cell_volume(n)` or `dis%get_flow_area(ipos, ...)`, the grid type
+packages call `dis%get_cell_volume(n)`, the grid type
 answers for itself, and packages don't need to know which grid they're on. That's the
 same encapsulation the SWF code already relies on.
 
@@ -229,7 +229,7 @@ behavior exactly, so the migration changes no results.
 
 | Accessor | Prism default | Replaces |
 |---|---|---|
-| `get_flow_area(n, m, ipos, satn, satm, area_n, area_m)` | `hwva` (vertical) or `hwva * thksat` (horizontal / staggered) | XT3D, DSP, CND copies |
+| `flow_area(ihc, hwva, top, bot, sat, topc, botc)` (stateless, not on the discretization) | `hwva` (vertical) or `hwva * thksat` (horizontal / staggered) | XT3D, DSP, CND copies |
 | `get_flow_width(...)` (exists) | `hwva` | — |
 | `connection_normal/vector` (exist) | unchanged | — |
 
@@ -268,7 +268,7 @@ affected unit and integration tests, expecting results identical to round-off.
 
 1. **Cell volume.** Replace the 17 inline `area*(top-bot)` with a no-head
    `get_cell_volume(n)` (or a cached volume array). Mechanical and low risk.
-2. **Flow area.** Add `get_flow_area`, then migrate DSP and CND to it and to each other:
+2. **Flow area.** Add a stateless `flow_area`, then migrate DSP and CND to it and to each other:
    fold the duplicated `calcdispcoef` into a shared routine parameterized by the
    coefficient arrays.
 3. **XT3D.** Route the vertical and non-Newton horizontal branches of `xt3d_areas`
@@ -322,16 +322,25 @@ branch on `origin`, for a separate PR.
   `area * (top - bot)`. The two existing callers passed `top`, where saturation is exactly
   1, so they now omit it. 81 simulations compared.
 - `dis-flow-area` (step 2) and `xt3d-flow-area` (step 3, stacked on step 2), worktree
-  `.../scratchpad/wt-flowarea`.
-  `get_flow_area(n, m, ipos, satn, satm, area_n, area_m)` follows the `get_flow_width`
-  convention. DSP and CND call one shared routine, `calc_dispcoef` in
+  `.../scratchpad/wt-flowarea`. Saturated flow area is a stateless function, `flow_area`,
+  in `GwfConductanceUtils.f90` next to `staggered_thkfrac`. It takes the connection type,
+  width, the cell's elevations and saturation, and the connected cell's elevations. DSP
+  and CND call one shared routine, `calc_dispcoef` in
   `src/Model/TransportModel/TspDispersionUtils.f90`, which keeps the dry/partially
   saturated zeroing rules because they are transport policy, not geometry. CND passes
-  `real(ibdgwfsat0, DP)` as saturation, preserving its full-thickness conduction.
-  `xt3d_areas` now takes the connection position instead of the symmetric index. 190
-  DSP/CND simulations and 278 XT3D simulations compared. No autotest covered DSP on
-  staggered (IHC 2) connections, so a staggered, partially saturated DISU GWF-GWT model
-  was compared too (scratchpad `tools/staggered_dsp.py`, not committed).
+  `real(ibdgwfsat0, DP)` as saturation, preserving its full-thickness conduction. XT3D's
+  vertical and non-Newton horizontal branches use `flow_area`. 191 DSP/CND simulations
+  and 278 XT3D simulations compared. No autotest covered DSP on staggered (IHC 2)
+  connections, so a staggered, partially saturated DISU GWF-GWT model was compared too
+  (scratchpad `tools/staggered_dsp.py`, not committed).
+
+  The first version put this on `DisBaseType` as `get_flow_area`. We moved it because it
+  is a prism formula: saturation determines saturated thickness only when thickness is
+  linear in head. DIS2D/DISV2D/DISV1D set only cell bottoms, a polyhedral grid would need
+  head and a single wetted face area, and SWF flow area is a cross-section from CXS. A
+  base-class signature would bake in the prism assumption, and converting head to
+  saturation inside the discretization would duplicate NPF's saturation rules. An
+  accessor's shape is better decided when a non-prism grid needs one.
 - `hfb-dis-pointers` (step 4), worktree `.../scratchpad/wt-hfb`. HFB points at
   `dis%top`, `dis%bot` and `dis%con` arrays, which are the same allocations it looked
   up by memory path. NPF arrays are still looked up by path. 39 simulations compared.
