@@ -618,5 +618,5 @@ the end of the step (`prt.f90:1125`), which the decoupling above affects.
 - `check_tdis_timing` returns as soon as it finds a period with `perlen == 0` (line 639,
   after the warning). Later periods are then not validated at all, so a negative `PERLEN`,
   `NSTP <= 0`, or `TSMULT <= 0` in a later period is not reported. Confirmed: negative `PERLEN`
-  and negative `TSMULT` run to normal termination, and `NSTP = 0` crashes. See
-  `zero-perlen-validation.md`.
+  and negative `TSMULT` run to normal termination, and `NSTP = 0` crashes. Fixed
+  separately, on branch `fix-tdis-zero-perlen-validation`.

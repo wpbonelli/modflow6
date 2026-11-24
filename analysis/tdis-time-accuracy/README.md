@@ -7,7 +7,6 @@ Notes and scripts for reproducing the analysis of simulation time accuracy in TD
 | File | Contents |
 |---|---|
 | `analysis.md` | The analysis: error sources, current behavior, options, measurement plan |
-| `zero-perlen-validation.md` | Plan for the `check_tdis_timing` zero-`PERLEN` validation bug |
 | `first_step_errors.py` | First-step error tables and the 20,000-case random survey |
 | `step_errors.py` | Middle-step and last-step error within one geometric period |
 | `plot_errors.py`, `figures/` | Figures comparing the first-step methods (current, #3204, `expm1`/`log1p`, hybrid) |
