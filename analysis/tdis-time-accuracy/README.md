@@ -10,17 +10,24 @@ Notes and scripts for reproducing the analysis of simulation time accuracy in TD
 | `zero-perlen-validation.md` | Plan for the `check_tdis_timing` zero-`PERLEN` validation bug |
 | `first_step_errors.py` | First-step error tables and the 20,000-case random survey |
 | `step_errors.py` | Middle-step and last-step error within one geometric period |
+| `plot_errors.py`, `figures/` | Figures comparing the first-step methods (current, #3204, `expm1`/`log1p`, hybrid) |
 | `first_step.f90`, `first_step_cmp.py` | Same first-step forms in Fortran, compared with Python |
 | `tdis_val_repro.py` | Writes small models that show the zero-`PERLEN` validation bug |
 
 The scripts use only the Python standard library, except `tdis_val_repro.py`, which needs
-FloPy. Run from the repository root.
+FloPy, and `plot_errors.py`, which needs numpy and matplotlib. Run from the repository root.
 
 ## First-step and per-step errors
 
 ```shell
 python3 -I analysis/tdis-time-accuracy/first_step_errors.py
 python3 -I analysis/tdis-time-accuracy/step_errors.py
+```
+
+The figures need numpy and matplotlib (both in the pixi environment) and take a few seconds:
+
+```shell
+pixi run python -I analysis/tdis-time-accuracy/plot_errors.py
 ```
 
 ## Fortran comparison

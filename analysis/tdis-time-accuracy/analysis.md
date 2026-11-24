@@ -233,10 +233,46 @@ else
 end if
 ```
 
-Fortran has no `expm1`/`log1p` intrinsics. They are available through `bind(c)` interfaces to
-the C99 math library, which gfortran, ifx, and the Windows runtime all provide, or as a local
-implementation. Like `pow`, they are within about 1 ulp, and results can differ by 1 ulp between
-math libraries.
+#### Getting `expm1` and `log1p` in Fortran
+
+No Fortran standard through Fortran 2023 has `expm1` or `log1p` as intrinsics, and gfortran and
+ifx don't add them as extensions. Fortran 2008 took `erf`, `gamma`, `hypot`, the Bessel
+functions, and the inverse hyperbolics from C99's math library, but not these two. There are
+three ways to get them.
+
+1. **`bind(c)` interfaces to the C library.** This is the recommended option. gfortran and ifx
+   already link libm, and the Windows runtime provides both functions. Like `pow`, they are
+   within about 1 ulp, and results can differ by 1 ulp between math libraries. MF6 already
+   uses `iso_c_binding` widely, and the interfaces could live in `MathUtilModule`
+   (`src/Utilities/MathUtil.f90`):
+
+   ```fortran
+   interface
+     pure real(c_double) function c_log1p(x) bind(c, name='log1p')
+       import c_double
+       real(c_double), value :: x
+     end function
+     pure real(c_double) function c_expm1(x) bind(c, name='expm1')
+       import c_double
+       real(c_double), value :: x
+     end function
+   end interface
+   ```
+
+2. **Standard intrinsics only**, as a fallback if a C dependency is unwanted. These identities
+   use functions that are accurate near 0:
+   - `log1p(x) = 2 * atanh(x / (x + 2))`. `atanh` has been standard since Fortran 2008.
+   - `expm1(x) = 2*t / (1 - t)` with `t = tanh(x/2)`. This is for small `|x|`, which is all
+     the hybrid needs.
+
+   With gfortran at -O2, both stayed within 2.2e-16 relative of libm for `x` from 1e-12 to
+   0.3. Plain `exp(x) - 1` was off by 8.9e-5 relative at `x = 1e-12`. The standard doesn't
+   specify how accurate intrinsics must be, so this relies on the compiler's `atanh` and
+   `tanh` being good near 0.
+
+3. **Kahan's trick** (`u = 1 + x`, `log1p(x) = log(u) * x / (u - 1)`) is accurate to a few
+   ulps, but only if `u - 1` is evaluated exactly as written. Value-unsafe optimization, such
+   as `-ffast-math` or ifx's default `-fp-model fast`, can simplify it away. Avoid it.
 
 The switch into the geometric branch is an exact `tsmult /= DONE` test, so any `tsmult` a few
 ulps from 1 takes the cancelling path at full strength.
@@ -287,6 +323,50 @@ log-uniform, `NSTP` from 2 to 1000), the worst errors were:
 | `expm1`/`log1p` alone | 367 ulp |
 | real `**` alone | 2.1e7 ulp |
 
+### Figures
+
+The figures compare four ways of computing the first step:
+
+- **Current:** an integer exponent.
+- **#3204:** a real exponent.
+- **`expm1`/`log1p` only.**
+- **Hybrid:** #3204 combined with `expm1`/`log1p`.
+
+The sweep covers `|tsmult - 1|` from 1e-8 to 0.5, on both sides of 1, and `NSTP` from 2 to
+1000. Errors are against exact rational arithmetic. They come from `plot_errors.py`.
+
+![First-step error over TSMULT and NSTP](figures/first_step_map.png)
+
+- **Current and #3204.** Both are dominated by cancellation over most of the range. The error
+  grows as `tsmult` approaches 1 and reaches 1e7 ulp at `|tsmult - 1| = 1e-8`. #3204 lowers
+  the error by roughly a factor of 10 to 100 when `NSTP` is large, which is the integer-exponent
+  part of the error. When `NSTP` is small, the two methods give nearly the same result,
+  because few multiplies are involved. Neither removes the cancellation.
+- **`expm1`/`log1p` alone.** It is within about 2 ulp everywhere left of the blue line
+  (`|y| = 1`). Above and to the right of the line, for `tsmult > 1` only, the large-`y` error
+  appears (up to 385 ulp at `NSTP = 1000`, `tsmult = 1.5`).
+- **Hybrid.** It is within 2.3 ulp over the whole sweep.
+
+![First-step error at NSTP = 10 and 100](figures/first_step_slice.png)
+
+The same data at fixed `NSTP`. The hybrid's points cover the `expm1` points where the two are
+identical, left of the dashed switch line. The `expm1` points show only to the right of the
+line, where they rise to about 20 ulp at `NSTP = 100`.
+
+![Errors within one period for each first-step method](figures/period_errors.png)
+
+This figure shows the effect on the rest of the period. It replays `tdis_set_delt` for one
+period (`PERLEN = 10`, `NSTP = 100`) with each first-step method:
+
+- **Top row.** The largest `totim` error over the period follows the first-step error. With
+  the hybrid it stays within about 10 ulp.
+- **Bottom row.** The last-step `delt` absorbs the period's accumulated error, so it also
+  improves with an accurate first step, down to about 1e-14 relative.
+- **Exception.** For `tsmult < 1` with `|tsmult - 1|` above about 0.02, the last-step error
+  rises to 1e-5 under every method. That is the last-step cancellation described under
+  [Current behavior](#current-behavior-srctimingtdisf90): the last step is tiny compared with
+  `perlen`. No first-step formula fixes it. It needs one of the options below.
+
 ### How these were measured, and whether Fortran agrees
 
 The tables come from Python scripts that evaluate the same expressions in double precision
@@ -294,7 +374,8 @@ The tables come from Python scripts that evaluate the same expressions in double
 platform math library) and compare them with exact rational arithmetic (`fractions.Fraction`).
 The scripts are on the `tdis-time-accuracy-analysis` branch in `analysis/tdis-time-accuracy/`:
 `first_step_errors.py` for these tables, `step_errors.py` for the middle-step and last-step
-figures, and `first_step.f90` with `first_step_cmp.py` for the Fortran comparison. The integer
+figures, `plot_errors.py` for the figures, and `first_step.f90` with `first_step_cmp.py` for
+the Fortran comparison. The integer
 column also reproduces #3204's numbers exactly (65.7, 23.7, 12.7, and 1.1 ulp).
 
 The same expressions compiled with gfortran 15.3 on arm64 macOS gave **bit-identical** results
