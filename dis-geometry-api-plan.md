@@ -1,35 +1,25 @@
 # Ask the discretization for geometry
 
-**Proposal:** model packages should get cell and connection geometry by *asking the
-discretization object* (type-bound accessors on `DisBaseType`, overridden per grid type)
-instead of reading the raw `dis%top`, `dis%bot` and `dis%area` arrays and re-deriving
-volumes, thicknesses and flow areas themselves.
+Model packages could get geometry info by asking the discretization for it. This could involve a standard set of type-bound procedures on `DisBaseType`, overridden per grid type, and possibly some extra procedures for each grid family.
 
-The idea came up while reviewing the fully 3D DISU proposal
-([#3207](https://github.com/MODFLOW-ORG/modflow6/issues/3207); see
-`full3d-disu-feasibility.md` on branch `full3d-disu-feasibility`). This doc argues it is
-worth doing on its own merits, regardless of what happens with that proposal.
-
-Counts and line references below are from `upstream/develop` at the time of writing.
-
-## Executive summary
+## Idea
 
 `DisBaseType` exposes `top`, `bot`, and `area` as public arrays, and packages use them to
-re-derive cell volumes, thicknesses, and connection flow areas themselves. There are ~250
-such references across 37 source files. The proposal is to route derived geometry through
-type-bound accessors on the discretization (with per-grid-type overrides), so each
-geometric concept has one implementation owned by the grid. The pattern already exists
-and works: SWF calls `dis%get_flow_width`, which DISV1D overrides, so SWF packages never
-need to know the grid type. This would extend it to the quantities that matter most
-numerically.
+re-derive cell volumes, thicknesses, and connection flow areas in ~250 places in 37 files.
+These geometric concepts could have a single implementation owned by the grid and called
+as needed by packages.
+
+SWF models already use this pattern by defining `dis%get_flow_width()`. SWF packages don't
+need to know the grid subtype to get this information. 
 
 ### Motivation
 
 - **Duplication.** `get_cell_volume` exists but has only 2 callers. 17 sites in GWT
   MST/IST, GWE EST, and FMI write out `area*(top-bot)` inline. The saturated flow area of
   a connection (vertical → `hwva`; horizontal → `hwva` × saturated thickness, with
-  staggered/convertible special cases) is reimplemented in NPF, XT3D, DSP, CND,
-  `GwfGwfConnection`, the GWF-GWF exchange, and the central-difference weights.
+  staggered/convertible special cases) is reimplemented in XT3D, DSP and CND. NPF, BUY,
+  the GWF-GWF exchange and `GwfGwfConnection` already share the stateless functions in
+  `GwfConductanceUtils.f90`.
   `calcdispcoef` in DSP and CND is 127 lines each, and only 3 differ. Every copy is a
   chance for a fix to miss the others.
 - **Encapsulation.** What volume, thickness, and flow area mean depends on the grid type
@@ -56,7 +46,7 @@ Default implementations in `DisBaseType` reproduce today's prism behavior exactl
 
 - cells: `get_cell_volume(n)`, `get_sat_volume(n, h)` / `get_dvdh(n, h)`,
   `get_cell_thickness(n)`, `get_sat_thickness(n, h)`, `get_cell_center(n, x, y, z)`
-- connections: `get_flow_area(ipos, satn, satm)` alongside the existing `get_flow_width`
+- connections: `get_flow_area(n, m, ipos, satn, satm, area_n, area_m)` alongside the existing `get_flow_width`
   and `connection_normal/vector`
 - capabilities: e.g. `has_vertical_extent`, `supports_unconfined`
 
@@ -71,9 +61,7 @@ its own:
 
 1. Replace the 17 inline cell-volume formulas with an accessor.
 2. Add `get_flow_area`, and merge the duplicated DSP/CND coefficient code.
-3. Route NPF/XT3D/exchange/advection flow-area logic through it, collapsing the `ihc`
-   branching. This is the riskiest step and needs review against the staggered, Newton,
-   and convertible-cell models.
+3. Route the XT3D flow-area logic through it.
 4. HFB: use the dis object instead of memory-path pointers.
 5. Migrate the remaining thickness/center derivations (STO, CSUB, advanced packages).
 6. Add capability flags.
@@ -135,9 +123,10 @@ numerically: **cell volume/saturation** and **connection flow area**.
   re-derive `area(n) * (top(n) - bot(n))` inline.
 - **Saturated flow area of a connection.** "Vertical → `hwva`; horizontal → `hwva` ×
   saturated thickness, with a special case for staggered connections and for convertible
-  or unsaturated cells" is re-implemented in NPF (via `GwfConductanceUtils`), XT3D
-  (`xt3d_areas`), GWT DSP, GWE CND, GWF-GWF spdis edge properties (`GwfGwfConnection.f90`),
-  the GWF-GWF exchange conductance, and the central-difference advection weights.
+  or unsaturated cells" is re-implemented in XT3D (`xt3d_areas`), GWT DSP and GWE CND.
+  NPF, BUY, the GWF-GWF exchange conductance and the GWF-GWF spdis edge properties
+  (`GwfGwfConnection.f90`) already share `hcond`/`vcond`/`thksatnm` in
+  `GwfConductanceUtils.f90`, which take scalar elevations and need no discretization.
 - **Thickness `top - bot`.** Computed inline in at least 25 files (12 in
   `GwfConductanceUtils.f90` alone, 8 in `gwt-mst.f90`, 7 in `gwf-csub.f90`, …).
 - **DSP and CND are near copies.** `calcdispcoef` in `gwt-dsp.f90` and `gwe-cnd.f90` is
@@ -240,7 +229,7 @@ behavior exactly, so the migration changes no results.
 
 | Accessor | Prism default | Replaces |
 |---|---|---|
-| `get_flow_area(ipos, satn, satm)` | `hwva` (vertical) or `hwva * thksat` (horizontal / staggered) | NPF, XT3D, DSP, CND, GwfGwfConnection, exchange copies |
+| `get_flow_area(n, m, ipos, satn, satm, area_n, area_m)` | `hwva` (vertical) or `hwva * thksat` (horizontal / staggered) | XT3D, DSP, CND copies |
 | `get_flow_width(...)` (exists) | `hwva` | — |
 | `connection_normal/vector` (exist) | unchanged | — |
 
@@ -282,10 +271,12 @@ affected unit and integration tests, expecting results identical to round-off.
 2. **Flow area.** Add `get_flow_area`, then migrate DSP and CND to it and to each other:
    fold the duplicated `calcdispcoef` into a shared routine parameterized by the
    coefficient arrays.
-3. **NPF/XT3D/exchanges.** Route the saturated-flow-area logic in NPF, `xt3d_areas`,
-   `GwfGwfConnection`, the GWF-GWF exchange and central-difference weights through the same
-   accessor. This is the step where the `ihc` branching collapses. It's also the riskiest
-   step, so it needs careful review against the staggered/Newton/convertible test models.
+3. **XT3D.** Route the vertical and non-Newton horizontal branches of `xt3d_areas`
+   through the same accessor. The `GwfConductanceUtils` functions used by NPF, BUY and the
+   exchanges stay stateless and unchanged: they are already a single shared
+   implementation, and making them take the discretization would touch every call site
+   for no deduplication. The Newton branch of `xt3d_areas` averages the two thicknesses
+   before multiplying by `hwva`, so it can't use the accessor without changing results.
 4. **HFB.** Stop pulling `TOP`/`BOT` via memory paths and use the discretization object.
 5. **Thickness/center accessors.** Migrate the remaining derived-geometry call sites
    (STO, CSUB, LAK/MAW/SFR where they compute thickness rather than compare elevations).
@@ -317,3 +308,36 @@ transport and storage packages. The fork's placeholder trick (`top=1`, `bot=0`,
 `area=volume`), its 60 `is_full_3d()` branches, and its silent dependence on thickness
 being 1 all disappear. But as argued above, the refactor stands on its own whether or not
 #3207 goes ahead.
+
+## Implementation status
+
+Steps 1 to 4 are implemented on branches off `develop` (603b3af5f5). Each was checked by
+rerunning the kept workspaces of the targeted autotests with a `develop` build and
+comparing binary and CSV outputs byte for byte. All were identical. Each step is its own
+branch on `origin`, for a separate PR.
+
+- `dis-cell-volume` (step 1), worktree
+  `/private/tmp/claude-502/-Users-wbonelli-dev-modflow6/2b1609a4-25bc-4d69-9056-ae4dd888c962/scratchpad/wt-cellvol`.
+  The head argument of `get_cell_volume` is optional. Without it the routine returns
+  `area * (top - bot)`. The two existing callers passed `top`, where saturation is exactly
+  1, so they now omit it. 81 simulations compared.
+- `dis-flow-area` (step 2) and `xt3d-flow-area` (step 3, stacked on step 2), worktree
+  `.../scratchpad/wt-flowarea`.
+  `get_flow_area(n, m, ipos, satn, satm, area_n, area_m)` follows the `get_flow_width`
+  convention. DSP and CND call one shared routine, `calc_dispcoef` in
+  `src/Model/TransportModel/TspDispersionUtils.f90`, which keeps the dry/partially
+  saturated zeroing rules because they are transport policy, not geometry. CND passes
+  `real(ibdgwfsat0, DP)` as saturation, preserving its full-thickness conduction.
+  `xt3d_areas` now takes the connection position instead of the symmetric index. 190
+  DSP/CND simulations and 278 XT3D simulations compared. No autotest covered DSP on
+  staggered (IHC 2) connections, so a staggered, partially saturated DISU GWF-GWT model
+  was compared too (scratchpad `tools/staggered_dsp.py`, not committed).
+- `hfb-dis-pointers` (step 4), worktree `.../scratchpad/wt-hfb`. HFB points at
+  `dis%top`, `dis%bot` and `dis%con` arrays, which are the same allocations it looked
+  up by memory path. NPF arrays are still looked up by path. 39 simulations compared.
+
+Steps 5 to 7 are deferred. Capability flags have no consumer yet. The interface model's
+data can't be narrowed until NPF and the others stop reading raw `top`/`bot`/`area`.
+Unit tests for the accessors would need a way to build a discretization in the Fortran
+unit-test suite, which doesn't exist yet.
+
