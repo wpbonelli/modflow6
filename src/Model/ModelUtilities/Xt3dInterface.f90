@@ -441,7 +441,7 @@ contains
           ar01 = DONE
           ar10 = DONE
         else
-          call this%xt3d_areas(nodes, n, m, jjs01, .false., ar01, ar10, hnew)
+          call this%xt3d_areas(nodes, n, m, ii01, .false., ar01, ar10, hnew)
         end if
         ! -- Compute "conductances" for interface between
         !    cells 0 and 1.
@@ -461,10 +461,10 @@ contains
           call this%xt3d_qnbrs(nodes, m, n, nnbr1, inbr1, chat1j, hnew, qnbrs)
           qnm = qnm - qnbrs
           ! -- Multiply by saturated area and save in qsat.
-          call this%xt3d_areas(nodes, n, m, jjs01, .true., ar01, ar10, hnew)
+          call this%xt3d_areas(nodes, n, m, ii01, .true., ar01, ar10, hnew)
           this%qsat(ii01) = qnm * ar01
           ! -- Scale coefficients by actual area.
-          call this%xt3d_areas(nodes, n, m, jjs01, .false., ar01, ar10, hnew, &
+          call this%xt3d_areas(nodes, n, m, ii01, .false., ar01, ar10, hnew, &
                                this%qsat(ii01))
           chat01 = chat01 * ar01
           chati0 = chati0 * ar01
@@ -553,7 +553,7 @@ contains
         call this%xt3d_indices(n, m, il0, ii01, jjs01, il01, il10, &
                                ii00, ii11, ii10)
         ! -- Compute confined areas.
-        call this%xt3d_areas(nodes, n, m, jjs01, lsat, ar01, ar10)
+        call this%xt3d_areas(nodes, n, m, ii01, lsat, ar01, ar10)
         ! -- Compute "conductances" for interface between
         ! -- cells 0 and 1.
         call qconds(this%nbrmax, nnbr0, inbr0, il01, vc0, vn0, dl0, dl0n, ck0, &
@@ -630,7 +630,7 @@ contains
       ar01 = DONE
       ar10 = DONE
     else
-      call this%xt3d_areas(nodes, n, m, jjs01, .false., ar01, ar10, hnew)
+      call this%xt3d_areas(nodes, n, m, ii01, .false., ar01, ar10, hnew)
     end if
     !
     ! -- Compute "conductances" for interface between
@@ -667,10 +667,10 @@ contains
       !    its sign; a future correction that could change the sign of
       !    qsat would require the upstream cell to be selected after all
       !    corrections are applied.
-      call this%xt3d_areas(nodes, n, m, jjs01, .true., ar01, ar10, hnew)
+      call this%xt3d_areas(nodes, n, m, ii01, .true., ar01, ar10, hnew)
       this%qsat(ii01) = this%qsat(ii01) + qnm * ar01
       ! -- Scale coefficients by actual area.
-      call this%xt3d_areas(nodes, n, m, jjs01, .false., ar01, ar10, hnew, &
+      call this%xt3d_areas(nodes, n, m, ii01, .false., ar01, ar10, hnew, &
                            this%qsat(ii01))
       chat01 = chat01 * ar01
       chati0 = chati0 * ar01
@@ -856,11 +856,11 @@ contains
         !
         ! -- Compute areas.
         if (this%inewton /= 0) then
-          call this%xt3d_areas(nodes, n, m, jjs01, .true., ar01, ar10, hnew)
-          call this%xt3d_areas(nodes, n, m, jjs01, .false., ar01, ar10, hnew, &
+          call this%xt3d_areas(nodes, n, m, ii01, .true., ar01, ar10, hnew)
+          call this%xt3d_areas(nodes, n, m, ii01, .false., ar01, ar10, hnew, &
                                this%qsat(ii01))
         else
-          call this%xt3d_areas(nodes, n, m, jjs01, .false., ar01, ar10, hnew)
+          call this%xt3d_areas(nodes, n, m, ii01, .false., ar01, ar10, hnew)
         end if
         !
         ! -- Compute "conductances" for interface between
@@ -947,7 +947,7 @@ contains
       ar01 = DONE
       ar10 = DONE
     else
-      call this%xt3d_areas(nodes, n, m, jjs01, .false., ar01, ar10, hnew)
+      call this%xt3d_areas(nodes, n, m, ii01, .false., ar01, ar10, hnew)
     end if
     !
     ! -- Compute "conductances" for interface between
@@ -980,8 +980,8 @@ contains
     ! -- If Newton, scale conductance-like coefficients by the
     !    actual area.
     if (this%inewton /= 0) then
-      call this%xt3d_areas(nodes, n, m, jjs01, .true., ar01, ar10, hnew)
-      call this%xt3d_areas(nodes, n, m, jjs01, .false., ar01, ar10, hnew, &
+      call this%xt3d_areas(nodes, n, m, ii01, .true., ar01, ar10, hnew)
+      call this%xt3d_areas(nodes, n, m, ii01, .false., ar01, ar10, hnew, &
                            this%qsat(ii01))
       qnm = qnm * ar01
     end if
@@ -1312,28 +1312,25 @@ contains
 
   !> @brief Compute interfacial areas.
   !<
-  subroutine xt3d_areas(this, nodes, n, m, jjs01, lsat, ar01, ar10, hnew, qsat)
+  subroutine xt3d_areas(this, nodes, n, m, ii01, lsat, ar01, ar10, hnew, qsat)
     ! -- modules
     use SimModule, only: store_error
     ! -- dummy
     class(Xt3dType) :: this
     logical :: lsat
-    integer(I4B) :: nodes, n, m, jjs01
+    integer(I4B) :: nodes, n, m, ii01
     real(DP) :: ar01, ar10
     real(DP), intent(inout), dimension(:), optional :: hnew
     real(DP), intent(in), optional :: qsat !< saturated flow into n from m; if present, its sign selects the upstream cell
     ! -- local
+    integer(I4B) :: jjs01
     real(DP) :: topn, botn, topm, botm, thksatn, thksatm
     real(DP) :: sill_top, sill_bot, tpn, tpm
-    real(DP) :: satups
+    real(DP) :: satups, satn, satm
     !
     ! -- Compute area depending on connection type
-    if (this%dis%con%ihc(jjs01) == 0) then
-      !
-      ! -- Vertical connection
-      ar01 = this%dis%con%hwva(jjs01)
-      ar10 = ar01
-    else if (this%inewton /= 0) then
+    jjs01 = this%dis%con%jas(ii01)
+    if (this%inewton /= 0 .and. this%dis%con%ihc(jjs01) /= 0) then
       !
       ! -- If Newton horizontal connection
       if (lsat) then
@@ -1387,28 +1384,15 @@ contains
       ar10 = ar01
     else
       !
-      ! -- Non-Newton horizontal connection
-      topn = this%dis%top(n)
-      botn = this%dis%bot(n)
-      topm = this%dis%top(m)
-      botm = this%dis%bot(m)
-      thksatn = topn - botn
-      thksatm = topm - botm
-      if (.not. lsat) then
-        thksatn = this%sat(n) * thksatn
-        thksatm = this%sat(m) * thksatm
+      ! -- Vertical or non-Newton horizontal connection
+      if (lsat) then
+        satn = DONE
+        satm = DONE
+      else
+        satn = this%sat(n)
+        satm = this%sat(m)
       end if
-      if (this%dis%con%ihc(jjs01) == 2) then
-        ! -- Vertically staggered
-        sill_top = min(topn, topm)
-        sill_bot = max(botn, botm)
-        tpn = botn + thksatn
-        tpm = botm + thksatm
-        thksatn = max(min(tpn, sill_top) - sill_bot, DZERO)
-        thksatm = max(min(tpm, sill_top) - sill_bot, DZERO)
-      end if
-      ar01 = this%dis%con%hwva(jjs01) * thksatn
-      ar10 = this%dis%con%hwva(jjs01) * thksatm
+      call this%dis%get_flow_area(n, m, ii01, satn, satm, ar01, ar10)
     end if
   end subroutine xt3d_areas
 
