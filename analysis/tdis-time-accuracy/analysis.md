@@ -114,6 +114,7 @@ in a long simulation lose many digits this way. This matters for the last step o
       `pertim` to `perlen`, and neither path snaps `totim`. So the period ends with `totim` up to
       `dtmin` behind, and the next period starts there. This error is **proportional to
       `dtmin`, not to roundoff**, and it carries forward to all later periods.
+      `autotest/test_gwf_ats04.py` reproduces this in a single-period model (strict xfail).
     - In the last period, `totim = totalsimtime` (line 239) hides this at the end of the
       simulation. That may be why the snap exists only on the retry path (see open questions).
       The snap doesn't adjust `delt`, so `totim /= totimsav + delt` on that step.
@@ -123,10 +124,8 @@ in a long simulation lose many digits this way. This matters for the last step o
       `endofperiod` is reset but `endofsimulation` stays `.true.`. The time loop in
       `mf6core.f90:47` would then stop after that step, before `totalsimtime`. Confirmed and
       fixed in [#3202](https://github.com/MODFLOW-ORG/modflow6/pull/3202) (open):
-      `test_gwf_ats03.py` stopped at t = 0.8 of a 100-day period. #3202 also snaps `pertim` to
-      `perlen` in `tdis_delt_reset`. It doesn't snap `totim` for periods before the last, so the
-      `dtmin`-sized `totim` shortfall above remains, and `pertim` and `totim - period start` now
-      disagree by up to `dtmin` on that step instead of agreeing.
+      `test_gwf_ats03.py` stopped at t = 0.8 of a 100-day period. #3202 doesn't snap `pertim`
+      or `totim` on the retry path, so the `dtmin`-sized shortfall above remains.
 - **End of simulation.**
   - `totim = totalsimtime` is applied only in `tdis_delt_reset` (line 239), the path for
     retrying a failed step.
@@ -446,8 +445,8 @@ Places outside TDIS compute or compare times in ways the options have to account
    with the retry path, but it depends on the open question above. With option 1 or 3 in place,
    this becomes a special case of snapping to `perstart(kper+1)`.
 5. **Fix the retry path** independently of accuracy. #3202 resets `endofsimulation` in
-   `tdis_delt_reset` and snaps `pertim` at the end of a period. What remains is snapping `totim`
-   at the end of every period on both paths (needs `perstart` from option 1, or at least
+   `tdis_delt_reset`. What remains is snapping `pertim` and `totim` at the end of every period
+   on both paths (needs `perstart` from option 1, or at least
    `topertim` set correctly for ATS periods).
 
 With options 0 to 3, every `totim` is within a few ulps of the value computed exactly from the

@@ -15,6 +15,7 @@ Notes and scripts for reproducing the analysis of simulation time accuracy in TD
 | `build_cases.py`, `run_drift.sh` | Synthetic drift models, and a runner for each first-step method |
 | `analyze_drift.py`, `plot_drift.py`, `drift_summary.csv` | Drift against exact references, figures, and the measured results |
 | `tdis_val_repro.py` | Writes small models that show the zero-`PERLEN` validation bug |
+| `autotest/test_gwf_ats04.py` | Strict xfail: an ATS retry ending within `dtmin` of the period end ends the period short |
 
 The scripts use only the Python standard library, except `tdis_val_repro.py` and
 `build_cases.py`, which need FloPy, and `plot_errors.py` and `plot_drift.py`, which need numpy
