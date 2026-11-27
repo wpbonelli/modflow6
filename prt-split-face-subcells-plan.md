@@ -241,6 +241,46 @@ not as the delivery.
 - PRT-PRT on nested grids: a nested pair of models gives the same paths as the equivalent
   single DISU model.
 
+## Experiment: per-cell splits against propagated refinement
+
+Tests the argument in "Why per-cell splits suffice": that per-cell splits differ from a
+conforming refinement only within cells, by less than the two flow models differ.
+
+Model pairs. Each pair shares domain, K, boundary conditions and stresses.
+
+- Vertical: a DISU model where some columns split a coarse layer into 2 or 4 sublayers
+  (`IHC=2` connections to unsplit neighbors), and a DISV model with layers at the union of
+  all cut elevations, so unsplit columns are divided into cells of equal K.
+- Plan view: a quadtree DISU model refined in one layer only, and a DISV model with that
+  refinement extended through all layers.
+- Vary the anisotropy ratio Kv/Kh, the refinement ratio, and flow direction relative to
+  the split (along it, across it). Include a well or drain in a fine cell, so a split
+  face carries sub-face flows of opposite sign.
+
+Solve each model with GWF. Then compare at three levels.
+
+1. Model difference. Sum the DISV connection flows onto the DISU connections and compare
+   with DISU's own flows. This is the floor: no tracking method on DISU can agree with the
+   DISV paths better than the two flow solutions agree.
+2. Subcell flows, before any tracking exists. Sum the DISV flows onto the per-cell
+   subcell faces (DISV cells refine the per-cell subcells, so this is a sum, never a
+   split) and compare with the per-cell split's internal flows. Use the Python prototype
+   (next steps, item 1). Normalize by cell throughflow.
+3. Paths, once vertical stacking exists in Fortran. Track the same release points with PRT
+   on DISV (existing methods), on DISU with per-cell splits, and on DISU with summed faces.
+   Compare the neighbor sequence (which cells each path visits, mapping DISV cells to
+   their DISU parent), path separation normalized by cell size, travel time, and the
+   fraction of a uniform release crossing each sub-face against its share of the flow.
+
+Expected outcome, if the argument holds: level 2 and 3 differences are no larger than
+level 1 differences, confined within split cells, and the neighbor sequences agree. The
+summed-face method should fail the sub-face crossing fractions where per-cell splits pass.
+A level 2 difference much larger than level 1 would point at the closure or the
+thickness-sharing assumption, most likely at high anisotropy.
+
+Scripts and models go on this branch, under a directory of their own, using FloPy and
+`pixi run`.
+
 ## Open questions
 
 - Plan-view closure: local solve, or leave plan-view splits to the "Velocity
@@ -258,6 +298,7 @@ not as the delivery.
    file and budget file (FloPy `MfGrdFile`, `CellBudgetFile`). Measure the summed-face
    method's sub-face flux-weighting error on vertically refined and nested test grids.
    This decides whether vertical stacking and plan-view splits are each worth building.
+   Run levels 1 and 2 of the propagated-refinement experiment with the same prototype.
 2. DISU method with summed faces, as in the PRT plan's "Tracking on DISU grids" item,
    including the sub-face lists in the cell definition. This is the baseline and the
    fallback.
