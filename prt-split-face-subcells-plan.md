@@ -55,6 +55,42 @@ fixed closure. `MethodCellPollockQuad` tracks Pollock within each subcell and pa
 particle between subcells inside the cell. The general split described below has this as
 a special case.
 
+## Why per-cell splits suffice
+
+The alternative is to propagate refinement into a conforming grid, where every face is
+shared by exactly one cell on each side. Converting DISU to DISV requires this: plan-view
+refinement propagates vertically, because all layers share one mesh, and vertical
+refinement propagates laterally, because lateral connections exist only within a layer.
+A per-cell split stops at the cell boundary instead. The neighbor on an unsplit face sees
+the split cell as one cell, and that face's flow is shared among the subcells touching it
+by area. There is no correctness reason to prefer propagation when the goal is tracking
+the GWF solution:
+
+- GWF is the source of truth. It provides one flow per connection and storage and source
+  terms per cell. Any velocity field inside a cell is a reconstruction, and a valid one
+  reproduces every connection flow, balances every cell, and keeps normal flux continuous
+  across faces. PRT should track the same flows GWT and GWE use.
+- Propagation adds no information. The extra faces it creates carry flows GWF never
+  computed. They come either from sharing by area, the per-cell assumption applied in
+  more places, or from re-solving flow on the refined grid, which gives a different model
+  that no longer reproduces the connection flows or matches GWT's budget. A re-solve
+  constrained to the GWF connection flows couples cells only through how each face's flow
+  is shared among its parts. Fixing that sharing decouples it into per-cell problems.
+- Uniform flux per connection is already the model's assumption. GWF's two-point flux
+  treats a connection as one flow over one area, and the existing tracking methods assume
+  uniform flux on each face. The per-cell split keeps this on every unsplit face and every
+  sub-face. Both sides of a face then see the same uniform flux, so normal flux is
+  continuous even where the two cells are cut at different elevations. Propagation would
+  make flux non-uniform at a resolution GWF never solved.
+
+What per-cell splits do change is the path within a split cell, through the cut positions
+and the internal flows. That is a deviation bounded by the cell, of the same order as the
+within-cell interpolation the existing methods make everywhere. The neighbor a particle
+exits to follows the sub-face flows either way.
+
+Propagation would matter only to resolve flow more finely than GWF did. That is
+downscaling, a different goal, and belongs outside PRT.
+
 ## Approach
 
 ### Face partition (static)
@@ -112,7 +148,9 @@ and three independent equations, one free value). A closure is needed. Options:
   unique up to a constant and the flows are unique. The system is small (tens of
   unknowns) and dense LU suffices. PRT receives no hydraulic conductivity through FMI
   (budget files carry none), so this uses isotropic K within the cell unless K is passed
-  in. Within one cell only the anisotropy ratio matters.
+  in. Within one cell only the anisotropy ratio matters. External sub-face flows must be
+  imposed as uniform flux per sub-face, so normal flux stays continuous with the
+  neighbor.
 - An algebraic closure in the style of the quad method. Cheap, but has no physical basis
   beyond symmetry and does not generalize past regular splits.
 
